@@ -847,7 +847,10 @@ function adminSessionHTML(){
   let html = `<div class="card">
     <h2>Session du ${open.date}</h2>
     <p class="small">Entre les pointages, puis clique sur « Terminer la session » pour appliquer les montées/descentes.</p>
-    <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
+    <div class="row">
+      <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
+      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
+    </div>
   </div>`;
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
@@ -968,6 +971,28 @@ function printMatchSheets(sessionId){
   const cleanup = ()=>{ document.body.classList.remove('print-mode'); window.removeEventListener('afterprint', cleanup); };
   window.addEventListener('afterprint', cleanup);
   setTimeout(()=>{ window.print(); }, 50);
+}
+
+// Ouvre l'app Mail avec un courriel pré-rempli rappelant aux joueurs de
+// déclarer leur absence pour la session en cours (l'app n'envoie pas de
+// courriel automatiquement, elle prépare seulement le message).
+async function emailAbsenceReminder(){
+  const open = currentOpenSession();
+  if(!open){ showAlert("Aucune session en cours."); return; }
+  await loadAllProfiles();
+  const emails = ALL_PROFILES
+    .filter(pr => pr.player_id && DATA.players.some(p=>p.id===pr.player_id))
+    .map(pr => pr.email)
+    .filter(Boolean);
+  const uniqueEmails = [...new Set(emails)];
+  if(uniqueEmails.length === 0){
+    showAlert("Aucun courriel de joueur trouvé. Les joueurs doivent d'abord créer un compte et être associés dans l'onglet Comptes.");
+    return;
+  }
+  const subject = `Rappel — Session du ${open.date}`;
+  const body = `Bonjour,\n\nLa prochaine session de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « Mon groupe »), afin qu'on puisse trouver un remplaçant à temps.\n\nMerci !`;
+  const mailto = `mailto:?bcc=${encodeURIComponent(uniqueEmails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
 }
 
 // Vérifie que chaque groupe a des matchs générés et à jour par rapport aux
