@@ -113,13 +113,19 @@ let CURRENT_PROFILE = null;
 let ADMIN_VIEWING_AS_PLAYER = false;
 let VIEW = { tab: null, error: null };
 
+// ---------- multi-ligues ----------
+let LEAGUES = [];              // toutes les ligues (admins) ou non utilisé (joueurs)
+let CURRENT_LEAGUE_ID = null;  // ligue actuellement affichée
+let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
+let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
+
 // ---------- stockage (Supabase) ----------
 let STORAGE_OK = null; // null=inconnu, true/false une fois vérifié
 let SAVE_ERROR = null;
 
-async function loadData(){
+async function loadData(leagueId){
   try{
-    const { data, error } = await sb.from('league_data').select('data').eq('id','main').single();
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
     if(error) throw error;
     STORAGE_OK = true;
     return (data && data.data && Object.keys(data.data).length>0) ? data.data : null;
@@ -130,8 +136,9 @@ async function loadData(){
   }
 }
 async function saveData(){
+  if(!CURRENT_LEAGUE_ID) return;
   try{
-    const { error } = await sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('id','main');
+    const { error } = await sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', CURRENT_LEAGUE_ID);
     if(error) throw error;
     SAVE_ERROR = null;
     STORAGE_OK = true;
@@ -140,12 +147,63 @@ async function saveData(){
     console.error('Erreur de sauvegarde', e);
   }
 }
+async function loadLeagues(){
+  const { data, error } = await sb.from('leagues').select('*').order('created_at', { ascending:true });
+  LEAGUES = error ? [] : (data || []);
+}
+async function createLeague(name, scheduleLabel){
+  const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null }).select().single();
+  if(error){ showAlert("Erreur lors de la création : " + error.message); return null; }
+  const fresh = defaultData();
+  fresh.leagueName = name;
+  const { error: err2 } = await sb.from('league_data').insert({ league_id: data.id, data: fresh });
+  if(err2){ showAlert("Erreur lors de la création : " + err2.message); return null; }
+  await loadLeagues();
+  return data.id;
+}
+function onCreateLeague(){
+  showPrompt("Nom de la nouvelle ligue :", '', (name)=>{
+    if(!name || !name.trim()) return;
+    showPrompt("Jour/heure de jeu (optionnel, ex: Lundi 19h) :", '', async (schedule)=>{
+      const id = await createLeague(name.trim(), schedule ? schedule.trim() : '');
+      if(id){ await switchToLeague(id); }
+    });
+  });
+}
+// Change la ligue affichée par un administrateur.
+async function switchToLeague(leagueId){
+  CURRENT_LEAGUE_ID = leagueId;
+  const loaded = await loadData(leagueId);
+  DATA = loaded || defaultData();
+  migrateData();
+  await refreshMyLinkForCurrentLeague();
+  VIEW = { tab:'groupes' };
+  render();
+}
+// Vérifie si le compte admin courant est lui-même lié à un joueur dans cette ligue.
+async function refreshMyLinkForCurrentLeague(){
+  if(!CURRENT_PROFILE || !CURRENT_LEAGUE_ID){ MY_LINK_IN_CURRENT_LEAGUE = null; return; }
+  const { data, error } = await sb.from('profile_players').select('*').eq('profile_id', CURRENT_PROFILE.id).eq('league_id', CURRENT_LEAGUE_ID).maybeSingle();
+  MY_LINK_IN_CURRENT_LEAGUE = error ? null : data;
+}
+// Change la ligue affichée par un joueur qui joue dans plusieurs ligues.
+async function switchMyLeague(leagueId){
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
+  if(!link) return;
+  CURRENT_LEAGUE_ID = leagueId;
+  const loaded = await loadData(leagueId);
+  DATA = loaded || defaultData();
+  migrateData();
+  SESSION_USER = { role:'player', playerId: link.player_id };
+  VIEW = { tab:'classement' };
+  render();
+}
+
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
 
 function defaultData(){
   return {
     leagueName: 'Ma ligue de pickleball',
-    appUrl: '',
     swapCount: 1,
     matchesPerSession: 10,
     testMode: false,
@@ -497,7 +555,7 @@ function storageBannerHTML(){
 function render(){
   if(!SESSION_USER){ renderLogin(); }
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
-  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS_PLAYER && CURRENT_PROFILE && CURRENT_PROFILE.player_id){ renderPlayer(CURRENT_PROFILE.player_id); }
+  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS_PLAYER && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
   else if(SESSION_USER.role === 'admin'){ renderAdmin(); }
   else { renderPlayer(SESSION_USER.playerId); }
   const existing = document.getElementById('modalRoot');
@@ -516,7 +574,7 @@ function topbarHTML(subtitle){
     <div class="brand">
       <div class="court-mark">P</div>
       <div>
-        <h1>${escapeHTML(DATA.leagueName)}</h1>
+        <h1>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h1>
         <div class="small">${subtitle||''}</div>
       </div>
     </div>
@@ -595,13 +653,6 @@ async function onResetPassword(){
 async function onAuthResolved(user){
   if(!user){ SESSION_USER = null; CURRENT_PROFILE = null; render(); return; }
 
-  // On ne peut lire les données de la ligue qu'une fois authentifié (règles
-  // de sécurité) : on les recharge donc ici pour être sûr d'avoir les vraies
-  // données à jour, plutôt que la version par défaut chargée avant connexion.
-  const loaded = await loadData();
-  if(loaded) DATA = loaded;
-  migrateData();
-
   const { data: profile, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
   if(error || !profile){
     SESSION_USER = { role:'pending', email: user.email, displayName: user.user_metadata && user.user_metadata.display_name };
@@ -610,16 +661,42 @@ async function onAuthResolved(user){
     return;
   }
   CURRENT_PROFILE = profile;
+  await loadLeagues();
+
   if(profile.role === 'admin'){
     SESSION_USER = { role:'admin', email: profile.email };
-    VIEW = { tab:'groupes' };
-  } else if(profile.role === 'player' && profile.player_id && DATA.players.some(p=>p.id===profile.player_id)){
-    SESSION_USER = { role:'player', playerId: profile.player_id };
-    VIEW = { tab:'classement' };
-  } else {
-    SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
+    if(LEAGUES.length === 0){
+      // Aucune ligue n'existe encore : l'admin devra en créer une.
+      CURRENT_LEAGUE_ID = null;
+      DATA = defaultData();
+      VIEW = { tab:'groupes' };
+      render();
+      return;
+    }
+    const target = (CURRENT_LEAGUE_ID && LEAGUES.some(l=>l.id===CURRENT_LEAGUE_ID)) ? CURRENT_LEAGUE_ID : LEAGUES[0].id;
+    await switchToLeague(target);
+    return;
   }
+
+  // Joueur : on regarde dans quelle(s) ligue(s) ce compte est lié.
+  await loadMyLeagueLinks(profile.id);
+  if(MY_LEAGUE_LINKS.length === 0){
+    SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
+    render();
+    return;
+  }
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===CURRENT_LEAGUE_ID) || MY_LEAGUE_LINKS[0];
+  CURRENT_LEAGUE_ID = link.league_id;
+  const loaded = await loadData(CURRENT_LEAGUE_ID);
+  DATA = loaded || defaultData();
+  migrateData();
+  SESSION_USER = { role:'player', playerId: link.player_id };
+  VIEW = { tab:'classement' };
   render();
+}
+async function loadMyLeagueLinks(profileId){
+  const { data, error } = await sb.from('profile_players').select('*').eq('profile_id', profileId);
+  MY_LEAGUE_LINKS = error ? [] : (data || []);
 }
 function renderPending(){
   app.innerHTML = `
@@ -636,18 +713,48 @@ async function logout(){
   SESSION_USER = null;
   CURRENT_PROFILE = null;
   ADMIN_VIEWING_AS_PLAYER = false;
+  LEAGUES = [];
+  CURRENT_LEAGUE_ID = null;
+  MY_LEAGUE_LINKS = [];
+  MY_LINK_IN_CURRENT_LEAGUE = null;
+  DATA = null;
   VIEW = {};
   render();
 }
 
 // ---- Admin ----
 function renderAdmin(){
+  if(!CURRENT_LEAGUE_ID){
+    // Aucune ligue n'existe encore.
+    app.innerHTML = `
+      ${topbarHTML('Espace administrateur')}
+      ${storageBannerHTML()}
+      <div class="card">
+        <h2>Bienvenue !</h2>
+        <p class="small">Aucune ligue n'a encore été créée. Commence par en créer une pour pouvoir ajouter des groupes et des joueurs.</p>
+        <button class="btn btn-primary" onclick="onCreateLeague()">Créer ma première ligue</button>
+      </div>`;
+    return;
+  }
   const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
-  const playerToggle = (CURRENT_PROFILE && CURRENT_PROFILE.player_id && DATA.players.some(p=>p.id===CURRENT_PROFILE.player_id))
+  const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
+  const leagueSwitcher = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div class="field" style="margin:0;flex:1;min-width:180px;">
+          <label>Ligue actuelle</label>
+          <select onchange="switchToLeague(this.value)">
+            ${LEAGUES.map(l=>`<option value="${l.id}" ${l.id===CURRENT_LEAGUE_ID?'selected':''}>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn-ghost" onclick="onCreateLeague()">+ Nouvelle ligue</button>
+      </div>
+    </div>`;
   app.innerHTML = `
     ${topbarHTML('Espace administrateur')}
     ${storageBannerHTML()}
+    ${leagueSwitcher}
     ${playerToggle}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
@@ -669,13 +776,11 @@ function setAdminTab(t){
 function adminPlayersHTML(){
   const players = DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));
   const groups = groupsSorted();
-  const linkedPlayerIds = new Set(ALL_PROFILES.filter(pr=>pr.player_id).map(pr=>pr.player_id));
   return `
     <div class="card">
       <h3>Ajouter un joueur</h3>
       <div class="row">
         <input id="newPlayerName" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
-        <input id="newPlayerEmail" type="email" placeholder="Courriel (optionnel, pour l'inviter)" style="flex:1;min-width:180px;">
         <select id="newPlayerGroup">
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
@@ -688,55 +793,27 @@ function adminPlayersHTML(){
         <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
       </div>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th>Compte</th><th></th></tr>
+        <tr><th>Nom</th><th>Groupe</th><th></th></tr>
         ${players.map(p=>{
           const g = groupById(p.groupId);
-          const hasAccount = linkedPlayerIds.has(p.id);
           return `<tr>
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
-            <td>${hasAccount ? '✅ lié' : '—'}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> ${hasAccount ? '' : `<button class="btn-ghost" onclick="invitePlayer('${p.id}')">inviter</button>`} <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
-        ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+        ${players.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
 }
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
-  const emailEl = document.getElementById('newPlayerEmail');
   const groupEl = document.getElementById('newPlayerGroup');
   const name = nameEl.value.trim();
-  const inviteEmail = emailEl.value.trim();
   const groupId = groupEl.value;
   if(!name || !groupId) return;
-  const player = { id: uid('p'), name, groupId };
-  if(inviteEmail) player.inviteEmail = inviteEmail;
-  DATA.players.push(player);
+  DATA.players.push({ id: uid('p'), name, groupId });
   saveAndRender();
-}
-// Ouvre l'app Mail avec une invitation pré-remplie pour ce joueur, l'invitant
-// à créer son compte (l'app ne peut pas envoyer de courriel automatiquement).
-function invitePlayer(pid){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  const sendInvite = (email)=>{
-    if(!email) return;
-    p.inviteEmail = email;
-    saveData();
-    const appUrl = DATA.appUrl && DATA.appUrl.trim() ? DATA.appUrl.trim() : '(demande l\'adresse à ton administrateur)';
-    const subject = `Invitation — ${DATA.leagueName}`;
-    const body = `Bonjour ${p.name},\n\nTu es inscrit(e) dans ${DATA.leagueName} ! Pour accéder à ton groupe et tes résultats, crée ton compte ici :\n\n${appUrl}\n\nUtilise ce courriel-ci (${email}) et choisis un mot de passe. Une fois ton compte créé, un administrateur l'associera à ton profil de joueur.\n\nÀ bientôt sur les terrains !`;
-    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-  if(p.inviteEmail){
-    sendInvite(p.inviteEmail);
-  } else {
-    showPrompt(`Courriel de ${p.name} pour l'invitation :`, '', (email)=>{
-      if(email && email.trim()) sendInvite(email.trim());
-    });
-  }
 }
 function renamePlayer(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -748,14 +825,20 @@ function renamePlayer(pid){
 
 // ---- Comptes : lier les comptes créés (courriel/mot de passe) à des joueurs ----
 let ALL_PROFILES = [];
+let LEAGUE_PLAYER_LINKS = []; // profile_players de la ligue actuellement affichée
 async function loadAllProfiles(){
   const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:true });
   ALL_PROFILES = error ? [] : (data || []);
+  const { data: links, error: err2 } = await sb.from('profile_players').select('*').eq('league_id', CURRENT_LEAGUE_ID);
+  LEAGUE_PLAYER_LINKS = err2 ? [] : (links || []);
 }
 function adminAccountsHTML(){
-  const linked = ALL_PROFILES.filter(p=>p.player_id);
-  const pending = ALL_PROFILES.filter(p=>!p.player_id);
-  const unlinkedPlayers = DATA.players.filter(pl => !ALL_PROFILES.some(pr=>pr.player_id===pl.id));
+  const linkedProfileIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.profile_id));
+  const pending = ALL_PROFILES.filter(p=>!linkedProfileIds.has(p.id));
+  const linked = LEAGUE_PLAYER_LINKS
+    .map(link=>({ link, profile: ALL_PROFILES.find(p=>p.id===link.profile_id) }))
+    .filter(x=>x.profile);
+  const unlinkedPlayers = DATA.players.filter(pl => !LEAGUE_PLAYER_LINKS.some(l=>l.player_id===pl.id));
   const adminCount = ALL_PROFILES.filter(p=>p.role==='admin').length;
   const roleButton = (pr)=>{
     const isAdmin = pr.role === 'admin';
@@ -767,7 +850,7 @@ function adminAccountsHTML(){
       <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
       <button class="btn-ghost" onclick="refreshAccountsTab()">rafraîchir</button>
     </div>
-    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de la ligue (inclut les comptes admin qui jouent aussi).</p>
+    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de <strong>cette ligue</strong> (inclut les comptes déjà liés dans d'autres ligues, et les comptes admin qui jouent aussi).</p>
     <table>
       <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
       ${pending.map(pr=>`<tr>
@@ -787,16 +870,16 @@ function adminAccountsHTML(){
     </table>
   </div>
   <div class="card">
-    <h2>Comptes liés <span class="small">(${linked.length})</span></h2>
+    <h2>Comptes liés à cette ligue <span class="small">(${linked.length})</span></h2>
     <table>
       <tr><th>Joueur</th><th>Courriel</th><th>Rôle</th><th></th></tr>
-      ${linked.map(pr=>{
-        const pl = DATA.players.find(x=>x.id===pr.player_id);
+      ${linked.map(({link, profile})=>{
+        const pl = DATA.players.find(x=>x.id===link.player_id);
         return `<tr>
           <td>${escapeHTML(pl ? pl.name : '(joueur introuvable)')}</td>
-          <td>${escapeHTML(pr.email)}</td>
-          <td>${pr.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(pr)}</td>
-          <td><button class="btn-ghost" onclick="unlinkAccount('${pr.id}')" style="color:var(--danger)">délier</button></td>
+          <td>${escapeHTML(profile.email)}</td>
+          <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
+          <td><button class="btn-ghost" onclick="unlinkAccount('${profile.id}')" style="color:var(--danger)">délier</button></td>
         </tr>`;
       }).join('')}
       ${linked.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte lié pour l'instant</td></tr>` : ''}
@@ -814,11 +897,20 @@ function setAccountRole(profileId, newRole){
       if(newRole === 'admin'){
         SESSION_USER = { role:'admin', email: CURRENT_PROFILE.email };
         VIEW = { tab:'groupes' };
-      } else if(CURRENT_PROFILE.player_id){
-        SESSION_USER = { role:'player', playerId: CURRENT_PROFILE.player_id };
-        VIEW = { tab:'classement' };
+        await refreshMyLinkForCurrentLeague();
       } else {
-        SESSION_USER = { role:'pending', email: CURRENT_PROFILE.email, displayName: CURRENT_PROFILE.display_name };
+        await loadMyLeagueLinks(CURRENT_PROFILE.id);
+        if(MY_LEAGUE_LINKS.length){
+          const link = MY_LEAGUE_LINKS[0];
+          CURRENT_LEAGUE_ID = link.league_id;
+          const loaded = await loadData(CURRENT_LEAGUE_ID);
+          DATA = loaded || defaultData();
+          migrateData();
+          SESSION_USER = { role:'player', playerId: link.player_id };
+          VIEW = { tab:'classement' };
+        } else {
+          SESSION_USER = { role:'pending', email: CURRENT_PROFILE.email, displayName: CURRENT_PROFILE.display_name };
+        }
       }
     }
     render();
@@ -839,14 +931,14 @@ async function linkAccount(profileId){
     await saveData();
     playerId = newPlayer.id;
   }
-  const { error } = await sb.from('profiles').update({ player_id: playerId }).eq('id', profileId);
+  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
   await loadAllProfiles();
   render();
 }
 async function unlinkAccount(profileId){
-  showConfirm("Délier ce compte de son joueur ? La personne devra être réassociée pour se connecter à nouveau.", async ()=>{
-    const { error } = await sb.from('profiles').update({ player_id: null }).eq('id', profileId);
+  showConfirm("Délier ce compte de son joueur pour cette ligue ? (Ses liens avec d'autres ligues, s'il y en a, ne sont pas touchés.)", async ()=>{
+    const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
     if(error){ showAlert("Erreur : " + error.message); return; }
     await loadAllProfiles();
     render();
@@ -1051,9 +1143,9 @@ async function emailAbsenceReminder(){
   const open = currentOpenSession();
   if(!open){ showAlert("Aucune session en cours."); return; }
   await loadAllProfiles();
-  const emails = ALL_PROFILES
-    .filter(pr => pr.player_id && DATA.players.some(p=>p.id===pr.player_id))
-    .map(pr => pr.email)
+  const emails = LEAGUE_PLAYER_LINKS
+    .filter(link => DATA.players.some(p=>p.id===link.player_id))
+    .map(link => { const pr = ALL_PROFILES.find(p=>p.id===link.profile_id); return pr ? pr.email : null; })
     .filter(Boolean);
   const uniqueEmails = [...new Set(emails)];
   if(uniqueEmails.length === 0){
@@ -1320,7 +1412,6 @@ function adminSettingsHTML(){
   return `
     <div class="card">
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
-      <div class="field"><label>Adresse de l'application (utilisée dans les courriels d'invitation)</label><input id="setAppUrl" placeholder="https://..." value="${escapeHTML(DATA.appUrl || '')}"></div>
       <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
     </div>
@@ -1346,7 +1437,6 @@ function adminSettingsHTML(){
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
-  DATA.appUrl = document.getElementById('setAppUrl').value.trim();
   DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
   DATA.testMode = document.getElementById('setTestMode').checked;
   DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
@@ -1364,10 +1454,23 @@ function renderPlayer(playerId){
   }
   const tabs = [['classement','Mon groupe'],['historique','Historique']];
   const backToAdmin = SESSION_USER.role === 'admin' ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">⚙️ Retour à l'administration</button>` : '';
+  const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
+    <div class="card">
+      <div class="field" style="margin:0;">
+        <label>Ma ligue</label>
+        <select onchange="switchMyLeague(this.value)">
+          ${MY_LEAGUE_LINKS.map(l=>{
+            const lg = LEAGUES.find(x=>x.id===l.league_id);
+            return `<option value="${l.league_id}" ${l.league_id===CURRENT_LEAGUE_ID?'selected':''}>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</option>`;
+          }).join('')}
+        </select>
+      </div>
+    </div>` : '';
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name))}
     ${storageBannerHTML()}
     ${backToAdmin}
+    ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setPlayerTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
@@ -1524,18 +1627,12 @@ function handleImportFile(input){
 function migrateData(){
   if(DATA.matchesPerSession === undefined) DATA.matchesPerSession = 10;
   if(DATA.testMode === undefined) DATA.testMode = false;
-  if(DATA.appUrl === undefined) DATA.appUrl = '';
   (DATA.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
 }
 async function boot(){
-  const loaded = await loadData();
-  DATA = loaded || defaultData();
-  migrateData();
-  if(!loaded){ await saveData(); }
-
-  // Si une session Supabase est déjà active (rare avec le stockage en
-  // mémoire, mais possible juste après une inscription/connexion), on la
-  // récupère pour éviter de redemander la connexion inutilement.
+  // Les données ne sont chargées qu'une fois connecté et une ligue choisie
+  // (voir onAuthResolved) — avant ça, DATA reste vide et l'écran de connexion
+  // s'affiche avec un titre générique.
   const { data: { session } } = await sb.auth.getSession();
   if(session && session.user){
     await onAuthResolved(session.user);
