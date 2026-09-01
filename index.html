@@ -783,7 +783,10 @@ function renderAdmin(){
 }
 function setAdminTab(t){
   VIEW.tab=t;
-  if(t==='comptes' || t==='joueurs'){ loadAllProfiles().then(render); return; }
+  if(t==='comptes' || t==='joueurs'){
+    Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(render);
+    return;
+  }
   render();
 }
 
@@ -807,16 +810,18 @@ function adminPlayersHTML(){
         <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
       </div>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th></th></tr>
+        <tr><th>Nom</th><th>Groupe</th><th>Compte</th><th></th></tr>
         ${players.map(p=>{
           const g = groupById(p.groupId);
+          const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
           return `<tr>
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td>${link ? '✅ lié' : '—'}</td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> ${link ? `<button class="btn-ghost" onclick="openPlayerLeaguesModal('${p.id}')">ligues</button>` : ''} <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
-        ${players.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+        ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
 }
@@ -840,11 +845,63 @@ function renamePlayer(pid){
 // ---- Comptes : lier les comptes créés (courriel/mot de passe) à des joueurs ----
 let ALL_PROFILES = [];
 let LEAGUE_PLAYER_LINKS = []; // profile_players de la ligue actuellement affichée
+let ALL_PROFILE_PLAYERS = []; // profile_players de TOUTES les ligues (pour gérer les ligues d'un joueur)
 async function loadAllProfiles(){
   const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:true });
   ALL_PROFILES = error ? [] : (data || []);
   const { data: links, error: err2 } = await sb.from('profile_players').select('*').eq('league_id', CURRENT_LEAGUE_ID);
   LEAGUE_PLAYER_LINKS = err2 ? [] : (links || []);
+}
+async function loadAllProfilePlayers(){
+  const { data, error } = await sb.from('profile_players').select('*');
+  ALL_PROFILE_PLAYERS = error ? [] : (data || []);
+}
+// Ajoute un joueur (par son compte lié) dans une AUTRE ligue : crée un nouveau
+// joueur là-bas (dans son premier groupe) et lie le compte à celui-ci.
+async function addPlayerToLeagueForProfile(leagueId, profileId, name){
+  const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+  if(error){ showAlert("Erreur : " + error.message); return null; }
+  const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
+  const firstGroup = (leagueData.groups||[]).slice().sort((a,b)=>a.order-b.order)[0];
+  if(!firstGroup){ showAlert("Cette ligue n'a pas encore de groupe — crée-en un d'abord (en y basculant)."); return null; }
+  const newPlayer = { id: uid('p'), name, groupId: firstGroup.id };
+  leagueData.players = leagueData.players || [];
+  leagueData.players.push(newPlayer);
+  const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  if(err2){ showAlert("Erreur : " + err2.message); return null; }
+  const { error: err3 } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: newPlayer.id });
+  if(err3){ showAlert("Erreur : " + err3.message); return null; }
+  return newPlayer.id;
+}
+async function removePlayerFromLeagueForProfile(leagueId, profileId){
+  const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', leagueId);
+  if(error){ showAlert("Erreur : " + error.message); }
+}
+// Ouvre un pop-up listant toutes les ligues, avec une case à cocher pour
+// ajouter/retirer ce joueur (via son compte lié) de chacune.
+function openPlayerLeaguesModal(playerId){
+  const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===playerId);
+  if(!link){ showAlert("Ce joueur n'a pas de compte lié dans cette ligue — associe-le d'abord dans l'onglet Comptes pour pouvoir gérer ses autres ligues."); return; }
+  const p = DATA.players.find(x=>x.id===playerId);
+  const memberLeagueIds = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===link.profile_id).map(pp=>pp.league_id));
+  const body = LEAGUES.map(l=>`
+    <label class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
+      <input type="checkbox" style="width:auto;" ${memberLeagueIds.has(l.id)?'checked':''} onchange="togglePlayerLeague('${link.profile_id}','${l.id}','${playerId}', this.checked)">
+      <span>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}${l.id===CURRENT_LEAGUE_ID ? ' <span class="small">(ligue actuelle)</span>' : ''}</span>
+    </label>`).join('');
+  showContentModal(`Ligues de ${p.name}`, body);
+}
+async function togglePlayerLeague(profileId, leagueId, currentPlayerId, checked){
+  if(checked){
+    const p = DATA.players.find(x=>x.id===currentPlayerId);
+    await addPlayerToLeagueForProfile(leagueId, profileId, p ? p.name : 'Joueur');
+  } else {
+    await removePlayerFromLeagueForProfile(leagueId, profileId);
+  }
+  await loadAllProfilePlayers();
+  if(leagueId === CURRENT_LEAGUE_ID){ await loadAllProfiles(); }
+  closeModal();
+  openPlayerLeaguesModal(currentPlayerId);
 }
 function adminAccountsHTML(){
   const linkedProfileIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.profile_id));
