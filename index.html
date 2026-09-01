@@ -100,17 +100,11 @@ tr.me{background:rgba(207,234,92,0.1);}
 const SUPABASE_URL = 'https://gywgvldkljwhjclwxtgb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5d2d2bGRrbGp3aGpjbHd4dGdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNDE5MzMsImV4cCI6MjEwMzcxNzkzM30.pB_pkDI5ru9HUPwSAMipwStovt02OYLtzTqpMtx0d30';
 
-// Stockage de session en mémoire seulement (pas de localStorage, peu fiable
-// selon l'environnement où le fichier est ouvert). Conséquence : il faut se
-// reconnecter à chaque nouvelle ouverture de l'application.
-const memoryAuthStorage = {
-  _data: {},
-  getItem(key){ return this._data[key] || null; },
-  setItem(key, value){ this._data[key] = value; },
-  removeItem(key){ delete this._data[key]; }
-};
+// L'app est maintenant hébergée sur un vrai site web (pas dans l'aperçu
+// fermé de Claude), donc le stockage normal du navigateur fonctionne bien ici
+// et permet de rester connecté d'un rafraîchissement à l'autre.
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storage: memoryAuthStorage, persistSession: true, autoRefreshToken: true }
+  auth: { persistSession: true, autoRefreshToken: true }
 });
 
 let DATA = null;
@@ -151,6 +145,7 @@ function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9
 function defaultData(){
   return {
     leagueName: 'Ma ligue de pickleball',
+    appUrl: '',
     swapCount: 1,
     matchesPerSession: 10,
     testMode: false,
@@ -667,18 +662,20 @@ function renderAdmin(){
 }
 function setAdminTab(t){
   VIEW.tab=t;
-  if(t==='comptes'){ loadAllProfiles().then(render); return; }
+  if(t==='comptes' || t==='joueurs'){ loadAllProfiles().then(render); return; }
   render();
 }
 
 function adminPlayersHTML(){
   const players = DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));
   const groups = groupsSorted();
+  const linkedPlayerIds = new Set(ALL_PROFILES.filter(pr=>pr.player_id).map(pr=>pr.player_id));
   return `
     <div class="card">
       <h3>Ajouter un joueur</h3>
       <div class="row">
         <input id="newPlayerName" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
+        <input id="newPlayerEmail" type="email" placeholder="Courriel (optionnel, pour l'inviter)" style="flex:1;min-width:180px;">
         <select id="newPlayerGroup">
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
@@ -691,27 +688,55 @@ function adminPlayersHTML(){
         <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
       </div>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th></th></tr>
+        <tr><th>Nom</th><th>Groupe</th><th>Compte</th><th></th></tr>
         ${players.map(p=>{
           const g = groupById(p.groupId);
+          const hasAccount = linkedPlayerIds.has(p.id);
           return `<tr>
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td>${hasAccount ? '✅ lié' : '—'}</td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> ${hasAccount ? '' : `<button class="btn-ghost" onclick="invitePlayer('${p.id}')">inviter</button>`} <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
-        ${players.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+        ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
 }
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
+  const emailEl = document.getElementById('newPlayerEmail');
   const groupEl = document.getElementById('newPlayerGroup');
   const name = nameEl.value.trim();
+  const inviteEmail = emailEl.value.trim();
   const groupId = groupEl.value;
   if(!name || !groupId) return;
-  DATA.players.push({ id: uid('p'), name, groupId });
+  const player = { id: uid('p'), name, groupId };
+  if(inviteEmail) player.inviteEmail = inviteEmail;
+  DATA.players.push(player);
   saveAndRender();
+}
+// Ouvre l'app Mail avec une invitation pré-remplie pour ce joueur, l'invitant
+// à créer son compte (l'app ne peut pas envoyer de courriel automatiquement).
+function invitePlayer(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  const sendInvite = (email)=>{
+    if(!email) return;
+    p.inviteEmail = email;
+    saveData();
+    const appUrl = DATA.appUrl && DATA.appUrl.trim() ? DATA.appUrl.trim() : '(demande l\'adresse à ton administrateur)';
+    const subject = `Invitation — ${DATA.leagueName}`;
+    const body = `Bonjour ${p.name},\n\nTu es inscrit(e) dans ${DATA.leagueName} ! Pour accéder à ton groupe et tes résultats, crée ton compte ici :\n\n${appUrl}\n\nUtilise ce courriel-ci (${email}) et choisis un mot de passe. Une fois ton compte créé, un administrateur l'associera à ton profil de joueur.\n\nÀ bientôt sur les terrains !`;
+    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+  if(p.inviteEmail){
+    sendInvite(p.inviteEmail);
+  } else {
+    showPrompt(`Courriel de ${p.name} pour l'invitation :`, '', (email)=>{
+      if(email && email.trim()) sendInvite(email.trim());
+    });
+  }
 }
 function renamePlayer(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -731,6 +756,12 @@ function adminAccountsHTML(){
   const linked = ALL_PROFILES.filter(p=>p.player_id);
   const pending = ALL_PROFILES.filter(p=>!p.player_id);
   const unlinkedPlayers = DATA.players.filter(pl => !ALL_PROFILES.some(pr=>pr.player_id===pl.id));
+  const adminCount = ALL_PROFILES.filter(p=>p.role==='admin').length;
+  const roleButton = (pr)=>{
+    const isAdmin = pr.role === 'admin';
+    const disable = isAdmin && adminCount<=1;
+    return `<button class="btn-ghost" ${disable?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${pr.id}','${isAdmin?'player':'admin'}')">${isAdmin?'retirer admin':'rendre admin'}</button>`;
+  };
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;">
       <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
@@ -738,10 +769,11 @@ function adminAccountsHTML(){
     </div>
     <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de la ligue (inclut les comptes admin qui jouent aussi).</p>
     <table>
-      <tr><th>Nom</th><th>Courriel</th><th>Associer à</th></tr>
+      <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
       ${pending.map(pr=>`<tr>
         <td>${escapeHTML(pr.display_name || '—')}</td>
         <td>${escapeHTML(pr.email)}</td>
+        <td>${pr.role==='admin'?'Admin':'Joueur'}<br>${roleButton(pr)}</td>
         <td>
           <select id="linkSelect_${pr.id}">
             <option value="">— choisir un joueur —</option>
@@ -751,7 +783,7 @@ function adminAccountsHTML(){
           <button class="btn-ghost" onclick="linkAccount('${pr.id}')">lier</button>
         </td>
       </tr>`).join('')}
-      ${pending.length===0 ? `<tr><td colspan="3" class="empty">Aucun compte en attente</td></tr>` : ''}
+      ${pending.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte en attente</td></tr>` : ''}
     </table>
   </div>
   <div class="card">
@@ -763,18 +795,34 @@ function adminAccountsHTML(){
         return `<tr>
           <td>${escapeHTML(pl ? pl.name : '(joueur introuvable)')}</td>
           <td>${escapeHTML(pr.email)}</td>
-          <td>${pr.role==='admin' ? 'Admin' : 'Joueur'}</td>
+          <td>${pr.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(pr)}</td>
           <td><button class="btn-ghost" onclick="unlinkAccount('${pr.id}')" style="color:var(--danger)">délier</button></td>
         </tr>`;
       }).join('')}
       ${linked.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte lié pour l'instant</td></tr>` : ''}
     </table>
-  </div>
-  <div class="card">
-    <h3>Rendre un compte administrateur</h3>
-    <p class="small">Pour donner les droits d'administrateur, va dans ton projet Supabase → Table Editor → profiles, et change la valeur « role » de ce compte à « admin ». Ce n'est pas possible depuis cette interface pour des raisons de sécurité.</p>
   </div>`;
   return html;
+}
+function setAccountRole(profileId, newRole){
+  showConfirm(`Confirmer le changement de rôle vers « ${newRole==='admin'?'Admin':'Joueur'} » ?`, async ()=>{
+    const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', profileId);
+    if(error){ showAlert("Erreur : " + error.message); return; }
+    await loadAllProfiles();
+    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){
+      CURRENT_PROFILE.role = newRole;
+      if(newRole === 'admin'){
+        SESSION_USER = { role:'admin', email: CURRENT_PROFILE.email };
+        VIEW = { tab:'groupes' };
+      } else if(CURRENT_PROFILE.player_id){
+        SESSION_USER = { role:'player', playerId: CURRENT_PROFILE.player_id };
+        VIEW = { tab:'classement' };
+      } else {
+        SESSION_USER = { role:'pending', email: CURRENT_PROFILE.email, displayName: CURRENT_PROFILE.display_name };
+      }
+    }
+    render();
+  });
 }
 function refreshAccountsTab(){ loadAllProfiles().then(render); }
 async function linkAccount(profileId){
@@ -1272,6 +1320,7 @@ function adminSettingsHTML(){
   return `
     <div class="card">
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
+      <div class="field"><label>Adresse de l'application (utilisée dans les courriels d'invitation)</label><input id="setAppUrl" placeholder="https://..." value="${escapeHTML(DATA.appUrl || '')}"></div>
       <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
     </div>
@@ -1297,6 +1346,7 @@ function adminSettingsHTML(){
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
+  DATA.appUrl = document.getElementById('setAppUrl').value.trim();
   DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
   DATA.testMode = document.getElementById('setTestMode').checked;
   DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
@@ -1474,6 +1524,7 @@ function handleImportFile(input){
 function migrateData(){
   if(DATA.matchesPerSession === undefined) DATA.matchesPerSession = 10;
   if(DATA.testMode === undefined) DATA.testMode = false;
+  if(DATA.appUrl === undefined) DATA.appUrl = '';
   (DATA.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
 }
 async function boot(){
