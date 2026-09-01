@@ -879,8 +879,8 @@ async function removePlayerFromLeagueForProfile(leagueId, profileId){
 // ajouter/retirer ce joueur (via son compte lié) de chacune.
 function leaguesSummaryForProfile(profileId){
   const ids = ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id);
-  const names = ids.map(id=>{ const l = LEAGUES.find(x=>x.id===id); return l ? l.name : '?'; });
-  return names.length ? names.join(', ') : '—';
+  const labels = ids.map(id=>{ const l = LEAGUES.find(x=>x.id===id); return l ? (l.schedule_label || l.name) : '?'; });
+  return labels.length ? labels.join(', ') : '—';
 }
 function openProfileLeaguesModal(profileId, displayName){
   const memberLeagueIds = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id));
@@ -888,7 +888,7 @@ function openProfileLeaguesModal(profileId, displayName){
   const body = LEAGUES.map(l=>`
     <label class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
       <input type="checkbox" style="width:auto;" ${memberLeagueIds.has(l.id)?'checked':''} onchange="toggleProfileLeague('${profileId}','${l.id}', this.checked, '${safeName}')">
-      <span>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}${l.id===CURRENT_LEAGUE_ID ? ' <span class="small">(ligue actuelle)</span>' : ''}</span>
+      <span>${l.schedule_label ? escapeHTML(l.schedule_label) : escapeHTML(l.name)}${l.schedule_label ? ' <span class="small">('+escapeHTML(l.name)+')</span>' : ''}${l.id===CURRENT_LEAGUE_ID ? ' <span class="small">— ligue actuelle</span>' : ''}</span>
     </label>`).join('');
   showContentModal(`Ligues de ${displayName}`, body || `<p class="small">Aucune ligue n'existe encore.</p>`);
 }
