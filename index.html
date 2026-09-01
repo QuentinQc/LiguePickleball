@@ -116,6 +116,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 let DATA = null;
 let SESSION_USER = null; // {role:'admin'|'player'|'pending', playerId?, email?, displayName?}
 let CURRENT_PROFILE = null;
+let ADMIN_VIEWING_AS_PLAYER = false;
 let VIEW = { tab: null, error: null };
 
 // ---------- stockage (Supabase) ----------
@@ -501,8 +502,9 @@ function storageBannerHTML(){
 function render(){
   if(!SESSION_USER){ renderLogin(); }
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
+  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS_PLAYER && CURRENT_PROFILE && CURRENT_PROFILE.player_id){ renderPlayer(CURRENT_PROFILE.player_id); }
   else if(SESSION_USER.role === 'admin'){ renderAdmin(); }
-  else { renderPlayer(); }
+  else { renderPlayer(SESSION_USER.playerId); }
   const existing = document.getElementById('modalRoot');
   if(existing) existing.remove();
   if(MODAL){
@@ -638,6 +640,7 @@ async function logout(){
   await sb.auth.signOut();
   SESSION_USER = null;
   CURRENT_PROFILE = null;
+  ADMIN_VIEWING_AS_PLAYER = false;
   VIEW = {};
   render();
 }
@@ -645,9 +648,12 @@ async function logout(){
 // ---- Admin ----
 function renderAdmin(){
   const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
+  const playerToggle = (CURRENT_PROFILE && CURRENT_PROFILE.player_id && DATA.players.some(p=>p.id===CURRENT_PROFILE.player_id))
+    ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   app.innerHTML = `
     ${topbarHTML('Espace administrateur')}
     ${storageBannerHTML()}
+    ${playerToggle}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
@@ -695,14 +701,14 @@ async function loadAllProfiles(){
 }
 function adminAccountsHTML(){
   const linked = ALL_PROFILES.filter(p=>p.player_id);
-  const pending = ALL_PROFILES.filter(p=>!p.player_id && p.role!=='admin');
+  const pending = ALL_PROFILES.filter(p=>!p.player_id);
   const unlinkedPlayers = DATA.players.filter(pl => !ALL_PROFILES.some(pr=>pr.player_id===pl.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;">
       <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
       <button class="btn-ghost" onclick="refreshAccountsTab()">rafraîchir</button>
     </div>
-    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de la ligue.</p>
+    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de la ligue (inclut les comptes admin qui jouent aussi).</p>
     <table>
       <tr><th>Nom</th><th>Courriel</th><th>Associer à</th></tr>
       ${pending.map(pr=>`<tr>
@@ -1281,18 +1287,27 @@ function saveSettings(){
 }
 
 // ---- Player ----
-function renderPlayer(){
-  const me = DATA.players.find(p=>p.id===SESSION_USER.playerId);
+function renderPlayer(playerId){
+  const me = DATA.players.find(p=>p.id===(playerId || SESSION_USER.playerId));
+  if(!me){
+    // Le joueur lié n'existe plus (supprimé) : on revient à la vue admin si possible.
+    if(SESSION_USER.role === 'admin'){ ADMIN_VIEWING_AS_PLAYER = false; renderAdmin(); return; }
+    app.innerHTML = `${topbarHTML()}<div class="card"><p class="small">Ton profil de joueur est introuvable. Contacte un administrateur.</p></div>`;
+    return;
+  }
   const tabs = [['classement','Mon groupe'],['historique','Historique']];
+  const backToAdmin = SESSION_USER.role === 'admin' ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">⚙️ Retour à l'administration</button>` : '';
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name))}
     ${storageBannerHTML()}
+    ${backToAdmin}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setPlayerTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : playerGroupHTML(me);
 }
+function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PLAYER; VIEW = { tab: ADMIN_VIEWING_AS_PLAYER ? 'classement' : 'groupes' }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
