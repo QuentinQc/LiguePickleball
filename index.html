@@ -934,6 +934,7 @@ async function linkAccount(profileId){
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
   await loadAllProfiles();
+  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyLinkForCurrentLeague(); }
   render();
 }
 async function unlinkAccount(profileId){
@@ -941,6 +942,7 @@ async function unlinkAccount(profileId){
     const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
     if(error){ showAlert("Erreur : " + error.message); return; }
     await loadAllProfiles();
+    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS_PLAYER = false; await refreshMyLinkForCurrentLeague(); }
     render();
   });
 }
