@@ -673,7 +673,19 @@ function setAdminTab(t){
 
 function adminPlayersHTML(){
   const players = DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const groups = groupsSorted();
   return `
+    <div class="card">
+      <h3>Ajouter un joueur</h3>
+      <div class="row">
+        <input id="newPlayerName" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
+        <select id="newPlayerGroup">
+          ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
+      </div>
+      ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
+    </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;">
         <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
@@ -685,12 +697,28 @@ function adminPlayersHTML(){
           return `<tr>
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
-            <td><button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
         ${players.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
+}
+function addPlayerFromList(){
+  const nameEl = document.getElementById('newPlayerName');
+  const groupEl = document.getElementById('newPlayerGroup');
+  const name = nameEl.value.trim();
+  const groupId = groupEl.value;
+  if(!name || !groupId) return;
+  DATA.players.push({ id: uid('p'), name, groupId });
+  saveAndRender();
+}
+function renamePlayer(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  showPrompt('Nouveau nom du joueur :', p.name, (name)=>{
+    if(name && name.trim()){ p.name = name.trim(); saveAndRender(); }
+  });
 }
 
 // ---- Comptes : lier les comptes créés (courriel/mot de passe) à des joueurs ----
@@ -778,7 +806,7 @@ async function unlinkAccount(profileId){
 }
 
 function adminGroupsHTML(){
-  let html = '';
+  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Tous les joueurs ».</p></div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
     html += `
@@ -788,15 +816,10 @@ function adminGroupsHTML(){
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
       </div>
       <table>
-        <tr><th>Nom</th><th></th></tr>
-        ${ps.map(p=>`<tr><td>${escapeHTML(p.name)}</td>
-          <td><button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td></tr>`).join('')}
-        ${ps.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
+        <tr><th>Nom</th></tr>
+        ${ps.map(p=>`<tr><td>${escapeHTML(p.name)}</td></tr>`).join('')}
+        ${ps.length===0 ? `<tr><td class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
-      <div class="row" style="margin-top:10px;">
-        <input id="newName_${g.id}" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
-        <button class="btn btn-secondary" onclick="addPlayer('${g.id}')">Ajouter</button>
-      </div>
     </div>`;
   });
   html += `
@@ -820,13 +843,7 @@ function renameGroup(gid){
     if(name && name.trim()){ g.name = name.trim(); saveAndRender(); }
   });
 }
-function addPlayer(gid){
-  const nameEl = document.getElementById('newName_'+gid);
-  const name = nameEl.value.trim();
-  if(!name) return;
-  DATA.players.push({ id: uid('p'), name, groupId: gid });
-  saveAndRender();
-}
+
 function removePlayer(pid){
   showConfirm('Retirer ce joueur de la ligue ?', ()=>{
     DATA.players = DATA.players.filter(p=>p.id!==pid);
