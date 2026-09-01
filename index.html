@@ -194,9 +194,22 @@ async function switchMyLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
-  SESSION_USER = { role:'player', playerId: link.player_id };
+  if(SESSION_USER.role === 'admin'){
+    // Un admin qui consulte sa propre vue joueur : on ne touche pas à son
+    // rôle, seulement à la ligue et au lien joueur affichés.
+    MY_LINK_IN_CURRENT_LEAGUE = link;
+  } else {
+    SESSION_USER = { role:'player', playerId: link.player_id };
+  }
   VIEW = { tab:'classement' };
   render();
+}
+// Recharge à la fois le lien joueur de l'admin dans la ligue affichée et la
+// liste complète de ses ligues (pour le sélecteur en vue joueur).
+async function refreshMyOwnLinks(){
+  if(!CURRENT_PROFILE) return;
+  await loadMyLeagueLinks(CURRENT_PROFILE.id);
+  await refreshMyLinkForCurrentLeague();
 }
 
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
@@ -665,6 +678,7 @@ async function onAuthResolved(user){
 
   if(profile.role === 'admin'){
     SESSION_USER = { role:'admin', email: profile.email };
+    await loadMyLeagueLinks(profile.id); // pour le sélecteur de ligue dans sa propre vue joueur
     if(LEAGUES.length === 0){
       // Aucune ligue n'existe encore : l'admin devra en créer une.
       CURRENT_LEAGUE_ID = null;
@@ -934,7 +948,7 @@ async function linkAccount(profileId){
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
   await loadAllProfiles();
-  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyLinkForCurrentLeague(); }
+  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   render();
 }
 async function unlinkAccount(profileId){
@@ -942,7 +956,7 @@ async function unlinkAccount(profileId){
     const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
     if(error){ showAlert("Erreur : " + error.message); return; }
     await loadAllProfiles();
-    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS_PLAYER = false; await refreshMyLinkForCurrentLeague(); }
+    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS_PLAYER = false; await refreshMyOwnLinks(); }
     render();
   });
 }
