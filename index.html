@@ -810,18 +810,16 @@ function adminPlayersHTML(){
         <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
       </div>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th>Compte</th><th></th></tr>
+        <tr><th>Nom</th><th>Groupe</th><th></th></tr>
         ${players.map(p=>{
           const g = groupById(p.groupId);
-          const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
           return `<tr>
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
-            <td>${link ? '✅ lié' : '—'}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> ${link ? `<button class="btn-ghost" onclick="openPlayerLeaguesModal('${p.id}')">ligues</button>` : ''} <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
-        ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+        ${players.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
 }
@@ -879,29 +877,32 @@ async function removePlayerFromLeagueForProfile(leagueId, profileId){
 }
 // Ouvre un pop-up listant toutes les ligues, avec une case à cocher pour
 // ajouter/retirer ce joueur (via son compte lié) de chacune.
-function openPlayerLeaguesModal(playerId){
-  const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===playerId);
-  if(!link){ showAlert("Ce joueur n'a pas de compte lié dans cette ligue — associe-le d'abord dans l'onglet Comptes pour pouvoir gérer ses autres ligues."); return; }
-  const p = DATA.players.find(x=>x.id===playerId);
-  const memberLeagueIds = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===link.profile_id).map(pp=>pp.league_id));
+function leaguesSummaryForProfile(profileId){
+  const ids = ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id);
+  const names = ids.map(id=>{ const l = LEAGUES.find(x=>x.id===id); return l ? l.name : '?'; });
+  return names.length ? names.join(', ') : '—';
+}
+function openProfileLeaguesModal(profileId, displayName){
+  const memberLeagueIds = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id));
+  const safeName = displayName.replace(/'/g, "\\'");
   const body = LEAGUES.map(l=>`
     <label class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
-      <input type="checkbox" style="width:auto;" ${memberLeagueIds.has(l.id)?'checked':''} onchange="togglePlayerLeague('${link.profile_id}','${l.id}','${playerId}', this.checked)">
+      <input type="checkbox" style="width:auto;" ${memberLeagueIds.has(l.id)?'checked':''} onchange="toggleProfileLeague('${profileId}','${l.id}', this.checked, '${safeName}')">
       <span>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}${l.id===CURRENT_LEAGUE_ID ? ' <span class="small">(ligue actuelle)</span>' : ''}</span>
     </label>`).join('');
-  showContentModal(`Ligues de ${p.name}`, body);
+  showContentModal(`Ligues de ${displayName}`, body || `<p class="small">Aucune ligue n'existe encore.</p>`);
 }
-async function togglePlayerLeague(profileId, leagueId, currentPlayerId, checked){
+async function toggleProfileLeague(profileId, leagueId, checked, displayName){
   if(checked){
-    const p = DATA.players.find(x=>x.id===currentPlayerId);
-    await addPlayerToLeagueForProfile(leagueId, profileId, p ? p.name : 'Joueur');
+    await addPlayerToLeagueForProfile(leagueId, profileId, displayName);
   } else {
     await removePlayerFromLeagueForProfile(leagueId, profileId);
   }
   await loadAllProfilePlayers();
   if(leagueId === CURRENT_LEAGUE_ID){ await loadAllProfiles(); }
+  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   closeModal();
-  openPlayerLeaguesModal(currentPlayerId);
+  openProfileLeaguesModal(profileId, displayName);
 }
 function adminAccountsHTML(){
   const linkedProfileIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.profile_id));
@@ -923,10 +924,11 @@ function adminAccountsHTML(){
     </div>
     <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de <strong>cette ligue</strong> (inclut les comptes déjà liés dans d'autres ligues, et les comptes admin qui jouent aussi).</p>
     <table>
-      <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
+      <tr><th>Nom</th><th>Courriel</th><th>Ligues</th><th>Rôle</th><th>Associer à</th></tr>
       ${pending.map(pr=>`<tr>
         <td>${escapeHTML(pr.display_name || '—')}</td>
         <td>${escapeHTML(pr.email)}</td>
+        <td>${escapeHTML(leaguesSummaryForProfile(pr.id))}<br><button class="btn-ghost" onclick="openProfileLeaguesModal('${pr.id}','${escapeHTML((pr.display_name||pr.email)).replace(/'/g,"\\'")}')">modifier</button></td>
         <td>${pr.role==='admin'?'Admin':'Joueur'}<br>${roleButton(pr)}</td>
         <td>
           <select id="linkSelect_${pr.id}">
@@ -937,23 +939,25 @@ function adminAccountsHTML(){
           <button class="btn-ghost" onclick="linkAccount('${pr.id}')">lier</button>
         </td>
       </tr>`).join('')}
-      ${pending.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte en attente</td></tr>` : ''}
+      ${pending.length===0 ? `<tr><td colspan="5" class="empty">Aucun compte en attente</td></tr>` : ''}
     </table>
   </div>
   <div class="card">
     <h2>Comptes liés à cette ligue <span class="small">(${linked.length})</span></h2>
     <table>
-      <tr><th>Joueur</th><th>Courriel</th><th>Rôle</th><th></th></tr>
+      <tr><th>Joueur</th><th>Courriel</th><th>Ligues</th><th>Rôle</th><th></th></tr>
       ${linked.map(({link, profile})=>{
         const pl = DATA.players.find(x=>x.id===link.player_id);
+        const displayName = pl ? pl.name : (profile.display_name || profile.email);
         return `<tr>
           <td>${escapeHTML(pl ? pl.name : '(joueur introuvable)')}</td>
           <td>${escapeHTML(profile.email)}</td>
+          <td>${escapeHTML(leaguesSummaryForProfile(profile.id))}<br><button class="btn-ghost" onclick="openProfileLeaguesModal('${profile.id}','${escapeHTML(displayName).replace(/'/g,"\\'")}')">modifier</button></td>
           <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
           <td><button class="btn-ghost" onclick="unlinkAccount('${profile.id}')" style="color:var(--danger)">délier</button></td>
         </tr>`;
       }).join('')}
-      ${linked.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte lié pour l'instant</td></tr>` : ''}
+      ${linked.length===0 ? `<tr><td colspan="5" class="empty">Aucun compte lié pour l'instant</td></tr>` : ''}
     </table>
   </div>`;
   return html;
