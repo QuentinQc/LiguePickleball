@@ -791,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -817,7 +817,6 @@ function renderAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='groupes') c.innerHTML = adminGroupsHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersHTML();
-  else if(VIEW.tab==='remplacants') c.innerHTML = adminSubstitutePoolHTML();
   else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
   else if(VIEW.tab==='session') c.innerHTML = adminSessionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
@@ -1166,6 +1165,7 @@ function adminGroupsHTML(){
       </div>
       <p class="small">Le groupe 1 est le sommet de l'échelle. Les nouveaux groupes s'ajoutent en bas.</p>
     </div>`;
+  html += adminSubstitutePoolHTML();
   return html;
 }
 function addGroup(){
