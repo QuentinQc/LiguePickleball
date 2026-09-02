@@ -75,6 +75,46 @@ tr.me{background:rgba(207,234,92,0.1);}
 @media (max-width:520px){.grid2{grid-template-columns:1fr;}}
 .err{color:var(--danger);font-size:13px;margin-top:6px;}
 .loading{color:var(--muted);text-align:center;padding:40px 0;font-family:var(--font-display);letter-spacing:0.1em;text-transform:uppercase;}
+
+/* ---------- Tableaux : défilement horizontal plutôt que colonnes écrasées ---------- */
+@media (max-width:900px){
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+}
+
+/* ---------- Onglets : défilement horizontal au lieu d'un retour à la ligne serré ---------- */
+.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{flex:0 0 auto;white-space:nowrap;}
+
+/* ---------- Bureau (écrans larges) : plus d'air, colonnes qui ne s'étirent pas à l'infini ---------- */
+@media (min-width:900px){
+  #app{max-width:1080px;padding:32px 24px 70px;}
+  h1{font-size:32px;}
+  .card{padding:20px 22px;}
+  th,td{white-space:normal;}
+}
+
+/* ---------- Mobile (écrans étroits) : cibles tactiles plus grandes, texte compact ---------- */
+@media (max-width:640px){
+  #app{padding:14px 12px 50px;}
+  h1{font-size:22px;}
+  h2{font-size:17px;}
+  .card{padding:12px;border-radius:8px;}
+  .btn{padding:11px 16px;font-size:12px;}
+  .btn,.btn-secondary,.btn-primary,select,input{min-height:42px;}
+  .row{gap:8px;}
+  .row > .btn,.row > .btn-secondary,.row > .btn-primary{flex:1 1 auto;}
+  .topbar{align-items:center;}
+  .topbar h1{font-size:19px;}
+  .topbar .small{display:none;} /* le sous-titre encombre sur petit écran, le contenu de la page suffit */
+  .court-mark{width:30px;height:30px;font-size:14px;}
+  th,td{padding:7px 6px;font-size:13px;}
+  .tab{padding:9px 12px;font-size:12px;}
+  .match-row{gap:6px;padding:9px 0;}
+  .team{min-width:90px;font-size:13px;}
+  .pill-input{width:48px;}
+}
+
 #printArea{display:none;}
 .print-page{page-break-after:always;}
 .print-page:last-child{page-break-after:auto;}
