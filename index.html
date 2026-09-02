@@ -262,7 +262,8 @@ function defaultData(){
     testMode: false,
     groups: [ { id: uid('g'), name: 'Groupe 1', order: 1 } ],
     players: [],
-    sessions: []
+    sessions: [],
+    substitutePool: []
   };
 }
 
@@ -790,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -816,6 +817,7 @@ function renderAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='groupes') c.innerHTML = adminGroupsHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersHTML();
+  else if(VIEW.tab==='remplacants') c.innerHTML = adminSubstitutePoolHTML();
   else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
   else if(VIEW.tab==='session') c.innerHTML = adminSessionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
@@ -830,6 +832,83 @@ function setAdminTab(t){
   render();
 }
 
+function adminSubstitutePoolHTML(){
+  const pool = (DATA.substitutePool || []).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return `
+    <div class="card">
+      <h3>Ajouter un remplaçant</h3>
+      <p class="small">Une liste de personnes disponibles pour dépanner à l'occasion — elles ne font partie d'aucun groupe régulier.</p>
+      <div class="row">
+        <input id="newSubName" placeholder="Nom" style="flex:1;min-width:120px;">
+        <input id="newSubEmail" type="email" placeholder="Courriel (optionnel)" style="flex:1;min-width:160px;">
+        <input id="newSubNotes" placeholder="Notes (optionnel, ex: dispo mardis)" style="flex:1;min-width:160px;">
+        <button class="btn btn-secondary" onclick="addSubstituteToPool()">Ajouter</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
+        ${pool.some(s=>s.email) ? `<button class="btn btn-secondary" onclick="emailAvailabilityRequest()">📧 Demander qui est disponible</button>` : ''}
+      </div>
+      <table>
+        <tr><th>Nom</th><th>Courriel</th><th>Notes</th><th></th></tr>
+        ${pool.map(s=>`<tr>
+          <td>${escapeHTML(s.name)}</td>
+          <td>${escapeHTML(s.email||'—')}</td>
+          <td>${escapeHTML(s.notes||'—')}</td>
+          <td><button class="btn-ghost" onclick="editSubstituteInPool('${s.id}')">modifier</button> <button class="btn-ghost" onclick="removeSubstituteFromPool('${s.id}')" style="color:var(--danger)">retirer</button></td>
+        </tr>`).join('')}
+        ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+      </table>
+      <p class="small">Ces personnes apparaissent automatiquement comme choix rapides dans le menu de remplaçant, lors d'une absence en session.</p>
+    </div>`;
+}
+function addSubstituteToPool(){
+  const nameEl = document.getElementById('newSubName');
+  const emailEl = document.getElementById('newSubEmail');
+  const notesEl = document.getElementById('newSubNotes');
+  const name = nameEl.value.trim();
+  if(!name) return;
+  const entry = { id: uid('sub'), name };
+  if(emailEl.value.trim()) entry.email = emailEl.value.trim();
+  if(notesEl.value.trim()) entry.notes = notesEl.value.trim();
+  DATA.substitutePool = DATA.substitutePool || [];
+  DATA.substitutePool.push(entry);
+  saveAndRender();
+}
+function editSubstituteInPool(id){
+  const s = (DATA.substitutePool||[]).find(x=>x.id===id);
+  if(!s) return;
+  showPrompt('Nom :', s.name, (name)=>{
+    if(!name || !name.trim()) return;
+    s.name = name.trim();
+    showPrompt('Courriel (laisser vide pour aucun) :', s.email||'', (email)=>{
+      s.email = email && email.trim() ? email.trim() : undefined;
+      showPrompt('Notes (laisser vide pour aucune) :', s.notes||'', (notes)=>{
+        s.notes = notes && notes.trim() ? notes.trim() : undefined;
+        saveAndRender();
+      });
+    });
+  });
+}
+function removeSubstituteFromPool(id){
+  showConfirm('Retirer ce remplaçant de la liste ?', ()=>{
+    DATA.substitutePool = (DATA.substitutePool||[]).filter(x=>x.id!==id);
+    saveAndRender();
+  });
+}
+// Ouvre l'app Mail avec une demande de disponibilité pré-remplie pour tous
+// les remplaçants ayant un courriel enregistré.
+function emailAvailabilityRequest(){
+  const pool = DATA.substitutePool || [];
+  const emails = [...new Set(pool.filter(s=>s.email).map(s=>s.email))];
+  if(emails.length===0){ showAlert("Aucun remplaçant n'a de courriel enregistré."); return; }
+  const open = currentOpenSession();
+  const dateLine = open ? `la session du ${open.date}` : 'notre prochaine session';
+  const subject = `Disponibilité — ${DATA.leagueName}`;
+  const body = `Bonjour,\n\nEst-ce que quelqu'un serait disponible pour dépanner comme remplaçant(e) pour ${dateLine} ?\n\nRéponds-moi directement si oui !\n\nMerci !`;
+  window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 function adminPlayersHTML(){
   const players = DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));
   const groups = groupsSorted();
@@ -1151,6 +1230,13 @@ function substituteManagementHTML(open){
           const pg = groupById(p.groupId);
           return `<option value="${p.id}" ${p.id===currentSub?'selected':''}>${escapeHTML(p.name)}${pg ? ' ('+escapeHTML(pg.name)+')' : ''}</option>`;
         }).join('')}
+        ${(DATA.substitutePool||[]).length ? `<optgroup label="Remplaçants réguliers">
+          ${(DATA.substitutePool||[]).map(s=>{
+            const gid = 'guest::' + encodeURIComponent(s.name);
+            if(gid === currentSub) return ''; // déjà affiché ci-dessous comme sélection courante
+            return `<option value="${gid}">${escapeHTML(s.name)}</option>`;
+          }).join('')}
+        </optgroup>` : ''}
         ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
         <option value="__guest__">Autre... (invité hors ligue)</option>
       </select>
@@ -1760,6 +1846,7 @@ function handleImportFile(input){
 function migrateData(){
   if(DATA.matchesPerSession === undefined) DATA.matchesPerSession = 10;
   if(DATA.testMode === undefined) DATA.testMode = false;
+  if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   (DATA.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
 }
 async function boot(){
