@@ -1734,6 +1734,11 @@ function adminSettingsHTML(){
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
     </div>
     <div class="card">
+      <h3>Cote évolutive</h3>
+      <p class="small">Remet la cote de tous les joueurs à ${RATING_DEFAULT.toFixed(1)} et efface leur historique de matchs comptés (utile si des cotes ont été faussées par une session supprimée avant que l'annulation automatique n'existe).</p>
+      <button class="btn btn-secondary" onclick="resetAllRatings()">Réinitialiser toutes les cotes à ${RATING_DEFAULT.toFixed(1)}</button>
+    </div>
+    <div class="card">
       <h3>Format des matchs</h3>
       <p class="small">Règle standard : groupe de 5 joueurs → 10 matchs, en 9 points. Groupe de 4 joueurs → 6 matchs, en 11 points. Ce nombre s'ajuste automatiquement selon le nombre de joueurs réellement présents pour chaque session.</p>
       <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
@@ -1753,6 +1758,13 @@ function adminSettingsHTML(){
       </div>
     </div>
     ` + adminAccountsHTML();
+}
+function resetAllRatings(){
+  showConfirm(`Remettre la cote de TOUS les joueurs à ${RATING_DEFAULT.toFixed(1)} ? Cette action ne peut pas être annulée.`, ()=>{
+    DATA.players.forEach(p=>{ p.rating = RATING_DEFAULT; p.ratingGames = 0; });
+    (DATA.sessions||[]).forEach(s=>{ delete s.ratingDeltas; });
+    saveAndRender();
+  });
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
