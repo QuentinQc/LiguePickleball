@@ -791,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -817,6 +817,7 @@ function renderAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='groupes') c.innerHTML = adminGroupsHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersHTML();
+  else if(VIEW.tab==='remplacants') c.innerHTML = adminSubstitutePoolHTML();
   else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
   else if(VIEW.tab==='session') c.innerHTML = adminSessionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
@@ -1141,7 +1142,8 @@ async function unlinkAccount(profileId){
 }
 
 function adminGroupsHTML(){
-  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Tous les joueurs ».</p></div>`;
+  const open = currentOpenSession();
+  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Tous les joueurs ». ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
     html += `
@@ -1155,6 +1157,7 @@ function adminGroupsHTML(){
         ${ps.map(p=>`<tr><td>${escapeHTML(p.name)}</td></tr>`).join('')}
         ${ps.length===0 ? `<tr><td class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
+      ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
   });
   html += `
@@ -1165,7 +1168,49 @@ function adminGroupsHTML(){
       </div>
       <p class="small">Le groupe 1 est le sommet de l'échelle. Les nouveaux groupes s'ajoutent en bas.</p>
     </div>`;
-  html += adminSubstitutePoolHTML();
+  return html;
+}
+// Gestion des absences/remplaçants pour UN groupe en particulier, intégrée
+// directement dans sa carte (au lieu d'une vue centralisée à part).
+function groupAbsenceManagementHTML(open, g){
+  const gd = open.groupsData.find(x=>x.groupId===g.id);
+  if(!gd) return '';
+  const groupPlayerIds = playersInGroup(g.id).map(p=>p.id);
+  const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id));
+  if(absentIds.length===0) return '';
+  const subs = gd.substitutes || {};
+  const inUse = substitutesInUse(open, g.id, null);
+  let html = `<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;">
+    <h3 style="margin-bottom:8px;">Remplaçants — session du ${open.date}</h3>`;
+  absentIds.forEach(id=>{
+    const currentSub = subs[id];
+    const loanedTo = open.loans && open.loans[id] ? groupById(open.loans[id]) : null;
+    const eligible = DATA.players.filter(p=> p.id!==id && p.groupId!==g.id && (!inUse.has(p.id) || p.id===currentSub));
+    const status = loanedTo
+      ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
+      : `<span class="small">descendra automatiquement d'un groupe</span>`;
+    html += `<div class="row" style="margin-bottom:8px;align-items:center;flex-wrap:wrap;">
+      <span style="min-width:110px;">${escapeHTML(playerName(id))}</span>
+      <span style="min-width:150px;">${status}</span>
+      <select onchange="onSubSelect('${g.id}','${id}', this.value)">
+        <option value="">— place vide, pas de remplaçant —</option>
+        ${eligible.map(p=>{
+          const pg = groupById(p.groupId);
+          return `<option value="${p.id}" ${p.id===currentSub?'selected':''}>${escapeHTML(p.name)}${pg ? ' ('+escapeHTML(pg.name)+')' : ''}</option>`;
+        }).join('')}
+        ${(DATA.substitutePool||[]).length ? `<optgroup label="Remplaçants réguliers">
+          ${(DATA.substitutePool||[]).map(s=>{
+            const gid = 'guest::' + encodeURIComponent(s.name);
+            if(gid === currentSub) return '';
+            return `<option value="${gid}">${escapeHTML(s.name)}</option>`;
+          }).join('')}
+        </optgroup>` : ''}
+        ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
+        <option value="__guest__">Autre... (invité hors ligue)</option>
+      </select>
+    </div>`;
+  });
+  html += `</div>`;
   return html;
 }
 function addGroup(){
@@ -1195,56 +1240,6 @@ function movePlayer(pid){
 
 // Vue centralisée de toutes les absences/remplaçants de la session, tous
 // groupes confondus, pour éviter d'avoir à fouiller dans chaque groupe.
-function substituteManagementHTML(open){
-  const rows = [];
-  groupsSorted().forEach(g=>{
-    const gd = open.groupsData.find(x=>x.groupId===g.id);
-    if(!gd) return;
-    const groupPlayerIds = playersInGroup(g.id).map(p=>p.id);
-    const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id));
-    if(absentIds.length===0) return;
-    const subs = gd.substitutes || {};
-    const inUse = substitutesInUse(open, g.id, null);
-    absentIds.forEach(id=>{
-      const currentSub = subs[id];
-      const loanedTo = open.loans && open.loans[id] ? groupById(open.loans[id]) : null;
-      const eligible = DATA.players.filter(p=> p.id!==id && p.groupId!==g.id && (!inUse.has(p.id) || p.id===currentSub));
-      rows.push({ g, id, currentSub, loanedTo, eligible });
-    });
-  });
-  if(rows.length===0){
-    return `<div class="card"><h3>Remplaçants</h3><p class="small">Aucune absence déclarée pour cette session pour l'instant.</p></div>`;
-  }
-  let html = `<div class="card"><h3>Remplaçants <span class="small">(${rows.length} absence${rows.length>1?'s':''})</span></h3>`;
-  rows.forEach(({g, id, currentSub, loanedTo, eligible})=>{
-    const status = loanedTo
-      ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
-      : `<span class="small">descendra automatiquement d'un groupe, peu importe le remplaçant choisi</span>`;
-    html += `<div class="row" style="margin-bottom:10px;align-items:center;flex-wrap:wrap;">
-      <span class="small" style="min-width:90px;"><strong>${escapeHTML(g.name)}</strong></span>
-      <span style="min-width:120px;">${escapeHTML(playerName(id))}</span>
-      <span style="min-width:140px;">${status}</span>
-      <select onchange="onSubSelect('${g.id}','${id}', this.value)">
-        <option value="">— place vide, pas de remplaçant —</option>
-        ${eligible.map(p=>{
-          const pg = groupById(p.groupId);
-          return `<option value="${p.id}" ${p.id===currentSub?'selected':''}>${escapeHTML(p.name)}${pg ? ' ('+escapeHTML(pg.name)+')' : ''}</option>`;
-        }).join('')}
-        ${(DATA.substitutePool||[]).length ? `<optgroup label="Remplaçants réguliers">
-          ${(DATA.substitutePool||[]).map(s=>{
-            const gid = 'guest::' + encodeURIComponent(s.name);
-            if(gid === currentSub) return ''; // déjà affiché ci-dessous comme sélection courante
-            return `<option value="${gid}">${escapeHTML(s.name)}</option>`;
-          }).join('')}
-        </optgroup>` : ''}
-        ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
-        <option value="__guest__">Autre... (invité hors ligue)</option>
-      </select>
-    </div>`;
-  });
-  html += `</div>`;
-  return html;
-}
 function adminSessionHTML(){
   const open = currentOpenSession();
   if(!open){
@@ -1257,13 +1252,12 @@ function adminSessionHTML(){
   }
   let html = `<div class="card">
     <h2>Session du ${open.date}</h2>
-    <p class="small">Entre les pointages, puis clique sur « Terminer la session » pour appliquer les montées/descentes.</p>
+    <p class="small">Entre les pointages, puis clique sur « Terminer la session » pour appliquer les montées/descentes. La gestion des absences/remplaçants se trouve dans l'onglet « Groupes & joueurs ».</p>
     <div class="row">
       <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
       <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
     </div>
   </div>`;
-  html += substituteManagementHTML(open);
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
