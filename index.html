@@ -217,7 +217,7 @@ async function switchToLeague(leagueId){
   DATA = loaded || defaultData();
   migrateData();
   await refreshMyLinkForCurrentLeague();
-  VIEW = { tab:'groupes' };
+  VIEW = { tab:'session' };
   render();
 }
 // Vérifie si le compte admin courant est lui-même lié à un joueur dans cette ligue.
@@ -724,7 +724,7 @@ async function onAuthResolved(user){
       // Aucune ligue n'existe encore : l'admin devra en créer une.
       CURRENT_LEAGUE_ID = null;
       DATA = defaultData();
-      VIEW = { tab:'groupes' };
+      VIEW = { tab:'session' };
       render();
       return;
     }
@@ -791,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['groupes','Groupes & joueurs'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['session','Session en cours'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['session','Session'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -815,14 +815,23 @@ function renderAdmin(){
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
-  if(VIEW.tab==='groupes') c.innerHTML = adminGroupsHTML();
+  if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersHTML();
   else if(VIEW.tab==='remplacants') c.innerHTML = adminSubstitutePoolHTML();
   else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
-  else if(VIEW.tab==='session') c.innerHTML = adminSessionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else c.innerHTML = adminSettingsHTML();
 }
+// Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
+// absences/remplaçants) et Résultats (matchs, scores, publication).
+function adminSessionSectionHTML(){
+  const sub = VIEW.sessionSubTab || 'groupes';
+  const subTabs = [['groupes','Groupes'],['resultats','Résultats']];
+  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
+  return html;
+}
+function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 function setAdminTab(t){
   VIEW.tab=t;
   if(t==='comptes' || t==='joueurs'){
@@ -1090,7 +1099,7 @@ function setAccountRole(profileId, newRole){
       CURRENT_PROFILE.role = newRole;
       if(newRole === 'admin'){
         SESSION_USER = { role:'admin', email: CURRENT_PROFILE.email };
-        VIEW = { tab:'groupes' };
+        VIEW = { tab:'session' };
         await refreshMyLinkForCurrentLeague();
       } else {
         await loadMyLeagueLinks(CURRENT_PROFILE.id);
