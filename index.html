@@ -411,12 +411,25 @@ function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order)
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
 // ---------- session lifecycle ----------
+// Retourne la date (YYYY-MM-DD) du prochain jour correspondant au jour de jeu
+// configuré pour la ligue (aujourd'hui inclus si on est justement ce jour-là).
+// Si aucun jour n'est configuré, retourne simplement la date d'aujourd'hui.
+function nextSessionDate(){
+  if(typeof DATA.playDayOfWeek !== 'number') return new Date().toISOString().slice(0,10);
+  const now = new Date();
+  const diff = (DATA.playDayOfWeek - now.getDay() + 7) % 7;
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 function startNewSession(){
   const groupsData = DATA.groups.map(g=>{
     const ids = playersInGroup(g.id).map(p=>p.id);
     return { groupId: g.id, matches: ids.length >= 2 ? generateMatches(ids) : [] };
   });
-  const session = { id: uid('s'), date: new Date().toISOString().slice(0,10), status:'open', groupsData, movements: null, absences: [], published: false };
+  const session = { id: uid('s'), date: nextSessionDate(), status:'open', groupsData, movements: null, absences: [], published: false };
   DATA.sessions.push(session);
   return session;
 }
@@ -1733,6 +1746,14 @@ function adminSettingsHTML(){
   return `
     <div class="card">
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
+      <div class="field">
+        <label>Jour de jeu habituel de la ligue</label>
+        <select id="setPlayDay">
+          <option value="">— non défini (date du jour par défaut) —</option>
+          ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
+        </select>
+        <p class="small" style="margin-top:4px;">Utilisé pour suggérer automatiquement la bonne date au démarrage d'une session (ex: si tu lances la session un jeudi alors que la ligue joue le mercredi, elle proposera le mercredi suivant).</p>
+      </div>
       <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
     </div>
@@ -1771,6 +1792,8 @@ function resetAllRatings(){
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
+  const dayVal = document.getElementById('setPlayDay').value;
+  DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
   DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
   DATA.testMode = document.getElementById('setTestMode').checked;
   DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
