@@ -654,12 +654,15 @@ function applyRatingUpdates(session){
       });
     });
   });
+  session.ratingDeltas = {}; // pour pouvoir annuler l'effet de cette session plus tard
   Object.keys(deltas).forEach(pid=>{
     const p = DATA.players.find(x=>x.id===pid);
     if(!p) return;
     const before = ratingOf(pid);
-    p.rating = Math.round((before + deltas[pid]) * 1000) / 1000;
+    const applied = Math.round(deltas[pid] * 1000) / 1000;
+    p.rating = Math.round((before + applied) * 1000) / 1000;
     p.ratingGames = ratingGamesOf(pid) + 1; // au moins un match joué cette session
+    session.ratingDeltas[pid] = applied;
   });
 }
 
@@ -1637,30 +1640,37 @@ function deleteSession(sessionId){
   const s = DATA.sessions.find(x=>x.id===sessionId);
   if(!s) return;
   const hasMovements = s.movements && s.movements.length > 0;
-  if(!hasMovements){
+  const hasRatingChanges = s.ratingDeltas && Object.keys(s.ratingDeltas).length > 0;
+  if(!hasMovements && !hasRatingChanges){
     showConfirm("Supprimer définitivement cette session ? Cette action ne peut pas être annulée.", ()=>{
       DATA.sessions = DATA.sessions.filter(x=>x.id!==sessionId);
       saveAndRender();
     });
     return;
   }
-  showChoice("Cette session a appliqué des montées/descentes. Que veux-tu faire en la supprimant ?", [
-    "Supprimer seulement l'historique (garder les joueurs où ils sont)",
-    "Supprimer et annuler les déplacements (remettre les joueurs dans leur groupe d'avant)"
+  showChoice("Cette session a appliqué des montées/descentes et/ou des changements de cote. Que veux-tu faire en la supprimant ?", [
+    "Supprimer seulement l'historique (garder les joueurs et cotes où ils sont)",
+    "Supprimer et tout annuler (déplacements ET cotes, comme si cette session n'avait pas eu lieu)"
   ], (choiceIdx)=>{
     let skipped = [];
     if(choiceIdx === 1){
-      s.movements.forEach(m=>{
+      (s.movements||[]).forEach(m=>{
         const pl = DATA.players.find(p=>p.id===m.playerId);
         if(!pl) return;
         if(pl.groupId === m.toGroupId){ pl.groupId = m.fromGroupId; }
         else { skipped.push(pl.name); }
       });
+      Object.keys(s.ratingDeltas||{}).forEach(pid=>{
+        const pl = DATA.players.find(p=>p.id===pid);
+        if(!pl) return;
+        pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
+        pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - 1);
+      });
     }
     DATA.sessions = DATA.sessions.filter(x=>x.id!==sessionId);
     saveAndRender();
     if(skipped.length){
-      showAlert("Session supprimée. Le déplacement de " + skipped.join(', ') + " n'a pas pu être annulé, car son groupe a changé depuis par une session plus récente — ajuste-le manuellement si besoin.");
+      showAlert("Session supprimée. Le déplacement de " + skipped.join(', ') + " n'a pas pu être annulé, car son groupe a changé depuis par une session plus récente — ajuste-le manuellement si besoin. Les cotes, elles, ont bien été annulées.");
     }
   });
 }
