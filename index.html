@@ -903,9 +903,38 @@ function renderAdmin(){
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
 // absences/remplaçants) et Résultats (matchs, scores, publication).
 function adminSessionSectionHTML(){
+  const open = currentOpenSession();
+  let html = '';
+  if(!open){
+    html += `<div class="card">
+      <h2>Aucune session en cours</h2>
+      <p class="small">Démarre une nouvelle session pour générer automatiquement les matchs de double dans chaque groupe.</p>
+      <button class="btn btn-primary" onclick="onStartSession()">Démarrer une nouvelle session</button>
+    </div>`;
+  } else {
+    html += `<div class="card">
+      <h2>Session du ${open.date}</h2>
+      <p class="small">Gère les absences/remplaçants dans « Groupes », entre les pointages dans « Résultats », puis clique sur « Terminer la session » quand tout est prêt.</p>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
+        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
+      </div>
+    </div>
+    <div class="card">
+      ${DATA.testMode ? `<button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button>` : ''}
+      <p class="small">${open.published ? '✅ Session publiée — visible par les joueurs.' : '🔒 Session non publiée — les joueurs ne voient pas encore leurs matchs.'}</p>
+      <div class="row">
+        ${open.published
+          ? `<button class="btn btn-secondary" onclick="onUnpublishSession()">Dépublier (masquer aux joueurs)</button>`
+          : `<button class="btn btn-primary" onclick="onPublishSession()">Publier la session aux joueurs</button>`}
+        <button class="btn btn-primary" onclick="onFinalize()">Terminer la session (appliquer montées/descentes)</button>
+        <button class="btn btn-secondary" onclick="onCancelSession()">Annuler la session</button>
+      </div>
+    </div>`;
+  }
   const sub = VIEW.sessionSubTab || 'groupes';
   const subTabs = [['groupes','Groupes'],['resultats','Résultats']];
-  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
   return html;
 }
@@ -1341,21 +1370,9 @@ function movePlayer(pid){
 function adminSessionHTML(){
   const open = currentOpenSession();
   if(!open){
-    return `
-      <div class="card">
-        <h2>Aucune session en cours</h2>
-        <p class="small">Démarre une nouvelle session pour générer automatiquement les matchs de double dans chaque groupe.</p>
-        <button class="btn btn-primary" onclick="onStartSession()">Démarrer une nouvelle session</button>
-      </div>`;
+    return `<div class="card"><p class="empty">Aucune session en cours.</p></div>`;
   }
-  let html = `<div class="card">
-    <h2>Session du ${open.date}</h2>
-    <p class="small">Entre les pointages, puis clique sur « Terminer la session » pour appliquer les montées/descentes. La gestion des absences/remplaçants se trouve dans l'onglet « Groupes & joueurs ».</p>
-    <div class="row">
-      <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
-      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
-    </div>
-  </div>`;
+  let html = '';
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
@@ -1393,18 +1410,6 @@ function adminSessionHTML(){
     }
     html += `</div>`;
   });
-  html += `
-    <div class="card">
-      ${DATA.testMode ? `<button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button>` : ''}
-      <p class="small">${open.published ? '✅ Session publiée — visible par les joueurs.' : '🔒 Session non publiée — les joueurs ne voient pas encore leurs matchs.'}</p>
-      <div class="row">
-        ${open.published
-          ? `<button class="btn btn-secondary" onclick="onUnpublishSession()">Dépublier (masquer aux joueurs)</button>`
-          : `<button class="btn btn-primary" onclick="onPublishSession()">Publier la session aux joueurs</button>`}
-        <button class="btn btn-primary" onclick="onFinalize()">Terminer la session (appliquer montées/descentes)</button>
-        <button class="btn btn-secondary" onclick="onCancelSession()">Annuler la session</button>
-      </div>
-    </div>`;
   return html;
 }
 function m_hasSitOut(matches){ return matches.some(m=>m.sit); }
