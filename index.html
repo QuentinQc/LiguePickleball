@@ -791,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['session','Session'],['joueurs','Joueurs'],['comptes','Comptes'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -817,7 +817,6 @@ function renderAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
-  else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else c.innerHTML = adminSettingsHTML();
 }
@@ -842,7 +841,7 @@ function adminPlayersSectionHTML(){
 function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
 function setAdminTab(t){
   VIEW.tab=t;
-  if(t==='comptes' || t==='joueurs'){
+  if(t==='reglages' || t==='joueurs'){
     Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(render);
     return;
   }
@@ -1663,7 +1662,8 @@ function adminSettingsHTML(){
         <button class="btn btn-secondary" onclick="triggerImport()">Importer une sauvegarde</button>
         <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
       </div>
-    </div>`;
+    </div>
+    ` + adminAccountsHTML();
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
