@@ -414,22 +414,25 @@ function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 // Retourne la date (YYYY-MM-DD) du prochain jour correspondant au jour de jeu
 // configuré pour la ligue (aujourd'hui inclus si on est justement ce jour-là).
 // Si aucun jour n'est configuré, retourne simplement la date d'aujourd'hui.
-function nextSessionDate(){
-  if(typeof DATA.playDayOfWeek !== 'number') return new Date().toISOString().slice(0,10);
-  const now = new Date();
-  const diff = (DATA.playDayOfWeek - now.getDay() + 7) % 7;
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+function fmtDate(d){
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth()+1).padStart(2,'0');
   const dd = String(d.getDate()).padStart(2,'0');
   return `${yyyy}-${mm}-${dd}`;
 }
-function startNewSession(){
+function nextSessionDate(){
+  if(typeof DATA.playDayOfWeek !== 'number') return fmtDate(new Date());
+  const now = new Date();
+  const diff = (DATA.playDayOfWeek - now.getDay() + 7) % 7;
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  return fmtDate(d);
+}
+function startNewSession(explicitDate){
   const groupsData = DATA.groups.map(g=>{
     const ids = playersInGroup(g.id).map(p=>p.id);
     return { groupId: g.id, matches: ids.length >= 2 ? generateMatches(ids) : [] };
   });
-  const session = { id: uid('s'), date: nextSessionDate(), status:'open', groupsData, movements: null, absences: [], published: false };
+  const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData, movements: null, absences: [], published: false };
   DATA.sessions.push(session);
   return session;
 }
@@ -1424,7 +1427,25 @@ function adminSessionHTML(){
   return html;
 }
 function m_hasSitOut(matches){ return matches.some(m=>m.sit); }
-function onStartSession(){ startNewSession(); saveAndRender(); }
+function onStartSession(){
+  const now = new Date();
+  if(typeof DATA.playDayOfWeek === 'number' && now.getDay() === DATA.playDayOfWeek){
+    const dayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+    const dayName = dayNames[DATA.playDayOfWeek];
+    const todayStr = fmtDate(now);
+    const nextWeekStr = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()+7));
+    showChoice(`On dirait qu'on est justement ${dayName} aujourd'hui. Cette session est-elle pour aujourd'hui, ou est-ce que tu prépares déjà celle de ${dayName} prochain ?`, [
+      `Aujourd'hui (${todayStr})`,
+      `${dayName.charAt(0).toUpperCase()+dayName.slice(1)} prochain (${nextWeekStr})`
+    ], (choiceIdx)=>{
+      startNewSession(choiceIdx === 0 ? todayStr : nextWeekStr);
+      saveAndRender();
+    });
+    return;
+  }
+  startNewSession();
+  saveAndRender();
+}
 
 // ---------- Impression des feuilles de match (papier/crayon) ----------
 function teamNamesForPrint(ids){
