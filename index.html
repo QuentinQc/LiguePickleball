@@ -1114,6 +1114,51 @@ function movePlayer(pid){
   });
 }
 
+// Vue centralisée de toutes les absences/remplaçants de la session, tous
+// groupes confondus, pour éviter d'avoir à fouiller dans chaque groupe.
+function substituteManagementHTML(open){
+  const rows = [];
+  groupsSorted().forEach(g=>{
+    const gd = open.groupsData.find(x=>x.groupId===g.id);
+    if(!gd) return;
+    const groupPlayerIds = playersInGroup(g.id).map(p=>p.id);
+    const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id));
+    if(absentIds.length===0) return;
+    const subs = gd.substitutes || {};
+    const inUse = substitutesInUse(open, g.id, null);
+    absentIds.forEach(id=>{
+      const currentSub = subs[id];
+      const loanedTo = open.loans && open.loans[id] ? groupById(open.loans[id]) : null;
+      const eligible = DATA.players.filter(p=> p.id!==id && p.groupId!==g.id && (!inUse.has(p.id) || p.id===currentSub));
+      rows.push({ g, id, currentSub, loanedTo, eligible });
+    });
+  });
+  if(rows.length===0){
+    return `<div class="card"><h3>Remplaçants</h3><p class="small">Aucune absence déclarée pour cette session pour l'instant.</p></div>`;
+  }
+  let html = `<div class="card"><h3>Remplaçants <span class="small">(${rows.length} absence${rows.length>1?'s':''})</span></h3>`;
+  rows.forEach(({g, id, currentSub, loanedTo, eligible})=>{
+    const status = loanedTo
+      ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
+      : `<span class="small">descendra automatiquement d'un groupe, peu importe le remplaçant choisi</span>`;
+    html += `<div class="row" style="margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+      <span class="small" style="min-width:90px;"><strong>${escapeHTML(g.name)}</strong></span>
+      <span style="min-width:120px;">${escapeHTML(playerName(id))}</span>
+      <span style="min-width:140px;">${status}</span>
+      <select onchange="onSubSelect('${g.id}','${id}', this.value)">
+        <option value="">— place vide, pas de remplaçant —</option>
+        ${eligible.map(p=>{
+          const pg = groupById(p.groupId);
+          return `<option value="${p.id}" ${p.id===currentSub?'selected':''}>${escapeHTML(p.name)}${pg ? ' ('+escapeHTML(pg.name)+')' : ''}</option>`;
+        }).join('')}
+        ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
+        <option value="__guest__">Autre... (invité hors ligue)</option>
+      </select>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
 function adminSessionHTML(){
   const open = currentOpenSession();
   if(!open){
@@ -1132,11 +1177,10 @@ function adminSessionHTML(){
       <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
     </div>
   </div>`;
+  html += substituteManagementHTML(open);
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
-    const groupPlayerIds = playersInGroup(g.id).map(p=>p.id);
-    const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id));
     const expectedRoster = new Set(activeRosterForGroup(open, g.id));
     const inMatches = new Set();
     gd.matches.forEach(m=>{ m.teamA.forEach(id=>inMatches.add(id)); m.teamB.forEach(id=>inMatches.add(id)); });
@@ -1144,35 +1188,7 @@ function adminSessionHTML(){
     const activeCount = expectedRoster.size;
     const info = activeCount>0 ? `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points` : '';
     html += `<div class="card"><h3>${escapeHTML(g.name)}</h3>${info ? `<p class="small">${info}</p>` : ''}`;
-    if(absentIds.length){
-      const subs = gd.substitutes || {};
-      const inUse = substitutesInUse(open, g.id, null);
-      html += `<div style="margin-bottom:10px;">`;
-      absentIds.forEach(id=>{
-        const currentSub = subs[id];
-        const loanedTo = open.loans && open.loans[id] ? groupById(open.loans[id]) : null;
-        // Joueurs sélectionnables : n'importe qui hors de ce groupe, pas déjà
-        // utilisé comme remplaçant ailleurs, et pas la personne absente elle-même.
-        const eligible = DATA.players.filter(p=> p.id!==id && p.groupId!==g.id && (!inUse.has(p.id) || p.id===currentSub));
-        const label = loanedTo
-          ? `${escapeHTML(playerName(id))} — <span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)} pour cette session`
-          : `${escapeHTML(playerName(id))} — absent(e) <span class="small">(descendra automatiquement d'un groupe, peu importe le remplaçant choisi)</span>`;
-        html += `<div class="row" style="margin-bottom:6px;align-items:center;">
-          <span class="small" style="min-width:160px;">${label}</span>
-          <select onchange="onSubSelect('${g.id}','${id}', this.value)">
-            <option value="">— place vide, pas de remplaçant —</option>
-            ${eligible.map(p=>{
-              const pg = groupById(p.groupId);
-              return `<option value="${p.id}" ${p.id===currentSub?'selected':''}>${escapeHTML(p.name)}${pg ? ' ('+escapeHTML(pg.name)+')' : ''}</option>`;
-            }).join('')}
-            ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
-            <option value="__guest__">Autre... (invité hors ligue)</option>
-          </select>
-        </div>`;
-      });
-      html += `</div>`;
-      if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « régénérer » ci-dessous.</p>`;
-    }
+    if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « régénérer » ci-dessous.</p>`;
     if(gd.matches.length===0){ html += `<p class="empty">Pas assez de joueurs pour générer des matchs.</p>`; }
     gd.matches.forEach((m, mi)=>{
       const nameTag = (id)=>{
