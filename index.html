@@ -791,7 +791,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['session','Session'],['joueurs','Tous les joueurs'],['remplacants','Remplaçants'],['comptes','Comptes'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['session','Session'],['joueurs','Joueurs'],['comptes','Comptes'],['historique','Historique'],['reglages','Réglages']];
   const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
     ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
   const leagueSwitcher = `
@@ -816,8 +816,7 @@ function renderAdmin(){
   `;
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
-  else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersHTML();
-  else if(VIEW.tab==='remplacants') c.innerHTML = adminSubstitutePoolHTML();
+  else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='comptes') c.innerHTML = adminAccountsHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else c.innerHTML = adminSettingsHTML();
@@ -832,6 +831,15 @@ function adminSessionSectionHTML(){
   return html;
 }
 function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
+// Onglet « Joueurs » unifié : sous-onglets Tous les joueurs et Remplaçants.
+function adminPlayersSectionHTML(){
+  const sub = VIEW.playersSubTab || 'tous';
+  const subTabs = [['tous','Réguliers'],['remplacants','Remplaçants']];
+  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : adminPlayersHTML();
+  return html;
+}
+function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
 function setAdminTab(t){
   VIEW.tab=t;
   if(t==='comptes' || t==='joueurs'){
@@ -935,7 +943,7 @@ function adminPlayersHTML(){
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;">
-        <h2>Tous les joueurs <span class="small">(${players.length})</span></h2>
+        <h2>Réguliers <span class="small">(${players.length})</span></h2>
       </div>
       <table>
         <tr><th>Nom</th><th>Groupe</th><th></th></tr>
@@ -1152,7 +1160,7 @@ async function unlinkAccount(profileId){
 
 function adminGroupsHTML(){
   const open = currentOpenSession();
-  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Tous les joueurs ». ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
     html += `
