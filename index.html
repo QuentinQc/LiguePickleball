@@ -914,14 +914,6 @@ function adminSessionSectionHTML(){
   } else {
     html += `<div class="card">
       <h2>Session du ${open.date}</h2>
-      <p class="small">Gère les absences/remplaçants dans « Groupes », entre les pointages dans « Résultats », puis clique sur « Terminer la session » quand tout est prêt.</p>
-      <div class="row">
-        <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
-        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
-      </div>
-    </div>
-    <div class="card">
-      ${DATA.testMode ? `<button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button>` : ''}
       <p class="small">${open.published ? '✅ Session publiée — visible par les joueurs.' : '🔒 Session non publiée — les joueurs ne voient pas encore leurs matchs.'}</p>
       <div class="row">
         ${open.published
@@ -930,6 +922,12 @@ function adminSessionSectionHTML(){
         <button class="btn btn-primary" onclick="onFinalize()">Terminer la session (appliquer montées/descentes)</button>
         <button class="btn btn-secondary" onclick="onCancelSession()">Annuler la session</button>
       </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
+        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
+      </div>
+      ${DATA.testMode ? `<div class="row" style="margin-top:10px;"><button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button></div>` : ''}
+      <p class="small" style="margin-top:10px;">Gère les absences/remplaçants dans « Groupes », entre les pointages dans « Résultats ».</p>
     </div>`;
   }
   const sub = VIEW.sessionSubTab || 'groupes';
