@@ -420,6 +420,23 @@ function playerName(id){
 }
 function isGuestId(id){ return typeof id === 'string' && id.startsWith('guest::'); }
 function groupById(id){ return DATA.groups.find(g=>g.id===id); }
+// Retrouve, pour un joueur, le groupe et le classement obtenus lors de sa
+// dernière session jouée (pour aider à ajuster les positions actuelles).
+function previousSessionInfoForPlayer(pid){
+  const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
+  for(const s of closed){
+    if(!s.standingsByGroup) continue;
+    for(const gid in s.standingsByGroup){
+      const rows = s.standingsByGroup[gid];
+      const idx = rows.findIndex(r=>r.playerId===pid);
+      if(idx !== -1){
+        const g = groupById(gid);
+        return { groupName: g ? g.name : '(groupe supprimé)', position: idx+1, total: rows.length, date: s.date };
+      }
+    }
+  }
+  return null;
+}
 function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order); }
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
@@ -1500,17 +1517,23 @@ function adminGroupsHTML(){
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
-        <tr><th>#</th><th>Nom</th></tr>
-        ${ps.map((p,i)=>`<tr class="draggable-row" draggable="true"
+        <tr><th>#</th><th>Nom</th><th>Session précédente</th></tr>
+        ${ps.map((p,i)=>{
+          const prev = previousSessionInfoForPlayer(p.id);
+          const prevText = prev ? `${escapeHTML(prev.groupName)} — ${prev.position}${prev.position===1?'er':'e'}/${prev.total}` : '<span class="small">—</span>';
+          return `<tr class="draggable-row" draggable="true"
           ondragstart="onPlayerDragStart(event,'${p.id}')"
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
           ondrop="onRowDrop(event,'${g.id}','${p.id}')">
           <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
           <td>${escapeHTML(p.name)}</td>
-        </tr>`).join('')}
-        ${ps.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
+          <td class="small">${prevText}</td>
+        </tr>`;
+        }).join('')}
+        ${ps.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
+      <p class="small">« Session précédente » indique le groupe et le classement du dernier match joué par chaque joueur, pour t'aider à ajuster les positions.</p>
       <p class="small">Glisse-dépose un joueur sur un autre pour changer sa position (ordinateur seulement).</p>
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
