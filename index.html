@@ -1594,13 +1594,16 @@ function removePlayer(pid){
   });
 }
 function movePlayer(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  const currentGroup = groupById(p.groupId);
   const sorted = groupsSorted();
-  showChoice('Déplacer vers quel groupe ?', sorted.map(g=>g.name), (idx)=>{
+  showChoice(`Déplacer ${p.name} (actuellement dans ${currentGroup ? currentGroup.name : '—'}) vers quel groupe ?`, sorted.map(g=>g.name), (idx)=>{
     if(!sorted[idx]) return;
-    const otherPlayers = DATA.players.filter(p=>p.id!==pid); // le joueur qu'on déplace ne compte pas contre lui-même
+    const otherPlayers = DATA.players.filter(x=>x.id!==pid); // le joueur qu'on déplace ne compte pas contre lui-même
     const groupId = resolveGroupAssignment(sorted[idx].id, DATA.groups, otherPlayers);
     if(!groupId) return;
-    DATA.players.find(p=>p.id===pid).groupId = groupId;
+    p.groupId = groupId;
     saveAndRender();
   });
 }
