@@ -70,6 +70,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .mode-switch button{border:none;background:transparent;color:var(--muted);font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .15s ease,color .15s ease;}
 .mode-switch button.active{background:var(--ball);color:var(--court);font-weight:700;}
 .mode-switch button:not(.active):hover{color:var(--line);}
+tr.draggable-row{cursor:grab;}
+tr.draggable-row:active{cursor:grabbing;}
+.drop-target{transition:background .12s ease, outline .12s ease;}
+.drop-target-hover{background:rgba(207,234,92,0.1);outline:2px dashed var(--ball);outline-offset:-2px;}
 .court-mark{width:34px;height:34px;border-radius:8px;background:var(--ball);display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;color:var(--court);font-size:16px;}
 .brand{display:flex;gap:10px;align-items:center;}
 .pill-input{width:64px;text-align:center;}
@@ -1442,12 +1446,12 @@ async function unlinkAccount(profileId){
 
 function adminGroupsHTML(){
   const open = currentOpenSession();
-  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
     const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS || ps.length > GROUP_MAX_PLAYERS);
     html += `
-    <div class="card">
+    <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;">
         <h2>${escapeHTML(g.name)} <span class="small">(${ps.length} joueur${ps.length>1?'s':''})</span></h2>
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
@@ -1456,7 +1460,7 @@ function adminGroupsHTML(){
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
         <tr><th>Nom</th></tr>
-        ${ps.map(p=>`<tr><td>${escapeHTML(p.name)}</td></tr>`).join('')}
+        ${ps.map(p=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')"><td>${escapeHTML(p.name)}</td></tr>`).join('')}
         ${ps.length===0 ? `<tr><td class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
@@ -1529,6 +1533,29 @@ function renameGroup(gid){
 // Supprime un groupe. S'il contient encore des joueurs, demande confirmation
 // et les réassigne automatiquement au premier groupe ayant de la place —
 // annule l'opération si un joueur ne peut être replacé nulle part.
+// ---------- glisser-déposer d'un joueur entre groupes (ordinateur) ----------
+function onPlayerDragStart(ev, pid){
+  ev.dataTransfer.setData('text/plain', pid);
+  ev.dataTransfer.effectAllowed = 'move';
+}
+function onGroupDragOver(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.add('drop-target-hover');
+}
+function onGroupDragLeave(ev){
+  ev.currentTarget.classList.remove('drop-target-hover');
+}
+function onGroupDrop(ev, gid){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drop-target-hover');
+  const pid = ev.dataTransfer.getData('text/plain');
+  if(!pid) return;
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p || p.groupId === gid) return;
+  const otherPlayers = DATA.players.filter(x=>x.id!==pid);
+  p.groupId = resolveGroupAssignment(gid, DATA.groups, otherPlayers);
+  saveAndRender();
+}
 function deleteGroup(gid){
   const g = groupById(gid);
   if(!g) return;
