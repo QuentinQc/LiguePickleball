@@ -1868,9 +1868,11 @@ function printableMatchSheetsHTML(session){
   groupsSorted().forEach(g=>{
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     if(!gd || !gd.matches || gd.matches.length===0) return;
+    const activeCount = activeRosterForGroup(session, g.id).length;
+    const target = targetPointsFor(activeCount);
     html += `<div class="print-page">
       <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
-      <p class="print-sub">${escapeHTML(g.name)} — session du ${session.date}</p>
+      <p class="print-sub">${escapeHTML(g.name)} — session du ${session.date} — matchs en ${target} points</p>
       <table class="print-table">
         <tr><th style="width:6%;">#</th><th>Équipe A</th><th style="width:16%;">Score</th><th style="width:16%;">Score</th><th>Équipe B</th></tr>
         ${gd.matches.map((m,i)=>`<tr>
@@ -2473,10 +2475,13 @@ function computePlayerFunStats(pid){
 function playerFunStatsHTML(me){
   const { headToHead, partnerStats, timeline } = computePlayerFunStats(me.id);
   const MIN_COUNT = 2;
+  const sameGroup = (id)=>{ const p = DATA.players.find(x=>x.id===id); return p && p.groupId === me.groupId; };
   const opponents = Object.keys(headToHead)
+    .filter(sameGroup)
     .map(id=>{ const s=headToHead[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
     .filter(o=>o.total>=MIN_COUNT);
   const partners = Object.keys(partnerStats)
+    .filter(sameGroup)
     .map(id=>{ const s=partnerStats[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
     .filter(o=>o.total>=MIN_COUNT);
 
