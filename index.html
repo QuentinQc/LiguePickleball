@@ -419,6 +419,7 @@ function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order)
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
 const GROUP_MAX_PLAYERS = 5;
+const GROUP_MIN_PLAYERS = 4;
 // Retourne le premier groupe (selon l'ordre de l'échelle) qui a encore de la
 // place (moins de GROUP_MAX_PLAYERS joueurs), ou null si tous sont pleins.
 function firstGroupWithRoom(groupsList, playersList){
@@ -433,12 +434,11 @@ function firstGroupWithRoom(groupsList, playersList){
 // avertit et retourne plutôt le premier groupe disponible.
 function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
   const count = playersList.filter(p=>p.groupId===desiredGroupId).length;
-  if(count < GROUP_MAX_PLAYERS) return desiredGroupId;
-  const alt = firstGroupWithRoom(groupsList, playersList);
-  const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
-  const altName = (groupsList.find(g=>g.id===alt)||{}).name || '—';
-  showAlert(`${desiredName} a déjà ${GROUP_MAX_PLAYERS} joueurs (maximum). Le joueur a plutôt été placé dans ${altName}.`);
-  return alt;
+  if(count >= GROUP_MAX_PLAYERS){
+    const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
+    showAlert(`Attention : ${desiredName} aura maintenant ${count+1} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`);
+  }
+  return desiredGroupId;
 }
 // Ajoute un suffixe numéroté si le nom existe déjà, pour éviter les doublons.
 function uniquePlayerName(desiredName, playersList, excludePlayerId){
@@ -944,11 +944,11 @@ function renderAdmin(){
   const leagueSwitcher = `
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <div class="field" style="margin:0;flex:1;min-width:180px;">
-          <label>Ligue actuelle</label>
-          <select onchange="switchToLeague(this.value)">
-            ${LEAGUES.map(l=>`<option value="${l.id}" ${l.id===CURRENT_LEAGUE_ID?'selected':''}>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</option>`).join('')}
-          </select>
+        <div style="flex:1;">
+          <label style="display:block;margin-bottom:6px;">Ligue actuelle</label>
+          <div class="row" style="gap:6px;">
+            ${LEAGUES.map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
+          </div>
         </div>
         <button class="btn-ghost" onclick="onCreateLeague()">+ Nouvelle ligue</button>
       </div>
@@ -1445,6 +1445,7 @@ function adminGroupsHTML(){
   let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS || ps.length > GROUP_MAX_PLAYERS);
     html += `
     <div class="card">
       <div class="row" style="justify-content:space-between;">
@@ -1452,6 +1453,7 @@ function adminGroupsHTML(){
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
         <button class="btn-ghost" onclick="deleteGroup('${g.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">supprimer</button>
       </div>
+      ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
         <tr><th>Nom</th></tr>
         ${ps.map(p=>`<tr><td>${escapeHTML(p.name)}</td></tr>`).join('')}
@@ -1708,6 +1710,10 @@ async function emailAbsenceReminder(){
 function sessionCompletionIssues(session){
   const issues = [];
   groupsSorted().forEach(g=>{
+    const memberCount = playersInGroup(g.id).length;
+    if(memberCount > GROUP_MAX_PLAYERS){
+      issues.push(`${g.name} : ${memberCount} joueurs, au-dessus de la limite de ${GROUP_MAX_PLAYERS} — déplace des joueurs avant de publier`);
+    }
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
     if(gd.matches.length===0){
@@ -2039,14 +2045,13 @@ function renderPlayer(playerId){
     </div>` : '';
   const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
     <div class="card">
-      <div class="field" style="margin:0;">
-        <label>Ma ligue</label>
-        <select onchange="switchMyLeague(this.value)">
-          ${MY_LEAGUE_LINKS.map(l=>{
-            const lg = LEAGUES.find(x=>x.id===l.league_id);
-            return `<option value="${l.league_id}" ${l.league_id===CURRENT_LEAGUE_ID?'selected':''}>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</option>`;
-          }).join('')}
-        </select>
+      <label style="display:block;margin-bottom:6px;">Ma ligue</label>
+      <div class="row" style="gap:6px;">
+        ${MY_LEAGUE_LINKS.map(l=>{
+          const lg = LEAGUES.find(x=>x.id===l.league_id);
+          const active = l.league_id===CURRENT_LEAGUE_ID;
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" onclick="switchMyLeague('${l.league_id}')">${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</button>`;
+        }).join('')}
       </div>
     </div>` : '';
   app.innerHTML = `
