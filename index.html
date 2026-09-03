@@ -606,6 +606,8 @@ function finalizeSession(session){
 
 // ---------- cote évolutive (ELO adapté au double, échelle ~3.5-5.0) ----------
 const RATING_DEFAULT = 4.0;
+const RATING_MIN = 2.0;
+const RATING_MAX = 8.0;
 const RATING_SCALE = 0.5; // contrôle la sensibilité de la probabilité de victoire attendue
 function ratingOf(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -1076,7 +1078,7 @@ function adminPlayersHTML(){
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
             <td>${rating.toFixed(2)}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="editPlayerRating('${p.id}')">modifier cote</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
           </tr>`;
         }).join('')}
         ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
@@ -1098,6 +1100,34 @@ function renamePlayer(pid){
   showPrompt('Nouveau nom du joueur :', p.name, (name)=>{
     if(name && name.trim()){ p.name = name.trim(); saveAndRender(); }
   });
+}
+// Modification manuelle de la cote d'un joueur, avec bornes raisonnables
+// (2.0-8.0) et une confirmation renforcée si le joueur a déjà des matchs
+// comptabilisés (pour éviter d'écraser une cote gagnée par erreur).
+function applyRatingEdit(pid, rawValue){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  const value = parseFloat(String(rawValue).replace(',', '.'));
+  if(isNaN(value)){ showAlert("Valeur invalide."); return; }
+  const clamped = Math.min(RATING_MAX, Math.max(RATING_MIN, value));
+  p.rating = Math.round(clamped * 1000) / 1000;
+  saveAndRender();
+}
+function editPlayerRating(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  const current = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
+  const games = typeof p.ratingGames === 'number' ? p.ratingGames : 0;
+  const promptForValue = ()=>{
+    showPrompt(`Nouvelle cote de ${p.name} (entre ${RATING_MIN.toFixed(1)} et ${RATING_MAX.toFixed(1)}) :`, current.toFixed(2), (val)=>{
+      if(val !== null && val !== undefined && val.trim() !== '') applyRatingEdit(pid, val.trim());
+    });
+  };
+  if(games > 0){
+    showConfirm(`${p.name} a déjà ${games} match${games>1?'s':''} comptabilisé${games>1?'s':''} dans sa cote actuelle (${current.toFixed(2)}). La modifier manuellement écrasera cette progression. Continuer ?`, promptForValue);
+  } else {
+    promptForValue();
+  }
 }
 
 // ---- Comptes : lier les comptes créés (courriel/mot de passe) à des joueurs ----
