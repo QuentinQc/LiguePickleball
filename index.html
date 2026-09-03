@@ -44,7 +44,9 @@ p{margin:4px 0;line-height:1.4;}
 .btn-secondary{background:transparent;color:var(--line);border:1px solid rgba(255,255,255,0.25);}
 .btn-secondary:hover{border-color:var(--ball);color:var(--ball);}
 .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
-.btn-ghost{background:transparent;color:var(--muted);border:none;text-decoration:underline;padding:4px 0;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;}
+.btn-ghost{display:inline-block;background:rgba(255,255,255,0.08);color:var(--line);border:none;border-radius:999px;padding:5px 12px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;text-decoration:none;cursor:pointer;transition:background .15s ease, color .15s ease, opacity .15s ease;margin:2px 3px 2px 0;}
+.btn-ghost:hover{background:rgba(255,255,255,0.16);color:var(--ball);}
+.btn-ghost:disabled{opacity:0.4;cursor:not-allowed;}
 input,select{font-family:var(--font-body);font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.2);color:var(--text);}
 input::placeholder{color:var(--muted);}
 input:focus,select:focus{outline:2px solid var(--ball);outline-offset:1px;}
@@ -997,7 +999,7 @@ function adminSubstitutePoolHTML(){
           <td>${escapeHTML(s.name)}</td>
           <td>${escapeHTML(s.email||'—')}</td>
           <td>${escapeHTML(s.notes||'—')}</td>
-          <td><button class="btn-ghost" onclick="editSubstituteInPool('${s.id}')">modifier</button> <button class="btn-ghost" onclick="removeSubstituteFromPool('${s.id}')" style="color:var(--danger)">retirer</button></td>
+          <td><button class="btn-ghost" onclick="editSubstituteInPool('${s.id}')">modifier</button> <button class="btn-ghost" onclick="removeSubstituteFromPool('${s.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button></td>
         </tr>`).join('')}
         ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
       </table>
@@ -1078,7 +1080,7 @@ function adminPlayersHTML(){
             <td>${escapeHTML(p.name)}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
             <td>${rating.toFixed(2)}</td>
-            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="editPlayerRating('${p.id}')">modifier cote</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger)">retirer</button></td>
+            <td><button class="btn-ghost" onclick="renamePlayer('${p.id}')">renommer</button> <button class="btn-ghost" onclick="editPlayerRating('${p.id}')">modifier cote</button> <button class="btn-ghost" onclick="movePlayer('${p.id}')">déplacer</button> <button class="btn-ghost" onclick="removePlayer('${p.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button></td>
           </tr>`;
         }).join('')}
         ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
@@ -1244,7 +1246,7 @@ function adminAccountsHTML(){
           <td>${escapeHTML(profile.email)}</td>
           <td>${escapeHTML(leaguesSummaryForProfile(profile.id))}<br><button class="btn-ghost" onclick="openProfileLeaguesModal('${profile.id}','${escapeHTML(displayName).replace(/'/g,"\\'")}')">modifier</button></td>
           <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
-          <td><button class="btn-ghost" onclick="unlinkAccount('${profile.id}')" style="color:var(--danger)">délier</button></td>
+          <td><button class="btn-ghost" onclick="unlinkAccount('${profile.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">délier</button></td>
         </tr>`;
       }).join('')}
       ${linked.length===0 ? `<tr><td colspan="5" class="empty">Aucun compte lié pour l'instant</td></tr>` : ''}
