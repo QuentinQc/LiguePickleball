@@ -291,7 +291,11 @@ function shuffle(arr){
 // Règle standard : 5 joueurs → 10 matchs (à 9 points) ; 4 joueurs → 6 matchs (à 11 points).
 // Le mode test (Réglages) permet de contourner temporairement cette règle pour essayer l'app rapidement.
 function matchesCountFor(n){
-  if(DATA.testMode) return Math.max(1, DATA.matchesPerSession || 3);
+  if(DATA.testMode){
+    if(n === 4) return Math.max(1, DATA.testMatches4 || 2);
+    if(n === 5) return Math.max(1, DATA.testMatches5 || 3);
+    return Math.max(1, DATA.matchesPerSession || 3);
+  }
   if(n === 5) return 10;
   if(n === 4) return 6;
   return DATA.matchesPerSession || 10; // repli pour une taille de groupe atypique
@@ -2346,9 +2350,14 @@ function adminSettingsHTML(){
       <p class="small">Règle standard : groupe de 5 joueurs → 10 matchs, en 9 points. Groupe de 4 joueurs → 6 matchs, en 11 points. Ce nombre s'ajuste automatiquement selon le nombre de joueurs réellement présents pour chaque session.</p>
       <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="setTestMode" ${DATA.testMode ? 'checked' : ''} style="width:auto;">
-        <span class="small">Mode test — remplacer la règle standard par un nombre réduit de matchs, pour essayer l'app rapidement</span>
+        <span class="small">Mode test — remplacer la règle standard par un nombre réduit de matchs, pour essayer l'app ou faire une démonstration rapidement</span>
       </label>
-      <div class="field" style="margin-top:8px;"><label>Nombre de matchs en mode test</label><input id="setMatchesPerSession" type="number" min="1" value="${DATA.matchesPerSession || 3}"></div>
+      <p class="small" style="margin-top:8px;">La règle 4 joueurs / 5 joueurs reste respectée même en mode test — utile pour démontrer la différence, mais avec des nombres réduits.</p>
+      <div class="row" style="margin-top:6px;">
+        <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 4 (test)</label><input id="setTestMatches4" type="number" min="1" value="${DATA.testMatches4 || 2}"></div>
+        <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 5 (test)</label><input id="setTestMatches5" type="number" min="1" value="${DATA.testMatches5 || 3}"></div>
+      </div>
+      <div class="field"><label>Matchs pour une taille de groupe atypique (test)</label><input id="setMatchesPerSession" type="number" min="1" value="${DATA.matchesPerSession || 3}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
     </div>
     <div class="card">
@@ -2378,6 +2387,8 @@ function saveSettings(){
   DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
   DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
   DATA.testMode = document.getElementById('setTestMode').checked;
+  DATA.testMatches4 = Math.max(1, parseInt(document.getElementById('setTestMatches4').value,10) || 2);
+  DATA.testMatches5 = Math.max(1, parseInt(document.getElementById('setTestMatches5').value,10) || 3);
   DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
   saveAndRender();
 }
@@ -2671,6 +2682,8 @@ function handleImportFile(input){
 function migrateData(){
   if(DATA.matchesPerSession === undefined) DATA.matchesPerSession = 10;
   if(DATA.testMode === undefined) DATA.testMode = false;
+  if(DATA.testMatches4 === undefined) DATA.testMatches4 = 2;
+  if(DATA.testMatches5 === undefined) DATA.testMatches5 = 3;
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
