@@ -1334,8 +1334,16 @@ function adminAccountsHTML(){
       ${linked.map(({link, profile})=>{
         const pl = DATA.players.find(x=>x.id===link.player_id);
         const displayName = pl ? pl.name : (profile.display_name || profile.email);
+        const orphanCell = pl ? '(joueur introuvable)' : `
+          <div class="small" style="color:var(--danger);margin-bottom:4px;">joueur introuvable (retiré par erreur ?)</div>
+          <select id="relinkSelect_${profile.id}">
+            <option value="">— choisir un joueur —</option>
+            ${unlinkedPlayers.map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
+            <option value="__new__">+ Créer un nouveau joueur « ${escapeHTML(displayName)} »</option>
+          </select>
+          <button class="btn-ghost" onclick="relinkAccount('${profile.id}')">relier</button>`;
         return `<tr>
-          <td>${escapeHTML(pl ? pl.name : '(joueur introuvable)')}</td>
+          <td>${pl ? escapeHTML(pl.name) : orphanCell}</td>
           <td>${escapeHTML(profile.email)}</td>
           <td>${escapeHTML(leaguesSummaryForProfile(profile.id))}<br><button class="btn-ghost" onclick="openProfileLeaguesModal('${profile.id}','${escapeHTML(displayName).replace(/'/g,"\\'")}')">modifier</button></td>
           <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
@@ -1394,6 +1402,30 @@ async function linkAccount(profileId){
   }
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+  await loadAllProfiles();
+  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
+  render();
+}
+// Reconnecte un compte dont le joueur associé a été retiré par erreur (le
+// lien existe déjà en base pour cette ligue, on met juste à jour vers quel
+// joueur il pointe, plutôt que de devoir délier puis relier séparément).
+async function relinkAccount(profileId){
+  const select = document.getElementById('relinkSelect_'+profileId);
+  const value = select.value;
+  if(!value) return;
+  let playerId = value;
+  if(value === '__new__'){
+    const pr = ALL_PROFILES.find(p=>p.id===profileId);
+    const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
+    if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
+    const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
+    const newPlayer = { id: uid('p'), name, groupId };
+    DATA.players.push(newPlayer);
+    await saveData();
+    playerId = newPlayer.id;
+  }
+  const { error } = await sb.from('profile_players').update({ player_id: playerId }).eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
+  if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   render();
