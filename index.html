@@ -2068,10 +2068,18 @@ function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PL
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
-  const teammates = playersInGroup(me.groupId).filter(p=>p.id!==me.id);
+  const groupMembers = playersInGroup(me.groupId).sort((a,b)=>a.name.localeCompare(b.name));
   const open = currentOpenSession();
   let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
-    <p class="small">Coéquipiers de groupe : ${teammates.map(p=>escapeHTML(p.name)).join(', ') || 'aucun autre joueur'}</p></div>`;
+    <table>
+      <tr><th>Nom</th><th>Cote</th></tr>
+      ${groupMembers.map(p=>{
+        const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
+        return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td><td>${rating.toFixed(2)}</td></tr>`;
+      }).join('')}
+      ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
+    </table>
+  </div>`;
   if(open){
     const absent = isAbsent(open, me.id);
     html += `<div class="card">
