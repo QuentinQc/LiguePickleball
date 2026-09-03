@@ -2437,11 +2437,83 @@ function ratingExplanationHTML(){
 function showRatingExplanationModal(){
   showContentModal('Comment fonctionne la cote ?', ratingExplanationHTML());
 }
+// ---------- Statistiques amusantes/encourageantes pour un joueur ----------
+function computePlayerFunStats(pid){
+  const closed = DATA.sessions.filter(s=>s.status==='closed');
+  const headToHead = {}; // adversaireId -> {wins, losses} (de mon point de vue)
+  const partnerStats = {}; // partenaireId -> {wins, losses}
+  const timeline = []; // 'W'/'L' dans l'ordre chronologique
+  closed.forEach(s=>{
+    (s.groupsData||[]).forEach(gd=>{
+      (gd.matches||[]).forEach(m=>{
+        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB==='') return;
+        const sa=Number(m.scoreA), sb=Number(m.scoreB);
+        if(sa===sb) return;
+        const inA = m.teamA.includes(pid), inB = m.teamB.includes(pid);
+        if(!inA && !inB) return;
+        const myTeam = inA ? m.teamA : m.teamB;
+        const oppTeam = inA ? m.teamB : m.teamA;
+        const won = inA ? sa>sb : sb>sa;
+        oppTeam.forEach(oppId=>{
+          if(isGuestId(oppId)) return;
+          if(!headToHead[oppId]) headToHead[oppId] = {wins:0, losses:0};
+          if(won) headToHead[oppId].wins++; else headToHead[oppId].losses++;
+        });
+        myTeam.forEach(partnerId=>{
+          if(partnerId===pid || isGuestId(partnerId)) return;
+          if(!partnerStats[partnerId]) partnerStats[partnerId] = {wins:0, losses:0};
+          if(won) partnerStats[partnerId].wins++; else partnerStats[partnerId].losses++;
+        });
+        timeline.push(won ? 'W' : 'L');
+      });
+    });
+  });
+  return { headToHead, partnerStats, timeline };
+}
+function playerFunStatsHTML(me){
+  const { headToHead, partnerStats, timeline } = computePlayerFunStats(me.id);
+  const MIN_COUNT = 2;
+  const opponents = Object.keys(headToHead)
+    .map(id=>{ const s=headToHead[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
+    .filter(o=>o.total>=MIN_COUNT);
+  const partners = Object.keys(partnerStats)
+    .map(id=>{ const s=partnerStats[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
+    .filter(o=>o.total>=MIN_COUNT);
+
+  const facts = [];
+  const nemesis = opponents.filter(o=>o.rate<0.5).sort((a,b)=>a.rate-b.rate || b.losses-a.losses)[0];
+  if(nemesis) facts.push(`🎯 <strong>Ta bête noire</strong> — ${escapeHTML(playerName(nemesis.id))}. Vous vous êtes affrontés ${nemesis.total} fois, il/elle en a gagné ${nemesis.losses}. Il va falloir un plan de match !`);
+
+  const favorite = opponents.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.wins-a.wins)[0];
+  if(favorite) facts.push(`🔥 <strong>Ta cible favorite</strong> — ${escapeHTML(playerName(favorite.id))}. ${favorite.wins} victoires sur ${favorite.total} face à lui/elle. Tu sais comment le/la jouer !`);
+
+  const closest = opponents.filter(o=>o.id!==(nemesis&&nemesis.id) && o.id!==(favorite&&favorite.id))
+    .sort((a,b)=>Math.abs(a.rate-0.5)-Math.abs(b.rate-0.5))[0];
+  if(closest) facts.push(`⚔️ <strong>Ton duel le plus serré</strong> — contre ${escapeHTML(playerName(closest.id))}, c'est presque du 50/50 (${closest.wins} victoires, ${closest.losses} défaites). Chaque match compte double !`);
+
+  const bestPartner = partners.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.wins-a.wins)[0];
+  if(bestPartner) facts.push(`🤝 <strong>Ton meilleur allié</strong> — en équipe avec ${escapeHTML(playerName(bestPartner.id))}, vous gagnez ${bestPartner.wins} fois sur ${bestPartner.total}. Une paire à ne pas séparer !`);
+
+  if(timeline.length>=MIN_COUNT){
+    const last = timeline[timeline.length-1];
+    let streak = 0;
+    for(let i=timeline.length-1;i>=0 && timeline[i]===last;i--) streak++;
+    if(streak>=MIN_COUNT){
+      facts.push(last==='W'
+        ? `🔥 <strong>En feu</strong> — ${streak} victoires de suite !`
+        : `💪 <strong>Ça va revenir</strong> — après ${streak} défaites d'affilée, la prochaine est pour toi.`);
+    }
+  }
+
+  if(facts.length===0) return '';
+  return `<div class="card"><h3>Tes stats</h3>${facts.map(f=>`<p>${f}</p>`).join('')}</div>`;
+}
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
   const groupMembers = playersInGroup(me.groupId).sort((a,b)=>a.name.localeCompare(b.name));
   const open = currentOpenSession();
-  let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
+  let html = playerFunStatsHTML(me);
+  html += `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
     <table>
       <tr><th>Nom</th><th>Cote</th></tr>
       ${groupMembers.map(p=>{
