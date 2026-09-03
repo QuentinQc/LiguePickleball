@@ -1301,7 +1301,16 @@ function playerDetailModalHTML(pid){
       <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
       <button class="btn-ghost" onclick="closeModal();movePlayer('${pid}')">déplacer</button>
       <button class="btn-ghost" onclick="closeModal();removePlayer('${pid}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
-    </div>
+    </div>`;
+  const openSession = currentOpenSession();
+  if(openSession){
+    const absent = isAbsent(openSession, pid);
+    html += `
+    <h3 style="margin-top:16px;">Présence — session du ${openSession.date}</h3>
+    <p class="small">${absent ? "Ce joueur est actuellement marqué absent(e) pour cette session." : "Ce joueur est actuellement considéré présent(e) pour cette session."}</p>
+    <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette session'}</button>`;
+  }
+  html += `
     <h3 style="margin-top:16px;">Compte lié</h3>`;
   if(profile){
     const isAdmin = profile.role === 'admin';
