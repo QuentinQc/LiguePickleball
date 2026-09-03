@@ -434,6 +434,27 @@ function firstGroupWithRoom(groupsList, playersList){
   }
   return sorted.length ? sorted[0].id : null;
 }
+// Prochaine valeur d'ordre pour placer un joueur en fin de son groupe.
+function nextOrderInGroup(groupId){
+  const members = DATA.players.filter(p=>p.groupId===groupId);
+  const maxOrder = members.reduce((m,p)=>Math.max(m, typeof p.order==='number'?p.order:0), 0);
+  return maxOrder + 1;
+}
+// Échange la position (haut/bas) d'un joueur avec son voisin immédiat dans
+// son groupe.
+function movePlayerOrder(pid, direction){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  const groupMembers = playersInGroup(p.groupId).slice().sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
+  const idx = groupMembers.findIndex(x=>x.id===pid);
+  const swapIdx = direction==='up' ? idx-1 : idx+1;
+  if(idx===-1 || swapIdx<0 || swapIdx>=groupMembers.length) return;
+  const other = groupMembers[swapIdx];
+  const tmp = typeof p.order==='number'?p.order:0;
+  p.order = typeof other.order==='number'?other.order:0;
+  other.order = tmp;
+  saveAndRender();
+}
 // Vérifie la capacité d'un groupe avant d'y placer un joueur. Si plein,
 // avertit et retourne plutôt le premier groupe disponible.
 function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
@@ -1188,7 +1209,7 @@ function addPlayerFromList(){
   if(!groupId) return;
   const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
   const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0 });
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: nextOrderInGroup(groupId) });
   saveAndRender();
 }
 function renamePlayer(pid){
@@ -1252,7 +1273,9 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
   const groupId = firstGroupWithRoom(leagueData.groups, leagueData.players);
   if(!groupId){ showAlert("Cette ligue n'a pas encore de groupe (ou tous sont pleins à 5 joueurs) — crée-en un d'abord (en y basculant)."); return null; }
   const finalName = uniquePlayerName(name, leagueData.players);
-  const newPlayer = { id: uid('p'), name: finalName, groupId };
+  const groupMembers = leagueData.players.filter(x=>x.groupId===groupId);
+  const nextOrder = groupMembers.reduce((m,x)=>Math.max(m, typeof x.order==='number'?x.order:0), 0) + 1;
+  const newPlayer = { id: uid('p'), name: finalName, groupId, order: nextOrder };
   leagueData.players.push(newPlayer);
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
@@ -1399,7 +1422,7 @@ async function linkAccount(profileId){
     const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
     if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
     const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
-    const newPlayer = { id: uid('p'), name, groupId };
+    const newPlayer = { id: uid('p'), name, groupId, order: nextOrderInGroup(groupId) };
     DATA.players.push(newPlayer);
     await saveData();
     playerId = newPlayer.id;
@@ -1423,7 +1446,7 @@ async function relinkAccount(profileId){
     const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
     if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
     const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
-    const newPlayer = { id: uid('p'), name, groupId };
+    const newPlayer = { id: uid('p'), name, groupId, order: nextOrderInGroup(groupId) };
     DATA.players.push(newPlayer);
     await saveData();
     playerId = newPlayer.id;
@@ -1448,7 +1471,7 @@ function adminGroupsHTML(){
   const open = currentOpenSession();
   let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   groupsSorted().forEach(g=>{
-    const ps = playersInGroup(g.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const ps = playersInGroup(g.id).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS || ps.length > GROUP_MAX_PLAYERS);
     html += `
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
@@ -1459,9 +1482,15 @@ function adminGroupsHTML(){
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
-        <tr><th>Nom</th></tr>
-        ${ps.map(p=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')"><td>${escapeHTML(p.name)}</td></tr>`).join('')}
-        ${ps.length===0 ? `<tr><td class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
+        <tr><th>Nom</th><th></th></tr>
+        ${ps.map((p,i)=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
+          <td>${escapeHTML(p.name)}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn-ghost" onclick="movePlayerOrder('${p.id}','up')" ${i===0?'disabled':''} title="Monter">▲</button>
+            <button class="btn-ghost" onclick="movePlayerOrder('${p.id}','down')" ${i===ps.length-1?'disabled':''} title="Descendre">▼</button>
+          </td>
+        </tr>`).join('')}
+        ${ps.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
@@ -1554,6 +1583,7 @@ function onGroupDrop(ev, gid){
   if(!p || p.groupId === gid) return;
   const otherPlayers = DATA.players.filter(x=>x.id!==pid);
   p.groupId = resolveGroupAssignment(gid, DATA.groups, otherPlayers);
+  p.order = nextOrderInGroup(p.groupId);
   saveAndRender();
 }
 function deleteGroup(gid){
@@ -1604,6 +1634,7 @@ function movePlayer(pid){
     const groupId = resolveGroupAssignment(sorted[idx].id, DATA.groups, otherPlayers);
     if(!groupId) return;
     p.groupId = groupId;
+    p.order = nextOrderInGroup(groupId);
     saveAndRender();
   });
 }
@@ -2256,6 +2287,13 @@ function migrateData(){
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
     if(typeof p.ratingGames !== 'number') p.ratingGames = 0;
+  });
+  // Ordre manuel au sein d'un groupe : si absent, on l'initialise selon
+  // l'ordre alphabétique actuel, groupe par groupe.
+  (DATA.groups||[]).forEach(g=>{
+    const members = (DATA.players||[]).filter(p=>p.groupId===g.id);
+    if(members.every(p=>typeof p.order==='number')) return;
+    members.sort((a,b)=>a.name.localeCompare(b.name)).forEach((p,i)=>{ p.order = i+1; });
   });
   (DATA.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
 }
