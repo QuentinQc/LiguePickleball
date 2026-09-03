@@ -2096,9 +2096,11 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
       const scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
+      const currentPlayer = DATA.players.find(x=>x.id===r.playerId);
+      const currentRating = currentPlayer && typeof currentPlayer.rating === 'number' ? currentPlayer.rating : null;
       const deltaCell = typeof delta === 'number'
-        ? `<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">${delta>=0?'+':''}${delta.toFixed(3)}</span>`
-        : `<span class="small">—</span>`;
+        ? `${currentRating!==null ? currentRating.toFixed(2)+' ' : ''}<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">(${delta>=0?'+':''}${delta.toFixed(3)})</span>`
+        : (currentRating!==null ? currentRating.toFixed(2) : `<span class="small">—</span>`);
       html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td><td>${deltaCell}</td><td>${tag}</td></tr>`;
     });
     html += `</table>`;
