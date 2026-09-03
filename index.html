@@ -2080,7 +2080,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
     if(!rows || rows.length===0) return;
     const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===g.id) : null;
     const subValues = new Set(gd && gd.substitutes ? Object.values(gd.substitutes) : []);
-    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3><table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th><th></th></tr>`;
+    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3><table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th><th>Cote</th><th></th></tr>`;
     rows.forEach((r,i)=>{
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
@@ -2095,7 +2095,11 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
       const played = r.played || 0;
       const scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
-      html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td><td>${tag}</td></tr>`;
+      const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
+      const deltaCell = typeof delta === 'number'
+        ? `<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">${delta>=0?'+':''}${delta.toFixed(3)}</span>`
+        : `<span class="small">—</span>`;
+      html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td><td>${deltaCell}</td><td>${tag}</td></tr>`;
     });
     html += `</table>`;
   });
