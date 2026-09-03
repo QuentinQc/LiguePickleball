@@ -416,6 +416,40 @@ function groupById(id){ return DATA.groups.find(g=>g.id===id); }
 function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order); }
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
+const GROUP_MAX_PLAYERS = 5;
+// Retourne le premier groupe (selon l'ordre de l'échelle) qui a encore de la
+// place (moins de GROUP_MAX_PLAYERS joueurs), ou null si tous sont pleins.
+function firstGroupWithRoom(groupsList, playersList){
+  const sorted = groupsList.slice().sort((a,b)=>a.order-b.order);
+  for(const g of sorted){
+    const count = playersList.filter(p=>p.groupId===g.id).length;
+    if(count < GROUP_MAX_PLAYERS) return g.id;
+  }
+  return sorted.length ? sorted[0].id : null;
+}
+// Vérifie la capacité d'un groupe avant d'y placer un joueur. Si plein,
+// avertit et retourne plutôt le premier groupe disponible.
+function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
+  const count = playersList.filter(p=>p.groupId===desiredGroupId).length;
+  if(count < GROUP_MAX_PLAYERS) return desiredGroupId;
+  const alt = firstGroupWithRoom(groupsList, playersList);
+  const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
+  const altName = (groupsList.find(g=>g.id===alt)||{}).name || '—';
+  showAlert(`${desiredName} a déjà ${GROUP_MAX_PLAYERS} joueurs (maximum). Le joueur a plutôt été placé dans ${altName}.`);
+  return alt;
+}
+// Ajoute un suffixe numéroté si le nom existe déjà, pour éviter les doublons.
+function uniquePlayerName(desiredName, playersList, excludePlayerId){
+  const base = desiredName.trim();
+  const existing = new Set(playersList.filter(p=>p.id!==excludePlayerId).map(p=>p.name.trim().toLowerCase()));
+  if(!existing.has(base.toLowerCase())) return base;
+  let n = 2;
+  while(existing.has(`${base} (${n})`.toLowerCase())) n++;
+  const finalName = `${base} (${n})`;
+  showAlert(`Le nom « ${base} » existe déjà — ce joueur a été nommé « ${finalName} » pour les distinguer.`);
+  return finalName;
+}
+
 // ---------- session lifecycle ----------
 // Retourne la date (YYYY-MM-DD) du prochain jour correspondant au jour de jeu
 // configuré pour la ligue (aujourd'hui inclus si on est justement ce jour-là).
@@ -1100,9 +1134,12 @@ function adminPlayersHTML(){
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
   const groupEl = document.getElementById('newPlayerGroup');
-  const name = nameEl.value.trim();
-  const groupId = groupEl.value;
-  if(!name || !groupId) return;
+  const rawName = nameEl.value.trim();
+  const desiredGroupId = groupEl.value;
+  if(!rawName || !desiredGroupId) return;
+  const name = uniquePlayerName(rawName, DATA.players);
+  const groupId = resolveGroupAssignment(desiredGroupId, DATA.groups, DATA.players);
+  if(!groupId) return;
   DATA.players.push({ id: uid('p'), name, groupId });
   saveAndRender();
 }
@@ -1110,7 +1147,7 @@ function renamePlayer(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
   showPrompt('Nouveau nom du joueur :', p.name, (name)=>{
-    if(name && name.trim()){ p.name = name.trim(); saveAndRender(); }
+    if(name && name.trim()){ p.name = uniquePlayerName(name.trim(), DATA.players, pid); saveAndRender(); }
   });
 }
 // Modification manuelle de la cote d'un joueur, avec bornes raisonnables
@@ -1162,10 +1199,12 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
-  const firstGroup = (leagueData.groups||[]).slice().sort((a,b)=>a.order-b.order)[0];
-  if(!firstGroup){ showAlert("Cette ligue n'a pas encore de groupe — crée-en un d'abord (en y basculant)."); return null; }
-  const newPlayer = { id: uid('p'), name, groupId: firstGroup.id };
   leagueData.players = leagueData.players || [];
+  leagueData.groups = leagueData.groups || [];
+  const groupId = firstGroupWithRoom(leagueData.groups, leagueData.players);
+  if(!groupId){ showAlert("Cette ligue n'a pas encore de groupe (ou tous sont pleins à 5 joueurs) — crée-en un d'abord (en y basculant)."); return null; }
+  const finalName = uniquePlayerName(name, leagueData.players);
+  const newPlayer = { id: uid('p'), name: finalName, groupId };
   leagueData.players.push(newPlayer);
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
@@ -1301,9 +1340,10 @@ async function linkAccount(profileId){
   let playerId = value;
   if(value === '__new__'){
     const pr = ALL_PROFILES.find(p=>p.id===profileId);
-    const firstGroup = groupsSorted()[0];
-    if(!firstGroup){ showAlert("Crée d'abord au moins un groupe."); return; }
-    const newPlayer = { id: uid('p'), name: (pr.display_name || pr.email), groupId: firstGroup.id };
+    const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
+    if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
+    const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
+    const newPlayer = { id: uid('p'), name, groupId };
     DATA.players.push(newPlayer);
     await saveData();
     playerId = newPlayer.id;
@@ -1417,7 +1457,12 @@ function removePlayer(pid){
 function movePlayer(pid){
   const sorted = groupsSorted();
   showChoice('Déplacer vers quel groupe ?', sorted.map(g=>g.name), (idx)=>{
-    if(sorted[idx]){ DATA.players.find(p=>p.id===pid).groupId = sorted[idx].id; saveAndRender(); }
+    if(!sorted[idx]) return;
+    const otherPlayers = DATA.players.filter(p=>p.id!==pid); // le joueur qu'on déplace ne compte pas contre lui-même
+    const groupId = resolveGroupAssignment(sorted[idx].id, DATA.groups, otherPlayers);
+    if(!groupId) return;
+    DATA.players.find(p=>p.id===pid).groupId = groupId;
+    saveAndRender();
   });
 }
 
