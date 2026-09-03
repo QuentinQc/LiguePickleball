@@ -74,6 +74,7 @@ tr.draggable-row{cursor:grab;}
 tr.draggable-row:active{cursor:grabbing;}
 .drop-target{transition:background .12s ease, outline .12s ease;}
 .drop-target-hover{background:rgba(207,234,92,0.1);outline:2px dashed var(--ball);outline-offset:-2px;}
+tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--ball);background:rgba(207,234,92,0.15);}
 .court-mark{width:34px;height:34px;border-radius:8px;background:var(--ball);display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;color:var(--court);font-size:16px;}
 .brand{display:flex;gap:10px;align-items:center;}
 .pill-input{width:64px;text-align:center;}
@@ -443,21 +444,33 @@ function nextOrderInGroup(groupId){
 // Échange la position (haut/bas) d'un joueur avec son voisin immédiat dans
 // son groupe.
 // Sélectionne/désélectionne un joueur pour afficher ses flèches de réordonnancement.
-function toggleOrderSelection(pid){
-  VIEW.orderSelectedPlayer = (VIEW.orderSelectedPlayer === pid) ? null : pid;
-  render();
+// Glisser-déposer un joueur sur la ligne d'un autre pour l'insérer à cette
+// position précise dans son groupe (renumérote tout le groupe ensuite).
+function onRowDragOver(ev){
+  ev.preventDefault();
+  ev.stopPropagation(); // évite de déclencher aussi le surlignage de toute la carte de groupe
+  ev.currentTarget.classList.add('row-drop-hover');
 }
-function movePlayerOrder(pid, direction){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  const groupMembers = playersInGroup(p.groupId).slice().sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
-  const idx = groupMembers.findIndex(x=>x.id===pid);
-  const swapIdx = direction==='up' ? idx-1 : idx+1;
-  if(idx===-1 || swapIdx<0 || swapIdx>=groupMembers.length) return;
-  const other = groupMembers[swapIdx];
-  const tmp = typeof p.order==='number'?p.order:0;
-  p.order = typeof other.order==='number'?other.order:0;
-  other.order = tmp;
+function onRowDragLeave(ev){
+  ev.currentTarget.classList.remove('row-drop-hover');
+}
+function onRowDrop(ev, gid, targetPid){
+  ev.preventDefault();
+  ev.stopPropagation();
+  ev.currentTarget.classList.remove('row-drop-hover');
+  const draggedPid = ev.dataTransfer.getData('text/plain');
+  if(!draggedPid || draggedPid === targetPid) return;
+  const dragged = DATA.players.find(x=>x.id===draggedPid);
+  if(!dragged) return;
+  if(dragged.groupId !== gid){
+    const otherPlayers = DATA.players.filter(x=>x.id!==draggedPid);
+    dragged.groupId = resolveGroupAssignment(gid, DATA.groups, otherPlayers);
+  }
+  let members = playersInGroup(gid).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
+  members = members.filter(p=>p.id!==draggedPid);
+  const targetIdx = members.findIndex(p=>p.id===targetPid);
+  members.splice(targetIdx===-1 ? members.length : targetIdx, 0, dragged);
+  members.forEach((p,i)=>{ p.order = i+1; });
   saveAndRender();
 }
 // Vérifie la capacité d'un groupe avant d'y placer un joueur. Si plein,
@@ -1487,20 +1500,18 @@ function adminGroupsHTML(){
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
-        <tr><th>Nom</th><th></th></tr>
-        ${ps.map((p,i)=>{
-          const selected = VIEW.orderSelectedPlayer === p.id;
-          return `<tr class="draggable-row${selected?' me':''}" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')" onclick="toggleOrderSelection('${p.id}')">
+        <tr><th>#</th><th>Nom</th></tr>
+        ${ps.map((p,i)=>`<tr class="draggable-row" draggable="true"
+          ondragstart="onPlayerDragStart(event,'${p.id}')"
+          ondragover="onRowDragOver(event)"
+          ondragleave="onRowDragLeave(event)"
+          ondrop="onRowDrop(event,'${g.id}','${p.id}')">
+          <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
           <td>${escapeHTML(p.name)}</td>
-          <td style="white-space:nowrap;">
-            ${selected ? `
-            <button class="btn-ghost" onclick="event.stopPropagation();movePlayerOrder('${p.id}','up')" ${i===0?'disabled':''} title="Monter">▲</button>
-            <button class="btn-ghost" onclick="event.stopPropagation();movePlayerOrder('${p.id}','down')" ${i===ps.length-1?'disabled':''} title="Descendre">▼</button>` : ''}
-          </td>
-        </tr>`;
-        }).join('')}
+        </tr>`).join('')}
         ${ps.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
+      <p class="small">Glisse-dépose un joueur sur un autre pour changer sa position (ordinateur seulement).</p>
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
   });
