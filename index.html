@@ -1043,7 +1043,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['reglages','Réglages']];
+  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const modeSwitch = canViewAsPlayer ? `
     <div class="mode-switch">
@@ -1073,6 +1073,7 @@ function renderAdmin(){
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
+  else if(VIEW.tab==='rapports') c.innerHTML = adminReportsHTML();
   else c.innerHTML = adminSettingsHTML();
 }
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
@@ -2037,6 +2038,140 @@ function onFinalize(){
   }
 }
 
+// ---------- Rapports (statistiques calculées à partir de l'historique) ----------
+function computePlayerReports(){
+  const closed = DATA.sessions.filter(s=>s.status==='closed');
+  const stats = {};
+  DATA.players.forEach(p=>{ stats[p.id] = { wins:0, losses:0, played:0, scheduled:0, sessionsAbsent:0, sessionsAppeared:0, promotions:0, relegations:0, ratingChange:0, subCount:0 }; });
+  closed.forEach(s=>{
+    const appeared = new Set();
+    if(s.standingsByGroup){
+      Object.keys(s.standingsByGroup).forEach(gid=>{
+        (s.standingsByGroup[gid]||[]).forEach(r=>{
+          if(!stats[r.playerId]) return; // invité ou joueur retiré depuis
+          stats[r.playerId].wins += r.wins||0;
+          stats[r.playerId].losses += r.losses||0;
+          stats[r.playerId].played += r.played||0;
+          stats[r.playerId].scheduled += r.scheduled||0;
+          appeared.add(r.playerId);
+        });
+      });
+    }
+    appeared.forEach(pid=>{ if(stats[pid]) stats[pid].sessionsAppeared++; });
+    (s.absences||[]).forEach(pid=>{ if(stats[pid]) stats[pid].sessionsAbsent++; });
+    (s.movements||[]).forEach(m=>{
+      if(!stats[m.playerId]) return;
+      const fromG = groupById(m.fromGroupId), toG = groupById(m.toGroupId);
+      if(fromG && toG){
+        if(toG.order < fromG.order) stats[m.playerId].promotions++;
+        else stats[m.playerId].relegations++;
+      }
+    });
+    if(s.ratingDeltas){
+      Object.keys(s.ratingDeltas).forEach(pid=>{ if(stats[pid]) stats[pid].ratingChange += s.ratingDeltas[pid]; });
+    }
+    if(s.loans){
+      Object.keys(s.loans).forEach(pid=>{ if(stats[pid]) stats[pid].subCount++; });
+    }
+  });
+  return DATA.players.map(p=>{
+    const st = stats[p.id];
+    const totalGames = st.wins + st.losses;
+    const totalRelevant = st.sessionsAbsent + st.sessionsAppeared;
+    return {
+      player: p,
+      wins: st.wins, losses: st.losses,
+      winRate: totalGames>0 ? st.wins/totalGames : null,
+      played: st.played, scheduled: st.scheduled,
+      sessionsAbsent: st.sessionsAbsent, sessionsAppeared: st.sessionsAppeared,
+      absenceRate: totalRelevant>0 ? st.sessionsAbsent/totalRelevant : null,
+      promotions: st.promotions, relegations: st.relegations,
+      ratingChange: st.ratingChange,
+      subCount: st.subCount
+    };
+  });
+}
+function adminReportsHTML(){
+  const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
+  const reports = computePlayerReports();
+  if(closedCount === 0){
+    return `<div class="card"><p class="empty">Aucune session terminée pour l'instant — les rapports apparaîtront une fois l'historique commencé.</p></div>`;
+  }
+  const withRate = reports.filter(r=>r.winRate!==null);
+  const withAbsence = reports.filter(r=>r.absenceRate!==null && (r.sessionsAbsent+r.sessionsAppeared)>=2);
+  const topWinRate = withRate.slice().sort((a,b)=>b.winRate-a.winRate)[0];
+  const mostActive = reports.slice().sort((a,b)=>b.played-a.played)[0];
+  const mostAbsent = withAbsence.slice().sort((a,b)=>b.absenceRate-a.absenceRate)[0];
+  const bestGain = reports.slice().sort((a,b)=>b.ratingChange-a.ratingChange)[0];
+  const avgAbsenceRate = withAbsence.length ? withAbsence.reduce((s,r)=>s+r.absenceRate,0)/withAbsence.length : null;
+
+  const sortBy = VIEW.reportsSortBy || 'winRate';
+  const sortDir = VIEW.reportsSortDir || 'desc';
+  const sorted = reports.slice().sort((a,b)=>{
+    let av, bv;
+    if(sortBy==='name'){ av=a.player.name.toLowerCase(); bv=b.player.name.toLowerCase(); }
+    else if(sortBy==='winRate'){ av=a.winRate===null?-1:a.winRate; bv=b.winRate===null?-1:b.winRate; }
+    else if(sortBy==='wins'){ av=a.wins; bv=b.wins; }
+    else if(sortBy==='losses'){ av=a.losses; bv=b.losses; }
+    else if(sortBy==='absenceRate'){ av=a.absenceRate===null?-1:a.absenceRate; bv=b.absenceRate===null?-1:b.absenceRate; }
+    else if(sortBy==='promotions'){ av=a.promotions; bv=b.promotions; }
+    else if(sortBy==='relegations'){ av=a.relegations; bv=b.relegations; }
+    else if(sortBy==='ratingChange'){ av=a.ratingChange; bv=b.ratingChange; }
+    else if(sortBy==='subCount'){ av=a.subCount; bv=b.subCount; }
+    else { av=a.player.name.toLowerCase(); bv=b.player.name.toLowerCase(); }
+    const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
+    return sortDir==='asc' ? cmp : -cmp;
+  });
+  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
+  const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
+
+  let html = `<div class="card">
+    <h2>Vue d'ensemble</h2>
+    <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total.</p>
+    <table>
+      <tr><td class="small">Meilleur taux de victoire</td><td>${topWinRate ? escapeHTML(topWinRate.player.name)+' — '+pct(topWinRate.winRate) : '—'}</td></tr>
+      <tr><td class="small">Joueur le plus actif (matchs joués)</td><td>${mostActive && mostActive.played>0 ? escapeHTML(mostActive.player.name)+' — '+mostActive.played+' matchs' : '—'}</td></tr>
+      <tr><td class="small">Taux d'absence moyen de la ligue</td><td>${avgAbsenceRate===null ? '—' : pct(avgAbsenceRate)}</td></tr>
+      <tr><td class="small">Taux d'absence le plus élevé</td><td>${mostAbsent ? escapeHTML(mostAbsent.player.name)+' — '+pct(mostAbsent.absenceRate) : '—'}</td></tr>
+      <tr><td class="small">Plus forte progression de cote</td><td>${bestGain ? escapeHTML(bestGain.player.name)+' — '+(bestGain.ratingChange>=0?'+':'')+bestGain.ratingChange.toFixed(3) : '—'}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Par joueur</h2>
+    <table>
+      <tr>
+        <th class="sortable" onclick="setReportsSort('name')">Nom${arrow('name')}</th>
+        <th class="sortable" onclick="setReportsSort('wins')">V${arrow('wins')}</th>
+        <th class="sortable" onclick="setReportsSort('losses')">D${arrow('losses')}</th>
+        <th class="sortable" onclick="setReportsSort('winRate')">% V${arrow('winRate')}</th>
+        <th class="sortable" onclick="setReportsSort('absenceRate')">Taux absence${arrow('absenceRate')}</th>
+        <th class="sortable" onclick="setReportsSort('promotions')">Montées${arrow('promotions')}</th>
+        <th class="sortable" onclick="setReportsSort('relegations')">Descentes${arrow('relegations')}</th>
+        <th class="sortable" onclick="setReportsSort('ratingChange')">Δ Cote${arrow('ratingChange')}</th>
+        <th class="sortable" onclick="setReportsSort('subCount')">Remplacements${arrow('subCount')}</th>
+      </tr>
+      ${sorted.map(r=>`<tr>
+        <td>${escapeHTML(r.player.name)}</td>
+        <td>${r.wins}</td>
+        <td>${r.losses}</td>
+        <td>${pct(r.winRate)}</td>
+        <td>${pct(r.absenceRate)}${r.absenceRate!==null ? ` <span class="small">(${r.sessionsAbsent}/${r.sessionsAbsent+r.sessionsAppeared})</span>` : ''}</td>
+        <td>${r.promotions}</td>
+        <td>${r.relegations}</td>
+        <td style="color:${r.ratingChange>0?'var(--ball)':(r.ratingChange<0?'var(--danger)':'inherit')};">${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
+        <td>${r.subCount}</td>
+      </tr>`).join('')}
+      ${sorted.length===0 ? `<tr><td colspan="9" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+    </table>
+    <p class="small">Le taux d'absence se calcule sur les sessions où le joueur était présent ou absent dans son groupe (les sessions avant qu'il rejoigne la ligue ne comptent pas contre lui).</p>
+  </div>`;
+  return html;
+}
+function setReportsSort(col){
+  if((VIEW.reportsSortBy||'winRate') === col){ VIEW.reportsSortDir = (VIEW.reportsSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
+  else { VIEW.reportsSortBy = col; VIEW.reportsSortDir = 'desc'; }
+  render();
+}
 function adminHistoryHTML(){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
   if(closed.length===0) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
