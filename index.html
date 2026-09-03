@@ -64,6 +64,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.mode-switch{display:inline-flex;border-radius:999px;background:rgba(255,255,255,0.08);padding:3px;gap:2px;}
+.mode-switch button{border:none;background:transparent;color:var(--muted);font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .15s ease,color .15s ease;}
+.mode-switch button.active{background:var(--ball);color:var(--court);font-weight:700;}
+.mode-switch button:not(.active):hover{color:var(--line);}
 .court-mark{width:34px;height:34px;border-radius:8px;background:var(--ball);display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;color:var(--court);font-size:16px;}
 .brand{display:flex;gap:10px;align-items:center;}
 .pill-input{width:64px;text-align:center;}
@@ -722,7 +726,7 @@ function render(){
   }
 }
 
-function topbarHTML(subtitle){
+function topbarHTML(subtitle, extraControls){
   return `
   <div class="topbar">
     <div class="brand">
@@ -732,7 +736,10 @@ function topbarHTML(subtitle){
         <div class="small">${subtitle||''}</div>
       </div>
     </div>
-    ${SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
+    <div class="row" style="gap:8px;align-items:center;">
+      ${extraControls||''}
+      ${SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
+    </div>
   </div>`;
 }
 
@@ -892,8 +899,12 @@ function renderAdmin(){
     return;
   }
   const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['reglages','Réglages']];
-  const playerToggle = (MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id))
-    ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">👤 Voir ma vue joueur</button>` : '';
+  const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
+  const modeSwitch = canViewAsPlayer ? `
+    <div class="mode-switch">
+      <button class="active" disabled>Admin</button>
+      <button onclick="toggleAdminPlayerView()">Joueur</button>
+    </div>` : '';
   const leagueSwitcher = `
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
@@ -907,10 +918,9 @@ function renderAdmin(){
       </div>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur')}
+    ${topbarHTML('Espace administrateur', modeSwitch)}
     ${storageBannerHTML()}
     ${leagueSwitcher}
-    ${playerToggle}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
@@ -1878,7 +1888,11 @@ function renderPlayer(playerId){
     return;
   }
   const tabs = [['classement','Mon groupe'],['historique','Historique']];
-  const backToAdmin = SESSION_USER.role === 'admin' ? `<button class="btn-ghost" onclick="toggleAdminPlayerView()">⚙️ Retour à l'administration</button>` : '';
+  const modeSwitch = SESSION_USER.role === 'admin' ? `
+    <div class="mode-switch">
+      <button onclick="toggleAdminPlayerView()">Admin</button>
+      <button class="active" disabled>Joueur</button>
+    </div>` : '';
   const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
     <div class="card">
       <div class="field" style="margin:0;">
@@ -1892,9 +1906,8 @@ function renderPlayer(playerId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name))}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), modeSwitch)}
     ${storageBannerHTML()}
-    ${backToAdmin}
     ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setPlayerTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
