@@ -1450,6 +1450,7 @@ function adminGroupsHTML(){
       <div class="row" style="justify-content:space-between;">
         <h2>${escapeHTML(g.name)} <span class="small">(${ps.length} joueur${ps.length>1?'s':''})</span></h2>
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
+        <button class="btn-ghost" onclick="deleteGroup('${g.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">supprimer</button>
       </div>
       <table>
         <tr><th>Nom</th></tr>
@@ -1521,6 +1522,39 @@ function renameGroup(gid){
   const g = groupById(gid);
   showPrompt('Nouveau nom du groupe :', g.name, (name)=>{
     if(name && name.trim()){ g.name = name.trim(); saveAndRender(); }
+  });
+}
+// Supprime un groupe. S'il contient encore des joueurs, demande confirmation
+// et les réassigne automatiquement au premier groupe ayant de la place —
+// annule l'opération si un joueur ne peut être replacé nulle part.
+function deleteGroup(gid){
+  const g = groupById(gid);
+  if(!g) return;
+  const members = playersInGroup(gid);
+  if(members.length === 0){
+    showConfirm(`Supprimer le groupe « ${g.name} » ? Cette action ne peut pas être annulée.`, ()=>{
+      DATA.groups = DATA.groups.filter(x=>x.id!==gid);
+      saveAndRender();
+    });
+    return;
+  }
+  const otherGroups = DATA.groups.filter(x=>x.id!==gid);
+  if(otherGroups.length === 0){
+    showAlert(`Impossible de supprimer « ${g.name} » : c'est le seul groupe et il contient encore ${members.length} joueur${members.length>1?'s':''}. Crée un autre groupe, ou retire/déplace d'abord ces joueurs.`);
+    return;
+  }
+  showConfirm(`Le groupe « ${g.name} » contient encore ${members.length} joueur${members.length>1?'s':''}. En confirmant, ${members.length>1?'ils seront':'il sera'} automatiquement déplacé${members.length>1?'s':''} vers le premier groupe ayant de la place. Continuer ?`, ()=>{
+    const blocked = [];
+    members.forEach(p=>{
+      const target = firstGroupWithRoom(otherGroups, DATA.players.filter(x=>x.groupId!==gid));
+      if(target){ p.groupId = target; } else { blocked.push(p.name); }
+    });
+    if(blocked.length){
+      showAlert(`Tous les autres groupes sont pleins — ${blocked.join(', ')} n'${blocked.length>1?'ont':'a'} pas pu être déplacé${blocked.length>1?'s':''}. Le groupe « ${g.name} » n'a pas été supprimé ; libère de la place ailleurs d'abord.`);
+      return;
+    }
+    DATA.groups = DATA.groups.filter(x=>x.id!==gid);
+    saveAndRender();
   });
 }
 
