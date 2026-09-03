@@ -1798,6 +1798,11 @@ function groupAbove(gid){
 function adminSettingsHTML(){
   return `
     <div class="card">
+      <h3>Partager l'application</h3>
+      <p class="small">Copie le lien de l'app pour l'envoyer directement par texto, Messenger, courriel, etc.</p>
+      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
+    </div>
+    <div class="card">
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
       <div class="field">
         <label>Jour de jeu habituel de la ligue</label>
@@ -1842,6 +1847,16 @@ function resetAllRatings(){
     (DATA.sessions||[]).forEach(s=>{ delete s.ratingDeltas; });
     saveAndRender();
   });
+}
+function copyAppLink(){
+  const url = window.location.origin + window.location.pathname;
+  const done = ()=> showAlert("Lien copié dans le presse-papier :\n" + url);
+  const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 function saveSettings(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
