@@ -701,9 +701,56 @@ function finalizeSession(session){
   });
 
   applyRatingUpdates(session);
+  reorderGroupsAfterMovements(standingsByGroup, movements);
 
   session.movements = movements;
   session.status = 'closed';
+}
+
+// Réordonne automatiquement chaque groupe après une session, selon la
+// provenance des joueurs :
+// 1) arrivées du groupe au-dessus (relégués), dans l'ordre de leur ancien
+//    classement (ex: 4e puis 5e du groupe au-dessus)
+// 2) joueurs restés dans le même groupe, dans leur ordre de classement précédent
+// 3) arrivées du groupe en dessous (promus), dans l'ordre de leur ancien
+//    classement (ex: 1er puis 2e du groupe en dessous)
+// 4) descentes automatiques pour absence, à la fin
+function reorderGroupsAfterMovements(standingsByGroup, movements){
+  const rankOf = (playerId, groupId)=>{
+    const rows = standingsByGroup[groupId];
+    if(!rows) return 999;
+    const idx = rows.findIndex(r=>r.playerId===playerId);
+    return idx===-1 ? 999 : idx;
+  };
+  groupsSorted().forEach(g=>{
+    const relegatedIn = [], promotedIn = [], absenceIn = [];
+    movements.forEach(m=>{
+      if(m.toGroupId !== g.id) return;
+      if(m.reason === 'absence'){ absenceIn.push(m); return; }
+      const fromG = groupById(m.fromGroupId);
+      if(fromG && fromG.order < g.order) relegatedIn.push(m); // venait d'un groupe plus fort
+      else promotedIn.push(m); // venait d'un groupe plus faible
+    });
+    relegatedIn.sort((a,b)=> rankOf(a.playerId,a.fromGroupId) - rankOf(b.playerId,b.fromGroupId));
+    promotedIn.sort((a,b)=> rankOf(a.playerId,a.fromGroupId) - rankOf(b.playerId,b.fromGroupId));
+    const movedIds = new Set([...relegatedIn, ...promotedIn, ...absenceIn].map(m=>m.playerId));
+    const currentMembers = playersInGroup(g.id);
+    const stayed = currentMembers.filter(p=> !movedIds.has(p.id) && standingsByGroup[g.id] && standingsByGroup[g.id].some(r=>r.playerId===p.id));
+    stayed.sort((a,b)=> rankOf(a.id,g.id) - rankOf(b.id,g.id));
+    const accounted = new Set([...stayed.map(p=>p.id), ...movedIds]);
+    const others = currentMembers.filter(p=>!accounted.has(p.id)); // n'a jamais joué / cas particulier : en fin de liste
+    const finalOrder = [
+      ...relegatedIn.map(m=>m.playerId),
+      ...stayed.map(p=>p.id),
+      ...promotedIn.map(m=>m.playerId),
+      ...absenceIn.map(m=>m.playerId),
+      ...others.map(p=>p.id)
+    ];
+    finalOrder.forEach((pid,i)=>{
+      const p = DATA.players.find(x=>x.id===pid);
+      if(p) p.order = i+1;
+    });
+  });
 }
 
 // ---------- cote évolutive (ELO adapté au double, échelle ~3.5-5.0) ----------
