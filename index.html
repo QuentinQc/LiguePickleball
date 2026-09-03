@@ -2223,6 +2223,25 @@ function renderPlayer(playerId){
 }
 function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PLAYER; VIEW = { tab: ADMIN_VIEWING_AS_PLAYER ? 'classement' : 'groupes' }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
+function ratingExplanationHTML(){
+  return `
+    <p>Chaque joueur a une <strong>cote</strong> entre 2.0 et 8.0 qui évolue automatiquement après chaque match — un indicateur de ton niveau de jeu qui te suit en continu, en plus de ton groupe.</p>
+    <p class="small">Ce n'est pas la même chose que ton groupe : le groupe reflète où tu joues en ce moment (selon tes résultats de session), alors que la cote suit ton niveau sur le long terme, match après match.</p>
+    <h3 style="margin-top:14px;">Trois facteurs entrent en jeu</h3>
+    <p><strong>1. Contre qui tu joues</strong><br>
+    Battre une équipe généralement plus forte que la tienne te fait gagner plus de points de cote que de battre une équipe plus faible. À l'inverse, perdre contre une équipe plus faible te coûte plus cher qu'une défaite contre une équipe plus forte.</p>
+    <p><strong>2. L'écart au tableau</strong><br>
+    Une victoire écrasante fait monter ta cote plus qu'une victoire arrachée. Une défaite serrée te coûte moins cher qu'une raclée.</p>
+    <p><strong>3. Ton nombre de matchs joués</strong><br>
+    Au début, ta cote bouge plus fort d'un match à l'autre. Plus tu accumules de matchs, plus elle se stabilise et bouge doucement.</p>
+    <h3 style="margin-top:14px;">Ce qui n'affecte pas ta cote</h3>
+    <p class="small">Un invité (quelqu'un hors de la ligue qui dépanne) n'a pas de cote — il ne fait ni monter ni descendre la tienne au-delà d'un match normal, et lui-même ne gagne ni ne perd rien.</p>
+    <p class="small">Ta cote ne détermine pas directement tes montées/descentes de groupe — ce sont tes résultats de la session qui comptent pour ça. La cote, elle, te suit à long terme comme indicateur de progression.</p>
+  `;
+}
+function showRatingExplanationModal(){
+  showContentModal('Comment fonctionne la cote ?', ratingExplanationHTML());
+}
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
   const groupMembers = playersInGroup(me.groupId).sort((a,b)=>a.name.localeCompare(b.name));
@@ -2236,6 +2255,7 @@ function playerGroupHTML(me){
       }).join('')}
       ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
+    <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
   </div>`;
   if(open){
     const absent = isAbsent(open, me.id);
