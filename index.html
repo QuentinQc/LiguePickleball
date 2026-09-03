@@ -442,6 +442,11 @@ function nextOrderInGroup(groupId){
 }
 // Échange la position (haut/bas) d'un joueur avec son voisin immédiat dans
 // son groupe.
+// Sélectionne/désélectionne un joueur pour afficher ses flèches de réordonnancement.
+function toggleOrderSelection(pid){
+  VIEW.orderSelectedPlayer = (VIEW.orderSelectedPlayer === pid) ? null : pid;
+  render();
+}
 function movePlayerOrder(pid, direction){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
@@ -1483,13 +1488,17 @@ function adminGroupsHTML(){
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
         <tr><th>Nom</th><th></th></tr>
-        ${ps.map((p,i)=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
+        ${ps.map((p,i)=>{
+          const selected = VIEW.orderSelectedPlayer === p.id;
+          return `<tr class="draggable-row${selected?' me':''}" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')" onclick="toggleOrderSelection('${p.id}')">
           <td>${escapeHTML(p.name)}</td>
           <td style="white-space:nowrap;">
-            <button class="btn-ghost" onclick="movePlayerOrder('${p.id}','up')" ${i===0?'disabled':''} title="Monter">▲</button>
-            <button class="btn-ghost" onclick="movePlayerOrder('${p.id}','down')" ${i===ps.length-1?'disabled':''} title="Descendre">▼</button>
+            ${selected ? `
+            <button class="btn-ghost" onclick="event.stopPropagation();movePlayerOrder('${p.id}','up')" ${i===0?'disabled':''} title="Monter">▲</button>
+            <button class="btn-ghost" onclick="event.stopPropagation();movePlayerOrder('${p.id}','down')" ${i===ps.length-1?'disabled':''} title="Descendre">▼</button>` : ''}
           </td>
-        </tr>`).join('')}
+        </tr>`;
+        }).join('')}
         ${ps.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
       </table>
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
