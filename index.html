@@ -54,6 +54,8 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
 .field{margin-bottom:10px;}
 table{width:100%;border-collapse:collapse;margin-top:8px;}
 th{text-align:left;font-family:var(--font-display);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.15);}
+th.sortable{cursor:pointer;user-select:none;}
+th.sortable:hover{color:var(--ball);}
 td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
 tr.me{background:rgba(207,234,92,0.1);}
 .tag{display:inline-block;font-family:var(--font-display);font-size:11px;padding:3px 9px;border-radius:999px;letter-spacing:0.05em;text-transform:uppercase;}
@@ -1020,7 +1022,15 @@ function setAdminTab(t){
 }
 
 function adminSubstitutePoolHTML(){
-  const pool = (DATA.substitutePool || []).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const sortBy = VIEW.subsSortBy || 'name';
+  const sortDir = VIEW.subsSortDir || 'asc';
+  const pool = (DATA.substitutePool || []).slice().sort((a,b)=>{
+    const av = (a[sortBy] || '').toString().toLowerCase();
+    const bv = (b[sortBy] || '').toString().toLowerCase();
+    const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
+    return sortDir==='asc' ? cmp : -cmp;
+  });
+  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   return `
     <div class="card">
       <h3>Ajouter un remplaçant</h3>
@@ -1038,7 +1048,12 @@ function adminSubstitutePoolHTML(){
         ${pool.some(s=>s.email) ? `<button class="btn btn-secondary" onclick="emailAvailabilityRequest()">📧 Demander qui est disponible</button>` : ''}
       </div>
       <table>
-        <tr><th>Nom</th><th>Courriel</th><th>Notes</th><th></th></tr>
+        <tr>
+          <th class="sortable" onclick="setSubsSort('name')">Nom${arrow('name')}</th>
+          <th class="sortable" onclick="setSubsSort('email')">Courriel${arrow('email')}</th>
+          <th class="sortable" onclick="setSubsSort('notes')">Notes${arrow('notes')}</th>
+          <th></th>
+        </tr>
         ${pool.map(s=>`<tr>
           <td>${escapeHTML(s.name)}</td>
           <td>${escapeHTML(s.email||'—')}</td>
@@ -1049,6 +1064,11 @@ function adminSubstitutePoolHTML(){
       </table>
       <p class="small">Ces personnes apparaissent automatiquement comme choix rapides dans le menu de remplaçant, lors d'une absence en session.</p>
     </div>`;
+}
+function setSubsSort(col){
+  if((VIEW.subsSortBy||'name') === col){ VIEW.subsSortDir = (VIEW.subsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
+  else { VIEW.subsSortBy = col; VIEW.subsSortDir = 'asc'; }
+  render();
 }
 function addSubstituteToPool(){
   const nameEl = document.getElementById('newSubName');
@@ -1097,7 +1117,17 @@ function emailAvailabilityRequest(){
   window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 function adminPlayersHTML(){
-  const players = DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const sortBy = VIEW.regularsSortBy || 'name';
+  const sortDir = VIEW.regularsSortDir || 'asc';
+  const players = DATA.players.slice().sort((a,b)=>{
+    let av, bv;
+    if(sortBy==='group'){ av=(groupById(a.groupId)||{order:999}).order; bv=(groupById(b.groupId)||{order:999}).order; }
+    else if(sortBy==='rating'){ av=typeof a.rating==='number'?a.rating:RATING_DEFAULT; bv=typeof b.rating==='number'?b.rating:RATING_DEFAULT; }
+    else { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
+    const cmp = av<bv ? -1 : (av>bv ? 1 : a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    return sortDir==='asc' ? cmp : -cmp;
+  });
+  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const groups = groupsSorted();
   return `
     <div class="card">
@@ -1116,7 +1146,12 @@ function adminPlayersHTML(){
         <h2>Réguliers <span class="small">(${players.length})</span></h2>
       </div>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th></th></tr>
+        <tr>
+          <th class="sortable" onclick="setRegularsSort('name')">Nom${arrow('name')}</th>
+          <th class="sortable" onclick="setRegularsSort('group')">Groupe${arrow('group')}</th>
+          <th class="sortable" onclick="setRegularsSort('rating')">Cote${arrow('rating')}</th>
+          <th></th>
+        </tr>
         ${players.map(p=>{
           const g = groupById(p.groupId);
           const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
@@ -1130,6 +1165,11 @@ function adminPlayersHTML(){
         ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
+}
+function setRegularsSort(col){
+  if((VIEW.regularsSortBy||'name') === col){ VIEW.regularsSortDir = (VIEW.regularsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
+  else { VIEW.regularsSortBy = col; VIEW.regularsSortDir = 'asc'; }
+  render();
 }
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
