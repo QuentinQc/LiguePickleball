@@ -1137,6 +1137,7 @@ function adminPlayersHTML(){
         <select id="newPlayerGroup">
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
+        <input id="newPlayerRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="Cote (${RATING_DEFAULT.toFixed(1)} par défaut)" style="width:170px;">
         <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
       </div>
       ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
@@ -1174,13 +1175,16 @@ function setRegularsSort(col){
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
   const groupEl = document.getElementById('newPlayerGroup');
+  const ratingEl = document.getElementById('newPlayerRating');
   const rawName = nameEl.value.trim();
   const desiredGroupId = groupEl.value;
   if(!rawName || !desiredGroupId) return;
   const name = uniquePlayerName(rawName, DATA.players);
   const groupId = resolveGroupAssignment(desiredGroupId, DATA.groups, DATA.players);
   if(!groupId) return;
-  DATA.players.push({ id: uid('p'), name, groupId });
+  const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
+  const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0 });
   saveAndRender();
 }
 function renamePlayer(pid){
