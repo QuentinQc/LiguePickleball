@@ -2576,11 +2576,12 @@ function groupAbove(gid){
 // Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
 function adminSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde']];
+  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde'],['guide','Guide']];
   let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='test') html += settingsTestModeHTML();
   else if(sub==='partage') html += settingsShareHTML();
   else if(sub==='sauvegarde') html += settingsBackupHTML();
+  else if(sub==='guide') html += settingsGuideHTML();
   else html += settingsLeagueHTML();
   return html;
 }
@@ -2667,6 +2668,37 @@ function settingsBackupHTML(){
       </div>
     </div>`;
 }
+function settingsGuideHTML(){
+  return `
+    <div class="card">
+      <h3>Onglet Session</h3>
+      <p class="small"><strong>Groupes</strong> : échelle, positions numérotées, glisser-déposer, joueurs en attente d'assignation, gestion des absences/remplaçants par groupe.</p>
+      <p class="small"><strong>Résultats</strong> : Publier/Dépublier, Terminer, Annuler, saisie des scores, impression des feuilles de match, rappel d'absence par courriel.</p>
+    </div>
+    <div class="card">
+      <h3>Onglet Joueurs</h3>
+      <p class="small"><strong>Réguliers</strong> : ajout de joueurs, comptes en attente/orphelins, pop-up de gestion complet par joueur (clique sur un nom).</p>
+      <p class="small"><strong>Remplaçants</strong> : bassin de personnes disponibles, courriel de disponibilité groupé.</p>
+    </div>
+    <div class="card">
+      <h3>Historique et Rapports</h3>
+      <p class="small"><strong>Historique</strong> : classements et matchs de chaque session passée, suppression avec annulation optionnelle des montées/descentes et de la cote.</p>
+      <p class="small"><strong>Rapports</strong> : liste des joueurs/remplaçants, statistiques détaillées par joueur, export PDF.</p>
+    </div>
+    <div class="card">
+      <h3>Comptes, rôles et cote</h3>
+      <p class="small">Un compte doit être lié à un joueur (onglet Joueurs) avant d'accéder à sa vue joueur. Le rôle admin/joueur se change dans le pop-up du joueur lié. La cote évolue automatiquement après chaque match et est modifiable manuellement au besoin.</p>
+    </div>
+    <div class="card">
+      <h3>Dépannage courant</h3>
+      <p class="small">• Mauvais nombre de matchs générés → vérifie le Mode test.<br>
+      • Joueur qui ne voit pas ses matchs → vérifie que la session est publiée.<br>
+      • Compte orphelin → onglet Joueurs → Réguliers, section Comptes orphelins.</p>
+    </div>
+    <div class="card">
+      <button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Aperçu du guide du joueur</button>
+    </div>`;
+}
 
 function copyAppLink(){
   const url = window.location.origin + window.location.pathname;
@@ -2748,6 +2780,27 @@ function renderPlayer(playerId){
 }
 function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PLAYER; VIEW = { tab: ADMIN_VIEWING_AS_PLAYER ? 'classement' : 'groupes' }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
+function playerGuideHTML(){
+  return `
+    <h3>Mon groupe</h3>
+    <p class="small">Affiche tes coéquipiers avec leur cote, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
+    <h3 style="margin-top:14px;">Déclarer une absence</h3>
+    <p class="small">Clique sur « Je serai absent(e) pour cette session » dans Mon groupe, avant que la session ne soit finalisée — ça laisse le temps à ton administrateur de trouver un remplaçant. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
+    <h3 style="margin-top:14px;">Voir tes matchs</h3>
+    <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
+    <h3 style="margin-top:14px;">Historique</h3>
+    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées, avec ton évolution de cote en vert/rouge. La pastille « 🎾 Matchs de mon groupe » ouvre le détail des matchs.</p>
+    <h3 style="margin-top:14px;">La cote évolutive</h3>
+    <p class="small">Ta cote évolue automatiquement après chaque match compté (adversaire affronté, écart de score, nombre de matchs joués). Le bouton « Comment fonctionne la cote ? » dans Mon groupe donne l'explication complète.</p>
+    <h3 style="margin-top:14px;">Plusieurs ligues</h3>
+    <p class="small">Si tu joues dans plus d'une ligue avec le même compte, un sélecteur apparaît en haut de ton écran pour choisir laquelle consulter.</p>
+    <h3 style="margin-top:14px;">Besoin d'aide ?</h3>
+    <p class="small">Pour toute question, contacte directement un administrateur de ta ligue.</p>
+  `;
+}
+function showPlayerGuideModal(){
+  showContentModal('Guide du joueur', playerGuideHTML());
+}
 function ratingExplanationHTML(){
   return `
     <p>Chaque joueur a une <strong>cote</strong> entre 2.0 et 8.0 qui évolue automatiquement après chaque match — un indicateur de ton niveau de jeu qui te suit en continu, en plus de ton groupe.</p>
@@ -2856,6 +2909,7 @@ function playerGroupHTML(me){
       ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
     <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
+    <button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide du joueur</button>
   </div>`;
   if(open){
     const absent = isAbsent(open, me.id);
