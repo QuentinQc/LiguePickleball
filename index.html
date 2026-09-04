@@ -2587,12 +2587,14 @@ function adminSettingsSectionHTML(){
 function setSettingsSubTab(t){ VIEW.settingsSubTab = t; render(); }
 
 function settingsLeagueHTML(){
+  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   return `
     <div class="card">
       <h3>Informations générales</h3>
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
+      <div class="field"><label>Jour et heure (étiquette affichée dans le sélecteur de ligue, ex: « Lundi 19h »)</label><input id="setLeagueSchedule" placeholder="ex: Lundi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
       <div class="field">
-        <label>Jour de jeu habituel de la ligue</label>
+        <label>Jour de jeu habituel de la ligue (pour la date suggérée automatiquement)</label>
         <select id="setPlayDay">
           <option value="">— non défini (date du jour par défaut) —</option>
           ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
@@ -2691,7 +2693,21 @@ function saveSettings(){
   if(byId('setTestMatches4')) DATA.testMatches4 = Math.max(1, parseInt(byId('setTestMatches4').value,10) || 2);
   if(byId('setTestMatches5')) DATA.testMatches5 = Math.max(1, parseInt(byId('setTestMatches5').value,10) || 3);
   if(byId('setMatchesPerSession')) DATA.matchesPerSession = Math.max(1, parseInt(byId('setMatchesPerSession').value,10) || 3);
+  if(byId('setLeagueSchedule')){
+    const scheduleLabel = byId('setLeagueSchedule').value.trim();
+    updateCurrentLeagueMeta(DATA.leagueName, scheduleLabel);
+  }
   saveAndRender();
+}
+// Garde le nom/l'étiquette jour-heure de la ligue (table leagues, utilisés
+// dans les boutons de sélection) synchronisés avec les réglages.
+async function updateCurrentLeagueMeta(name, scheduleLabel){
+  if(!CURRENT_LEAGUE_ID) return;
+  const { error } = await sb.from('leagues').update({ name, schedule_label: scheduleLabel || null }).eq('id', CURRENT_LEAGUE_ID);
+  if(error){ showAlert("Erreur lors de la mise à jour de la ligue : " + error.message); return; }
+  const l = LEAGUES.find(x=>x.id===CURRENT_LEAGUE_ID);
+  if(l){ l.name = name; l.schedule_label = scheduleLabel || null; }
+  render();
 }
 
 // ---- Player ----
