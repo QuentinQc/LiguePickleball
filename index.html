@@ -2269,10 +2269,16 @@ function reportsSessionHTML(){
 }
 // ---------- Export PDF des rapports (impression du navigateur) ----------
 function reportsListPrintableHTML(){
+  const sortBy = VIEW.reportsListSortBy || 'rating';
+  const sortDir = VIEW.reportsListSortDir || 'desc';
   const ratingList = DATA.players.slice().sort((a,b)=>{
-    const av = typeof a.rating==='number'?a.rating:RATING_DEFAULT;
-    const bv = typeof b.rating==='number'?b.rating:RATING_DEFAULT;
-    return bv-av;
+    let av, bv;
+    if(sortBy==='group'){ av=(groupById(a.groupId)||{order:999}).order; bv=(groupById(b.groupId)||{order:999}).order; }
+    else if(sortBy==='status'){ av=a.status==='new'?1:0; bv=b.status==='new'?1:0; }
+    else if(sortBy==='rating'){ av=typeof a.rating==='number'?a.rating:RATING_DEFAULT; bv=typeof b.rating==='number'?b.rating:RATING_DEFAULT; }
+    else { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
+    const cmp = av<bv ? -1 : (av>bv ? 1 : a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    return sortDir==='asc' ? cmp : -cmp;
   });
   const pool = DATA.substitutePool || [];
   return `<div class="print-page">
@@ -2305,7 +2311,23 @@ function reportsSessionPrintableHTML(){
   const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
   const reports = computePlayerReports();
   const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
-  const sorted = reports.slice().sort((a,b)=> (b.winRate===null?-1:b.winRate) - (a.winRate===null?-1:a.winRate));
+  const sortBy = VIEW.reportsSortBy || 'winRate';
+  const sortDir = VIEW.reportsSortDir || 'desc';
+  const sorted = reports.slice().sort((a,b)=>{
+    let av, bv;
+    if(sortBy==='name'){ av=a.player.name.toLowerCase(); bv=b.player.name.toLowerCase(); }
+    else if(sortBy==='winRate'){ av=a.winRate===null?-1:a.winRate; bv=b.winRate===null?-1:b.winRate; }
+    else if(sortBy==='wins'){ av=a.wins; bv=b.wins; }
+    else if(sortBy==='losses'){ av=a.losses; bv=b.losses; }
+    else if(sortBy==='absenceRate'){ av=a.absenceRate===null?-1:a.absenceRate; bv=b.absenceRate===null?-1:b.absenceRate; }
+    else if(sortBy==='promotions'){ av=a.promotions; bv=b.promotions; }
+    else if(sortBy==='relegations'){ av=a.relegations; bv=b.relegations; }
+    else if(sortBy==='ratingChange'){ av=a.ratingChange; bv=b.ratingChange; }
+    else if(sortBy==='subCount'){ av=a.subCount; bv=b.subCount; }
+    else { av=a.player.name.toLowerCase(); bv=b.player.name.toLowerCase(); }
+    const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
+    return sortDir==='asc' ? cmp : -cmp;
+  });
   return `<div class="print-page">
     <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
     <p class="print-sub">Rapport de session — ${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''}</p>
