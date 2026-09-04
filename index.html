@@ -672,6 +672,17 @@ function finalizeSession(session){
   });
   session.standingsByGroup = standingsByGroup;
 
+  // Nombre d'absents (sans prêt) par groupe d'origine : chacun descend
+  // automatiquement plus bas, donc ça compte déjà comme une place qui se
+  // libère — pas besoin de faire descendre quelqu'un d'autre en plus pour ça.
+  const absentNoLoanByGroup = {};
+  (session.absences || []).forEach(pid=>{
+    if(session.loans && session.loans[pid]) return;
+    const pl = DATA.players.find(p=>p.id===pid);
+    if(!pl) return;
+    absentNoLoanByGroup[pl.groupId] = (absentNoLoanByGroup[pl.groupId] || 0) + 1;
+  });
+
   for(let i=0;i<sorted.length-1;i++){
     const upper = sorted[i];   // meilleur groupe (order plus petit)
     const lower = sorted[i+1];
@@ -679,11 +690,15 @@ function finalizeSession(session){
     // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
     const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestId(r.playerId));
     const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestId(r.playerId));
-    const n = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
-    for(let k=0;k<n;k++){
+    const nUp = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
+    const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
+    const nDown = Math.max(0, Math.min(DATA.swapCount, upperStand.length, lowerStand.length) - absentFromUpper);
+    for(let k=0;k<nUp;k++){
       const goingUp = lowerStand[k];          // top du groupe inférieur
-      const goingDown = upperStand[upperStand.length-1-k]; // bas du groupe supérieur
       if(goingUp) movements.push({ playerId: goingUp.playerId, fromGroupId: lower.id, toGroupId: upper.id });
+    }
+    for(let k=0;k<nDown;k++){
+      const goingDown = upperStand[upperStand.length-1-k]; // bas du groupe supérieur
       if(goingDown) movements.push({ playerId: goingDown.playerId, fromGroupId: upper.id, toGroupId: lower.id });
     }
   }
@@ -1274,7 +1289,7 @@ function adminPlayersHTML(){
           const g = groupById(p.groupId);
           const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}</td>
+            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}</td>
             <td>${escapeHTML(g ? g.name : '—')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
@@ -1295,7 +1310,10 @@ function playerDetailModalHTML(pid){
   const adminCount = ALL_PROFILES.filter(pr=>pr.role==='admin').length;
 
   let html = `
-    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : '—')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong></p>
+    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : '—')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong></p>
+    <div class="row" style="margin-bottom:10px;">
+      <button class="btn-ghost" onclick="togglePlayerStatus('${pid}')">${p.status==='new' ? 'Marquer comme confirmé(e)' : 'Marquer comme nouveau/nouvelle'}</button>
+    </div>
     <div class="row" style="margin:10px 0;">
       <button class="btn-ghost" onclick="closeModal();renamePlayer('${pid}')">renommer</button>
       <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
@@ -1343,6 +1361,13 @@ function openPlayerDetailModal(pid){
   if(!p) return;
   showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
 }
+function togglePlayerStatus(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  p.status = p.status==='new' ? 'confirmed' : 'new';
+  saveData();
+  openPlayerDetailModal(pid);
+}
 async function linkPlayerToAccountFromModal(pid){
   const select = document.getElementById('detailLinkSelect_'+pid);
   if(!select) return;
@@ -1371,7 +1396,7 @@ function addPlayerFromList(){
   if(!groupId) return;
   const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
   const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: nextOrderInGroup(groupId) });
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: nextOrderInGroup(groupId), status: 'new' });
   saveAndRender();
 }
 function renamePlayer(pid){
@@ -2109,8 +2134,38 @@ function computePlayerReports(){
 function adminReportsHTML(){
   const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
   const reports = computePlayerReports();
+  const ratingSortDir = VIEW.ratingListSortDir || 'desc';
+  const ratingList = DATA.players.slice().sort((a,b)=>{
+    const av = typeof a.rating==='number'?a.rating:RATING_DEFAULT;
+    const bv = typeof b.rating==='number'?b.rating:RATING_DEFAULT;
+    return ratingSortDir==='asc' ? av-bv : bv-av;
+  });
+  let ratingListHTML = `<div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h2>Liste des joueurs et leur cote</h2>
+      <button class="btn-ghost" onclick="toggleRatingListSort()">${ratingSortDir==='desc' ? 'Cote ▼' : 'Cote ▲'}</button>
+    </div>
+    <table>
+      <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
+      ${ratingList.map(p=>{
+        const g = groupById(p.groupId);
+        const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
+        return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td></tr>`;
+      }).join('')}
+      ${ratingList.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+    </table>
+  </div>`;
   if(closedCount === 0){
-    return `<div class="card"><p class="empty">Aucune session terminée pour l'instant — les rapports apparaîtront une fois l'historique commencé.</p></div>`;
+    const pool0 = DATA.substitutePool || [];
+    const subsHTML0 = `<div class="card">
+      <h2>Remplaçants <span class="small">(${pool0.length})</span></h2>
+      <table>
+        <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
+        ${pool0.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
+        ${pool0.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+      </table>
+    </div>`;
+    return ratingListHTML + `<div class="card"><p class="empty">Aucune session terminée pour l'instant — les autres rapports apparaîtront une fois l'historique commencé.</p></div>` + subsHTML0;
   }
   const withRate = reports.filter(r=>r.winRate!==null);
   const withAbsence = reports.filter(r=>r.absenceRate!==null && (r.sessionsAbsent+r.sessionsAppeared)>=2);
@@ -2140,7 +2195,7 @@ function adminReportsHTML(){
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
 
-  let html = `<div class="card">
+  let html = ratingListHTML + `<div class="card">
     <h2>Vue d'ensemble</h2>
     <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total.</p>
     <table>
@@ -2156,6 +2211,7 @@ function adminReportsHTML(){
     <table>
       <tr>
         <th class="sortable" onclick="setReportsSort('name')">Nom${arrow('name')}</th>
+        <th>Statut</th>
         <th class="sortable" onclick="setReportsSort('wins')">V${arrow('wins')}</th>
         <th class="sortable" onclick="setReportsSort('losses')">D${arrow('losses')}</th>
         <th class="sortable" onclick="setReportsSort('winRate')">% V${arrow('winRate')}</th>
@@ -2167,6 +2223,7 @@ function adminReportsHTML(){
       </tr>
       ${sorted.map(r=>`<tr>
         <td>${escapeHTML(r.player.name)}</td>
+        <td>${r.player.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td>
         <td>${r.wins}</td>
         <td>${r.losses}</td>
         <td>${pct(r.winRate)}</td>
@@ -2176,11 +2233,24 @@ function adminReportsHTML(){
         <td style="color:${r.ratingChange>0?'var(--ball)':(r.ratingChange<0?'var(--danger)':'inherit')};">${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
         <td>${r.subCount}</td>
       </tr>`).join('')}
-      ${sorted.length===0 ? `<tr><td colspan="9" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+      ${sorted.length===0 ? `<tr><td colspan="10" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
     </table>
     <p class="small">Le taux d'absence se calcule sur les sessions où le joueur était présent ou absent dans son groupe (les sessions avant qu'il rejoigne la ligue ne comptent pas contre lui).</p>
   </div>`;
+  const pool = DATA.substitutePool || [];
+  html += `<div class="card">
+    <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
+    <table>
+      <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
+      ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
+      ${pool.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+    </table>
+  </div>`;
   return html;
+}
+function toggleRatingListSort(){
+  VIEW.ratingListSortDir = (VIEW.ratingListSortDir||'desc')==='desc' ? 'asc' : 'desc';
+  render();
 }
 function setReportsSort(col){
   if((VIEW.reportsSortBy||'winRate') === col){ VIEW.reportsSortDir = (VIEW.reportsSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
@@ -2697,6 +2767,7 @@ function migrateData(){
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
     if(typeof p.ratingGames !== 'number') p.ratingGames = 0;
+    if(p.status === undefined) p.status = 'confirmed';
   });
   // Ordre manuel au sein d'un groupe : si absent, on l'initialise selon
   // l'ordre alphabétique actuel, groupe par groupe.
