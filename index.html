@@ -2143,24 +2143,32 @@ function adminReportsSectionHTML(){
 function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
 
 function reportsListHTML(){
-  const ratingSortDir = VIEW.ratingListSortDir || 'desc';
+  const sortBy = VIEW.reportsListSortBy || 'rating';
+  const sortDir = VIEW.reportsListSortDir || 'desc';
   const ratingList = DATA.players.slice().sort((a,b)=>{
-    const av = typeof a.rating==='number'?a.rating:RATING_DEFAULT;
-    const bv = typeof b.rating==='number'?b.rating:RATING_DEFAULT;
-    return ratingSortDir==='asc' ? av-bv : bv-av;
+    let av, bv;
+    if(sortBy==='group'){ av=(groupById(a.groupId)||{order:999}).order; bv=(groupById(b.groupId)||{order:999}).order; }
+    else if(sortBy==='status'){ av=a.status==='new'?1:0; bv=b.status==='new'?1:0; }
+    else if(sortBy==='rating'){ av=typeof a.rating==='number'?a.rating:RATING_DEFAULT; bv=typeof b.rating==='number'?b.rating:RATING_DEFAULT; }
+    else { av=a.name.toLowerCase(); bv=b.name.toLowerCase(); }
+    const cmp = av<bv ? -1 : (av>bv ? 1 : a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    return sortDir==='asc' ? cmp : -cmp;
   });
+  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const pool = DATA.substitutePool || [];
   return `
     <div class="card">
       <button class="btn-ghost" onclick="printReportsList()">📄 Exporter en PDF</button>
     </div>
     <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <h2>Liste des joueurs et leur cote</h2>
-        <button class="btn-ghost" onclick="toggleRatingListSort()">${ratingSortDir==='desc' ? 'Cote ▼' : 'Cote ▲'}</button>
-      </div>
+      <h2>Liste des joueurs et leur cote</h2>
       <table>
-        <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
+        <tr>
+          <th class="sortable" onclick="setReportsListSort('name')">Nom${arrow('name')}</th>
+          <th class="sortable" onclick="setReportsListSort('group')">Groupe${arrow('group')}</th>
+          <th class="sortable" onclick="setReportsListSort('rating')">Cote${arrow('rating')}</th>
+          <th class="sortable" onclick="setReportsListSort('status')">Statut${arrow('status')}</th>
+        </tr>
         ${ratingList.map(p=>{
           const g = groupById(p.groupId);
           const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
@@ -2324,8 +2332,9 @@ function printReportsSession(){
   window.addEventListener('afterprint', cleanup);
   setTimeout(()=>{ window.print(); }, 50);
 }
-function toggleRatingListSort(){
-  VIEW.ratingListSortDir = (VIEW.ratingListSortDir||'desc')==='desc' ? 'asc' : 'desc';
+function setReportsListSort(col){
+  if((VIEW.reportsListSortBy||'rating') === col){ VIEW.reportsListSortDir = (VIEW.reportsListSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
+  else { VIEW.reportsListSortBy = col; VIEW.reportsListSortDir = col==='rating' ? 'desc' : 'asc'; }
   render();
 }
 function setReportsSort(col){
