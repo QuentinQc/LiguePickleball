@@ -1114,7 +1114,7 @@ function renderAdmin(){
       </div>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur', modeSwitch)}
+    ${topbarHTML('Espace administrateur', modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>')}
     ${storageBannerHTML()}
     ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
@@ -2576,12 +2576,11 @@ function groupAbove(gid){
 // Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
 function adminSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde'],['guide','Guide']];
+  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde']];
   let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='test') html += settingsTestModeHTML();
   else if(sub==='partage') html += settingsShareHTML();
   else if(sub==='sauvegarde') html += settingsBackupHTML();
-  else if(sub==='guide') html += settingsGuideHTML();
   else html += settingsLeagueHTML();
   return html;
 }
@@ -2667,6 +2666,9 @@ function settingsBackupHTML(){
         <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
       </div>
     </div>`;
+}
+function showAdminGuideModal(){
+  showContentModal('Guide de l\'administrateur', settingsGuideHTML());
 }
 function settingsGuideHTML(){
   return `
@@ -2769,7 +2771,7 @@ function renderPlayer(playerId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), modeSwitch)}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), modeSwitch + '<button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide</button>')}
     ${storageBannerHTML()}
     ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setPlayerTab('${k}')">${l}</div>`).join('')}</div>
@@ -2909,7 +2911,6 @@ function playerGroupHTML(me){
       ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
     <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
-    <button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide du joueur</button>
   </div>`;
   if(open){
     const absent = isAbsent(open, me.id);
