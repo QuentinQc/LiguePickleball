@@ -203,11 +203,43 @@ async function saveData(){
   }
 }
 async function loadLeagues(){
-  const { data, error } = await sb.from('leagues').select('*').order('created_at', { ascending:true });
+  const { data, error } = await sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
   LEAGUES = error ? [] : (data || []);
 }
+// Réordonne les ligues par glisser-déposer et sauvegarde le nouvel ordre.
+async function reorderLeague(draggedId, targetId){
+  if(!draggedId || draggedId===targetId) return;
+  const list = LEAGUES.slice();
+  const fromIdx = list.findIndex(l=>l.id===draggedId);
+  if(fromIdx===-1) return;
+  const [moved] = list.splice(fromIdx,1);
+  const targetIdx = list.findIndex(l=>l.id===targetId);
+  list.splice(targetIdx===-1 ? list.length : targetIdx, 0, moved);
+  LEAGUES = list;
+  render(); // mise à jour immédiate à l'écran, sauvegarde en arrière-plan
+  const updates = list.map((l,i)=> sb.from('leagues').update({ order_index: i+1 }).eq('id', l.id));
+  await Promise.all(updates);
+}
+function onLeagueDragStart(ev, leagueId){
+  ev.dataTransfer.setData('text/plain', leagueId);
+  ev.dataTransfer.effectAllowed = 'move';
+}
+function onLeagueDragOver(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.add('row-drop-hover');
+}
+function onLeagueDragLeave(ev){
+  ev.currentTarget.classList.remove('row-drop-hover');
+}
+function onLeagueDrop(ev, targetLeagueId){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('row-drop-hover');
+  const draggedId = ev.dataTransfer.getData('text/plain');
+  reorderLeague(draggedId, targetLeagueId);
+}
 async function createLeague(name, scheduleLabel){
-  const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null }).select().single();
+  const nextOrder = LEAGUES.reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
+  const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder }).select().single();
   if(error){ showAlert("Erreur lors de la création : " + error.message); return null; }
   const fresh = defaultData();
   fresh.leagueName = name;
@@ -1071,14 +1103,14 @@ function renderAdmin(){
     </div>` : '';
   const leagueSwitcher = `
     <div class="card">
-      <div class="row" style="justify-content:space-between;align-items:center;">
-        <div style="flex:1;">
-          <label style="display:block;margin-bottom:6px;">Ligue actuelle</label>
-          <div class="row" style="gap:6px;">
-            ${LEAGUES.map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
-          </div>
-        </div>
-        <button class="btn-ghost" onclick="onCreateLeague()">+ Nouvelle ligue</button>
+      <label style="display:block;margin-bottom:6px;">Ligue actuelle <span class="small">(glisse-dépose pour réordonner, sur ordinateur)</span></label>
+      <div class="row" style="gap:6px;">
+        ${LEAGUES.map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" draggable="true"
+          ondragstart="onLeagueDragStart(event,'${l.id}')"
+          ondragover="onLeagueDragOver(event)"
+          ondragleave="onLeagueDragLeave(event)"
+          ondrop="onLeagueDrop(event,'${l.id}')"
+          onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
       </div>
     </div>`;
   app.innerHTML = `
@@ -1265,11 +1297,13 @@ function adminPlayersHTML(){
       <div class="row">
         <input id="newPlayerName" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
         <select id="newPlayerGroup">
+          <option value="">— En attente (à placer plus tard) —</option>
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
         <input id="newPlayerRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="Cote (${RATING_DEFAULT.toFixed(1)} par défaut)" style="width:170px;">
         <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
       </div>
+      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes.</p>
       ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
     </div>
     ${adminAccountsHTML()}
@@ -1290,7 +1324,7 @@ function adminPlayersHTML(){
           const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
             <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}</td>
-            <td>${escapeHTML(g ? g.name : '—')}</td>
+            <td>${escapeHTML(g ? g.name : 'En attente')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
           </tr>`;
@@ -1310,7 +1344,7 @@ function playerDetailModalHTML(pid){
   const adminCount = ALL_PROFILES.filter(pr=>pr.role==='admin').length;
 
   let html = `
-    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : '—')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong></p>
+    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : 'En attente')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong></p>
     <div class="row" style="margin-bottom:10px;">
       <button class="btn-ghost" onclick="togglePlayerStatus('${pid}')">${p.status==='new' ? 'Marquer comme confirmé(e)' : 'Marquer comme nouveau/nouvelle'}</button>
     </div>
@@ -1390,13 +1424,16 @@ function addPlayerFromList(){
   const ratingEl = document.getElementById('newPlayerRating');
   const rawName = nameEl.value.trim();
   const desiredGroupId = groupEl.value;
-  if(!rawName || !desiredGroupId) return;
+  if(!rawName) return;
   const name = uniquePlayerName(rawName, DATA.players);
-  const groupId = resolveGroupAssignment(desiredGroupId, DATA.groups, DATA.players);
-  if(!groupId) return;
+  let groupId = null;
+  if(desiredGroupId){
+    groupId = resolveGroupAssignment(desiredGroupId, DATA.groups, DATA.players);
+    if(!groupId) return;
+  }
   const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
   const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: nextOrderInGroup(groupId), status: 'new' });
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
   saveAndRender();
 }
 function renamePlayer(pid){
@@ -1652,6 +1689,16 @@ async function unlinkAccount(profileId){
 function adminGroupsHTML(){
   const open = currentOpenSession();
   let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+  const unassigned = DATA.players.filter(p=>!p.groupId);
+  html += `<div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
+    <h2>En attente d'assignation <span class="small">(${unassigned.length})</span></h2>
+    <p class="small">Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner.</p>
+    <table>
+      <tr><th>Nom</th></tr>
+      ${unassigned.map(p=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')"><td>${escapeHTML(p.name)}</td></tr>`).join('')}
+      ${unassigned.length===0 ? `<tr><td class="empty">Aucun joueur en attente</td></tr>` : ''}
+    </table>
+  </div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS || ps.length > GROUP_MAX_PLAYERS);
@@ -1770,9 +1817,17 @@ function onGroupDrop(ev, gid){
   const pid = ev.dataTransfer.getData('text/plain');
   if(!pid) return;
   const p = DATA.players.find(x=>x.id===pid);
-  if(!p || p.groupId === gid) return;
+  const targetGroupId = gid || null;
+  if(!p || p.groupId === targetGroupId) return;
+  if(!targetGroupId){
+    // Déposé sur la carte « En attente d'assignation »
+    p.groupId = null;
+    p.order = 0;
+    saveAndRender();
+    return;
+  }
   const otherPlayers = DATA.players.filter(x=>x.id!==pid);
-  p.groupId = resolveGroupAssignment(gid, DATA.groups, otherPlayers);
+  p.groupId = resolveGroupAssignment(targetGroupId, DATA.groups, otherPlayers);
   p.order = nextOrderInGroup(p.groupId);
   saveAndRender();
 }
@@ -1818,7 +1873,14 @@ function movePlayer(pid){
   if(!p) return;
   const currentGroup = groupById(p.groupId);
   const sorted = groupsSorted();
-  showChoice(`Déplacer ${p.name} (actuellement dans ${currentGroup ? currentGroup.name : '—'}) vers quel groupe ?`, sorted.map(g=>g.name), (idx)=>{
+  const choices = sorted.map(g=>g.name).concat(['— Mettre en attente (aucun groupe) —']);
+  showChoice(`Déplacer ${p.name} (actuellement dans ${currentGroup ? currentGroup.name : 'en attente'}) vers quel groupe ?`, choices, (idx)=>{
+    if(idx === sorted.length){
+      p.groupId = null;
+      p.order = 0;
+      saveAndRender();
+      return;
+    }
     if(!sorted[idx]) return;
     const otherPlayers = DATA.players.filter(x=>x.id!==pid); // le joueur qu'on déplace ne compte pas contre lui-même
     const groupId = resolveGroupAssignment(sorted[idx].id, DATA.groups, otherPlayers);
@@ -2519,6 +2581,7 @@ function adminSettingsHTML(){
       <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
     </div>
     <div class="card">
+      <h3>Paramètres de ligue</h3>
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
       <div class="field">
         <label>Jour de jeu habituel de la ligue</label>
@@ -2530,6 +2593,9 @@ function adminSettingsHTML(){
       </div>
       <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
+      <div class="row" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+        <button class="btn-ghost" onclick="onCreateLeague()">+ Créer une nouvelle ligue</button>
+      </div>
     </div>
     <div class="card">
       <h3>Format des matchs</h3>
