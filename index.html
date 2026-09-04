@@ -328,13 +328,13 @@ function matchesCountFor(n){
     if(n === 5) return Math.max(1, DATA.testMatches5 || 3);
     return Math.max(1, DATA.matchesPerSession || 3);
   }
-  if(n === 5) return 10;
-  if(n === 4) return 6;
+  if(n === 5) return Math.max(1, DATA.rules5Matches || 10);
+  if(n === 4) return Math.max(1, DATA.rules4Matches || 6);
   return DATA.matchesPerSession || 10; // repli pour une taille de groupe atypique
 }
 function targetPointsFor(n){
-  if(n === 5) return 9;
-  if(n === 4) return 11;
+  if(n === 5) return Math.max(1, DATA.rules5Points || 9);
+  if(n === 4) return Math.max(1, DATA.rules4Points || 11);
   return 11;
 }
 
@@ -478,15 +478,15 @@ function previousSessionInfoForPlayer(pid){
 function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order); }
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
-const GROUP_MAX_PLAYERS = 5;
-const GROUP_MIN_PLAYERS = 4;
+function GROUP_MAX_PLAYERS(){ return DATA.groupMaxPlayers || 5; }
+function GROUP_MIN_PLAYERS(){ return DATA.groupMinPlayers || 4; }
 // Retourne le premier groupe (selon l'ordre de l'échelle) qui a encore de la
-// place (moins de GROUP_MAX_PLAYERS joueurs), ou null si tous sont pleins.
+// place (moins de GROUP_MAX_PLAYERS() joueurs), ou null si tous sont pleins.
 function firstGroupWithRoom(groupsList, playersList){
   const sorted = groupsList.slice().sort((a,b)=>a.order-b.order);
   for(const g of sorted){
     const count = playersList.filter(p=>p.groupId===g.id).length;
-    if(count < GROUP_MAX_PLAYERS) return g.id;
+    if(count < GROUP_MAX_PLAYERS()) return g.id;
   }
   return sorted.length ? sorted[0].id : null;
 }
@@ -532,9 +532,9 @@ function onRowDrop(ev, gid, targetPid){
 // avertit et retourne plutôt le premier groupe disponible.
 function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
   const count = playersList.filter(p=>p.groupId===desiredGroupId).length;
-  if(count >= GROUP_MAX_PLAYERS){
+  if(count >= GROUP_MAX_PLAYERS()){
     const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
-    showAlert(`Attention : ${desiredName} aura maintenant ${count+1} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`);
+    showAlert(`Attention : ${desiredName} aura maintenant ${count+1} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`);
   }
   return desiredGroupId;
 }
@@ -1125,7 +1125,7 @@ function renderAdmin(){
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
-  else c.innerHTML = adminSettingsHTML();
+  else c.innerHTML = adminSettingsSectionHTML();
 }
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
 // absences/remplaçants) et Résultats (matchs, scores, publication).
@@ -1701,7 +1701,7 @@ function adminGroupsHTML(){
   </div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
-    const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS || ps.length > GROUP_MAX_PLAYERS);
+    const outOfRange = ps.length > 0 && (ps.length < GROUP_MIN_PLAYERS() || ps.length > GROUP_MAX_PLAYERS());
     html += `
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;">
@@ -1709,7 +1709,7 @@ function adminGroupsHTML(){
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
         <button class="btn-ghost" onclick="deleteGroup('${g.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">supprimer</button>
       </div>
-      ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS} et ${GROUP_MAX_PLAYERS} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
+      ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${ps.length}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
         <tr><th>#</th><th>Nom</th><th>Session précédente</th></tr>
         ${ps.map((p,i)=>{
@@ -2026,8 +2026,8 @@ function sessionCompletionIssues(session){
   const issues = [];
   groupsSorted().forEach(g=>{
     const memberCount = playersInGroup(g.id).length;
-    if(memberCount > GROUP_MAX_PLAYERS){
-      issues.push(`${g.name} : ${memberCount} joueurs, au-dessus de la limite de ${GROUP_MAX_PLAYERS} — déplace des joueurs avant de publier`);
+    if(memberCount > GROUP_MAX_PLAYERS()){
+      issues.push(`${g.name} : ${memberCount} joueurs, au-dessus de la limite de ${GROUP_MAX_PLAYERS()} — déplace des joueurs avant de publier`);
     }
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
@@ -2573,15 +2573,23 @@ function groupAbove(gid){
   return idx>0 ? sorted[idx-1].id : null;
 }
 
-function adminSettingsHTML(){
+// Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
+function adminSettingsSectionHTML(){
+  const sub = VIEW.settingsSubTab || 'ligue';
+  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde']];
+  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  if(sub==='test') html += settingsTestModeHTML();
+  else if(sub==='partage') html += settingsShareHTML();
+  else if(sub==='sauvegarde') html += settingsBackupHTML();
+  else html += settingsLeagueHTML();
+  return html;
+}
+function setSettingsSubTab(t){ VIEW.settingsSubTab = t; render(); }
+
+function settingsLeagueHTML(){
   return `
     <div class="card">
-      <h3>Partager l'application</h3>
-      <p class="small">Copie le lien de l'app pour l'envoyer directement par texto, Messenger, courriel, etc.</p>
-      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
-    </div>
-    <div class="card">
-      <h3>Paramètres de ligue</h3>
+      <h3>Informations générales</h3>
       <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
       <div class="field">
         <label>Jour de jeu habituel de la ligue</label>
@@ -2589,17 +2597,41 @@ function adminSettingsHTML(){
           <option value="">— non défini (date du jour par défaut) —</option>
           ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
         </select>
-        <p class="small" style="margin-top:4px;">Utilisé pour suggérer automatiquement la bonne date au démarrage d'une session (ex: si tu lances la session un jeudi alors que la ligue joue le mercredi, elle proposera le mercredi suivant).</p>
+        <p class="small" style="margin-top:4px;">Utilisé pour suggérer automatiquement la bonne date au démarrage d'une session.</p>
       </div>
       <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
+    </div>
+    <div class="card">
+      <h3>Taille des groupes</h3>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:140px;"><label>Minimum de joueurs par groupe</label><input id="setGroupMin" type="number" min="1" value="${DATA.groupMinPlayers || 4}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input id="setGroupMax" type="number" min="1" value="${DATA.groupMaxPlayers || 5}"></div>
+      </div>
+      <p class="small">Contrôle l'avertissement de déséquilibre et la limite appliquée à l'ajout/déplacement de joueurs.</p>
+    </div>
+    <div class="card">
+      <h3>Format des matchs</h3>
+      <p class="small">Nombre de matchs et de points selon le nombre de joueurs réellement actifs pour une session (s'ajuste automatiquement, ex. lors d'une absence).</p>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 4</label><input id="setRules4Matches" type="number" min="1" value="${DATA.rules4Matches || 6}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 4</label><input id="setRules4Points" type="number" min="1" value="${DATA.rules4Points || 11}"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 5</label><input id="setRules5Matches" type="number" min="1" value="${DATA.rules5Matches || 10}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
+      </div>
+      <p class="small">Pour une taille de groupe différente de 4 ou 5, les matchs sont générés de façon plus simple (paires successives) plutôt qu'avec une rotation optimisée — ces deux tailles sont les seules pour lesquelles l'algorithme garantit que chacun joue avec/contre tout le monde équitablement.</p>
+    </div>
+    <div class="card">
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
       <div class="row" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
         <button class="btn-ghost" onclick="onCreateLeague()">+ Créer une nouvelle ligue</button>
       </div>
-    </div>
+    </div>`;
+}
+function settingsTestModeHTML(){
+  return `
     <div class="card">
-      <h3>Format des matchs</h3>
-      <p class="small">Règle standard : groupe de 5 joueurs → 10 matchs, en 9 points. Groupe de 4 joueurs → 6 matchs, en 11 points. Ce nombre s'ajuste automatiquement selon le nombre de joueurs réellement présents pour chaque session.</p>
       <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="setTestMode" ${DATA.testMode ? 'checked' : ''} style="width:auto;">
         <span class="small">Mode test — remplacer la règle standard par un nombre réduit de matchs, pour essayer l'app ou faire une démonstration rapidement</span>
@@ -2611,7 +2643,18 @@ function adminSettingsHTML(){
       </div>
       <div class="field"><label>Matchs pour une taille de groupe atypique (test)</label><input id="setMatchesPerSession" type="number" min="1" value="${DATA.matchesPerSession || 3}"></div>
       <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
-    </div>
+    </div>`;
+}
+function settingsShareHTML(){
+  return `
+    <div class="card">
+      <h3>Partager l'application</h3>
+      <p class="small">Copie le lien de l'app pour l'envoyer directement par texto, Messenger, courriel, etc.</p>
+      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
+    </div>`;
+}
+function settingsBackupHTML(){
+  return `
     <div class="card">
       <h3>Sauvegarde manuelle</h3>
       <p class="small">Les données sont normalement sauvegardées automatiquement dans la base de données en ligne. Ces boutons servent de filet de sécurité en cas de problème de connexion : exporte un fichier de sauvegarde de temps en temps, et réimporte-le si jamais des données étaient perdues.</p>
@@ -2634,14 +2677,20 @@ function copyAppLink(){
   }
 }
 function saveSettings(){
-  DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
-  const dayVal = document.getElementById('setPlayDay').value;
-  DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
-  DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
-  DATA.testMode = document.getElementById('setTestMode').checked;
-  DATA.testMatches4 = Math.max(1, parseInt(document.getElementById('setTestMatches4').value,10) || 2);
-  DATA.testMatches5 = Math.max(1, parseInt(document.getElementById('setTestMatches5').value,10) || 3);
-  DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
+  const byId = (id)=> document.getElementById(id);
+  if(byId('setLeagueName')) DATA.leagueName = byId('setLeagueName').value.trim() || DATA.leagueName;
+  if(byId('setPlayDay')){ const dayVal = byId('setPlayDay').value; DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10); }
+  if(byId('setSwap')) DATA.swapCount = Math.max(1, parseInt(byId('setSwap').value,10) || 1);
+  if(byId('setGroupMin')) DATA.groupMinPlayers = Math.max(1, parseInt(byId('setGroupMin').value,10) || 4);
+  if(byId('setGroupMax')) DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(byId('setGroupMax').value,10) || 5);
+  if(byId('setRules4Matches')) DATA.rules4Matches = Math.max(1, parseInt(byId('setRules4Matches').value,10) || 6);
+  if(byId('setRules4Points')) DATA.rules4Points = Math.max(1, parseInt(byId('setRules4Points').value,10) || 11);
+  if(byId('setRules5Matches')) DATA.rules5Matches = Math.max(1, parseInt(byId('setRules5Matches').value,10) || 10);
+  if(byId('setRules5Points')) DATA.rules5Points = Math.max(1, parseInt(byId('setRules5Points').value,10) || 9);
+  if(byId('setTestMode')) DATA.testMode = byId('setTestMode').checked;
+  if(byId('setTestMatches4')) DATA.testMatches4 = Math.max(1, parseInt(byId('setTestMatches4').value,10) || 2);
+  if(byId('setTestMatches5')) DATA.testMatches5 = Math.max(1, parseInt(byId('setTestMatches5').value,10) || 3);
+  if(byId('setMatchesPerSession')) DATA.matchesPerSession = Math.max(1, parseInt(byId('setMatchesPerSession').value,10) || 3);
   saveAndRender();
 }
 
@@ -2936,6 +2985,12 @@ function migrateData(){
   if(DATA.testMode === undefined) DATA.testMode = false;
   if(DATA.testMatches4 === undefined) DATA.testMatches4 = 2;
   if(DATA.testMatches5 === undefined) DATA.testMatches5 = 3;
+  if(DATA.groupMinPlayers === undefined) DATA.groupMinPlayers = 4;
+  if(DATA.groupMaxPlayers === undefined) DATA.groupMaxPlayers = 5;
+  if(DATA.rules4Matches === undefined) DATA.rules4Matches = 6;
+  if(DATA.rules4Points === undefined) DATA.rules4Points = 11;
+  if(DATA.rules5Matches === undefined) DATA.rules5Matches = 10;
+  if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
