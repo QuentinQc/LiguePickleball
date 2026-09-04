@@ -2161,7 +2161,7 @@ function reportsListHTML(){
       <button class="btn-ghost" onclick="printReportsList()">📄 Exporter en PDF</button>
     </div>
     <div class="card">
-      <h2>Liste des joueurs et leur cote</h2>
+      <h2>Liste des joueurs et leur cote <span class="small">(${ratingList.length})</span></h2>
       <table>
         <tr>
           <th class="sortable" onclick="setReportsListSort('name')">Nom${arrow('name')}</th>
@@ -2225,7 +2225,7 @@ function reportsSessionHTML(){
   </div>
   <div class="card">
     <h2>Vue d'ensemble</h2>
-    <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total.</p>
+    <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total · ${DATA.players.length} joueur${DATA.players.length>1?'s':''} · ${(DATA.substitutePool||[]).length} remplaçant${(DATA.substitutePool||[]).length>1?'s':''}</p>
     <table>
       <tr><td class="small">Meilleur taux de victoire</td><td>${topWinRate ? escapeHTML(topWinRate.player.name)+' — '+pct(topWinRate.winRate) : '—'}</td></tr>
       <tr><td class="small">Joueur le plus actif (matchs joués)</td><td>${mostActive && mostActive.played>0 ? escapeHTML(mostActive.player.name)+' — '+mostActive.played+' matchs' : '—'}</td></tr>
@@ -2283,7 +2283,7 @@ function reportsListPrintableHTML(){
   const pool = DATA.substitutePool || [];
   return `<div class="print-page">
     <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
-    <p class="print-sub">Liste des joueurs et remplaçants</p>
+    <p class="print-sub">${ratingList.length} joueur${ratingList.length>1?'s':''}, ${pool.length} remplaçant${pool.length>1?'s':''}</p>
     <table class="print-table">
       <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
       ${ratingList.map(p=>{
@@ -2330,7 +2330,7 @@ function reportsSessionPrintableHTML(){
   });
   return `<div class="print-page">
     <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
-    <p class="print-sub">Rapport de session — ${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''}</p>
+    <p class="print-sub">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} · ${DATA.players.length} joueur${DATA.players.length>1?'s':''} · ${(DATA.substitutePool||[]).length} remplaçant${(DATA.substitutePool||[]).length>1?'s':''}</p>
     <table class="print-table">
       <tr><th>Nom</th><th>Statut</th><th>V</th><th>D</th><th>% V</th><th>Taux absence</th><th>Montées</th><th>Descentes</th><th>Δ Cote</th></tr>
       ${sorted.map(r=>`<tr>
