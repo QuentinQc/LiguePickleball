@@ -1092,7 +1092,7 @@ function renderAdmin(){
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
-  else if(VIEW.tab==='rapports') c.innerHTML = adminReportsHTML();
+  else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsHTML();
 }
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
@@ -2131,42 +2131,59 @@ function computePlayerReports(){
     };
   });
 }
-function adminReportsHTML(){
-  const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
-  const reports = computePlayerReports();
+// Onglet « Rapports » unifié : sous-onglets Liste (joueurs/remplaçants) et
+// Rapport de session (stats calculées à partir de l'historique).
+function adminReportsSectionHTML(){
+  const sub = VIEW.reportsSubTab || 'liste';
+  const subTabs = [['liste','Liste'],['session','Rapport de session']];
+  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setReportsSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += sub === 'session' ? reportsSessionHTML() : reportsListHTML();
+  return html;
+}
+function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
+
+function reportsListHTML(){
   const ratingSortDir = VIEW.ratingListSortDir || 'desc';
   const ratingList = DATA.players.slice().sort((a,b)=>{
     const av = typeof a.rating==='number'?a.rating:RATING_DEFAULT;
     const bv = typeof b.rating==='number'?b.rating:RATING_DEFAULT;
     return ratingSortDir==='asc' ? av-bv : bv-av;
   });
-  let ratingListHTML = `<div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <h2>Liste des joueurs et leur cote</h2>
-      <button class="btn-ghost" onclick="toggleRatingListSort()">${ratingSortDir==='desc' ? 'Cote ▼' : 'Cote ▲'}</button>
+  const pool = DATA.substitutePool || [];
+  return `
+    <div class="card">
+      <button class="btn-ghost" onclick="printReportsList()">📄 Exporter en PDF</button>
     </div>
-    <table>
-      <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
-      ${ratingList.map(p=>{
-        const g = groupById(p.groupId);
-        const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-        return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td></tr>`;
-      }).join('')}
-      ${ratingList.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
-    </table>
-  </div>`;
-  if(closedCount === 0){
-    const pool0 = DATA.substitutePool || [];
-    const subsHTML0 = `<div class="card">
-      <h2>Remplaçants <span class="small">(${pool0.length})</span></h2>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h2>Liste des joueurs et leur cote</h2>
+        <button class="btn-ghost" onclick="toggleRatingListSort()">${ratingSortDir==='desc' ? 'Cote ▼' : 'Cote ▲'}</button>
+      </div>
+      <table>
+        <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
+        ${ratingList.map(p=>{
+          const g = groupById(p.groupId);
+          const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
+          return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td></tr>`;
+        }).join('')}
+        ${ratingList.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+      </table>
+    </div>
+    <div class="card">
+      <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
       <table>
         <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
-        ${pool0.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
-        ${pool0.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+        ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
+        ${pool.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
       </table>
     </div>`;
-    return ratingListHTML + `<div class="card"><p class="empty">Aucune session terminée pour l'instant — les autres rapports apparaîtront une fois l'historique commencé.</p></div>` + subsHTML0;
+}
+function reportsSessionHTML(){
+  const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
+  if(closedCount === 0){
+    return `<div class="card"><p class="empty">Aucune session terminée pour l'instant — ce rapport apparaîtra une fois l'historique commencé.</p></div>`;
   }
+  const reports = computePlayerReports();
   const withRate = reports.filter(r=>r.winRate!==null);
   const withAbsence = reports.filter(r=>r.absenceRate!==null && (r.sessionsAbsent+r.sessionsAppeared)>=2);
   const topWinRate = withRate.slice().sort((a,b)=>b.winRate-a.winRate)[0];
@@ -2195,7 +2212,10 @@ function adminReportsHTML(){
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
 
-  let html = ratingListHTML + `<div class="card">
+  let html = `<div class="card">
+    <button class="btn-ghost" onclick="printReportsSession()">📄 Exporter en PDF</button>
+  </div>
+  <div class="card">
     <h2>Vue d'ensemble</h2>
     <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total.</p>
     <table>
@@ -2237,16 +2257,72 @@ function adminReportsHTML(){
     </table>
     <p class="small">Le taux d'absence se calcule sur les sessions où le joueur était présent ou absent dans son groupe (les sessions avant qu'il rejoigne la ligue ne comptent pas contre lui).</p>
   </div>`;
+  return html;
+}
+// ---------- Export PDF des rapports (impression du navigateur) ----------
+function reportsListPrintableHTML(){
+  const ratingList = DATA.players.slice().sort((a,b)=>{
+    const av = typeof a.rating==='number'?a.rating:RATING_DEFAULT;
+    const bv = typeof b.rating==='number'?b.rating:RATING_DEFAULT;
+    return bv-av;
+  });
   const pool = DATA.substitutePool || [];
-  html += `<div class="card">
-    <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
-    <table>
+  return `<div class="print-page">
+    <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
+    <p class="print-sub">Liste des joueurs et remplaçants</p>
+    <table class="print-table">
+      <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
+      ${ratingList.map(p=>{
+        const g = groupById(p.groupId);
+        const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
+        return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? 'Nouveau' : 'Confirmé'}</td></tr>`;
+      }).join('')}
+    </table>
+    <p class="print-sub" style="margin-top:16px;">Remplaçants</p>
+    <table class="print-table">
       <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
       ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
-      ${pool.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+      ${pool.length===0 ? `<tr><td colspan="3">Aucun</td></tr>` : ''}
     </table>
   </div>`;
-  return html;
+}
+function printReportsList(){
+  document.getElementById('printArea').innerHTML = reportsListPrintableHTML();
+  document.body.classList.add('print-mode');
+  const cleanup = ()=>{ document.body.classList.remove('print-mode'); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(()=>{ window.print(); }, 50);
+}
+function reportsSessionPrintableHTML(){
+  const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
+  const reports = computePlayerReports();
+  const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
+  const sorted = reports.slice().sort((a,b)=> (b.winRate===null?-1:b.winRate) - (a.winRate===null?-1:a.winRate));
+  return `<div class="print-page">
+    <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
+    <p class="print-sub">Rapport de session — ${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''}</p>
+    <table class="print-table">
+      <tr><th>Nom</th><th>Statut</th><th>V</th><th>D</th><th>% V</th><th>Taux absence</th><th>Montées</th><th>Descentes</th><th>Δ Cote</th></tr>
+      ${sorted.map(r=>`<tr>
+        <td>${escapeHTML(r.player.name)}</td>
+        <td>${r.player.status==='new' ? 'Nouveau' : 'Confirmé'}</td>
+        <td>${r.wins}</td>
+        <td>${r.losses}</td>
+        <td>${pct(r.winRate)}</td>
+        <td>${pct(r.absenceRate)}</td>
+        <td>${r.promotions}</td>
+        <td>${r.relegations}</td>
+        <td>${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
+      </tr>`).join('')}
+    </table>
+  </div>`;
+}
+function printReportsSession(){
+  document.getElementById('printArea').innerHTML = reportsSessionPrintableHTML();
+  document.body.classList.add('print-mode');
+  const cleanup = ()=>{ document.body.classList.remove('print-mode'); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(()=>{ window.print(); }, 50);
 }
 function toggleRatingListSort(){
   VIEW.ratingListSortDir = (VIEW.ratingListSortDir||'desc')==='desc' ? 'asc' : 'desc';
