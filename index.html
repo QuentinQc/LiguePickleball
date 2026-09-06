@@ -2753,7 +2753,7 @@ function renderPlayer(playerId){
     app.innerHTML = `${topbarHTML()}<div class="card"><p class="small">Ton profil de joueur est introuvable. Contacte un administrateur.</p></div>`;
     return;
   }
-  const tabs = [['classement','Mon groupe'],['historique','Historique']];
+  const tabs = [['classement','Mon groupe'],['stats','Statistiques'],['historique','Historique']];
   const modeSwitch = SESSION_USER.role === 'admin' ? `
     <div class="mode-switch">
       <button onclick="toggleAdminPlayerView()">Admin</button>
@@ -2778,7 +2778,7 @@ function renderPlayer(playerId){
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : playerGroupHTML(me);
+  c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : playerGroupHTML(me));
 }
 function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PLAYER; VIEW = { tab: ADMIN_VIEWING_AS_PLAYER ? 'classement' : 'groupes' }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
@@ -2823,6 +2823,81 @@ function showRatingExplanationModal(){
   showContentModal('Comment fonctionne la cote ?', ratingExplanationHTML());
 }
 // ---------- Statistiques amusantes/encourageantes pour un joueur ----------
+// Reconstitue une estimation de l'historique de cote (à partir des
+// ajustements enregistrés par session) pour trouver le plus haut/bas atteint.
+function computePlayerRatingHistory(pid){
+  const closed = DATA.sessions.filter(s=>s.status==='closed');
+  let running = RATING_DEFAULT;
+  const history = [running];
+  closed.forEach(s=>{
+    if(s.ratingDeltas && typeof s.ratingDeltas[pid] === 'number'){
+      running += s.ratingDeltas[pid];
+      history.push(running);
+    }
+  });
+  return history;
+}
+// Le meilleur (plus haut) groupe atteint par un joueur, selon l'historique des sessions.
+function computePlayerBestGroup(pid){
+  let best = null;
+  DATA.sessions.filter(s=>s.status==='closed').forEach(s=>{
+    if(!s.standingsByGroup) return;
+    Object.keys(s.standingsByGroup).forEach(gid=>{
+      if(s.standingsByGroup[gid].some(r=>r.playerId===pid)){
+        const g = groupById(gid);
+        if(g && (!best || g.order < best.order)) best = g;
+      }
+    });
+  });
+  return best;
+}
+function playerStatsTabHTML(me){
+  const pct = (x)=> (x===null||x===undefined) ? '—' : Math.round(x*100)+'%';
+  const funHTML = playerFunStatsHTML(me);
+  const reports = computePlayerReports();
+  const r = reports.find(x=>x.player.id===me.id);
+  const ratingHistory = computePlayerRatingHistory(me.id);
+  const bestGroup = computePlayerBestGroup(me.id);
+  const currentGroup = groupById(me.groupId);
+
+  let html = funHTML || `<div class="card"><p class="small">Continue à jouer pour débloquer tes statistiques de rivalité — reviens ici après quelques matchs !</p></div>`;
+
+  html += `<div class="card">
+    <h3>Ta cote</h3>
+    <table>
+      <tr><td class="small">Cote actuelle</td><td><strong>${(typeof me.rating==='number'?me.rating:RATING_DEFAULT).toFixed(2)}</strong></td></tr>
+      <tr><td class="small">Plus haute atteinte</td><td>${Math.max(...ratingHistory).toFixed(2)}</td></tr>
+      <tr><td class="small">Plus basse atteinte</td><td>${Math.min(...ratingHistory).toFixed(2)}</td></tr>
+      <tr><td class="small">Matchs comptés vers ta cote</td><td>${typeof me.ratingGames==='number'?me.ratingGames:0}</td></tr>
+    </table>
+  </div>`;
+
+  if(r){
+    html += `<div class="card">
+      <h3>Bilan global</h3>
+      <table>
+        <tr><td class="small">Victoires</td><td>${r.wins}</td></tr>
+        <tr><td class="small">Défaites</td><td>${r.losses}</td></tr>
+        <tr><td class="small">Taux de victoire</td><td>${pct(r.winRate)}</td></tr>
+        <tr><td class="small">Matchs joués</td><td>${r.played} / ${r.scheduled}</td></tr>
+        <tr><td class="small">Taux d'absence</td><td>${pct(r.absenceRate)}</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Ton parcours dans l'échelle</h3>
+      <table>
+        <tr><td class="small">Groupe actuel</td><td>${escapeHTML(currentGroup?currentGroup.name:'—')}</td></tr>
+        <tr><td class="small">Meilleur groupe atteint</td><td>${bestGroup?escapeHTML(bestGroup.name):'—'}</td></tr>
+        <tr><td class="small">Montées</td><td>${r.promotions}</td></tr>
+        <tr><td class="small">Descentes</td><td>${r.relegations}</td></tr>
+        <tr><td class="small">Fois remplaçant(e) dans un autre groupe</td><td>${r.subCount}</td></tr>
+      </table>
+    </div>`;
+  } else {
+    html += `<div class="card"><p class="small">Pas encore de session terminée pour calculer ton bilan global.</p></div>`;
+  }
+  return html;
+}
 function computePlayerFunStats(pid){
   const closed = DATA.sessions.filter(s=>s.status==='closed');
   const headToHead = {}; // adversaireId -> {wins, losses} (de mon point de vue)
@@ -2896,12 +2971,26 @@ function playerFunStatsHTML(me){
   if(facts.length===0) return '';
   return `<div class="card"><h3>Tes stats</h3>${facts.map(f=>`<p>${f}</p>`).join('')}</div>`;
 }
+// Résultats de la dernière session jouée par le groupe actuel du joueur.
+function previousGroupSessionHTML(me){
+  const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
+  const s = closed.find(sess => sess.standingsByGroup && sess.standingsByGroup[me.groupId]);
+  if(!s) return '';
+  const rows = s.standingsByGroup[me.groupId];
+  const g = groupById(me.groupId);
+  return `<div class="card">
+    <h3>Résultats de la session précédente — ${escapeHTML(g ? g.name : '')} (${s.date})</h3>
+    <table>
+      <tr><th>#</th><th>Joueur</th><th>Points</th><th>V-D</th></tr>
+      ${rows.map((r,i)=>`<tr class="${r.playerId===me.id?'me':''}"><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${r.wins}-${r.losses}</td></tr>`).join('')}
+    </table>
+  </div>`;
+}
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
   const groupMembers = playersInGroup(me.groupId).sort((a,b)=>a.name.localeCompare(b.name));
   const open = currentOpenSession();
-  let html = playerFunStatsHTML(me);
-  html += `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
+  let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
     <table>
       <tr><th>Nom</th><th>Cote</th></tr>
       ${groupMembers.map(p=>{
@@ -2912,6 +3001,7 @@ function playerGroupHTML(me){
     </table>
     <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
   </div>`;
+  html += previousGroupSessionHTML(me);
   if(open){
     const absent = isAbsent(open, me.id);
     html += `<div class="card">
