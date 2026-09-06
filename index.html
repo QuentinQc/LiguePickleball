@@ -569,20 +569,40 @@ function nextSessionDate(){
 }
 // Point d'entrée unique pour la génération des matchs d'un groupe : respecte
 // le mode choisi dans Réglages (automatique ou manuel).
-function matchesForRoster(playerIds){
-  if(DATA.matchupMode === 'manual'){
-    const count = Math.max(1, DATA.manualMatchCount || 10);
-    return Array.from({ length: count }, ()=>({ sit:null, teamA:[], teamB:[], scoreA:null, scoreB:null }));
-  }
-  return playerIds.length >= 2 ? generateMatches(playerIds) : [];
+// Effectif d'un groupe ordonné par position (#1, #2, ...), avec le
+// remplaçant à la place de chaque joueur absent (ou une case vide si aucun).
+// Sert à appliquer le modèle de rotation manuel par numéro de position.
+function orderedRosterWithSubs(session, gid){
+  const regularOrder = playersInGroup(gid).slice().sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
+  const gd = session.groupsData.find(x=>x.groupId===gid);
+  const subs = (gd && gd.substitutes) || {};
+  return regularOrder.map(p=> isAbsent(session, p.id) ? (subs[p.id] || null) : p.id);
+}
+// Construit les matchs d'un groupe à partir du modèle de rotation défini
+// dans Réglages (positions 1,2,3... → joueur occupant cette position).
+function matchesFromTemplate(session, gid){
+  const ordered = orderedRosterWithSubs(session, gid);
+  const template = DATA.manualMatchupTemplate || [];
+  return template.map(t=>{
+    const teamA = (t.teamA||[]).map(pos=>ordered[pos-1]).filter(Boolean);
+    const teamB = (t.teamB||[]).map(pos=>ordered[pos-1]).filter(Boolean);
+    return { sit:null, teamA, teamB, scoreA:null, scoreB:null };
+  });
+}
+// Point d'entrée unique pour la génération des matchs d'un groupe : respecte
+// le mode choisi dans Réglages (automatique ou modèle manuel par position).
+function matchesForGroup(session, gid){
+  if(DATA.matchupMode === 'manual') return matchesFromTemplate(session, gid);
+  const ids = activeRosterForGroup(session, gid);
+  return ids.length >= 2 ? generateMatches(ids) : [];
 }
 function startNewSession(explicitDate){
-  const groupsData = DATA.groups.map(g=>{
-    const ids = playersInGroup(g.id).map(p=>p.id);
-    return { groupId: g.id, matches: matchesForRoster(ids) };
-  });
-  const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData, movements: null, absences: [], published: false };
+  const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData: DATA.groups.map(g=>({ groupId:g.id, matches:[] })), movements: null, absences: [], published: false };
   DATA.sessions.push(session);
+  DATA.groups.forEach(g=>{
+    const gd = session.groupsData.find(x=>x.groupId===g.id);
+    gd.matches = matchesForGroup(session, g.id);
+  });
   return session;
 }
 function toggleAbsence(playerId){
@@ -634,9 +654,7 @@ function activeRosterForGroup(session, gid){
 function regenerateGroupMatches(session, gid){
   const gd = session.groupsData.find(x=>x.groupId===gid);
   if(!gd) return;
-  if(DATA.matchupMode === 'manual') return; // en mode manuel, on ne touche jamais aux matchs saisis par l'admin
-  const ids = activeRosterForGroup(session, gid);
-  gd.matches = matchesForRoster(ids);
+  gd.matches = matchesForGroup(session, gid);
 }
 // Joueurs déjà utilisés comme remplaçants ailleurs dans la session (pour éviter
 // qu'un même joueur soit assigné à deux groupes en même temps).
@@ -1918,16 +1936,13 @@ function adminSessionHTML(){
     gd.matches.forEach(m=>{ m.teamA.forEach(id=>inMatches.add(id)); m.teamB.forEach(id=>inMatches.add(id)); });
     const stale = !manual && (expectedRoster.size !== inMatches.size || [...expectedRoster].some(id=>!inMatches.has(id)));
     const activeCount = expectedRoster.size;
-    const info = (!manual && activeCount>0) ? `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points` : '';
+    const info = activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
     html += `<div class="card"><h3>${escapeHTML(g.name)}</h3>${info ? `<p class="small">${info}</p>` : ''}`;
     if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « régénérer » ci-dessous.</p>`;
-    if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucune case de match pour ce groupe pour l\'instant.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
+    if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucun modèle de rotation défini — configure-le dans Réglages → Paramètres de ligue.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
     gd.matches.forEach((m, mi)=>{
-      if(manual){
-        html += manualMatchRowHTML(open, g.id, m, mi);
-        return;
-      }
       const nameTag = (id)=>{
+        if(!id) return '<span class="small">— (position vide)</span>';
         if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(invité)</span>';
         const p = DATA.players.find(x=>x.id===id);
         const isSub = p && p.groupId !== g.id;
@@ -1935,69 +1950,23 @@ function adminSessionHTML(){
       };
       html += `
         <div class="match-row">
-          <div class="team">${m.teamA.map(nameTag).join(' & ')}</div>
+          <div class="team">${m.teamA.length ? m.teamA.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
           <input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${g.id}','${mi}','A',this.value)">
           <div class="vs">VS</div>
           <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${g.id}','${mi}','B',this.value)">
-          <div class="team" style="text-align:right;">${m.teamB.map(nameTag).join(' & ')}</div>
+          <div class="team" style="text-align:right;">${m.teamB.length ? m.teamB.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
         </div>`;
     });
     if(!manual && m_hasSitOut(gd.matches)){
       html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?playerName(m.sit):'—').join(', ')}</p>`;
     }
-    if(manual){
-      html += `<button class="btn-ghost" onclick="resetManualMatches('${g.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">réinitialiser les ${gd.matches.length} cases de ce groupe</button>`;
-    } else {
-      html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">régénérer les matchs de ce groupe</button>`;
-    }
+    html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">régénérer les matchs de ce groupe</button>`;
     if(DATA.testMode && gd.matches.length){
       html += ` <button class="btn-ghost" onclick="autoFillGroupScores('${g.id}')">🎲 générer des scores aléatoires (test)</button>`;
     }
     html += `</div>`;
   });
   return html;
-}
-// Une case de match en mode manuel : 4 menus déroulants (2 joueurs par
-// équipe) choisis parmi l'effectif actif du groupe, modifiables en tout temps.
-function manualMatchRowHTML(session, gid, m, mi){
-  const roster = activeRosterForGroup(session, gid);
-  const sel = (slot, currentId)=>{
-    const opts = roster.map(id=>`<option value="${id}" ${id===currentId?'selected':''}>${escapeHTML(playerName(id))}</option>`).join('');
-    return `<select onchange="setManualMatchPlayer('${gid}',${mi},'${slot}',this.value)"><option value="">—</option>${opts}</select>`;
-  };
-  return `<div class="match-row" style="flex-wrap:wrap;">
-    <span class="small" style="min-width:64px;">Match ${mi+1}</span>
-    <div class="team" style="display:flex;flex-direction:column;gap:4px;">${sel('A1', m.teamA[0])}${sel('A2', m.teamA[1])}</div>
-    <input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${gid}','${mi}','A',this.value)">
-    <div class="vs">VS</div>
-    <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${gid}','${mi}','B',this.value)">
-    <div class="team" style="display:flex;flex-direction:column;gap:4px;">${sel('B1', m.teamB[0])}${sel('B2', m.teamB[1])}</div>
-  </div>`;
-}
-function setManualMatchPlayer(gid, mi, slot, playerId){
-  const open = currentOpenSession();
-  if(!open) return;
-  const gd = open.groupsData.find(x=>x.groupId===gid);
-  if(!gd || !gd.matches[mi]) return;
-  const m = gd.matches[mi];
-  if(!Array.isArray(m.teamA)) m.teamA = [];
-  if(!Array.isArray(m.teamB)) m.teamB = [];
-  if(slot==='A1') m.teamA[0] = playerId || undefined;
-  else if(slot==='A2') m.teamA[1] = playerId || undefined;
-  else if(slot==='B1') m.teamB[0] = playerId || undefined;
-  else if(slot==='B2') m.teamB[1] = playerId || undefined;
-  saveAndRender();
-}
-function resetManualMatches(gid){
-  const open = currentOpenSession();
-  if(!open) return;
-  const gd = open.groupsData.find(x=>x.groupId===gid);
-  if(!gd) return;
-  showConfirm("Réinitialiser tous les matchs de ce groupe ? Les compositions et scores actuels seront perdus.", ()=>{
-    const count = Math.max(1, DATA.manualMatchCount || 10);
-    gd.matches = Array.from({ length: count }, ()=>({ sit:null, teamA:[], teamB:[], scoreA:null, scoreB:null }));
-    saveAndRender();
-  });
 }
 
 function m_hasSitOut(matches){ return matches.some(m=>m.sit); }
@@ -2648,6 +2617,31 @@ function adminSettingsSectionHTML(){
 }
 function setSettingsSubTab(t){ VIEW.settingsSubTab = t; render(); }
 
+// Éditeur du modèle de rotation manuel : une ligne par match, 4 menus de
+// numéros de position (1, 2, 3...) à choisir pour chaque équipe.
+function manualTemplateEditorHTML(){
+  const count = Math.max(1, DATA.manualMatchCount || 10);
+  const maxPos = Math.max(DATA.groupMaxPlayers || 5, 5);
+  const template = DATA.manualMatchupTemplate || [];
+  const posOptions = (current)=>{
+    let opts = '<option value="">—</option>';
+    for(let i=1;i<=maxPos;i++){ opts += `<option value="${i}" ${current===i?'selected':''}>${i}</option>`; }
+    return opts;
+  };
+  let rows = '';
+  for(let i=0;i<count;i++){
+    const t = template[i] || { teamA:[], teamB:[] };
+    rows += `<div class="row" style="align-items:center;margin-bottom:6px;flex-wrap:nowrap;">
+      <span class="small" style="min-width:64px;">Match ${i+1}</span>
+      <select id="tplA1_${i}">${posOptions(t.teamA[0])}</select>
+      <select id="tplA2_${i}">${posOptions(t.teamA[1])}</select>
+      <span class="vs">VS</span>
+      <select id="tplB1_${i}">${posOptions(t.teamB[0])}</select>
+      <select id="tplB2_${i}">${posOptions(t.teamB[1])}</select>
+    </div>`;
+  }
+  return rows;
+}
 function settingsLeagueHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   return `
@@ -2679,12 +2673,15 @@ function settingsLeagueHTML(){
         <label>Composition des équipes</label>
         <select id="setMatchupMode">
           <option value="auto" ${DATA.matchupMode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
-          <option value="manual" ${DATA.matchupMode==='manual'?'selected':''}>Manuelle — j'entre moi-même qui joue avec/contre qui</option>
+          <option value="manual" ${DATA.matchupMode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
         </select>
       </div>
-      <p class="small">En mode manuel, les matchs ne sont plus générés automatiquement au démarrage d'une session — construis-les toi-même dans Session → Résultats, pour chaque groupe.</p>
-      <div class="field"><label>Nombre de matchs à remplir (mode manuel)</label><input id="setManualMatchCount" type="number" min="1" value="${DATA.manualMatchCount || 10}"></div>
-      <p class="small">Ex : si tu choisis 10, chaque groupe affichera 10 cases « Match 1 » à « Match 10 » à remplir toi-même.</p>
+      <p class="small">En mode manuel, définis ici un modèle réutilisable en indiquant les <strong>numéros de position</strong> (# dans l'onglet Groupes) de chaque groupe qui s'affrontent — ex : Match 1 : position 1 et 2 contre position 3 et 4. Ce modèle s'applique automatiquement à tous les groupes à chaque session (chaque groupe garde ses propres joueurs à ses positions).</p>
+      <div class="field"><label>Nombre de matchs dans le modèle</label><input id="setManualMatchCount" type="number" min="1" value="${DATA.manualMatchCount || 10}"></div>
+      <p class="small" style="color:var(--paddle);">Change ce nombre puis clique « Enregistrer » une première fois pour faire apparaître les bonnes lignes ci-dessous, avant de les remplir.</p>
+      <div style="margin-top:10px;">
+        ${manualTemplateEditorHTML()}
+      </div>
     </div>
     <div class="card">
       <h3>Format des matchs</h3>
@@ -2795,7 +2792,19 @@ function saveSettings(){
   if(byId('setGroupMin')) DATA.groupMinPlayers = Math.max(1, parseInt(byId('setGroupMin').value,10) || 4);
   if(byId('setGroupMax')) DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(byId('setGroupMax').value,10) || 5);
   if(byId('setMatchupMode')) DATA.matchupMode = byId('setMatchupMode').value === 'manual' ? 'manual' : 'auto';
-  if(byId('setManualMatchCount')) DATA.manualMatchCount = Math.max(1, parseInt(byId('setManualMatchCount').value,10) || 10);
+  if(byId('setManualMatchCount')){
+    const count = Math.max(1, parseInt(byId('setManualMatchCount').value,10) || 10);
+    DATA.manualMatchCount = count;
+    const template = [];
+    for(let i=0;i<count;i++){
+      const a1 = byId('tplA1_'+i), a2 = byId('tplA2_'+i), b1 = byId('tplB1_'+i), b2 = byId('tplB2_'+i);
+      if(!a1) break; // le nombre de matchs vient d'augmenter : ces lignes n'existent pas encore à l'écran
+      const teamA = [a1.value, a2.value].filter(Boolean).map(Number);
+      const teamB = [b1.value, b2.value].filter(Boolean).map(Number);
+      template.push({ teamA, teamB });
+    }
+    if(template.length === count) DATA.manualMatchupTemplate = template;
+  }
   if(byId('setRules4Matches')) DATA.rules4Matches = Math.max(1, parseInt(byId('setRules4Matches').value,10) || 6);
   if(byId('setRules4Points')) DATA.rules4Points = Math.max(1, parseInt(byId('setRules4Points').value,10) || 11);
   if(byId('setRules5Matches')) DATA.rules5Matches = Math.max(1, parseInt(byId('setRules5Matches').value,10) || 10);
@@ -3231,6 +3240,7 @@ function migrateData(){
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.manualMatchCount === undefined) DATA.manualMatchCount = 10;
+  if(DATA.manualMatchupTemplate === undefined) DATA.manualMatchupTemplate = [];
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
