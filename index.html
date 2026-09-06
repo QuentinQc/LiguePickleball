@@ -582,7 +582,10 @@ function orderedRosterWithSubs(session, gid){
 // dans Réglages (positions 1,2,3... → joueur occupant cette position).
 function matchesFromTemplate(session, gid){
   const ordered = orderedRosterWithSubs(session, gid);
-  const template = DATA.manualMatchupTemplate || [];
+  const groupSize = playersInGroup(gid).length;
+  // On choisit le modèle selon la taille réelle du groupe (4 ou 5 joueurs) —
+  // le plus proche est utilisé pour une taille atypique.
+  const template = (groupSize <= 4 ? (DATA.manualMatchupTemplate4 || []) : (DATA.manualMatchupTemplate5 || []));
   return template.map(t=>{
     const teamA = (t.teamA||[]).map(pos=>ordered[pos-1]).filter(Boolean);
     const teamB = (t.teamB||[]).map(pos=>ordered[pos-1]).filter(Boolean);
@@ -2619,10 +2622,9 @@ function setSettingsSubTab(t){ VIEW.settingsSubTab = t; render(); }
 
 // Éditeur du modèle de rotation manuel : une ligne par match, 4 menus de
 // numéros de position (1, 2, 3...) à choisir pour chaque équipe.
-function manualTemplateEditorHTML(){
-  const count = Math.max(1, DATA.manualMatchCount || 10);
-  const maxPos = Math.max(DATA.groupMaxPlayers || 5, 5);
-  const template = DATA.manualMatchupTemplate || [];
+function manualTemplateEditorHTML(sizeLabel, prefix, maxPos, countKey, templateKey){
+  const count = Math.max(1, DATA[countKey] || (maxPos===4?6:10));
+  const template = DATA[templateKey] || [];
   const posOptions = (current)=>{
     let opts = '<option value="">—</option>';
     for(let i=1;i<=maxPos;i++){ opts += `<option value="${i}" ${current===i?'selected':''}>${i}</option>`; }
@@ -2633,17 +2635,20 @@ function manualTemplateEditorHTML(){
     const t = template[i] || { teamA:[], teamB:[] };
     rows += `<div class="row" style="align-items:center;margin-bottom:6px;flex-wrap:nowrap;">
       <span class="small" style="min-width:64px;">Match ${i+1}</span>
-      <select id="tplA1_${i}">${posOptions(t.teamA[0])}</select>
-      <select id="tplA2_${i}">${posOptions(t.teamA[1])}</select>
+      <select id="${prefix}A1_${i}">${posOptions(t.teamA[0])}</select>
+      <select id="${prefix}A2_${i}">${posOptions(t.teamA[1])}</select>
       <span class="vs">VS</span>
-      <select id="tplB1_${i}">${posOptions(t.teamB[0])}</select>
-      <select id="tplB2_${i}">${posOptions(t.teamB[1])}</select>
+      <select id="${prefix}B1_${i}">${posOptions(t.teamB[0])}</select>
+      <select id="${prefix}B2_${i}">${posOptions(t.teamB[1])}</select>
     </div>`;
   }
-  return rows;
+  return `<h4 style="margin:14px 0 6px;">${sizeLabel}</h4>
+    <div class="field" style="max-width:260px;"><label>Nombre de matchs dans ce modèle</label><input id="${prefix}Count" type="number" min="1" value="${count}"></div>
+    ${rows}`;
 }
 function settingsLeagueHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  const previewMode = VIEW.matchupModePreview !== undefined ? VIEW.matchupModePreview : (DATA.matchupMode || 'auto');
   return `
     <div class="card">
       <h3>Informations générales</h3>
@@ -2671,17 +2676,17 @@ function settingsLeagueHTML(){
       <h3>Génération des matchs</h3>
       <div class="field">
         <label>Composition des équipes</label>
-        <select id="setMatchupMode">
-          <option value="auto" ${DATA.matchupMode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
-          <option value="manual" ${DATA.matchupMode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
+        <select id="setMatchupMode" onchange="onMatchupModePreview(this.value)">
+          <option value="auto" ${previewMode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
+          <option value="manual" ${previewMode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
         </select>
       </div>
-      <p class="small">En mode manuel, définis ici un modèle réutilisable en indiquant les <strong>numéros de position</strong> (# dans l'onglet Groupes) de chaque groupe qui s'affrontent — ex : Match 1 : position 1 et 2 contre position 3 et 4. Ce modèle s'applique automatiquement à tous les groupes à chaque session (chaque groupe garde ses propres joueurs à ses positions).</p>
-      <div class="field"><label>Nombre de matchs dans le modèle</label><input id="setManualMatchCount" type="number" min="1" value="${DATA.manualMatchCount || 10}"></div>
-      <p class="small" style="color:var(--paddle);">Change ce nombre puis clique « Enregistrer » une première fois pour faire apparaître les bonnes lignes ci-dessous, avant de les remplir.</p>
-      <div style="margin-top:10px;">
-        ${manualTemplateEditorHTML()}
-      </div>
+      ${previewMode==='manual' ? `
+      <p class="small">Définis ici un modèle réutilisable en indiquant les <strong>numéros de position</strong> (# dans l'onglet Groupes) qui s'affrontent — ex : Match 1 : position 1 et 2 contre position 3 et 4. Un modèle séparé pour les groupes de 4 et de 5, appliqué automatiquement à chaque session (chaque groupe garde ses propres joueurs à ses positions).</p>
+      <p class="small" style="color:var(--paddle);">Si tu changes le nombre de matchs d'un modèle, clique « Enregistrer » une première fois pour faire apparaître les bonnes lignes, avant de les remplir.</p>
+      ${manualTemplateEditorHTML('Modèle pour les groupes de 4 joueurs', 'tpl4', 4, 'manualMatchCount4', 'manualMatchupTemplate4')}
+      ${manualTemplateEditorHTML('Modèle pour les groupes de 5 joueurs', 'tpl5', 5, 'manualMatchCount5', 'manualMatchupTemplate5')}
+      ` : `<p class="small">En mode automatique, les matchs et rotations sont générés par l'app selon les réglages ci-dessous.</p>`}
     </div>
     <div class="card">
       <h3>Format des matchs</h3>
@@ -2784,6 +2789,10 @@ function copyAppLink(){
     fallback();
   }
 }
+function onMatchupModePreview(v){
+  VIEW.matchupModePreview = v;
+  render();
+}
 function saveSettings(){
   const byId = (id)=> document.getElementById(id);
   if(byId('setLeagueName')) DATA.leagueName = byId('setLeagueName').value.trim() || DATA.leagueName;
@@ -2792,19 +2801,22 @@ function saveSettings(){
   if(byId('setGroupMin')) DATA.groupMinPlayers = Math.max(1, parseInt(byId('setGroupMin').value,10) || 4);
   if(byId('setGroupMax')) DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(byId('setGroupMax').value,10) || 5);
   if(byId('setMatchupMode')) DATA.matchupMode = byId('setMatchupMode').value === 'manual' ? 'manual' : 'auto';
-  if(byId('setManualMatchCount')){
-    const count = Math.max(1, parseInt(byId('setManualMatchCount').value,10) || 10);
-    DATA.manualMatchCount = count;
+  delete VIEW.matchupModePreview; // on repart de la valeur enregistrée au prochain affichage
+  const saveTemplate = (prefix, countKey, templateKey, defaultCount)=>{
+    const countEl = byId(prefix+'Count');
+    if(!countEl) return;
+    const count = Math.max(1, parseInt(countEl.value,10) || defaultCount);
+    DATA[countKey] = count;
     const template = [];
     for(let i=0;i<count;i++){
-      const a1 = byId('tplA1_'+i), a2 = byId('tplA2_'+i), b1 = byId('tplB1_'+i), b2 = byId('tplB2_'+i);
+      const a1 = byId(prefix+'A1_'+i), a2 = byId(prefix+'A2_'+i), b1 = byId(prefix+'B1_'+i), b2 = byId(prefix+'B2_'+i);
       if(!a1) break; // le nombre de matchs vient d'augmenter : ces lignes n'existent pas encore à l'écran
-      const teamA = [a1.value, a2.value].filter(Boolean).map(Number);
-      const teamB = [b1.value, b2.value].filter(Boolean).map(Number);
-      template.push({ teamA, teamB });
+      template.push({ teamA: [a1.value,a2.value].filter(Boolean).map(Number), teamB: [b1.value,b2.value].filter(Boolean).map(Number) });
     }
-    if(template.length === count) DATA.manualMatchupTemplate = template;
-  }
+    if(template.length === count) DATA[templateKey] = template;
+  };
+  saveTemplate('tpl4', 'manualMatchCount4', 'manualMatchupTemplate4', 6);
+  saveTemplate('tpl5', 'manualMatchCount5', 'manualMatchupTemplate5', 10);
   if(byId('setRules4Matches')) DATA.rules4Matches = Math.max(1, parseInt(byId('setRules4Matches').value,10) || 6);
   if(byId('setRules4Points')) DATA.rules4Points = Math.max(1, parseInt(byId('setRules4Points').value,10) || 11);
   if(byId('setRules5Matches')) DATA.rules5Matches = Math.max(1, parseInt(byId('setRules5Matches').value,10) || 10);
@@ -3239,8 +3251,10 @@ function migrateData(){
   if(DATA.rules5Matches === undefined) DATA.rules5Matches = 10;
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
-  if(DATA.manualMatchCount === undefined) DATA.manualMatchCount = 10;
-  if(DATA.manualMatchupTemplate === undefined) DATA.manualMatchupTemplate = [];
+  if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
+  if(DATA.manualMatchupTemplate4 === undefined) DATA.manualMatchupTemplate4 = [];
+  if(DATA.manualMatchCount5 === undefined) DATA.manualMatchCount5 = 10;
+  if(DATA.manualMatchupTemplate5 === undefined) DATA.manualMatchupTemplate5 = [];
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
