@@ -91,6 +91,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 tr.draggable-row{cursor:grab;}
 tr.clickable-row{cursor:pointer;}
 tr.clickable-row:hover td{background:rgba(255,255,255,0.04);}
+td.clickable-row{cursor:pointer;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.25);text-underline-offset:3px;}
+td.clickable-row:hover{color:var(--ball);}
 tr.draggable-row:active{cursor:grabbing;}
 .drop-target{transition:background .12s ease, outline .12s ease;}
 .drop-target-hover{background:rgba(207,234,92,0.1);outline:2px dashed var(--ball);outline-offset:-2px;}
@@ -2003,7 +2005,7 @@ function adminGroupsHTML(){
       ${unassigned.map(p=>{
         const lastGroup = p.lastGroupId ? groupById(p.lastGroupId) : null;
         return `<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
-          <td>${escapeHTML(p.name)}</td>
+          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
           <td>${p.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : '<span class="tag tag-stay">⏳ En attente</span>'}</td>
           <td>${lastGroup ? escapeHTML(lastGroup.name) : '—'}</td>
         </tr>`;
@@ -2011,7 +2013,7 @@ function adminGroupsHTML(){
       ${absentNow.map(p=>{
         const g2 = groupById(p.groupId);
         return `<tr>
-          <td>${escapeHTML(p.name)}</td>
+          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
           <td><span class="tag tag-orange">🚫 Absent (cette session)</span></td>
           <td>${g2 ? escapeHTML(g2.name) : '—'} <span class="small">— gère son remplaçant directement dans ce groupe, ci-dessous</span></td>
         </tr>`;
@@ -2043,7 +2045,7 @@ function adminGroupsHTML(){
           ondragleave="onRowDragLeave(event)"
           ondrop="onRowDrop(event,'${g.id}','${p.id}')">
           <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
-          <td>${escapeHTML(p.name)}</td>
+          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
           <td class="small">${prevText}</td>
         </tr>`;
         }).join('')}
@@ -2052,15 +2054,17 @@ function adminGroupsHTML(){
           const subId = gd && gd.substitutes ? gd.substitutes[p.id] : null;
           if(subId){
             const isRealPlayer = !isGuestOrSubId(subId);
+            const isSubPool = isSubPoolId(subId);
+            const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
             return `<tr>
               <td style="width:28px;color:var(--muted);font-family:var(--font-display);">↳</td>
-              <td>${escapeHTML(playerName(subId))}${isRealPlayer ? '' : ` <span class="tag tag-yellow">remplace ${escapeHTML(p.name)}</span>`}</td>
+              <td${openFn ? ` class="clickable-row" onclick="${openFn}"` : ''}>${escapeHTML(playerName(subId))}${isRealPlayer ? '' : ` <span class="tag tag-yellow">remplace ${escapeHTML(p.name)}</span>`}</td>
               <td class="small">—</td>
             </tr>`;
           }
           return `<tr>
             <td style="width:28px;color:var(--muted);font-family:var(--font-display);">—</td>
-            <td style="opacity:0.6;">Place vide <span class="tag tag-orange">🚫 ${escapeHTML(p.name)} absent(e)</span></td>
+            <td class="clickable-row" style="opacity:0.6;" onclick="openPlayerDetailModal('${p.id}')">Place vide <span class="tag tag-orange">🚫 ${escapeHTML(p.name)} absent(e)</span></td>
             <td class="small">—</td>
           </tr>`;
         }).join('')}
