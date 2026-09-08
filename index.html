@@ -1353,8 +1353,11 @@ function adminPlayersHTML(){
         ${players.map(p=>{
           const g = groupById(p.groupId);
           const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
+          const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
+          const linkedProfile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
+          const isAdmin = linkedProfile && linkedProfile.role === 'admin';
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}</td>
+            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
             <td>${escapeHTML(g ? g.name : 'En attente')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
@@ -1399,7 +1402,7 @@ function playerDetailModalHTML(pid){
     const isAdmin = profile.role === 'admin';
     const disableRole = isAdmin && adminCount<=1;
     html += `
-      <p class="small">${escapeHTML(profile.email)} — ${isAdmin ? 'Admin' : 'Joueur'}</p>
+      <p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
       <div class="row">
         <button class="btn-ghost" onclick="closeModal();openProfileLeaguesModal('${profile.id}','${escapeHTML(p.name).replace(/'/g,"\\'")}')">gérer ses ligues</button>
         <button class="btn-ghost" ${disableRole?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${profile.id}','${isAdmin?'player':'admin'}')">${isAdmin?'retirer admin':'rendre admin'}</button>
@@ -1589,11 +1592,11 @@ function adminAccountsHTML(){
       <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
       <button class="btn-ghost" onclick="refreshAccountsTab()">rafraîchir</button>
     </div>
-    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de cette ligue.</p>
+    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de cette ligue. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
     <table>
       <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
-      ${pending.map(pr=>`<tr>
-        <td>${escapeHTML(pr.display_name || '—')}</td>
+      ${pending.map(pr=>`<tr${pr.role==='admin' ? ' style="background:rgba(207,234,92,0.06);"' : ''}>
+        <td>${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
         <td>${escapeHTML(pr.email)}</td>
         <td>${pr.role==='admin'?'Admin':'Joueur'}<br>${roleButton(pr)}</td>
         <td>
