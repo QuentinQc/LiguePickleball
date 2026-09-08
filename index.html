@@ -1436,7 +1436,8 @@ function convertPlayerToSubstitute(pid){
     const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===pid);
     if(link){
       const { error } = await sb.from('profile_players').update({ player_id: null, substitute_id: newSub.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
-      if(!error) await sb.from('profiles').update({ role: 'substitute' }).eq('id', link.profile_id);
+      const linkedProfile = ALL_PROFILES.find(pr=>pr.id===link.profile_id);
+      if(!error && linkedProfile && linkedProfile.role !== 'admin') await sb.from('profiles').update({ role: 'substitute' }).eq('id', link.profile_id);
       await loadAllProfiles();
       if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
     }
@@ -1459,7 +1460,8 @@ function convertSubstituteToPlayer(subId){
     const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
     if(link){
       const { error } = await sb.from('profile_players').update({ substitute_id: null, player_id: newPlayer.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
-      if(!error) await sb.from('profiles').update({ role: 'player' }).eq('id', link.profile_id);
+      const linkedProfile = ALL_PROFILES.find(pr=>pr.id===link.profile_id);
+      if(!error && linkedProfile && linkedProfile.role !== 'admin') await sb.from('profiles').update({ role: 'player' }).eq('id', link.profile_id);
       await loadAllProfiles();
       if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
     }
