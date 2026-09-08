@@ -65,6 +65,21 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tag-green{background:rgba(76,175,80,0.18);color:#6FCF73;}
 .tag-yellow{background:rgba(255,214,10,0.18);color:#FFD60A;}
 .tag-orange{background:rgba(255,159,10,0.18);color:#FF9F0A;}
+.modal-header-row{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+.avatar-circle{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:19px;flex-shrink:0;}
+.modal-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;}
+.stat-chip{display:flex;flex-direction:column;background:rgba(255,255,255,0.05);border-radius:12px;padding:9px 16px;min-width:84px;}
+.stat-chip .stat-label{font-family:var(--font-display);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:2px;}
+.stat-chip .stat-value{font-size:17px;font-weight:700;color:var(--line);}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;}
+.action-btn{display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.05);border:none;color:var(--line);font-family:var(--font-body);font-size:14px;cursor:pointer;text-align:left;transition:background .15s ease;}
+.action-btn:hover{background:rgba(255,255,255,0.11);}
+.action-btn .icon{font-size:18px;flex-shrink:0;}
+.action-btn.danger{color:var(--danger);background:rgba(233,85,107,0.10);}
+.action-btn.danger:hover{background:rgba(233,85,107,0.18);}
+.modal-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:14px;margin-top:14px;}
+.modal-section h3{margin:0 0 10px;font-size:13px;}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
@@ -1386,33 +1401,42 @@ function substituteDetailModalHTML(subId){
   if(!s) return `<p class="small">Remplaçant introuvable.</p>`;
   const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
   const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
+  const initials = s.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   let html = `
-    <p class="small">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
-    <div class="row" style="margin:10px 0;">
-      <button class="btn-ghost" onclick="closeModal();editSubstituteInPool('${subId}')">modifier</button>
-      <button class="btn-ghost" onclick="convertSubstituteToPlayer('${subId}')">convertir en joueur régulier</button>
-      <button class="btn-ghost" onclick="closeModal();removeSubstituteFromPool('${subId}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
+    <div class="modal-header-row">
+      <div class="avatar-circle" style="background:linear-gradient(135deg, #FFD60A, #FF9F0A);">${escapeHTML(initials||'?')}</div>
+      <div>
+        <div style="font-size:19px;font-weight:700;">${escapeHTML(s.name)}</div>
+        <div class="modal-badges"><span class="tag tag-yellow">Remplaçant</span></div>
+      </div>
     </div>
-    <h3 style="margin-top:16px;">Compte lié</h3>`;
+    <p class="small" style="margin:10px 0;">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
+    <div class="action-grid">
+      <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">✏️</span> Modifier</button>
+      <button class="action-btn" onclick="convertSubstituteToPlayer('${subId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
+      <button class="action-btn danger" onclick="closeModal();removeSubstituteFromPool('${subId}')"><span class="icon">🗑️</span> Retirer</button>
+    </div>
+    <div class="modal-section"><h3>Compte lié</h3>`;
   if(profile){
     html += `
-      <p class="small">${escapeHTML(profile.email)} — Remplaçant</p>
-      <button class="btn-ghost" onclick="closeModal();unlinkAccount('${profile.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">délier</button>`;
+      <p class="small" style="margin-bottom:10px;">${escapeHTML(profile.email)} — Remplaçant</p>
+      <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>`;
   } else {
     const linkedProfileIds = new Set((LEAGUE_PLAYER_LINKS||[]).map(l=>l.profile_id));
     const pendingAccounts = ALL_PROFILES.filter(pr=>!linkedProfileIds.has(pr.id));
-    html += `<p class="small">Aucun compte lié — ce remplaçant n'a pas encore accès à sa propre vue.</p>`;
+    html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié — ce remplaçant n'a pas encore accès à sa propre vue.</p>`;
     if(pendingAccounts.length){
       html += `
         <select id="subLinkSelect_${subId}">
           <option value="">— choisir un compte en attente —</option>
           ${pendingAccounts.map(pr=>`<option value="${pr.id}">${escapeHTML(pr.display_name||pr.email)} (${escapeHTML(pr.email)})</option>`).join('')}
         </select>
-        <button class="btn-ghost" onclick="linkSubstituteAccount('${subId}')">lier</button>`;
+        <button class="btn btn-secondary" style="margin-top:8px;" onclick="linkSubstituteAccount('${subId}')">Lier ce compte</button>`;
     } else {
       html += `<p class="small">Aucun compte en attente à lier pour l'instant.</p>`;
     }
   }
+  html += `</div>`;
   return html;
 }
 function openSubstituteDetailModal(subId){
@@ -1584,55 +1608,74 @@ function playerDetailModalHTML(pid){
   const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===pid);
   const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
   const adminCount = ALL_PROFILES.filter(pr=>pr.role==='admin').length;
+  const openSession = currentOpenSession();
+  const absent = openSession ? isAbsent(openSession, pid) : false;
+  const initials = p.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+  const isAdminAccount = profile && profile.role === 'admin';
+
+  const badges = [];
+  if(p.status==='new') badges.push('<span class="tag tag-yellow">🆕 Nouveau</span>');
+  if(p.injured) badges.push('<span class="tag tag-down">🤕 Blessé</span>');
+  if(absent) badges.push('<span class="tag tag-orange">🚫 Absent cette session</span>');
+  if(isAdminAccount) badges.push('<span class="tag tag-up">👑 Admin</span>');
+  if(!p.injured) badges.push(g ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-stay">⏳ En attente</span>');
 
   let html = `
-    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : 'En attente')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong>${p.injured ? ' · <strong style="color:var(--danger);">🤕 Blessé</strong>' : ''}</p>
-    <div class="row" style="margin-bottom:10px;">
-      <button class="btn-ghost" onclick="togglePlayerStatus('${pid}')">${p.status==='new' ? 'Marquer comme confirmé(e)' : 'Marquer comme nouveau/nouvelle'}</button>
-      <button class="btn-ghost" onclick="togglePlayerInjured('${pid}')" ${p.injured ? 'style="color:var(--danger);background:rgba(233,85,107,0.12);"' : ''}>${p.injured ? 'Marquer comme rétabli(e)' : 'Marquer comme blessé(e)'}</button>
+    <div class="modal-header-row">
+      <div class="avatar-circle">${escapeHTML(initials||'?')}</div>
+      <div>
+        <div style="font-size:19px;font-weight:700;">${escapeHTML(p.name)}</div>
+        <div class="modal-badges">${badges.join('')}</div>
+      </div>
     </div>
-    ${p.injured ? `<p class="small" style="color:var(--danger);">Ce joueur est marqué blessé : il a été basculé en attente d'assignation (visible dans Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}
-    <div class="row" style="margin:10px 0;">
-      <button class="btn-ghost" onclick="closeModal();renamePlayer('${pid}')">renommer</button>
-      <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
-      <button class="btn-ghost" onclick="closeModal();movePlayer('${pid}')">déplacer</button>
-      <button class="btn-ghost" onclick="convertPlayerToSubstitute('${pid}')">convertir en remplaçant</button>
-      <button class="btn-ghost" onclick="closeModal();removePlayer('${pid}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
-    </div>`;
-  const openSession = currentOpenSession();
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Groupe</span><span class="stat-value">${escapeHTML(g ? g.name : '—')}</span></div>
+      <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${rating.toFixed(2)}</span></div>
+    </div>
+    <div class="action-grid">
+      <button class="action-btn" onclick="closeModal();renamePlayer('${pid}')"><span class="icon">✏️</span> Renommer</button>
+      <button class="action-btn" onclick="closeModal();editPlayerRating('${pid}')"><span class="icon">📊</span> Modifier la cote</button>
+      <button class="action-btn" onclick="closeModal();movePlayer('${pid}')"><span class="icon">🔀</span> Déplacer de groupe</button>
+      <button class="action-btn" onclick="togglePlayerStatus('${pid}')"><span class="icon">${p.status==='new'?'✅':'🆕'}</span> ${p.status==='new' ? 'Marquer confirmé(e)' : 'Marquer nouveau/nouvelle'}</button>
+      <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
+      <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
+      <button class="action-btn danger" onclick="closeModal();removePlayer('${pid}')"><span class="icon">🗑️</span> Retirer de la ligue</button>
+    </div>
+    ${p.injured ? `<p class="small" style="color:var(--danger);">Basculé en attente d'assignation (Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}`;
   if(openSession){
-    const absent = isAbsent(openSession, pid);
     html += `
-    <h3 style="margin-top:16px;">Présence — session du ${openSession.date}</h3>
-    <p class="small">${absent ? "Ce joueur est actuellement marqué absent(e) pour cette session." : "Ce joueur est actuellement considéré présent(e) pour cette session."}</p>
-    <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette session'}</button>`;
+    <div class="modal-section">
+      <h3>Présence — session du ${openSession.date}</h3>
+      <p class="small" style="margin-bottom:10px;">${absent ? "Ce joueur est actuellement marqué absent(e) pour cette session." : "Ce joueur est actuellement considéré présent(e) pour cette session."}</p>
+      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette session'}</button>
+    </div>`;
   }
-  html += `
-    <h3 style="margin-top:16px;">Compte lié</h3>`;
+  html += `<div class="modal-section"><h3>Compte lié</h3>`;
   if(profile){
     const isAdmin = profile.role === 'admin';
     const disableRole = isAdmin && adminCount<=1;
     html += `
-      <p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
-      <div class="row">
-        <button class="btn-ghost" onclick="closeModal();openProfileLeaguesModal('${profile.id}','${escapeHTML(p.name).replace(/'/g,"\\'")}')">gérer ses ligues</button>
-        <button class="btn-ghost" ${disableRole?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${profile.id}','${isAdmin?'player':'admin'}')">${isAdmin?'retirer admin':'rendre admin'}</button>
-        <button class="btn-ghost" onclick="closeModal();unlinkAccount('${profile.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">délier</button>
+      <p class="small" style="margin-bottom:10px;">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
+      <div class="action-grid">
+        <button class="action-btn" onclick="closeModal();openProfileLeaguesModal('${profile.id}','${escapeHTML(p.name).replace(/'/g,"\\'")}')"><span class="icon">🏆</span> Gérer ses ligues</button>
+        <button class="action-btn" ${disableRole?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${profile.id}','${isAdmin?'player':'admin'}')"><span class="icon">${isAdmin?'⬇️':'👑'}</span> ${isAdmin?'Retirer admin':'Rendre admin'}</button>
+        <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>
       </div>`;
   } else {
     const pendingAccounts = ALL_PROFILES.filter(pr=>!LEAGUE_PLAYER_LINKS.some(l=>l.profile_id===pr.id));
-    html += `<p class="small">Aucun compte lié.</p>`;
+    html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié.</p>`;
     if(pendingAccounts.length){
       html += `
         <select id="detailLinkSelect_${pid}">
           <option value="">— choisir un compte en attente —</option>
           ${pendingAccounts.map(pr=>`<option value="${pr.id}">${escapeHTML(pr.display_name||pr.email)} (${escapeHTML(pr.email)})</option>`).join('')}
         </select>
-        <button class="btn-ghost" onclick="linkPlayerToAccountFromModal('${pid}')">lier</button>`;
+        <button class="btn btn-secondary" style="margin-top:8px;" onclick="linkPlayerToAccountFromModal('${pid}')">Lier ce compte</button>`;
     } else {
       html += `<p class="small">Aucun compte en attente à lier pour l'instant.</p>`;
     }
   }
+  html += `</div>`;
   return html;
 }
 function openPlayerDetailModal(pid){
