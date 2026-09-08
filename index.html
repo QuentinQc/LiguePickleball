@@ -237,25 +237,48 @@ function onLeagueDrop(ev, targetLeagueId){
   const draggedId = ev.dataTransfer.getData('text/plain');
   reorderLeague(draggedId, targetLeagueId);
 }
-async function createLeague(name, scheduleLabel){
+async function createLeague(name, scheduleLabel, format){
   const nextOrder = LEAGUES.reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
   const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder }).select().single();
   if(error){ showAlert("Erreur lors de la création : " + error.message); return null; }
   const fresh = defaultData();
   fresh.leagueName = name;
+  fresh.leagueFormat = format || 'ladder';
   const { error: err2 } = await sb.from('league_data').insert({ league_id: data.id, data: fresh });
   if(err2){ showAlert("Erreur lors de la création : " + err2.message); return null; }
   await loadLeagues();
   return data.id;
 }
+const LEAGUE_FORMAT_HINTS = {
+  ladder: "Les groupes montent/descendent automatiquement selon les résultats de chaque session — l'échelle classique.",
+  pools: "Plusieurs groupes fixes qui ne bougent jamais, peu importe les résultats — utile pour des poules de niveau stable.",
+  single: "Un seul groupe pour tous les joueurs, avec un classement cumulatif sur toute la saison plutôt que des montées/descentes."
+};
 function onCreateLeague(){
-  showPrompt("Nom de la nouvelle ligue :", '', (name)=>{
-    if(!name || !name.trim()) return;
-    showPrompt("Jour/heure de jeu (optionnel, ex: Lundi 19h) :", '', async (schedule)=>{
-      const id = await createLeague(name.trim(), schedule ? schedule.trim() : '');
-      if(id){ await switchToLeague(id); }
-    });
-  });
+  const html = `
+    <div class="field"><label>Nom de la ligue</label><input id="newLeagueName" placeholder="ex: Ligue du mardi"></div>
+    <div class="field"><label>Jour et heure (optionnel)</label><input id="newLeagueSchedule" placeholder="ex: Mardi 19h"></div>
+    <div class="field">
+      <label>Format de ligue</label>
+      <select id="newLeagueFormat" onchange="document.getElementById('newLeagueFormatHint').textContent = ({ladder:'${LEAGUE_FORMAT_HINTS.ladder}',pools:'${LEAGUE_FORMAT_HINTS.pools}',single:'${LEAGUE_FORMAT_HINTS.single}'})[this.value]">
+        <option value="ladder">Échelle — montées/descentes selon les résultats</option>
+        <option value="pools">Poules fixes — groupes qui ne bougent jamais</option>
+        <option value="single">Division unique — classement cumulatif de saison</option>
+      </select>
+    </div>
+    <p class="small" id="newLeagueFormatHint">${LEAGUE_FORMAT_HINTS.ladder}</p>
+    <p class="small" style="color:var(--paddle);">Le format ne pourra pas être changé facilement après coup — choisis celui qui correspond à ta ligue.</p>`;
+  showFormModal('Créer une nouvelle ligue', html, saveNewLeagueForm);
+}
+function saveNewLeagueForm(){
+  const name = document.getElementById('newLeagueName').value.trim();
+  if(!name){ showAlert("Le nom de la ligue est requis."); return false; }
+  const schedule = document.getElementById('newLeagueSchedule').value.trim();
+  const format = document.getElementById('newLeagueFormat').value || 'ladder';
+  (async ()=>{
+    const id = await createLeague(name, schedule, format);
+    if(id){ await switchToLeague(id); }
+  })();
 }
 // Change la ligue affichée par un administrateur.
 async function switchToLeague(leagueId){
@@ -304,6 +327,7 @@ function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9
 function defaultData(){
   return {
     leagueName: 'Ma ligue de pickleball',
+    leagueFormat: 'ladder',
     swapCount: 1,
     matchesPerSession: 10,
     testMode: false,
@@ -735,54 +759,59 @@ function finalizeSession(session){
   });
   session.standingsByGroup = standingsByGroup;
 
-  // Nombre d'absents (sans prêt) par groupe d'origine : chacun descend
-  // automatiquement plus bas, donc ça compte déjà comme une place qui se
-  // libère — pas besoin de faire descendre quelqu'un d'autre en plus pour ça.
-  const absentNoLoanByGroup = {};
-  (session.absences || []).forEach(pid=>{
-    if(session.loans && session.loans[pid]) return;
-    const pl = DATA.players.find(p=>p.id===pid);
-    if(!pl) return;
-    absentNoLoanByGroup[pl.groupId] = (absentNoLoanByGroup[pl.groupId] || 0) + 1;
-  });
+  // Les montées/descentes automatiques ne s'appliquent qu'en format Échelle.
+  // En Poules fixes ou Division unique, les groupes ne bougent jamais.
+  const isLadderFormat = DATA.leagueFormat !== 'pools' && DATA.leagueFormat !== 'single';
+  if(isLadderFormat){
+    // Nombre d'absents (sans prêt) par groupe d'origine : chacun descend
+    // automatiquement plus bas, donc ça compte déjà comme une place qui se
+    // libère — pas besoin de faire descendre quelqu'un d'autre en plus pour ça.
+    const absentNoLoanByGroup = {};
+    (session.absences || []).forEach(pid=>{
+      if(session.loans && session.loans[pid]) return;
+      const pl = DATA.players.find(p=>p.id===pid);
+      if(!pl) return;
+      absentNoLoanByGroup[pl.groupId] = (absentNoLoanByGroup[pl.groupId] || 0) + 1;
+    });
 
-  for(let i=0;i<sorted.length-1;i++){
-    const upper = sorted[i];   // meilleur groupe (order plus petit)
-    const lower = sorted[i+1];
-    // Les remplaçants réguliers (joueurs prêtés) suivent les règles normales du
-    // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
-    const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestId(r.playerId));
-    const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestId(r.playerId));
-    const nUp = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
-    const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
-    const nDown = Math.max(0, Math.min(DATA.swapCount, upperStand.length, lowerStand.length) - absentFromUpper);
-    for(let k=0;k<nUp;k++){
-      const goingUp = lowerStand[k];          // top du groupe inférieur
-      if(goingUp) movements.push({ playerId: goingUp.playerId, fromGroupId: lower.id, toGroupId: upper.id });
+    for(let i=0;i<sorted.length-1;i++){
+      const upper = sorted[i];   // meilleur groupe (order plus petit)
+      const lower = sorted[i+1];
+      // Les remplaçants réguliers (joueurs prêtés) suivent les règles normales du
+      // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
+      const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestId(r.playerId));
+      const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestId(r.playerId));
+      const nUp = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
+      const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
+      const nDown = Math.max(0, Math.min(DATA.swapCount, upperStand.length, lowerStand.length) - absentFromUpper);
+      for(let k=0;k<nUp;k++){
+        const goingUp = lowerStand[k];          // top du groupe inférieur
+        if(goingUp) movements.push({ playerId: goingUp.playerId, fromGroupId: lower.id, toGroupId: upper.id });
+      }
+      for(let k=0;k<nDown;k++){
+        const goingDown = upperStand[upperStand.length-1-k]; // bas du groupe supérieur
+        if(goingDown) movements.push({ playerId: goingDown.playerId, fromGroupId: upper.id, toGroupId: lower.id });
+      }
     }
-    for(let k=0;k<nDown;k++){
-      const goingDown = upperStand[upperStand.length-1-k]; // bas du groupe supérieur
-      if(goingDown) movements.push({ playerId: goingDown.playerId, fromGroupId: upper.id, toGroupId: lower.id });
-    }
+    movements.forEach(m=>{
+      const pl = DATA.players.find(p=>p.id===m.playerId);
+      if(pl) pl.groupId = m.toGroupId;
+    });
+
+    // Un joueur absent qui n'a pas été prêté ailleurs (donc n'a joué nulle part
+    // cette session) descend automatiquement d'un groupe pour la session suivante.
+    (session.absences || []).forEach(pid=>{
+      if(session.loans && session.loans[pid]) return; // il jouait ailleurs comme remplaçant : pas pénalisé
+      const pl = DATA.players.find(p=>p.id===pid);
+      if(!pl) return;
+      const fromGroupId = pl.groupId;
+      const below = groupBelow(fromGroupId);
+      if(below){
+        movements.push({ playerId: pid, fromGroupId, toGroupId: below, reason:'absence' });
+        pl.groupId = below;
+      }
+    });
   }
-  movements.forEach(m=>{
-    const pl = DATA.players.find(p=>p.id===m.playerId);
-    if(pl) pl.groupId = m.toGroupId;
-  });
-
-  // Un joueur absent qui n'a pas été prêté ailleurs (donc n'a joué nulle part
-  // cette session) descend automatiquement d'un groupe pour la session suivante.
-  (session.absences || []).forEach(pid=>{
-    if(session.loans && session.loans[pid]) return; // il jouait ailleurs comme remplaçant : pas pénalisé
-    const pl = DATA.players.find(p=>p.id===pid);
-    if(!pl) return;
-    const fromGroupId = pl.groupId;
-    const below = groupBelow(fromGroupId);
-    if(below){
-      movements.push({ playerId: pid, fromGroupId, toGroupId: below, reason:'absence' });
-      pl.groupId = below;
-    }
-  });
 
   applyRatingUpdates(session);
   reorderGroupsAfterMovements(standingsByGroup, movements);
@@ -2181,7 +2210,7 @@ function onFinalize(){
 function computePlayerReports(){
   const closed = DATA.sessions.filter(s=>s.status==='closed');
   const stats = {};
-  DATA.players.forEach(p=>{ stats[p.id] = { wins:0, losses:0, played:0, scheduled:0, sessionsAbsent:0, sessionsAppeared:0, promotions:0, relegations:0, ratingChange:0, subCount:0 }; });
+  DATA.players.forEach(p=>{ stats[p.id] = { wins:0, losses:0, played:0, scheduled:0, totalPoints:0, sessionsAbsent:0, sessionsAppeared:0, promotions:0, relegations:0, ratingChange:0, subCount:0 }; });
   closed.forEach(s=>{
     const appeared = new Set();
     if(s.standingsByGroup){
@@ -2192,6 +2221,7 @@ function computePlayerReports(){
           stats[r.playerId].losses += r.losses||0;
           stats[r.playerId].played += r.played||0;
           stats[r.playerId].scheduled += r.scheduled||0;
+          stats[r.playerId].totalPoints += r.pf||0;
           appeared.add(r.playerId);
         });
       });
@@ -2221,7 +2251,7 @@ function computePlayerReports(){
       player: p,
       wins: st.wins, losses: st.losses,
       winRate: totalGames>0 ? st.wins/totalGames : null,
-      played: st.played, scheduled: st.scheduled,
+      played: st.played, scheduled: st.scheduled, totalPoints: st.totalPoints,
       sessionsAbsent: st.sessionsAbsent, sessionsAppeared: st.sessionsAppeared,
       absenceRate: totalRelevant>0 ? st.sessionsAbsent/totalRelevant : null,
       promotions: st.promotions, relegations: st.relegations,
@@ -2331,6 +2361,15 @@ function reportsSessionHTML(){
       <tr><td class="small">Taux d'absence moyen de la ligue</td><td>${avgAbsenceRate===null ? '—' : pct(avgAbsenceRate)}</td></tr>
       <tr><td class="small">Taux d'absence le plus élevé</td><td>${mostAbsent ? escapeHTML(mostAbsent.player.name)+' — '+pct(mostAbsent.absenceRate) : '—'}</td></tr>
       <tr><td class="small">Plus forte progression de cote</td><td>${bestGain ? escapeHTML(bestGain.player.name)+' — '+(bestGain.ratingChange>=0?'+':'')+bestGain.ratingChange.toFixed(3) : '—'}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Classement cumulatif de la saison</h2>
+    <p class="small">Total des points, victoires et défaites sur toutes les sessions terminées — pertinent surtout en format Poules fixes ou Division unique, mais visible pour tous les formats.</p>
+    <table>
+      <tr><th>#</th><th>Nom</th><th>Points</th><th>V-D</th></tr>
+      ${reports.slice().sort((a,b)=>b.totalPoints-a.totalPoints).map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHTML(r.player.name)}</td><td>${r.totalPoints}</td><td>${r.wins}-${r.losses}</td></tr>`).join('')}
+      ${reports.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
     </table>
   </div>
   <div class="card">
@@ -2630,7 +2669,8 @@ function adminSettingsSectionHTML(){
     ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
     : 'Automatique — génération et rotation par l\'app';
   let html = '';
-  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · échange de ${DATA.swapCount||1}`, "openGeneralInfoModal()");
+  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle';
+  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
   html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
@@ -2656,7 +2696,9 @@ function adminSettingsSectionHTML(){
 // ---- Pop-up : Informations générales ----
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
   const html = `
+    <p class="small">Format de ligue : <strong>${formatLabel}</strong> <span class="small">(défini à la création, non modifiable ici)</span></p>
     <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
     <div class="field"><label>Jour et heure (étiquette affichée dans le sélecteur de ligue, ex: « Lundi 19h »)</label><input id="setLeagueSchedule" placeholder="ex: Lundi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
     <div class="field">
@@ -3187,7 +3229,8 @@ function showFormModal(title, htmlContent, onSave){ MODAL = { kind:'form', title
 function modalFormSaveClick(){
   if(!MODAL || !MODAL.onSave) return;
   const cb = MODAL.onSave;
-  cb();
+  const result = cb();
+  if(result === false){ render(); return; } // validation a échoué : le pop-up reste ouvert (ex: showAlert affiché)
   MODAL = null;
   saveAndRender();
 }
@@ -3295,6 +3338,7 @@ function handleImportFile(input){
 function migrateData(){
   if(DATA.matchesPerSession === undefined) DATA.matchesPerSession = 10;
   if(DATA.testMode === undefined) DATA.testMode = false;
+  if(DATA.leagueFormat === undefined) DATA.leagueFormat = 'ladder';
   if(DATA.testMatches4 === undefined) DATA.testMatches4 = 2;
   if(DATA.testMatches5 === undefined) DATA.testMatches5 = 3;
   if(DATA.groupMinPlayers === undefined) DATA.groupMinPlayers = 4;
