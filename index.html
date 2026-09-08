@@ -64,6 +64,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tag-stay{background:rgba(255,255,255,0.08);color:var(--muted);}
 .tag-green{background:rgba(76,175,80,0.18);color:#6FCF73;}
 .tag-yellow{background:rgba(255,214,10,0.18);color:#FFD60A;}
+.tag-orange{background:rgba(255,159,10,0.18);color:#FF9F0A;}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
@@ -1272,13 +1273,15 @@ function adminPlayersSectionHTML(){
 function adminAllPeopleHTML(){
   const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.player_id).map(l=>l.player_id));
   const linkedSubIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.substitute_id).map(l=>l.substitute_id));
+  const openSessionForBadge = currentOpenSession();
   const regulars = DATA.players.map(p=>({
     id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
+    absent: !!(openSessionForBadge && isAbsent(openSessionForBadge, p.id)),
     group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
     linked: linkedPlayerIds.has(p.id), openModal: `openPlayerDetailModal('${p.id}')`
   }));
   const subs = (DATA.substitutePool||[]).map(s=>({
-    id: s.id, name: s.name, type: 'remplacant', injured: false,
+    id: s.id, name: s.name, type: 'remplacant', injured: false, absent: false,
     group: null, rating: null,
     linked: linkedSubIds.has(s.id), openModal: `openSubstituteDetailModal('${s.id}')`
   }));
@@ -1291,7 +1294,7 @@ function adminAllPeopleHTML(){
       ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
         <td>${escapeHTML(x.name)}</td>
         <td>${x.type==='regulier' ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-yellow">Remplaçant</span>'}</td>
-        <td>${x.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : ''}</td>
+        <td>${x.injured ? '<span class="tag tag-down">🤕 Blessé</span> ' : ''}${x.absent ? '<span class="tag tag-orange">🚫 Absent</span> ' : ''}${(!x.group && x.type==='regulier' && !x.injured) ? '<span class="tag tag-stay">⏳ En attente</span>' : ''}</td>
         <td>${x.group ? escapeHTML(x.group.name) : '—'}</td>
         <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
         <td>${x.linked ? '✅' : '—'}</td>
@@ -1524,6 +1527,7 @@ function adminPlayersHTML(){
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const groups = groupsSorted();
   const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.player_id));
+  const openSessionForBadge = currentOpenSession();
   return `
     <div class="card">
       <h3>Ajouter un joueur</h3>
@@ -1559,7 +1563,7 @@ function adminPlayersHTML(){
           const linkedProfile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
           const isAdmin = linkedProfile && linkedProfile.role === 'admin';
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
+            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${(openSessionForBadge && isAbsent(openSessionForBadge, p.id)) ? ' <span class="tag tag-orange">🚫 Absent</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
             <td>${escapeHTML(g ? g.name : 'En attente')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
@@ -1585,7 +1589,7 @@ function playerDetailModalHTML(pid){
       <button class="btn-ghost" onclick="togglePlayerStatus('${pid}')">${p.status==='new' ? 'Marquer comme confirmé(e)' : 'Marquer comme nouveau/nouvelle'}</button>
       <button class="btn-ghost" onclick="togglePlayerInjured('${pid}')" ${p.injured ? 'style="color:var(--danger);background:rgba(233,85,107,0.12);"' : ''}>${p.injured ? 'Marquer comme rétabli(e)' : 'Marquer comme blessé(e)'}</button>
     </div>
-    ${p.injured ? `<p class="small" style="color:var(--danger);">Ce joueur est marqué blessé : il n'est pas inclus dans les matchs générés automatiquement (sauf si un remplaçant est assigné), mais reste dans la liste et ne descend pas de groupe pour cette raison.</p>` : ''}
+    ${p.injured ? `<p class="small" style="color:var(--danger);">Ce joueur est marqué blessé : il a été basculé en attente d'assignation (visible dans Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}
     <div class="row" style="margin:10px 0;">
       <button class="btn-ghost" onclick="closeModal();renamePlayer('${pid}')">renommer</button>
       <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
@@ -1644,7 +1648,16 @@ function togglePlayerStatus(pid){
 function togglePlayerInjured(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
-  p.injured = !p.injured;
+  if(!p.injured){
+    // Devient blessé : bascule en attente, en gardant une trace de son dernier groupe.
+    p.lastGroupId = p.groupId || p.lastGroupId || null;
+    p.groupId = null;
+    p.injured = true;
+  } else {
+    // Rétabli : reste en attente pour être replacé manuellement (le groupe
+    // et l'ordre ont pu changer entretemps).
+    p.injured = false;
+  }
   saveAndRender();
   openPlayerDetailModal(pid);
 }
@@ -1940,9 +1953,16 @@ function adminGroupsHTML(){
     <h2>En attente d'assignation <span class="small">(${unassigned.length})</span></h2>
     <p class="small">Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner.</p>
     <table>
-      <tr><th>Nom</th></tr>
-      ${unassigned.map(p=>`<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')"><td>${escapeHTML(p.name)}</td></tr>`).join('')}
-      ${unassigned.length===0 ? `<tr><td class="empty">Aucun joueur en attente</td></tr>` : ''}
+      <tr><th>Nom</th><th>Statut</th><th>Dernier groupe</th></tr>
+      ${unassigned.map(p=>{
+        const lastGroup = p.lastGroupId ? groupById(p.lastGroupId) : null;
+        return `<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
+          <td>${escapeHTML(p.name)}</td>
+          <td>${p.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : '<span class="tag tag-stay">⏳ En attente</span>'}</td>
+          <td>${lastGroup ? escapeHTML(lastGroup.name) : '—'}</td>
+        </tr>`;
+      }).join('')}
+      ${unassigned.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur en attente</td></tr>` : ''}
     </table>
   </div>`;
   groupsSorted().forEach(g=>{
@@ -1961,13 +1981,14 @@ function adminGroupsHTML(){
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
           const prevText = prev ? `${escapeHTML(prev.groupName)} — ${prev.position}${prev.position===1?'er':'e'}/${prev.total}` : '<span class="small">—</span>';
+          const isPlayerAbsent = open && isAbsent(open, p.id);
           return `<tr class="draggable-row" draggable="true"
           ondragstart="onPlayerDragStart(event,'${p.id}')"
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
           ondrop="onRowDrop(event,'${g.id}','${p.id}')">
           <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
-          <td>${escapeHTML(p.name)}</td>
+          <td${isPlayerAbsent ? ' style="opacity:0.55;text-decoration:line-through;"' : ''}>${escapeHTML(p.name)}${isPlayerAbsent ? ' <span class="tag tag-orange" style="text-decoration:none;">🚫 Absent</span>' : ''}</td>
           <td class="small">${prevText}</td>
         </tr>`;
         }).join('')}
