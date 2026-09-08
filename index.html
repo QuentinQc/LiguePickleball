@@ -62,6 +62,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tag-up{background:rgba(207,234,92,0.18);color:var(--ball);}
 .tag-down{background:rgba(233,85,107,0.15);color:var(--danger);}
 .tag-stay{background:rgba(255,255,255,0.08);color:var(--muted);}
+.tag-green{background:rgba(76,175,80,0.18);color:#6FCF73;}
+.tag-yellow{background:rgba(255,214,10,0.18);color:#FFD60A;}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
@@ -678,6 +680,11 @@ function activeRosterForGroup(session, gid){
   const subs = (gd && gd.substitutes) || {};
   const roster = [];
   groupIds.forEach(id=>{
+    const p = DATA.players.find(x=>x.id===id);
+    if(p && p.injured){
+      if(subs[id]) roster.push(subs[id]); // un remplaçant peut quand même prendre sa place
+      return; // sinon la position reste vide, sans compter comme une absence
+    }
     if(isAbsent(session, id)){
       if(subs[id]) roster.push(subs[id]);
     } else {
@@ -1266,12 +1273,12 @@ function adminAllPeopleHTML(){
   const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.player_id).map(l=>l.player_id));
   const linkedSubIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.substitute_id).map(l=>l.substitute_id));
   const regulars = DATA.players.map(p=>({
-    id: p.id, name: p.name, type: 'regulier',
+    id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
     group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
     linked: linkedPlayerIds.has(p.id), openModal: `openPlayerDetailModal('${p.id}')`
   }));
   const subs = (DATA.substitutePool||[]).map(s=>({
-    id: s.id, name: s.name, type: 'remplacant',
+    id: s.id, name: s.name, type: 'remplacant', injured: false,
     group: null, rating: null,
     linked: linkedSubIds.has(s.id), openModal: `openSubstituteDetailModal('${s.id}')`
   }));
@@ -1280,15 +1287,16 @@ function adminAllPeopleHTML(){
     <h2>Tous <span class="small">(${all.length})</span></h2>
     <p class="small">Réguliers et remplaçants ensemble — clique pour ouvrir la gestion de chacun.</p>
     <table>
-      <tr><th>Nom</th><th>Type</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
+      <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
       ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
         <td>${escapeHTML(x.name)}</td>
-        <td>${x.type==='regulier' ? '<span class="tag tag-stay">Régulier</span>' : '<span class="tag tag-up">Remplaçant</span>'}</td>
+        <td>${x.type==='regulier' ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-yellow">Remplaçant</span>'}</td>
+        <td>${x.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : ''}</td>
         <td>${x.group ? escapeHTML(x.group.name) : '—'}</td>
         <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
         <td>${x.linked ? '✅' : '—'}</td>
       </tr>`).join('')}
-      ${all.length===0 ? `<tr><td colspan="5" class="empty">Personne pour l'instant</td></tr>` : ''}
+      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant</td></tr>` : ''}
     </table>
   </div>`;
 }
@@ -1551,7 +1559,7 @@ function adminPlayersHTML(){
           const linkedProfile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
           const isAdmin = linkedProfile && linkedProfile.role === 'admin';
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
+            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
             <td>${escapeHTML(g ? g.name : 'En attente')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
@@ -1572,10 +1580,12 @@ function playerDetailModalHTML(pid){
   const adminCount = ALL_PROFILES.filter(pr=>pr.role==='admin').length;
 
   let html = `
-    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : 'En attente')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong></p>
+    <p class="small">Groupe : <strong>${escapeHTML(g ? g.name : 'En attente')}</strong> · Cote : <strong>${rating.toFixed(2)}</strong> · Statut : <strong>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</strong>${p.injured ? ' · <strong style="color:var(--danger);">🤕 Blessé</strong>' : ''}</p>
     <div class="row" style="margin-bottom:10px;">
       <button class="btn-ghost" onclick="togglePlayerStatus('${pid}')">${p.status==='new' ? 'Marquer comme confirmé(e)' : 'Marquer comme nouveau/nouvelle'}</button>
+      <button class="btn-ghost" onclick="togglePlayerInjured('${pid}')" ${p.injured ? 'style="color:var(--danger);background:rgba(233,85,107,0.12);"' : ''}>${p.injured ? 'Marquer comme rétabli(e)' : 'Marquer comme blessé(e)'}</button>
     </div>
+    ${p.injured ? `<p class="small" style="color:var(--danger);">Ce joueur est marqué blessé : il n'est pas inclus dans les matchs générés automatiquement (sauf si un remplaçant est assigné), mais reste dans la liste et ne descend pas de groupe pour cette raison.</p>` : ''}
     <div class="row" style="margin:10px 0;">
       <button class="btn-ghost" onclick="closeModal();renamePlayer('${pid}')">renommer</button>
       <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
@@ -1629,6 +1639,13 @@ function togglePlayerStatus(pid){
   if(!p) return;
   p.status = p.status==='new' ? 'confirmed' : 'new';
   saveData();
+  openPlayerDetailModal(pid);
+}
+function togglePlayerInjured(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  p.injured = !p.injured;
+  saveAndRender();
   openPlayerDetailModal(pid);
 }
 async function linkPlayerToAccountFromModal(pid){
@@ -1977,19 +1994,24 @@ function groupAbsenceManagementHTML(open, g){
   const gd = open.groupsData.find(x=>x.groupId===g.id);
   if(!gd) return '';
   const groupPlayerIds = playersInGroup(g.id).map(p=>p.id);
-  const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id));
-  if(absentIds.length===0) return '';
+  const injuredIds = groupPlayerIds.filter(id=>{ const p = DATA.players.find(x=>x.id===id); return p && p.injured; });
+  const absentIds = groupPlayerIds.filter(id=>isAbsent(open,id) && !injuredIds.includes(id));
+  const allIds = [...injuredIds, ...absentIds];
+  if(allIds.length===0) return '';
   const subs = gd.substitutes || {};
   const inUse = substitutesInUse(open, g.id, null);
   let html = `<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;">
     <h3 style="margin-bottom:8px;">Remplaçants — session du ${open.date}</h3>`;
-  absentIds.forEach(id=>{
+  allIds.forEach(id=>{
+    const isInjured = injuredIds.includes(id);
     const currentSub = subs[id];
     const loanedTo = open.loans && open.loans[id] ? groupById(open.loans[id]) : null;
     const eligible = DATA.players.filter(p=> p.id!==id && p.groupId!==g.id && (!inUse.has(p.id) || p.id===currentSub));
-    const status = loanedTo
-      ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
-      : `<span class="small">descendra automatiquement d'un groupe</span>`;
+    const status = isInjured
+      ? `<span class="tag tag-down">🤕 blessé</span> <span class="small">— ne descend pas de groupe pour ça</span>`
+      : (loanedTo
+        ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
+        : `<span class="small">descendra automatiquement d'un groupe</span>`);
     html += `<div class="row" style="margin-bottom:8px;align-items:center;flex-wrap:wrap;">
       <span style="min-width:110px;">${escapeHTML(playerName(id))}</span>
       <span style="min-width:150px;">${status}</span>
@@ -3644,6 +3666,7 @@ function migrateData(){
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
     if(typeof p.ratingGames !== 'number') p.ratingGames = 0;
     if(p.status === undefined) p.status = 'confirmed';
+    if(p.injured === undefined) p.injured = false;
   });
   // Ordre manuel au sein d'un groupe : si absent, on l'initialise selon
   // l'ordre alphabétique actuel, groupe par groupe.
