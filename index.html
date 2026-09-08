@@ -1377,6 +1377,7 @@ function substituteDetailModalHTML(subId){
     <p class="small">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
     <div class="row" style="margin:10px 0;">
       <button class="btn-ghost" onclick="closeModal();editSubstituteInPool('${subId}')">modifier</button>
+      <button class="btn-ghost" onclick="convertSubstituteToPlayer('${subId}')">convertir en joueur régulier</button>
       <button class="btn-ghost" onclick="closeModal();removeSubstituteFromPool('${subId}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
     </div>
     <h3 style="margin-top:16px;">Compte lié</h3>`;
@@ -1418,6 +1419,53 @@ async function linkSubstituteAccount(subId){
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   openSubstituteDetailModal(subId);
+}
+// Convertit un joueur régulier en remplaçant : il quitte son groupe et la
+// liste des Réguliers, rejoint le bassin de Remplaçants. Son compte lié (s'il
+// y en a un) est migré avec lui. Sa cote/historique passés restent dans
+// l'historique déjà enregistré, mais il n'accumulera plus de cote à l'avenir.
+function convertPlayerToSubstitute(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  showConfirm(`Convertir ${p.name} en remplaçant ? Il/elle quittera son groupe et la liste des Réguliers pour rejoindre le bassin de Remplaçants. Son historique de matchs passés reste dans l'historique, mais il/elle n'aura plus de cote évolutive à l'avenir.`, async ()=>{
+    closeModal();
+    const newSub = { id: uid('sub'), name: p.name };
+    DATA.substitutePool = DATA.substitutePool || [];
+    DATA.substitutePool.push(newSub);
+    DATA.players = DATA.players.filter(x=>x.id!==pid);
+    const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===pid);
+    if(link){
+      const { error } = await sb.from('profile_players').update({ player_id: null, substitute_id: newSub.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
+      if(!error) await sb.from('profiles').update({ role: 'substitute' }).eq('id', link.profile_id);
+      await loadAllProfiles();
+      if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
+    }
+    saveAndRender();
+    openSubstituteDetailModal(newSub.id);
+  });
+}
+// Convertit un remplaçant en joueur régulier : il rejoint la liste des
+// Réguliers, en attente d'assignation à un groupe. Son compte lié (s'il y en
+// a un) est migré avec lui.
+function convertSubstituteToPlayer(subId){
+  const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
+  if(!s) return;
+  showConfirm(`Convertir ${s.name} en joueur régulier ? Il/elle rejoindra la liste des Réguliers, en attente d'assignation à un groupe.`, async ()=>{
+    closeModal();
+    const newPlayer = { id: uid('p'), name: s.name, groupId: null, rating: RATING_DEFAULT, ratingGames: 0, order: 0, status: 'new' };
+    DATA.players = DATA.players || [];
+    DATA.players.push(newPlayer);
+    DATA.substitutePool = (DATA.substitutePool||[]).filter(x=>x.id!==subId);
+    const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
+    if(link){
+      const { error } = await sb.from('profile_players').update({ substitute_id: null, player_id: newPlayer.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
+      if(!error) await sb.from('profiles').update({ role: 'player' }).eq('id', link.profile_id);
+      await loadAllProfiles();
+      if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
+    }
+    saveAndRender();
+    openPlayerDetailModal(newPlayer.id);
+  });
 }
 function editSubstituteInPool(id){
   const s = (DATA.substitutePool||[]).find(x=>x.id===id);
@@ -1530,6 +1578,7 @@ function playerDetailModalHTML(pid){
       <button class="btn-ghost" onclick="closeModal();renamePlayer('${pid}')">renommer</button>
       <button class="btn-ghost" onclick="closeModal();editPlayerRating('${pid}')">modifier cote</button>
       <button class="btn-ghost" onclick="closeModal();movePlayer('${pid}')">déplacer</button>
+      <button class="btn-ghost" onclick="convertPlayerToSubstitute('${pid}')">convertir en remplaçant</button>
       <button class="btn-ghost" onclick="closeModal();removePlayer('${pid}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
     </div>`;
   const openSession = currentOpenSession();
