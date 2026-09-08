@@ -160,9 +160,12 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .print-table th{background:#eee;text-transform:uppercase;font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;}
 .print-score-box{display:inline-block;width:42px;height:24px;border:1px solid #666;vertical-align:middle;}
 @media print{
+  html, body{background:#fff !important;}
   body.print-mode #app{display:none !important;}
-  body.print-mode #printArea{display:block !important;color:#000;background:#fff;font-family:var(--font-body);padding:0;}
-  body.print-mode{background:#fff;}
+  body.print-mode #printArea{display:block !important;color:#000 !important;background:#fff !important;font-family:var(--font-body);padding:0;}
+  body.print-mode #printArea *{color:#000 !important;background:transparent !important;border-color:#999 !important;box-shadow:none !important;text-shadow:none !important;}
+  body.print-mode #printArea .print-table th{background:#eee !important;}
+  body.print-mode #printArea .print-score-box{border-color:#666 !important;}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
