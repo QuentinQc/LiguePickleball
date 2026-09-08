@@ -670,6 +670,8 @@ function toggleAbsence(playerId){
   saveAndRender();
 }
 function isAbsent(session, playerId){ return !!(session && session.absences && session.absences.includes(playerId)); }
+// Absent "pour de vrai" (pas juste prêté à un autre groupe, où il joue quand même).
+function isTrulyAbsent(session, playerId){ return isAbsent(session, playerId) && !(session && session.loans && session.loans[playerId]); }
 function currentOpenSession(){ return DATA.sessions.find(s=>s.status==='open'); }
 
 // Effectif réellement actif d'un groupe pour une session : membres présents,
@@ -1276,7 +1278,7 @@ function adminAllPeopleHTML(){
   const openSessionForBadge = currentOpenSession();
   const regulars = DATA.players.map(p=>({
     id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
-    absent: !!(openSessionForBadge && isAbsent(openSessionForBadge, p.id)),
+    absent: !!(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)),
     group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
     linked: linkedPlayerIds.has(p.id), openModal: `openPlayerDetailModal('${p.id}')`
   }));
@@ -1563,7 +1565,7 @@ function adminPlayersHTML(){
           const linkedProfile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
           const isAdmin = linkedProfile && linkedProfile.role === 'admin';
           return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${(openSessionForBadge && isAbsent(openSessionForBadge, p.id)) ? ' <span class="tag tag-orange">🚫 Absent</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
+            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)) ? ' <span class="tag tag-orange">🚫 Absent</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
             <td>${escapeHTML(g ? g.name : 'En attente')}</td>
             <td>${rating.toFixed(2)}</td>
             <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
@@ -1949,7 +1951,7 @@ function adminGroupsHTML(){
   const open = currentOpenSession();
   let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   const unassigned = DATA.players.filter(p=>!p.groupId);
-  const absentNow = open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id)) : [];
+  const absentNow = open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
   html += `<div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
     <h2>En attente d'assignation <span class="small">(${unassigned.length + absentNow.length})</span></h2>
     <p class="small">Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner.</p>
@@ -2006,9 +2008,10 @@ function adminGroupsHTML(){
           const gd = open.groupsData.find(x=>x.groupId===g.id);
           const subId = gd && gd.substitutes ? gd.substitutes[p.id] : null;
           if(subId){
+            const isRealPlayer = !isGuestOrSubId(subId);
             return `<tr>
               <td style="width:28px;color:var(--muted);font-family:var(--font-display);">↳</td>
-              <td>${escapeHTML(playerName(subId))} <span class="tag tag-yellow">remplace ${escapeHTML(p.name)}</span></td>
+              <td>${escapeHTML(playerName(subId))}${isRealPlayer ? '' : ` <span class="tag tag-yellow">remplace ${escapeHTML(p.name)}</span>`}</td>
               <td class="small">—</td>
             </tr>`;
           }
