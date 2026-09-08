@@ -477,10 +477,18 @@ function computeStandings(groupPlayers, matches){
 
 function playerName(id){
   if(typeof id === 'string' && id.startsWith('guest::')) return decodeURIComponent(id.slice(7));
+  if(typeof id === 'string' && id.startsWith('sub::')){
+    const s = (DATA.substitutePool||[]).find(x=>x.id===id.slice(5));
+    return s ? s.name : 'Remplaçant';
+  }
   const p = DATA.players.find(x=>x.id===id);
   return p ? p.name : '?';
 }
 function isGuestId(id){ return typeof id === 'string' && id.startsWith('guest::'); }
+function isSubPoolId(id){ return typeof id === 'string' && id.startsWith('sub::'); }
+// Vrai pour un invité anonyme OU un remplaçant régulier du bassin — les deux
+// sont exclus des montées/descentes, de la cote et des statistiques de rivalité.
+function isGuestOrSubId(id){ return isGuestId(id) || isSubPoolId(id); }
 function groupById(id){ return DATA.groups.find(g=>g.id===id); }
 // Retrouve, pour un joueur, le groupe et le classement obtenus lors de sa
 // dernière session jouée (pour aider à ajuster les positions actuelles).
@@ -692,7 +700,7 @@ function substitutesInUse(session, excludeGid, excludeAbsentId){
     if(!gd2 || !gd2.substitutes) return;
     Object.entries(gd2.substitutes).forEach(([aId, subId])=>{
       if(g.id===excludeGid && aId===excludeAbsentId) return;
-      if(!isGuestId(subId)) set.add(subId);
+      if(!isGuestOrSubId(subId)) set.add(subId);
     });
   });
   return set;
@@ -710,7 +718,7 @@ function setSubstitute(gid, absentId, subId){
   const groupsToRefresh = new Set([gid]);
 
   // annuler le prêt précédent s'il y en avait un pour cette place
-  if(oldSub && !isGuestId(oldSub) && open.loans[oldSub] === gid){
+  if(oldSub && !isGuestOrSubId(oldSub) && open.loans[oldSub] === gid){
     delete open.loans[oldSub];
     const idx2 = open.absences.indexOf(oldSub);
     if(idx2>-1) open.absences.splice(idx2,1);
@@ -720,7 +728,7 @@ function setSubstitute(gid, absentId, subId){
 
   if(subId){
     gd.substitutes[absentId] = subId;
-    if(!isGuestId(subId)){
+    if(!isGuestOrSubId(subId)){
       if(!open.absences.includes(subId)) open.absences.push(subId);
       open.loans[subId] = gid;
       const homeNew = DATA.players.find(p=>p.id===subId);
@@ -779,8 +787,8 @@ function finalizeSession(session){
       const lower = sorted[i+1];
       // Les remplaçants réguliers (joueurs prêtés) suivent les règles normales du
       // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
-      const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestId(r.playerId));
-      const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestId(r.playerId));
+      const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestOrSubId(r.playerId));
+      const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestOrSubId(r.playerId));
       const nUp = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
       const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
       const nDown = Math.max(0, Math.min(DATA.swapCount, upperStand.length, lowerStand.length) - absentFromUpper);
@@ -895,7 +903,7 @@ function applyRatingUpdates(session){
   const deltas = {};   // cumul des ajustements par joueur
   const gamesSnapshot = {};
   function getSnapshotRating(pid){
-    if(isGuestId(pid)) return null;
+    if(isGuestOrSubId(pid)) return null;
     if(!(pid in snapshot)) snapshot[pid] = ratingOf(pid);
     return snapshot[pid];
   }
@@ -921,13 +929,13 @@ function applyRatingUpdates(session){
       // écrasante compte plus qu'une victoire serrée, et vice-versa pour la défaite.
       const actualA = Math.min(1, Math.max(0, 0.5 + (sa - sb) / (2 * target)));
       m.teamA.forEach(pid=>{
-        if(isGuestId(pid)) return;
+        if(isGuestOrSubId(pid)) return;
         const k = kFactorFor(getSnapshotGames(pid));
         deltas[pid] = (deltas[pid] || 0) + k * (actualA - expectedA);
         gamesSnapshot[pid] = getSnapshotGames(pid) + 1;
       });
       m.teamB.forEach(pid=>{
-        if(isGuestId(pid)) return;
+        if(isGuestOrSubId(pid)) return;
         const k = kFactorFor(getSnapshotGames(pid));
         deltas[pid] = (deltas[pid] || 0) + k * ((1-actualA) - (1-expectedA));
         gamesSnapshot[pid] = getSnapshotGames(pid) + 1;
@@ -971,6 +979,7 @@ function render(){
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
   else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS_PLAYER && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
   else if(SESSION_USER.role === 'admin'){ renderAdmin(); }
+  else if(SESSION_USER.role === 'substitute'){ renderSubstitute(SESSION_USER.substituteId); }
   else { renderPlayer(SESSION_USER.playerId); }
   const existing = document.getElementById('modalRoot');
   if(existing) existing.remove();
@@ -1096,10 +1105,26 @@ async function onAuthResolved(user){
     return;
   }
 
-  // Joueur : on regarde dans quelle(s) ligue(s) ce compte est lié.
+  // Joueur ou remplaçant : on regarde dans quelle(s) ligue(s) ce compte est lié.
   await loadMyLeagueLinks(profile.id);
   if(MY_LEAGUE_LINKS.length === 0){
     SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
+    render();
+    return;
+  }
+  if(profile.role === 'substitute'){
+    const subLink = MY_LEAGUE_LINKS.find(l=>l.league_id===CURRENT_LEAGUE_ID && l.substitute_id) || MY_LEAGUE_LINKS.find(l=>l.substitute_id);
+    if(!subLink){
+      SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
+      render();
+      return;
+    }
+    CURRENT_LEAGUE_ID = subLink.league_id;
+    const loadedSub = await loadData(CURRENT_LEAGUE_ID);
+    DATA = loadedSub || defaultData();
+    migrateData();
+    SESSION_USER = { role:'substitute', substituteId: subLink.substitute_id };
+    VIEW = { tab:'dispo' };
     render();
     return;
   }
@@ -1252,6 +1277,7 @@ function adminSubstitutePoolHTML(){
     return sortDir==='asc' ? cmp : -cmp;
   });
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
+  const linkedSubIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.substitute_id).map(l=>l.substitute_id));
   return `
     <div class="card">
       <h3>Ajouter un remplaçant</h3>
@@ -1268,18 +1294,19 @@ function adminSubstitutePoolHTML(){
         <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
         ${pool.some(s=>s.email) ? `<button class="btn btn-secondary" onclick="emailAvailabilityRequest()">📧 Demander qui est disponible</button>` : ''}
       </div>
+      <p class="small">Clique sur un remplaçant pour le modifier, gérer son compte, ou le retirer.</p>
       <table>
         <tr>
           <th class="sortable" onclick="setSubsSort('name')">Nom${arrow('name')}</th>
           <th class="sortable" onclick="setSubsSort('email')">Courriel${arrow('email')}</th>
           <th class="sortable" onclick="setSubsSort('notes')">Notes${arrow('notes')}</th>
-          <th></th>
+          <th>Compte</th>
         </tr>
-        ${pool.map(s=>`<tr>
+        ${pool.map(s=>`<tr class="clickable-row" onclick="openSubstituteDetailModal('${s.id}')">
           <td>${escapeHTML(s.name)}</td>
           <td>${escapeHTML(s.email||'—')}</td>
           <td>${escapeHTML(s.notes||'—')}</td>
-          <td><button class="btn-ghost" onclick="editSubstituteInPool('${s.id}')">modifier</button> <button class="btn-ghost" onclick="removeSubstituteFromPool('${s.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button></td>
+          <td>${linkedSubIds.has(s.id) ? '✅' : '—'}</td>
         </tr>`).join('')}
         ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
       </table>
@@ -1303,6 +1330,59 @@ function addSubstituteToPool(){
   DATA.substitutePool = DATA.substitutePool || [];
   DATA.substitutePool.push(entry);
   saveAndRender();
+}
+// Pop-up de gestion d'un remplaçant : infos, et gestion de son compte (lier
+// un compte en attente comme remplaçant, changer son rôle, le délier).
+function substituteDetailModalHTML(subId){
+  const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
+  if(!s) return `<p class="small">Remplaçant introuvable.</p>`;
+  const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
+  const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
+  let html = `
+    <p class="small">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
+    <div class="row" style="margin:10px 0;">
+      <button class="btn-ghost" onclick="closeModal();editSubstituteInPool('${subId}')">modifier</button>
+      <button class="btn-ghost" onclick="closeModal();removeSubstituteFromPool('${subId}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button>
+    </div>
+    <h3 style="margin-top:16px;">Compte lié</h3>`;
+  if(profile){
+    html += `
+      <p class="small">${escapeHTML(profile.email)} — Remplaçant</p>
+      <button class="btn-ghost" onclick="closeModal();unlinkAccount('${profile.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">délier</button>`;
+  } else {
+    const linkedProfileIds = new Set((LEAGUE_PLAYER_LINKS||[]).map(l=>l.profile_id));
+    const pendingAccounts = ALL_PROFILES.filter(pr=>!linkedProfileIds.has(pr.id));
+    html += `<p class="small">Aucun compte lié — ce remplaçant n'a pas encore accès à sa propre vue.</p>`;
+    if(pendingAccounts.length){
+      html += `
+        <select id="subLinkSelect_${subId}">
+          <option value="">— choisir un compte en attente —</option>
+          ${pendingAccounts.map(pr=>`<option value="${pr.id}">${escapeHTML(pr.display_name||pr.email)} (${escapeHTML(pr.email)})</option>`).join('')}
+        </select>
+        <button class="btn-ghost" onclick="linkSubstituteAccount('${subId}')">lier</button>`;
+    } else {
+      html += `<p class="small">Aucun compte en attente à lier pour l'instant.</p>`;
+    }
+  }
+  return html;
+}
+function openSubstituteDetailModal(subId){
+  const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
+  if(!s) return;
+  showContentModal(escapeHTML(s.name), substituteDetailModalHTML(subId));
+}
+async function linkSubstituteAccount(subId){
+  const select = document.getElementById('subLinkSelect_'+subId);
+  if(!select) return;
+  const profileId = select.value;
+  if(!profileId) return;
+  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, substitute_id: subId });
+  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+  const { error: err2 } = await sb.from('profiles').update({ role: 'substitute' }).eq('id', profileId);
+  if(err2){ showAlert("Erreur lors de la mise à jour du rôle : " + err2.message); return; }
+  await loadAllProfiles();
+  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
+  openSubstituteDetailModal(subId);
 }
 function editSubstituteInPool(id){
   const s = (DATA.substitutePool||[]).find(x=>x.id===id);
@@ -1627,7 +1707,7 @@ function adminAccountsHTML(){
       ${pending.map(pr=>`<tr${pr.role==='admin' ? ' style="background:rgba(207,234,92,0.06);"' : ''}>
         <td>${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
         <td>${escapeHTML(pr.email)}</td>
-        <td>${pr.role==='admin'?'Admin':'Joueur'}<br>${roleButton(pr)}</td>
+        <td>${pr.role==='admin'?'Admin':(pr.role==='substitute'?'Remplaçant':'Joueur')}<br>${roleButton(pr)}</td>
         <td>
           <select id="linkSelect_${pr.id}">
             <option value="">— choisir un joueur —</option>
@@ -1835,9 +1915,9 @@ function groupAbsenceManagementHTML(open, g){
         }).join('')}
         ${(DATA.substitutePool||[]).length ? `<optgroup label="Remplaçants réguliers">
           ${(DATA.substitutePool||[]).map(s=>{
-            const gid = 'guest::' + encodeURIComponent(s.name);
-            if(gid === currentSub) return '';
-            return `<option value="${gid}">${escapeHTML(s.name)}</option>`;
+            const subEncoded = 'sub::' + s.id;
+            const isAvailable = open && (open.availableSubs||[]).includes(s.id);
+            return `<option value="${subEncoded}" ${subEncoded===currentSub?'selected':''}>${escapeHTML(s.name)}${isAvailable ? ' ✓ disponible' : ''}</option>`;
           }).join('')}
         </optgroup>` : ''}
         ${isGuestId(currentSub) ? `<option value="${currentSub}" selected>${escapeHTML(playerName(currentSub))} (invité)</option>` : ''}
@@ -1979,6 +2059,7 @@ function adminSessionHTML(){
       const nameTag = (id)=>{
         if(!id) return '<span class="small">— (position vide)</span>';
         if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(invité)</span>';
+        if(isSubPoolId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(remplaçant)</span>';
         const p = DATA.players.find(x=>x.id===id);
         const isSub = p && p.groupId !== g.id;
         return escapeHTML(p ? p.name : '?') + (isSub ? ' <span class="small">(remplaçant)</span>' : '');
@@ -2922,6 +3003,120 @@ async function updateCurrentLeagueMeta(name, scheduleLabel){
 }
 
 // ---- Player ----
+// ---- Remplaçant (vue dédiée) ----
+function renderSubstitute(subId){
+  const sub = (DATA.substitutePool||[]).find(s=>s.id===subId);
+  if(!sub){
+    app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
+    return;
+  }
+  const tabs = [['dispo','Disponibilité'],['historique','Historique']];
+  const leagueSwitcher = MY_LEAGUE_LINKS.filter(l=>l.substitute_id).length > 1 ? `
+    <div class="card">
+      <label style="display:block;margin-bottom:6px;">Ma ligue</label>
+      <div class="row" style="gap:6px;">
+        ${MY_LEAGUE_LINKS.filter(l=>l.substitute_id).map(l=>{
+          const lg = LEAGUES.find(x=>x.id===l.league_id);
+          const active = l.league_id===CURRENT_LEAGUE_ID;
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" onclick="switchMySubstituteLeague('${l.league_id}')">${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</button>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+  app.innerHTML = `
+    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)')}
+    ${storageBannerHTML()}
+    ${leagueSwitcher}
+    <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setSubstituteTab('${k}')">${l}</div>`).join('')}</div>
+    <div id="tabContent"></div>
+  `;
+  const c = document.getElementById('tabContent');
+  c.innerHTML = VIEW.tab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
+}
+function setSubstituteTab(t){ VIEW.tab=t; render(); }
+async function switchMySubstituteLeague(leagueId){
+  CURRENT_LEAGUE_ID = leagueId;
+  const loaded = await loadData(leagueId);
+  DATA = loaded || defaultData();
+  migrateData();
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
+  SESSION_USER = { role:'substitute', substituteId: link ? link.substitute_id : null };
+  render();
+}
+function substituteAvailabilityHTML(sub){
+  const open = currentOpenSession();
+  if(!open){
+    return `<div class="card"><p class="small">Aucune session en cours pour l'instant. Reviens ici quand une session sera lancée pour indiquer ta disponibilité.</p></div>`;
+  }
+  const available = (open.availableSubs||[]).includes(sub.id);
+  return `<div class="card">
+    <h2>Session du ${open.date}</h2>
+    <p class="small">${available ? "Tu es marqué(e) disponible pour cette session — les administrateurs peuvent te contacter." : "Indique ici si tu es disponible pour dépanner lors de cette session."}</p>
+    <button class="btn ${available?'btn-secondary':'btn-primary'}" onclick="toggleSubAvailability('${sub.id}')">${available ? "Je ne suis plus disponible" : "Je suis disponible pour cette session"}</button>
+  </div>`;
+}
+function toggleSubAvailability(subId){
+  const open = currentOpenSession();
+  if(!open) return;
+  open.availableSubs = open.availableSubs || [];
+  const idx = open.availableSubs.indexOf(subId);
+  if(idx===-1) open.availableSubs.push(subId); else open.availableSubs.splice(idx,1);
+  saveAndRender();
+}
+// Recherche, dans tout l'historique, les sessions où ce remplaçant a
+// effectivement joué (peu importe le groupe), avec le résultat pour chacune.
+function computeSubstituteAppearances(subId){
+  const closed = DATA.sessions.filter(s=>s.status==='closed');
+  const appearances = [];
+  closed.forEach(s=>{
+    (s.groupsData||[]).forEach(gd=>{
+      let wins=0, losses=0, pf=0, played=0;
+      (gd.matches||[]).forEach(m=>{
+        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB==='') return;
+        const inA = (m.teamA||[]).includes(subId), inB = (m.teamB||[]).includes(subId);
+        if(!inA && !inB) return;
+        const sa=Number(m.scoreA), sb=Number(m.scoreB);
+        if(sa===sb) return;
+        played++;
+        const won = inA ? sa>sb : sb>sa;
+        if(won) wins++; else losses++;
+        pf += inA ? sa : sb;
+      });
+      if(played>0){
+        const g = groupById(gd.groupId);
+        appearances.push({ date:s.date, groupName: g?g.name:'(groupe supprimé)', wins, losses, pf, played });
+      }
+    });
+  });
+  return appearances.sort((a,b)=> b.date.localeCompare(a.date));
+}
+function substituteHistoryHTML(sub){
+  const appearances = computeSubstituteAppearances(sub.id);
+  const totalWins = appearances.reduce((s,a)=>s+a.wins,0);
+  const totalLosses = appearances.reduce((s,a)=>s+a.losses,0);
+  const totalGames = totalWins+totalLosses;
+  const winRate = totalGames>0 ? Math.round(totalWins/totalGames*100)+'%' : '—';
+  const groupCounts = {};
+  appearances.forEach(a=>{ groupCounts[a.groupName] = (groupCounts[a.groupName]||0)+1; });
+  const favoriteGroup = Object.keys(groupCounts).sort((a,b)=>groupCounts[b]-groupCounts[a])[0];
+  return `<div class="card">
+    <h3>Tes statistiques comme remplaçant</h3>
+    <table>
+      <tr><td class="small">Sessions dépannées</td><td>${appearances.length}</td></tr>
+      <tr><td class="small">Victoires</td><td>${totalWins}</td></tr>
+      <tr><td class="small">Défaites</td><td>${totalLosses}</td></tr>
+      <tr><td class="small">Taux de victoire</td><td>${winRate}</td></tr>
+      <tr><td class="small">Groupe le plus fréquent</td><td>${favoriteGroup ? escapeHTML(favoriteGroup) : '—'}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Historique des sessions</h3>
+    <table>
+      <tr><th>Date</th><th>Groupe</th><th>V-D</th><th>Points</th></tr>
+      ${appearances.map(a=>`<tr><td>${a.date}</td><td>${escapeHTML(a.groupName)}</td><td>${a.wins}-${a.losses}</td><td>${a.pf}</td></tr>`).join('')}
+      ${appearances.length===0 ? `<tr><td colspan="4" class="empty">Aucune session jouée comme remplaçant pour l'instant</td></tr>` : ''}
+    </table>
+  </div>`;
+}
 function renderPlayer(playerId){
   const me = DATA.players.find(p=>p.id===(playerId || SESSION_USER.playerId));
   if(!me){
@@ -3092,12 +3287,12 @@ function computePlayerFunStats(pid){
         const oppTeam = inA ? m.teamB : m.teamA;
         const won = inA ? sa>sb : sb>sa;
         oppTeam.forEach(oppId=>{
-          if(isGuestId(oppId)) return;
+          if(isGuestOrSubId(oppId)) return;
           if(!headToHead[oppId]) headToHead[oppId] = {wins:0, losses:0};
           if(won) headToHead[oppId].wins++; else headToHead[oppId].losses++;
         });
         myTeam.forEach(partnerId=>{
-          if(partnerId===pid || isGuestId(partnerId)) return;
+          if(partnerId===pid || isGuestOrSubId(partnerId)) return;
           if(!partnerStats[partnerId]) partnerStats[partnerId] = {wins:0, losses:0};
           if(won) partnerStats[partnerId].wins++; else partnerStats[partnerId].losses++;
         });
