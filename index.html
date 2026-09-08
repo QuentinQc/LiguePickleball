@@ -2961,6 +2961,7 @@ function adminSettingsSectionHTML(){
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
   html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
   html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
+  html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
   html += `<div class="card">
     <h3>🔗 Partage</h3>
     <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
@@ -3150,6 +3151,18 @@ function saveTestModeForm(){
   DATA.testMatches4 = Math.max(1, parseInt(document.getElementById('setTestMatches4').value,10) || 2);
   DATA.testMatches5 = Math.max(1, parseInt(document.getElementById('setTestMatches5').value,10) || 3);
   DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
+}
+function openScoreEntryModal(){
+  const html = `
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="setAllowPlayerScoreEntry" ${DATA.allowPlayerScoreEntry ? 'checked' : ''} style="width:auto;">
+      <span class="small">Permettre aux joueurs de saisir eux-mêmes les scores de leurs matchs, directement depuis leur vue « Mon groupe »</span>
+    </label>
+    <p class="small" style="margin-top:8px;">Quand c'est désactivé (par défaut), seuls les administrateurs peuvent entrer les scores dans Session → Résultats. Les joueurs peuvent toujours voir les scores une fois la session publiée, peu importe ce réglage.</p>`;
+  showFormModal('Saisie des scores', html, saveScoreEntryForm);
+}
+function saveScoreEntryForm(){
+  DATA.allowPlayerScoreEntry = document.getElementById('setAllowPlayerScoreEntry').checked;
 }
 function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
@@ -3597,11 +3610,17 @@ function playerGroupHTML(me){
       html += `<div class="card"><p class="small">La session du ${open.date} est en préparation. Tes matchs seront visibles ici une fois qu'un administrateur l'aura publiée.</p></div>`;
     } else if(gd && gd.matches.length){
       html += `<div class="card"><h3>Matchs de la session en cours (${open.date})</h3>`;
-      gd.matches.forEach(m=>{
+      if(DATA.allowPlayerScoreEntry){
+        html += `<p class="small">Tu peux entrer les scores directement ci-dessous.</p>`;
+      }
+      gd.matches.forEach((m,mi)=>{
         const mine = m.teamA.includes(me.id) || m.teamB.includes(me.id);
+        const scoreDisplay = DATA.allowPlayerScoreEntry
+          ? `<input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${me.groupId}','${mi}','A',this.value)"> : <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${me.groupId}','${mi}','B',this.value)">`
+          : `${m.scoreA===null?'—':m.scoreA} : ${m.scoreB===null?'—':m.scoreB}`;
         html += `<div class="match-row ${mine?'me':''}">
           <div class="team">${m.teamA.map(playerName).map(escapeHTML).join(' & ')}</div>
-          <div class="vs">${m.scoreA===null?'—':m.scoreA} : ${m.scoreB===null?'—':m.scoreB}</div>
+          <div class="vs">${scoreDisplay}</div>
           <div class="team" style="text-align:right;">${m.teamB.map(playerName).map(escapeHTML).join(' & ')}</div>
         </div>`;
       });
@@ -3754,6 +3773,7 @@ function migrateData(){
   if(DATA.rules5Matches === undefined) DATA.rules5Matches = 10;
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
+  if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
   if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
   if(DATA.manualMatchupTemplate4 === undefined) DATA.manualMatchupTemplate4 = [];
   if(DATA.manualMatchCount5 === undefined) DATA.manualMatchCount5 = 10;
