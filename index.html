@@ -165,7 +165,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 let DATA = null;
 let SESSION_USER = null; // {role:'admin'|'player'|'pending', playerId?, email?, displayName?}
 let CURRENT_PROFILE = null;
-let ADMIN_VIEWING_AS_PLAYER = false;
+let ADMIN_VIEWING_AS = null; // null | 'player' | 'substitute'
 let VIEW = { tab: null, error: null };
 
 // ---------- multi-ligues ----------
@@ -977,7 +977,8 @@ function storageBannerHTML(){
 function render(){
   if(!SESSION_USER){ renderLogin(); }
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
-  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS_PLAYER && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
+  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'player' && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
+  else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'substitute' && MY_LINK_IN_CURRENT_LEAGUE){ renderSubstitute(MY_LINK_IN_CURRENT_LEAGUE.substitute_id); }
   else if(SESSION_USER.role === 'admin'){ renderAdmin(); }
   else if(SESSION_USER.role === 'substitute'){ renderSubstitute(SESSION_USER.substituteId); }
   else { renderPlayer(SESSION_USER.playerId); }
@@ -1155,7 +1156,7 @@ async function logout(){
   await sb.auth.signOut();
   SESSION_USER = null;
   CURRENT_PROFILE = null;
-  ADMIN_VIEWING_AS_PLAYER = false;
+  ADMIN_VIEWING_AS = null;
   LEAGUES = [];
   CURRENT_LEAGUE_ID = null;
   MY_LEAGUE_LINKS = [];
@@ -1181,10 +1182,12 @@ function renderAdmin(){
   }
   const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
-  const modeSwitch = canViewAsPlayer ? `
+  const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
+  const modeSwitch = (canViewAsPlayer || canViewAsSub) ? `
     <div class="mode-switch">
       <button class="active" disabled>Admin</button>
-      <button onclick="toggleAdminPlayerView()">Joueur</button>
+      ${canViewAsPlayer ? `<button onclick="toggleAdminPlayerView()">Joueur</button>` : ''}
+      ${canViewAsSub ? `<button onclick="toggleAdminSubView()">Remplaçant</button>` : ''}
     </div>` : '';
   const leagueSwitcher = `
     <div class="card">
@@ -1252,10 +1255,42 @@ function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 // Onglet « Joueurs » unifié : sous-onglets Tous les joueurs et Remplaçants.
 function adminPlayersSectionHTML(){
   const sub = VIEW.playersSubTab || 'tous';
-  const subTabs = [['tous','Réguliers'],['remplacants','Remplaçants']];
+  const subTabs = [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants']];
   let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
-  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : adminPlayersHTML();
+  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : adminAllPeopleHTML());
   return html;
+}
+// Vue combinée en lecture seule : réguliers et remplaçants ensemble, avec
+// leur type, pour un coup d'œil rapide sur tout le monde.
+function adminAllPeopleHTML(){
+  const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.player_id).map(l=>l.player_id));
+  const linkedSubIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.substitute_id).map(l=>l.substitute_id));
+  const regulars = DATA.players.map(p=>({
+    id: p.id, name: p.name, type: 'regulier',
+    group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
+    linked: linkedPlayerIds.has(p.id), openModal: `openPlayerDetailModal('${p.id}')`
+  }));
+  const subs = (DATA.substitutePool||[]).map(s=>({
+    id: s.id, name: s.name, type: 'remplacant',
+    group: null, rating: null,
+    linked: linkedSubIds.has(s.id), openModal: `openSubstituteDetailModal('${s.id}')`
+  }));
+  const all = regulars.concat(subs).sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  return `<div class="card">
+    <h2>Tous <span class="small">(${all.length})</span></h2>
+    <p class="small">Réguliers et remplaçants ensemble — clique pour ouvrir la gestion de chacun.</p>
+    <table>
+      <tr><th>Nom</th><th>Type</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
+      ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
+        <td>${escapeHTML(x.name)}</td>
+        <td>${x.type==='regulier' ? '<span class="tag tag-stay">Régulier</span>' : '<span class="tag tag-up">Remplaçant</span>'}</td>
+        <td>${x.group ? escapeHTML(x.group.name) : '—'}</td>
+        <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
+        <td>${x.linked ? '✅' : '—'}</td>
+      </tr>`).join('')}
+      ${all.length===0 ? `<tr><td colspan="5" class="empty">Personne pour l'instant</td></tr>` : ''}
+    </table>
+  </div>`;
 }
 function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
 function setAdminTab(t){
@@ -1824,7 +1859,7 @@ async function unlinkAccount(profileId){
     const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
     if(error){ showAlert("Erreur : " + error.message); return; }
     await loadAllProfiles();
-    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS_PLAYER = false; await refreshMyOwnLinks(); }
+    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
     render();
   });
 }
@@ -3011,6 +3046,11 @@ function renderSubstitute(subId){
     return;
   }
   const tabs = [['dispo','Disponibilité'],['historique','Historique']];
+  const modeSwitch = SESSION_USER.role === 'admin' ? `
+    <div class="mode-switch">
+      <button onclick="toggleAdminSubView()">Admin</button>
+      <button class="active" disabled>Remplaçant</button>
+    </div>` : '';
   const leagueSwitcher = MY_LEAGUE_LINKS.filter(l=>l.substitute_id).length > 1 ? `
     <div class="card">
       <label style="display:block;margin-bottom:6px;">Ma ligue</label>
@@ -3023,7 +3063,7 @@ function renderSubstitute(subId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)')}
+    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', modeSwitch)}
     ${storageBannerHTML()}
     ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setSubstituteTab('${k}')">${l}</div>`).join('')}</div>
@@ -3121,7 +3161,7 @@ function renderPlayer(playerId){
   const me = DATA.players.find(p=>p.id===(playerId || SESSION_USER.playerId));
   if(!me){
     // Le joueur lié n'existe plus (supprimé) : on revient à la vue admin si possible.
-    if(SESSION_USER.role === 'admin'){ ADMIN_VIEWING_AS_PLAYER = false; renderAdmin(); return; }
+    if(SESSION_USER.role === 'admin'){ ADMIN_VIEWING_AS = null; renderAdmin(); return; }
     app.innerHTML = `${topbarHTML()}<div class="card"><p class="small">Ton profil de joueur est introuvable. Contacte un administrateur.</p></div>`;
     return;
   }
@@ -3152,7 +3192,8 @@ function renderPlayer(playerId){
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : playerGroupHTML(me));
 }
-function toggleAdminPlayerView(){ ADMIN_VIEWING_AS_PLAYER = !ADMIN_VIEWING_AS_PLAYER; VIEW = { tab: ADMIN_VIEWING_AS_PLAYER ? 'classement' : 'groupes' }; render(); }
+function toggleAdminPlayerView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'player' ? null : 'player'; VIEW = { tab: ADMIN_VIEWING_AS ? 'classement' : 'groupes' }; render(); }
+function toggleAdminSubView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'substitute' ? null : 'substitute'; VIEW = { tab: ADMIN_VIEWING_AS ? 'dispo' : 'groupes' }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGuideHTML(){
   return `
