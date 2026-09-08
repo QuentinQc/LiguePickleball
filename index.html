@@ -2608,141 +2608,217 @@ function groupAbove(gid){
 }
 
 // Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
+// ============ Réglages : écran principal (liste de cartes -> pop-ups) ============
+function settingsRow(icon, title, summary, onClickFn){
+  return `<div class="card clickable-row" onclick="${onClickFn}">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:600;">${icon} ${escapeHTML(title)}</div>
+        <div class="small">${escapeHTML(summary)}</div>
+      </div>
+      <span class="small">›</span>
+    </div>
+  </div>`;
+}
 function adminSettingsSectionHTML(){
-  const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','Paramètres de ligue'],['test','Mode test'],['partage','Partage'],['sauvegarde','Sauvegarde']];
-  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab('${k}')">${l}</div>`).join('')}</div>`;
-  if(sub==='test') html += settingsTestModeHTML();
-  else if(sub==='partage') html += settingsShareHTML();
-  else if(sub==='sauvegarde') html += settingsBackupHTML();
-  else html += settingsLeagueHTML();
+  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
+  const matchupSummary = DATA.matchupMode==='manual'
+    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
+    : 'Automatique — génération et rotation par l\'app';
+  let html = '';
+  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · échange de ${DATA.swapCount||1}`, "openGeneralInfoModal()");
+  html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
+  html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
+  html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
+  html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
+  html += `<div class="card">
+    <h3>🔗 Partage</h3>
+    <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
+    <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
+  </div>`;
+  html += `<div class="card">
+    <h3>💾 Sauvegarde</h3>
+    <p class="small">Filet de sécurité manuel, en plus de la sauvegarde automatique en ligne.</p>
+    <div class="row">
+      <button class="btn btn-secondary" onclick="exportData()">Exporter les données</button>
+      <button class="btn btn-secondary" onclick="triggerImport()">Importer une sauvegarde</button>
+      <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
+    </div>
+  </div>`;
+  html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
   return html;
 }
-function setSettingsSubTab(t){ VIEW.settingsSubTab = t; render(); }
 
-// Éditeur du modèle de rotation manuel : une ligne par match, 4 menus de
-// numéros de position (1, 2, 3...) à choisir pour chaque équipe.
-function manualTemplateEditorHTML(sizeLabel, prefix, maxPos, countKey, templateKey){
-  const count = Math.max(1, DATA[countKey] || (maxPos===4?6:10));
-  const template = DATA[templateKey] || [];
+// ---- Pop-up : Informations générales ----
+function openGeneralInfoModal(){
+  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  const html = `
+    <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
+    <div class="field"><label>Jour et heure (étiquette affichée dans le sélecteur de ligue, ex: « Lundi 19h »)</label><input id="setLeagueSchedule" placeholder="ex: Lundi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
+    <div class="field">
+      <label>Jour de jeu habituel (pour la date suggérée automatiquement)</label>
+      <select id="setPlayDay">
+        <option value="">— non défini (date du jour par défaut) —</option>
+        ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>`;
+  showFormModal('Informations générales', html, saveGeneralInfoForm);
+}
+function saveGeneralInfoForm(){
+  DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
+  const dayVal = document.getElementById('setPlayDay').value;
+  DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
+  DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
+  const scheduleLabel = document.getElementById('setLeagueSchedule').value.trim();
+  updateCurrentLeagueMeta(DATA.leagueName, scheduleLabel);
+}
+
+// ---- Pop-up : Taille des groupes ----
+function openGroupSizeModal(){
+  const html = `
+    <div class="row">
+      <div class="field" style="flex:1;min-width:140px;"><label>Minimum de joueurs par groupe</label><input id="setGroupMin" type="number" min="1" value="${DATA.groupMinPlayers || 4}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input id="setGroupMax" type="number" min="1" value="${DATA.groupMaxPlayers || 5}"></div>
+    </div>
+    <p class="small">Contrôle l'avertissement de déséquilibre et la limite appliquée à l'ajout/déplacement de joueurs.</p>`;
+  showFormModal('Taille des groupes', html, saveGroupSizeForm);
+}
+function saveGroupSizeForm(){
+  DATA.groupMinPlayers = Math.max(1, parseInt(document.getElementById('setGroupMin').value,10) || 4);
+  DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(document.getElementById('setGroupMax').value,10) || 5);
+}
+
+// ---- Pop-up : Génération des matchs (auto/manuel), avec accès aux modèles ----
+let SETTINGS_MATCHUP_PREVIEW = 'auto';
+function openMatchupSettingsModal(){
+  SETTINGS_MATCHUP_PREVIEW = DATA.matchupMode === 'manual' ? 'manual' : 'auto';
+  showFormModal('Génération des matchs', matchupSettingsFormHTML, saveMatchupSettingsForm);
+}
+function matchupSettingsFormHTML(){
+  const mode = SETTINGS_MATCHUP_PREVIEW;
+  return `
+    <div class="field">
+      <label>Composition des équipes</label>
+      <select id="setMatchupMode" onchange="SETTINGS_MATCHUP_PREVIEW=this.value;render();">
+        <option value="auto" ${mode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
+        <option value="manual" ${mode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
+      </select>
+    </div>
+    ${mode==='manual' ? `
+    <p class="small">Un modèle séparé pour les groupes de 4 et de 5 joueurs, basé sur les numéros de position (# dans l'onglet Groupes). Appliqué automatiquement à chaque session.</p>
+    <div class="row">
+      <button class="btn-ghost" onclick="closeModal();openTemplateModal(4)">Modifier le modèle — groupes de 4</button>
+      <button class="btn-ghost" onclick="closeModal();openTemplateModal(5)">Modifier le modèle — groupes de 5</button>
+    </div>` : `<p class="small">Enregistre pour appliquer ce choix, puis reviens ici pour configurer un modèle si tu passes en manuel.</p>`}`;
+}
+function saveMatchupSettingsForm(){
+  DATA.matchupMode = SETTINGS_MATCHUP_PREVIEW === 'manual' ? 'manual' : 'auto';
+}
+
+// ---- Pop-up : modèle de rotation par position (un par taille de groupe) ----
+let TEMPLATE_MODAL_STATE = null;
+function openTemplateModal(size){
+  const countKey = size===4 ? 'manualMatchCount4' : 'manualMatchCount5';
+  const templateKey = size===4 ? 'manualMatchupTemplate4' : 'manualMatchupTemplate5';
+  const count = Math.max(1, DATA[countKey] || (size===4?6:10));
+  const saved = DATA[templateKey] || [];
+  const rows = Array.from({ length: count }, (_,i)=> saved[i] ? { teamA:(saved[i].teamA||[]).slice(), teamB:(saved[i].teamB||[]).slice() } : { teamA:[], teamB:[] });
+  TEMPLATE_MODAL_STATE = { size, count, rows };
+  showFormModal(`Modèle de rotation — groupes de ${size}`, templateModalFormHTML, saveTemplateModalForm);
+}
+function templateModalFormHTML(){
+  const st = TEMPLATE_MODAL_STATE;
   const posOptions = (current)=>{
     let opts = '<option value="">—</option>';
-    for(let i=1;i<=maxPos;i++){ opts += `<option value="${i}" ${current===i?'selected':''}>${i}</option>`; }
+    for(let i=1;i<=st.size;i++){ opts += `<option value="${i}" ${current===i?'selected':''}>${i}</option>`; }
     return opts;
   };
-  let rows = '';
-  for(let i=0;i<count;i++){
-    const t = template[i] || { teamA:[], teamB:[] };
-    rows += `<div class="row" style="align-items:center;margin-bottom:6px;flex-wrap:nowrap;">
+  const rowsHtml = st.rows.map((r,i)=>`
+    <div class="row" style="align-items:center;margin-bottom:6px;flex-wrap:nowrap;">
       <span class="small" style="min-width:64px;">Match ${i+1}</span>
-      <select id="${prefix}A1_${i}">${posOptions(t.teamA[0])}</select>
-      <select id="${prefix}A2_${i}">${posOptions(t.teamA[1])}</select>
+      <select onchange="updateTemplateSlot(${i},'A',0,this.value)">${posOptions(r.teamA[0])}</select>
+      <select onchange="updateTemplateSlot(${i},'A',1,this.value)">${posOptions(r.teamA[1])}</select>
       <span class="vs">VS</span>
-      <select id="${prefix}B1_${i}">${posOptions(t.teamB[0])}</select>
-      <select id="${prefix}B2_${i}">${posOptions(t.teamB[1])}</select>
-    </div>`;
-  }
-  return `<h4 style="margin:14px 0 6px;">${sizeLabel}</h4>
-    <div class="field" style="max-width:260px;"><label>Nombre de matchs dans ce modèle</label><input id="${prefix}Count" type="number" min="1" value="${count}"></div>
-    ${rows}`;
-}
-function settingsLeagueHTML(){
-  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const previewMode = VIEW.matchupModePreview !== undefined ? VIEW.matchupModePreview : (DATA.matchupMode || 'auto');
+      <select onchange="updateTemplateSlot(${i},'B',0,this.value)">${posOptions(r.teamB[0])}</select>
+      <select onchange="updateTemplateSlot(${i},'B',1,this.value)">${posOptions(r.teamB[1])}</select>
+    </div>`).join('');
   return `
-    <div class="card">
-      <h3>Informations générales</h3>
-      <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
-      <div class="field"><label>Jour et heure (étiquette affichée dans le sélecteur de ligue, ex: « Lundi 19h »)</label><input id="setLeagueSchedule" placeholder="ex: Lundi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
-      <div class="field">
-        <label>Jour de jeu habituel de la ligue (pour la date suggérée automatiquement)</label>
-        <select id="setPlayDay">
-          <option value="">— non défini (date du jour par défaut) —</option>
-          ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
-        </select>
-        <p class="small" style="margin-top:4px;">Utilisé pour suggérer automatiquement la bonne date au démarrage d'une session.</p>
-      </div>
-      <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>
+    <div class="field" style="max-width:220px;">
+      <label>Nombre de matchs</label>
+      <input type="number" min="1" value="${st.count}" onchange="updateTemplateCount(this.value)">
     </div>
-    <div class="card">
-      <h3>Taille des groupes</h3>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Minimum de joueurs par groupe</label><input id="setGroupMin" type="number" min="1" value="${DATA.groupMinPlayers || 4}"></div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input id="setGroupMax" type="number" min="1" value="${DATA.groupMaxPlayers || 5}"></div>
-      </div>
-      <p class="small">Contrôle l'avertissement de déséquilibre et la limite appliquée à l'ajout/déplacement de joueurs.</p>
-    </div>
-    <div class="card">
-      <h3>Génération des matchs</h3>
-      <div class="field">
-        <label>Composition des équipes</label>
-        <select id="setMatchupMode" onchange="onMatchupModePreview(this.value)">
-          <option value="auto" ${previewMode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
-          <option value="manual" ${previewMode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
-        </select>
-      </div>
-      ${previewMode==='manual' ? `
-      <p class="small">Définis ici un modèle réutilisable en indiquant les <strong>numéros de position</strong> (# dans l'onglet Groupes) qui s'affrontent — ex : Match 1 : position 1 et 2 contre position 3 et 4. Un modèle séparé pour les groupes de 4 et de 5, appliqué automatiquement à chaque session (chaque groupe garde ses propres joueurs à ses positions).</p>
-      <p class="small" style="color:var(--paddle);">Si tu changes le nombre de matchs d'un modèle, clique « Enregistrer » une première fois pour faire apparaître les bonnes lignes, avant de les remplir.</p>
-      ${manualTemplateEditorHTML('Modèle pour les groupes de 4 joueurs', 'tpl4', 4, 'manualMatchCount4', 'manualMatchupTemplate4')}
-      ${manualTemplateEditorHTML('Modèle pour les groupes de 5 joueurs', 'tpl5', 5, 'manualMatchCount5', 'manualMatchupTemplate5')}
-      ` : `<p class="small">En mode automatique, les matchs et rotations sont générés par l'app selon les réglages ci-dessous.</p>`}
-    </div>
-    <div class="card">
-      <h3>Format des matchs</h3>
-      <p class="small">Nombre de matchs et de points selon le nombre de joueurs réellement actifs pour une session (s'ajuste automatiquement, ex. lors d'une absence). S'applique uniquement en mode automatique.</p>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 4</label><input id="setRules4Matches" type="number" min="1" value="${DATA.rules4Matches || 6}"></div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 4</label><input id="setRules4Points" type="number" min="1" value="${DATA.rules4Points || 11}"></div>
-      </div>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 5</label><input id="setRules5Matches" type="number" min="1" value="${DATA.rules5Matches || 10}"></div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
-      </div>
-      <p class="small">Pour une taille de groupe différente de 4 ou 5, les matchs sont générés de façon plus simple (paires successives) plutôt qu'avec une rotation optimisée — ces deux tailles sont les seules pour lesquelles l'algorithme garantit que chacun joue avec/contre tout le monde équitablement.</p>
-    </div>
-    <div class="card">
-      <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
-      <div class="row" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-        <button class="btn-ghost" onclick="onCreateLeague()">+ Créer une nouvelle ligue</button>
-      </div>
-    </div>`;
+    <div style="margin-top:10px;">${rowsHtml}</div>`;
 }
-function settingsTestModeHTML(){
-  return `
-    <div class="card">
-      <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="setTestMode" ${DATA.testMode ? 'checked' : ''} style="width:auto;">
-        <span class="small">Mode test — remplacer la règle standard par un nombre réduit de matchs, pour essayer l'app ou faire une démonstration rapidement</span>
-      </label>
-      <p class="small" style="margin-top:8px;">La règle 4 joueurs / 5 joueurs reste respectée même en mode test — utile pour démontrer la différence, mais avec des nombres réduits.</p>
-      <div class="row" style="margin-top:6px;">
-        <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 4 (test)</label><input id="setTestMatches4" type="number" min="1" value="${DATA.testMatches4 || 2}"></div>
-        <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 5 (test)</label><input id="setTestMatches5" type="number" min="1" value="${DATA.testMatches5 || 3}"></div>
-      </div>
-      <div class="field"><label>Matchs pour une taille de groupe atypique (test)</label><input id="setMatchesPerSession" type="number" min="1" value="${DATA.matchesPerSession || 3}"></div>
-      <button class="btn btn-primary" onclick="saveSettings()">Enregistrer</button>
-    </div>`;
+function updateTemplateSlot(rowIdx, team, slotIdx, value){
+  const st = TEMPLATE_MODAL_STATE;
+  if(!st) return;
+  const arr = team==='A' ? st.rows[rowIdx].teamA : st.rows[rowIdx].teamB;
+  arr[slotIdx] = value ? Number(value) : undefined;
+  render();
 }
-function settingsShareHTML(){
-  return `
-    <div class="card">
-      <h3>Partager l'application</h3>
-      <p class="small">Copie le lien de l'app pour l'envoyer directement par texto, Messenger, courriel, etc.</p>
-      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
-    </div>`;
+function updateTemplateCount(value){
+  const st = TEMPLATE_MODAL_STATE;
+  if(!st) return;
+  const count = Math.max(1, parseInt(value,10) || st.count);
+  if(count > st.rows.length){ while(st.rows.length < count) st.rows.push({ teamA:[], teamB:[] }); }
+  else { st.rows.length = count; }
+  st.count = count;
+  render();
 }
-function settingsBackupHTML(){
-  return `
-    <div class="card">
-      <h3>Sauvegarde manuelle</h3>
-      <p class="small">Les données sont normalement sauvegardées automatiquement dans la base de données en ligne. Ces boutons servent de filet de sécurité en cas de problème de connexion : exporte un fichier de sauvegarde de temps en temps, et réimporte-le si jamais des données étaient perdues.</p>
-      <div class="row">
-        <button class="btn btn-secondary" onclick="exportData()">Exporter les données (télécharger)</button>
-        <button class="btn btn-secondary" onclick="triggerImport()">Importer une sauvegarde</button>
-        <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
-      </div>
-    </div>`;
+function saveTemplateModalForm(){
+  const st = TEMPLATE_MODAL_STATE;
+  if(!st) return;
+  const countKey = st.size===4 ? 'manualMatchCount4' : 'manualMatchCount5';
+  const templateKey = st.size===4 ? 'manualMatchupTemplate4' : 'manualMatchupTemplate5';
+  DATA[countKey] = st.count;
+  DATA[templateKey] = st.rows.map(r=>({ teamA:(r.teamA||[]).filter(x=>x), teamB:(r.teamB||[]).filter(x=>x) }));
+  TEMPLATE_MODAL_STATE = null;
+}
+
+// ---- Pop-up : Format des matchs (automatique) ----
+function openMatchFormatModal(){
+  const html = `
+    <p class="small">Nombre de matchs et de points selon le nombre de joueurs réellement actifs pour une session (s'ajuste automatiquement, ex. lors d'une absence). S'applique uniquement en mode automatique.</p>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 4</label><input id="setRules4Matches" type="number" min="1" value="${DATA.rules4Matches || 6}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 4</label><input id="setRules4Points" type="number" min="1" value="${DATA.rules4Points || 11}"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 5</label><input id="setRules5Matches" type="number" min="1" value="${DATA.rules5Matches || 10}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
+    </div>
+    <p class="small">Pour une taille de groupe différente de 4 ou 5, les matchs sont générés de façon plus simple (paires successives) plutôt qu'avec une rotation optimisée.</p>`;
+  showFormModal('Format des matchs', html, saveMatchFormatForm);
+}
+function saveMatchFormatForm(){
+  DATA.rules4Matches = Math.max(1, parseInt(document.getElementById('setRules4Matches').value,10) || 6);
+  DATA.rules4Points = Math.max(1, parseInt(document.getElementById('setRules4Points').value,10) || 11);
+  DATA.rules5Matches = Math.max(1, parseInt(document.getElementById('setRules5Matches').value,10) || 10);
+  DATA.rules5Points = Math.max(1, parseInt(document.getElementById('setRules5Points').value,10) || 9);
+}
+
+// ---- Pop-up : Mode test ----
+function openTestModeModal(){
+  const html = `
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="setTestMode" ${DATA.testMode ? 'checked' : ''} style="width:auto;">
+      <span class="small">Mode test — remplacer la règle standard par un nombre réduit de matchs, pour essayer l'app ou faire une démonstration rapidement</span>
+    </label>
+    <p class="small" style="margin-top:8px;">La règle 4 joueurs / 5 joueurs reste respectée même en mode test — utile pour démontrer la différence, mais avec des nombres réduits.</p>
+    <div class="row" style="margin-top:6px;">
+      <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 4 (test)</label><input id="setTestMatches4" type="number" min="1" value="${DATA.testMatches4 || 2}"></div>
+      <div class="field" style="flex:1;min-width:160px;"><label>Matchs pour un groupe de 5 (test)</label><input id="setTestMatches5" type="number" min="1" value="${DATA.testMatches5 || 3}"></div>
+    </div>
+    <div class="field"><label>Matchs pour une taille de groupe atypique (test)</label><input id="setMatchesPerSession" type="number" min="1" value="${DATA.matchesPerSession || 3}"></div>`;
+  showFormModal('Mode test', html, saveTestModeForm);
+}
+function saveTestModeForm(){
+  DATA.testMode = document.getElementById('setTestMode').checked;
+  DATA.testMatches4 = Math.max(1, parseInt(document.getElementById('setTestMatches4').value,10) || 2);
+  DATA.testMatches5 = Math.max(1, parseInt(document.getElementById('setTestMatches5').value,10) || 3);
+  DATA.matchesPerSession = Math.max(1, parseInt(document.getElementById('setMatchesPerSession').value,10) || 3);
 }
 function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
@@ -2788,48 +2864,6 @@ function copyAppLink(){
   } else {
     fallback();
   }
-}
-function onMatchupModePreview(v){
-  VIEW.matchupModePreview = v;
-  render();
-}
-function saveSettings(){
-  const byId = (id)=> document.getElementById(id);
-  if(byId('setLeagueName')) DATA.leagueName = byId('setLeagueName').value.trim() || DATA.leagueName;
-  if(byId('setPlayDay')){ const dayVal = byId('setPlayDay').value; DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10); }
-  if(byId('setSwap')) DATA.swapCount = Math.max(1, parseInt(byId('setSwap').value,10) || 1);
-  if(byId('setGroupMin')) DATA.groupMinPlayers = Math.max(1, parseInt(byId('setGroupMin').value,10) || 4);
-  if(byId('setGroupMax')) DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(byId('setGroupMax').value,10) || 5);
-  if(byId('setMatchupMode')) DATA.matchupMode = byId('setMatchupMode').value === 'manual' ? 'manual' : 'auto';
-  delete VIEW.matchupModePreview; // on repart de la valeur enregistrée au prochain affichage
-  const saveTemplate = (prefix, countKey, templateKey, defaultCount)=>{
-    const countEl = byId(prefix+'Count');
-    if(!countEl) return;
-    const count = Math.max(1, parseInt(countEl.value,10) || defaultCount);
-    DATA[countKey] = count;
-    const template = [];
-    for(let i=0;i<count;i++){
-      const a1 = byId(prefix+'A1_'+i), a2 = byId(prefix+'A2_'+i), b1 = byId(prefix+'B1_'+i), b2 = byId(prefix+'B2_'+i);
-      if(!a1) break; // le nombre de matchs vient d'augmenter : ces lignes n'existent pas encore à l'écran
-      template.push({ teamA: [a1.value,a2.value].filter(Boolean).map(Number), teamB: [b1.value,b2.value].filter(Boolean).map(Number) });
-    }
-    if(template.length === count) DATA[templateKey] = template;
-  };
-  saveTemplate('tpl4', 'manualMatchCount4', 'manualMatchupTemplate4', 6);
-  saveTemplate('tpl5', 'manualMatchCount5', 'manualMatchupTemplate5', 10);
-  if(byId('setRules4Matches')) DATA.rules4Matches = Math.max(1, parseInt(byId('setRules4Matches').value,10) || 6);
-  if(byId('setRules4Points')) DATA.rules4Points = Math.max(1, parseInt(byId('setRules4Points').value,10) || 11);
-  if(byId('setRules5Matches')) DATA.rules5Matches = Math.max(1, parseInt(byId('setRules5Matches').value,10) || 10);
-  if(byId('setRules5Points')) DATA.rules5Points = Math.max(1, parseInt(byId('setRules5Points').value,10) || 9);
-  if(byId('setTestMode')) DATA.testMode = byId('setTestMode').checked;
-  if(byId('setTestMatches4')) DATA.testMatches4 = Math.max(1, parseInt(byId('setTestMatches4').value,10) || 2);
-  if(byId('setTestMatches5')) DATA.testMatches5 = Math.max(1, parseInt(byId('setTestMatches5').value,10) || 3);
-  if(byId('setMatchesPerSession')) DATA.matchesPerSession = Math.max(1, parseInt(byId('setMatchesPerSession').value,10) || 3);
-  if(byId('setLeagueSchedule')){
-    const scheduleLabel = byId('setLeagueSchedule').value.trim();
-    updateCurrentLeagueMeta(DATA.leagueName, scheduleLabel);
-  }
-  saveAndRender();
 }
 // Garde le nom/l'étiquette jour-heure de la ligue (table leagues, utilisés
 // dans les boutons de sélection) synchronisés avec les réglages.
@@ -3143,6 +3177,17 @@ function showAlert(message){ MODAL = { kind:'alert', message }; render(); }
 function showPrompt(message, defaultValue, onConfirm){ MODAL = { kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }; render(); }
 function showChoice(message, choices, onConfirm){ MODAL = { kind:'choice', message, choices, onConfirm }; render(); }
 function showContentModal(title, htmlContent){ MODAL = { kind:'content', title, htmlContent }; render(); }
+// Pop-up formulaire réutilisable : affiche du HTML (avec des champs), un
+// bouton Enregistrer qui appelle onSave() (qui lit les champs elle-même,
+// pendant que le pop-up est encore ouvert), puis referme et rafraîchit.
+function showFormModal(title, htmlContent, onSave){ MODAL = { kind:'form', title, htmlContent, onSave }; render(); }
+function modalFormSaveClick(){
+  if(!MODAL || !MODAL.onSave) return;
+  const cb = MODAL.onSave;
+  cb();
+  MODAL = null;
+  saveAndRender();
+}
 function closeModal(){ MODAL = null; render(); }
 function modalConfirmClick(){
   if(!MODAL) return;
@@ -3163,14 +3208,19 @@ function modalChoiceClick(idx){
 function modalHTML(){
   if(!MODAL) return '';
   const overlay = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-  if(MODAL.kind === 'content'){
+  if(MODAL.kind === 'content' || MODAL.kind === 'form'){
     const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.15);';
+    const bodyHtml = typeof MODAL.htmlContent === 'function' ? MODAL.htmlContent() : MODAL.htmlContent;
     const inner = `
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
         <h3 style="margin:0;">${escapeHTML(MODAL.title)}</h3>
         <button class="btn-ghost" onclick="closeModal()">✕ fermer</button>
       </div>
-      ${MODAL.htmlContent}`;
+      ${bodyHtml}
+      ${MODAL.kind==='form' ? `<div class="row" style="justify-content:flex-end;margin-top:14px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="modalFormSaveClick()">Enregistrer</button>
+      </div>` : ''}`;
     return `<div style="${overlay}"><div style="${box}">${inner}</div></div>`;
   }
   const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:380px;width:100%;border:1px solid rgba(255,255,255,0.15);';
