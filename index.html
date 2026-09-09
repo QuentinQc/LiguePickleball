@@ -234,7 +234,7 @@ async function toggleSuperAdminOrgView(){
   render();
 }
 async function loadLeagues(){
-  const { data, error } = await sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
+  const { data, error } = await sb.from('leagues').select('*, organizations(name)').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
   LEAGUES = error ? [] : (data || []);
 }
 // Ligues de l'organisation actuellement sélectionnée (vue admin uniquement) —
@@ -3647,14 +3647,19 @@ function renderSubstitute(subId){
       <button onclick="toggleAdminSubView()">Admin</button>
       <button class="active" disabled>Remplaçant</button>
     </div>` : '';
-  const leagueSwitcher = MY_LEAGUE_LINKS.filter(l=>l.substitute_id).length > 1 ? `
+  const subLinks = MY_LEAGUE_LINKS.filter(l=>l.substitute_id);
+  const subOrgCount = new Set(subLinks.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
+  const leagueSwitcher = subLinks.length > 1 ? `
     <div class="card">
       <label style="display:block;margin-bottom:6px;">Ma ligue</label>
       <div class="row" style="gap:6px;">
-        ${MY_LEAGUE_LINKS.filter(l=>l.substitute_id).map(l=>{
+        ${subLinks.map(l=>{
           const lg = LEAGUES.find(x=>x.id===l.league_id);
           const active = l.league_id===CURRENT_LEAGUE_ID;
-          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" onclick="switchMySubstituteLeague('${l.league_id}')">${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</button>`;
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMySubstituteLeague('${l.league_id}')">
+            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</span>
+            ${subOrgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
+          </button>`;
         }).join('')}
       </div>
     </div>` : '';
@@ -3767,6 +3772,7 @@ function renderPlayer(playerId){
       <button onclick="toggleAdminPlayerView()">Admin</button>
       <button class="active" disabled>Joueur</button>
     </div>` : '';
+  const myOrgCount = new Set(MY_LEAGUE_LINKS.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
   const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
     <div class="card">
       <label style="display:block;margin-bottom:6px;">Ma ligue</label>
@@ -3774,7 +3780,10 @@ function renderPlayer(playerId){
         ${MY_LEAGUE_LINKS.map(l=>{
           const lg = LEAGUES.find(x=>x.id===l.league_id);
           const active = l.league_id===CURRENT_LEAGUE_ID;
-          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" onclick="switchMyLeague('${l.league_id}')">${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</button>`;
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMyLeague('${l.league_id}')">
+            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</span>
+            ${myOrgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
+          </button>`;
         }).join('')}
       </div>
     </div>` : '';
