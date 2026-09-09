@@ -173,6 +173,10 @@ let DATA = null;
 let SESSION_USER = null; // {role:'admin'|'player'|'pending', playerId?, email?, displayName?}
 let CURRENT_PROFILE = null;
 let ADMIN_VIEWING_AS = null; // null | 'player' | 'substitute'
+// Si le lien contient ?org=<id>, ce compte s'inscrit pour rejoindre cette
+// organisation précise (voir Réglages → lien d'inscription d'organisation).
+const SIGNUP_ORG_ID = new URLSearchParams(window.location.search).get('org') || null;
+let SIGNUP_ORG_NAME = null;
 let VIEW = { tab: null, error: null };
 
 // ---------- multi-ligues ----------
@@ -1063,6 +1067,7 @@ function renderLogin(){
         <button class="btn btn-primary" onclick="onResetPassword()">Envoyer le lien</button>
         <p class="small"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← Retour à la connexion</a></p>
       ` : mode==='signup' ? `
+        ${SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Tu t'inscris pour rejoindre : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong></p>` : (SIGNUP_ORG_ID ? `<p class="small" style="color:var(--danger);">Ce lien d'inscription ne correspond à aucune organisation valide.</p>` : '')}
         <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" placeholder="Prénom Nom"></div>
         <div class="field"><label>Courriel</label><input id="signupEmail" type="email" placeholder="toi@exemple.com"></div>
         <div class="field"><label>Mot de passe</label><input id="signupPassword" type="password" placeholder="6 caractères minimum"></div>
@@ -1088,7 +1093,7 @@ async function onSignUp(){
   if(!name){ VIEW.error='Entre ton nom.'; render(); return; }
   if(!email || !password){ VIEW.error='Courriel et mot de passe requis.'; render(); return; }
   VIEW.error=null; VIEW.info='Création du compte…'; render();
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name } } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined } } });
   if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
   VIEW.info = "Compte créé ! Vérifie tes courriels pour confirmer ton adresse, puis connecte-toi. Un administrateur devra ensuite associer ton compte à ton profil de joueur.";
   VIEW.loginMode = 'signin';
@@ -1178,14 +1183,32 @@ async function loadMyLeagueLinks(profileId){
   MY_LEAGUE_LINKS = error ? [] : (data || []);
 }
 function renderPending(){
+  const canCreateOrg = CURRENT_PROFILE && !CURRENT_PROFILE.organization_id;
   app.innerHTML = `
     ${topbarHTML('Compte en attente')}
     ${storageBannerHTML()}
     <div class="card">
       <h2>Compte créé ✅</h2>
-      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à un joueur de la ligue. Un administrateur doit faire ce lien dans l'onglet « Comptes ». Reviens un peu plus tard, ou contacte ton administrateur.</p>
+      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à un joueur de la ligue. Un administrateur doit faire ce lien dans l'onglet « Joueurs ». Reviens un peu plus tard, ou contacte ton administrateur.</p>
       <button class="btn btn-secondary" onclick="logout()">Déconnexion</button>
-    </div>`;
+    </div>
+    ${canCreateOrg ? `
+    <div class="card">
+      <h3>Tu démarres ta propre ligue ?</h3>
+      <p class="small">Si tu n'attends pas d'invitation d'un administrateur existant, tu peux créer ta propre organisation et devenir administrateur de tes propres ligues.</p>
+      <button class="btn btn-primary" onclick="onCreateMyOwnOrganization()">Créer mon organisation</button>
+    </div>` : ''}`;
+}
+async function onCreateMyOwnOrganization(){
+  showPrompt("Nom de ton organisation (ex: ton nom, ton club) :", '', async (name)=>{
+    if(!name || !name.trim()) return;
+    const { data: org, error } = await sb.from('organizations').insert({ name: name.trim() }).select().single();
+    if(error){ showAlert("Erreur lors de la création : " + error.message); return; }
+    const { error: err2 } = await sb.from('profiles').update({ role:'admin', organization_id: org.id }).eq('id', CURRENT_PROFILE.id);
+    if(err2){ showAlert("Erreur lors de la mise à jour du compte : " + err2.message); return; }
+    const { data: { user } } = await sb.auth.getUser();
+    await onAuthResolved(user);
+  });
 }
 async function logout(){
   await sb.auth.signOut();
@@ -3011,6 +3034,8 @@ function adminSettingsSectionHTML(){
     <h3>🔗 Partage</h3>
     <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
     <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
+    <p class="small" style="margin-top:10px;">Ce lien-ci associe automatiquement toute nouvelle personne qui s'inscrit à ton organisation (utile si tu gères plusieurs organisations séparées).</p>
+    <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
   </div>`;
   html += `<div class="card">
     <h3>💾 Sauvegarde</h3>
@@ -3311,6 +3336,20 @@ function settingsGuideHTML(){
 function copyAppLink(){
   const url = window.location.origin + window.location.pathname;
   const done = ()=> showAlert("Lien copié dans le presse-papier :\n" + url);
+  const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+function copyOrgSignupLink(){
+  if(!CURRENT_PROFILE || !CURRENT_PROFILE.organization_id){
+    showAlert("Impossible de trouver ton organisation. Contacte le support si ça persiste.");
+    return;
+  }
+  const url = window.location.origin + window.location.pathname + '?org=' + CURRENT_PROFILE.organization_id;
+  const done = ()=> showAlert("Lien d'inscription copié dans le presse-papier :\n" + url);
   const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(done).catch(fallback);
@@ -3912,6 +3951,10 @@ async function boot(){
   // Les données ne sont chargées qu'une fois connecté et une ligue choisie
   // (voir onAuthResolved) — avant ça, DATA reste vide et l'écran de connexion
   // s'affiche avec un titre générique.
+  if(SIGNUP_ORG_ID){
+    const { data } = await sb.from('organizations').select('name').eq('id', SIGNUP_ORG_ID).maybeSingle();
+    if(data) SIGNUP_ORG_NAME = data.name;
+  }
   const { data: { session } } = await sb.auth.getSession();
   if(session && session.user){
     await onAuthResolved(session.user);
