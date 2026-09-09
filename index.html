@@ -4122,39 +4122,18 @@ function previousGroupSessionHTML(me){
   if(!s) return '';
   const g = groupById(me.groupId);
   const rows = s.standingsByGroup[me.groupId];
-  const myRow = rows.find(r=>r.playerId===me.id);
-  const gd = (s.groupsData||[]).find(x=>x.groupId===me.groupId);
-  const myMatches = gd ? gd.matches.filter(m=> (m.teamA||[]).includes(me.id) || (m.teamB||[]).includes(me.id)) : [];
-
-  let html = `<div class="card">
-    <h3>Tes matchs — session précédente (${s.date})</h3>`;
-  if(myMatches.length){
-    html += myMatches.map(m=>{
-      const iWasA = (m.teamA||[]).includes(me.id);
-      const hasScore = m.scoreA!==null && m.scoreB!==null && m.scoreA!=='' && m.scoreB!=='';
-      const won = hasScore ? (iWasA ? Number(m.scoreA) > Number(m.scoreB) : Number(m.scoreB) > Number(m.scoreA)) : null;
-      const borderColor = won===true ? 'var(--ball)' : (won===false ? 'var(--danger)' : 'rgba(255,255,255,0.15)');
-      return `<div class="match-row" style="border-left:3px solid ${borderColor};padding-left:10px;margin-bottom:6px;">
-        <div class="team">${(m.teamA||[]).map(playerName).map(escapeHTML).join(' & ')}</div>
-        <div class="vs">${m.scoreA===null?'—':m.scoreA} : ${m.scoreB===null?'—':m.scoreB}</div>
-        <div class="team" style="text-align:right;">${(m.teamB||[]).map(playerName).map(escapeHTML).join(' & ')}</div>
-      </div>`;
-    }).join('');
-    if(myRow) html += `<p class="small" style="margin-top:6px;">Bilan : <strong>${myRow.wins}-${myRow.losses}</strong> · ${myRow.pf} points marqués.</p>`;
-  } else {
-    html += `<p class="small">Aucun match trouvé pour toi lors de cette session (absence ou remplacement ailleurs).</p>`;
-  }
-  html += `</div>`;
-
-  html += `<div class="card">
-    <h3>Classement du groupe ${escapeHTML(g ? g.name : '')} — ${s.date}</h3>
-    <p class="small">Tous les joueurs de ton groupe pour cette session, pas seulement toi.</p>
-    <table>
-      <tr><th>#</th><th>Joueur</th><th>Points</th><th>V-D</th></tr>
-      ${rows.map((r,i)=>`<tr class="${r.playerId===me.id?'me':''}"><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${r.wins}-${r.losses}</td></tr>`).join('')}
-    </table>
+  const myIndex = rows.findIndex(r=>r.playerId===me.id);
+  if(myIndex === -1) return '';
+  const myRow = rows[myIndex];
+  return `<div class="card">
+    <h3>Mon résultat — session précédente</h3>
+    <p class="small">${escapeHTML(g ? g.name : '')} — ${s.date}</p>
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Position</span><span class="stat-value">${myIndex+1}/${rows.length}</span></div>
+      <div class="stat-chip"><span class="stat-label">V-D</span><span class="stat-value">${myRow.wins}-${myRow.losses}</span></div>
+      <div class="stat-chip"><span class="stat-label">Points</span><span class="stat-value">${myRow.pf}</span></div>
+    </div>
   </div>`;
-  return html;
 }
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
