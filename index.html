@@ -3831,6 +3831,30 @@ function ratingExplanationHTML(){
 function showRatingExplanationModal(){
   showContentModal('Comment fonctionne la cote ?', ratingExplanationHTML());
 }
+function showLeagueRulesModal(){
+  showContentModal('Règles de la ligue', leagueRulesHTML());
+}
+// Résumé des règles actuelles de la ligue, généré à partir des réglages en
+// vigueur — s'ajuste donc automatiquement si l'admin les modifie.
+function leagueRulesHTML(){
+  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
+  const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
+  return `
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Format</span><span class="stat-value" style="font-size:14px;">${formatLabel}</span></div>
+      <div class="stat-chip"><span class="stat-label">Joueurs / groupe</span><span class="stat-value">${GROUP_MIN_PLAYERS()}–${GROUP_MAX_PLAYERS()}</span></div>
+    </div>
+    <h3 style="margin-top:14px;">Format des matchs</h3>
+    <table>
+      <tr><th>Taille du groupe</th><th>Matchs</th><th>Points par match</th></tr>
+      <tr><td>4 joueurs</td><td>${DATA.rules4Matches||6}</td><td>${DATA.rules4Points||11}</td></tr>
+      <tr><td>5 joueurs</td><td>${DATA.rules5Matches||10}</td><td>${DATA.rules5Points||9}</td></tr>
+    </table>
+    <h3 style="margin-top:14px;">Ordre de départage en cas d'égalité</h3>
+    ${enabledCriteria.length ? `<ol style="margin:0;padding-left:20px;">${enabledCriteria.map(c=>`<li class="small">${c}</li>`).join('')}</ol>` : `<p class="small">Aucun critère activé — les égalités ne sont pas départagées.</p>`}
+    ${DATA.autoStartSessions ? `<h3 style="margin-top:14px;">Calendrier</h3><p class="small">Les sessions démarrent automatiquement chaque semaine${DATA.seasonEndDate ? ', jusqu\'au '+DATA.seasonEndDate : ''}.</p>` : ''}
+    <p class="small" style="margin-top:14px;">Ce résumé reflète toujours les réglages actuels de la ligue.</p>`;
+}
 // ---------- Statistiques amusantes/encourageantes pour un joueur ----------
 // Reconstitue une estimation de l'historique de cote (à partir des
 // ajustements enregistrés par session) pour trouver le plus haut/bas atteint.
@@ -4009,6 +4033,7 @@ function playerGroupHTML(me){
       ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
     <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
+    <button class="btn-ghost" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
   </div>`;
   html += previousGroupSessionHTML(me);
   if(open){
