@@ -3100,6 +3100,8 @@ function adminSettingsSectionHTML(){
     : 'Automatique — génération et rotation par l\'app';
   let html = '';
   const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle';
+  const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  html += settingsRow('🏢', 'Organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
@@ -3135,6 +3137,24 @@ function adminSettingsSectionHTML(){
 }
 
 // ---- Pop-up : Informations générales ----
+// ---- Pop-up : Organisation ----
+function openOrganizationModal(){
+  const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  const html = `
+    <div class="field"><label>Nom de l'organisation</label><input id="setOrgName" value="${escapeHTML(currentOrg ? currentOrg.name : '')}"></div>
+    <p class="small">Ce nom identifie ton organisation dans le sélecteur (si tu en gères plusieurs) et n'a aucun lien avec le nom d'une ligue précise.</p>`;
+  showFormModal('Organisation', html, saveOrganizationForm);
+}
+function saveOrganizationForm(){
+  const name = document.getElementById('setOrgName').value.trim();
+  if(!name){ showAlert("Le nom de l'organisation est requis."); return false; }
+  (async ()=>{
+    const { error } = await sb.from('organizations').update({ name }).eq('id', CURRENT_ORGANIZATION_ID);
+    if(error){ showAlert("Erreur : " + error.message); return; }
+    const org = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+    if(org){ org.name = name; render(); }
+  })();
+}
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
