@@ -217,13 +217,21 @@ async function saveData(){
   }
 }
 async function loadMyOrganizations(profileId){
-  if(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin){
-    const { data, error } = await sb.from('organizations').select('id, name').order('created_at', { ascending:true });
-    MY_ORGANIZATIONS = error ? [] : (data || []);
-    return;
-  }
   const { data, error } = await sb.from('organization_admins').select('organization_id, organizations(id, name)').eq('profile_id', profileId);
   MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
+}
+// Vue "super admin" : ne se charge que sur demande explicite (bouton), jamais
+// automatiquement — pour garder le sélecteur normal propre aux organisations
+// où le compte est réellement impliqué.
+let SUPER_ADMIN_MODE = false;
+let ALL_ORGANIZATIONS = [];
+async function toggleSuperAdminOrgView(){
+  SUPER_ADMIN_MODE = !SUPER_ADMIN_MODE;
+  if(SUPER_ADMIN_MODE && ALL_ORGANIZATIONS.length === 0){
+    const { data, error } = await sb.from('organizations').select('id, name').order('created_at', { ascending:true });
+    ALL_ORGANIZATIONS = error ? [] : (data || []);
+  }
+  render();
 }
 async function loadLeagues(){
   const { data, error } = await sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
@@ -1354,6 +1362,8 @@ async function logout(){
   MY_LINK_IN_CURRENT_LEAGUE = null;
   MY_ORGANIZATIONS = [];
   CURRENT_ORGANIZATION_ID = null;
+  SUPER_ADMIN_MODE = false;
+  ALL_ORGANIZATIONS = [];
   DATA = null;
   VIEW = {};
   render();
@@ -1390,11 +1400,17 @@ function renderAdmin(){
       ${canViewAsPlayer ? `<button onclick="toggleAdminPlayerView()">Joueur</button>` : ''}
       ${canViewAsSub ? `<button onclick="toggleAdminSubView()">Remplaçant</button>` : ''}
     </div>` : '';
-  const orgSwitcher = MY_ORGANIZATIONS.length > 1 ? `
+  const isSuperAdmin = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
+  const orgSwitcher = (MY_ORGANIZATIONS.length > 1 || isSuperAdmin) ? `
     <div class="card">
-      <label style="display:block;margin-bottom:6px;">Organisation actuelle</label>
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <label style="display:block;margin-bottom:6px;">${SUPER_ADMIN_MODE ? '🛡️ Toutes les organisations (super admin)' : 'Organisation actuelle'}</label>
+        ${isSuperAdmin ? `<button class="btn-ghost" onclick="toggleSuperAdminOrgView()">${SUPER_ADMIN_MODE ? '← Revenir à mes organisations' : '🛡️ Voir toutes les organisations'}</button>` : ''}
+      </div>
       <div class="row" style="gap:6px;">
-        ${MY_ORGANIZATIONS.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')}
+        ${SUPER_ADMIN_MODE
+          ? ALL_ORGANIZATIONS.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" style="${o.id===CURRENT_ORGANIZATION_ID?'':'border:1px dashed var(--muted);'}" onclick="switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')
+          : MY_ORGANIZATIONS.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')}
       </div>
     </div>` : '';
   const leagueSwitcher = `
