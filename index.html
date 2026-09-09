@@ -1131,9 +1131,9 @@ function renderLogin(){
         ${SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Tu t'inscris pour rejoindre : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong></p>` : (SIGNUP_ORG_ID ? `<p class="small" style="color:var(--danger);">Ce lien d'inscription ne correspond à aucune organisation valide.</p>` : '')}
         <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" placeholder="Prénom Nom"></div>
         <div class="field"><label>Courriel</label><input id="signupEmail" type="email" placeholder="toi@exemple.com"></div>
+        <div class="field"><label>Confirme ton courriel</label><input id="signupEmailConfirm" type="email" placeholder="Retape le même courriel"></div>
         <div class="field"><label>Mot de passe</label><input id="signupPassword" type="password" placeholder="6 caractères minimum"></div>
         <div class="field"><label>Confirme ton mot de passe</label><input id="signupPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
-        <div class="field"><label>Confirme le mot de passe</label><input id="signupPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
         <button class="btn btn-primary" onclick="onSignUp()">Créer mon compte</button>
         <p class="small">Un administrateur devra ensuite associer ton compte à un joueur de la ligue.</p>
       ` : `
@@ -1152,10 +1152,12 @@ function setLoginMode(m){ VIEW.loginMode = m; VIEW.error=null; VIEW.info=null; r
 async function onSignUp(){
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
+  const emailConfirm = document.getElementById('signupEmailConfirm').value.trim();
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
   if(!name){ VIEW.error='Entre ton nom.'; render(); return; }
   if(!email || !password){ VIEW.error='Courriel et mot de passe requis.'; render(); return; }
+  if(email.toLowerCase() !== emailConfirm.toLowerCase()){ VIEW.error='Les deux courriels ne correspondent pas.'; render(); return; }
   if(password !== passwordConfirm){ VIEW.error='Les deux mots de passe ne correspondent pas.'; render(); return; }
   VIEW.error=null; VIEW.info='Création du compte…'; render();
   const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname } });
