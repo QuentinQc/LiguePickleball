@@ -606,6 +606,27 @@ function nextSessionDate(){
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
   return fmtDate(d);
 }
+// Calcule la prochaine date de jeu valide à partir d'une date donnée (incluse),
+// en sautant les dates bloquées du calendrier de saison. Retourne
+// { date, skipped } où skipped liste les dates bloquées sautées en chemin,
+// ou { date: null } si ça dépasse la fin de saison configurée.
+function nextValidSessionDate(fromDateStr){
+  const blocked = new Set(DATA.blockedDates || []);
+  const seasonEnd = DATA.seasonEndDate || null;
+  let d = new Date(fromDateStr + 'T00:00:00');
+  const skipped = [];
+  for(let i=0;i<52;i++){ // garde-fou : au plus un an de sauts
+    const ds = fmtDate(d);
+    if(seasonEnd && ds > seasonEnd) return { date: null, skipped };
+    if(blocked.has(ds)){
+      skipped.push(ds);
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+      continue;
+    }
+    return { date: ds, skipped };
+  }
+  return { date: null, skipped };
+}
 // Point d'entrée unique pour la génération des matchs d'un groupe : respecte
 // le mode choisi dans Réglages (automatique ou manuel).
 // Effectif d'un groupe ordonné par position (#1, #2, ...), avec le
@@ -2490,14 +2511,33 @@ function onCancelSession(){
 function onFinalize(){
   const open = currentOpenSession();
   const incomplete = open.groupsData.some(gd=>gd.matches.some(m=>m.scoreA===null || m.scoreB===null));
-  if(incomplete){
-    showConfirm('Certains pointages sont manquants et seront ignorés dans le calcul. Continuer ?', ()=>{
-      finalizeSession(open);
-      saveAndRender();
-    });
-  } else {
+  const afterFinalize = ()=>{
     finalizeSession(open);
+    if(DATA.autoStartSessions){
+      autoStartNextSession();
+    }
     saveAndRender();
+  };
+  if(incomplete){
+    showConfirm('Certains pointages sont manquants et seront ignorés dans le calcul. Continuer ?', afterFinalize);
+  } else {
+    afterFinalize();
+  }
+}
+// Tente de créer automatiquement la prochaine session, selon le calendrier
+// de saison (dates bloquées, fin de saison). Avertit si des dates ont été
+// sautées, ou si la fin de saison est atteinte.
+function autoStartNextSession(){
+  const fromDate = nextSessionDate();
+  const result = nextValidSessionDate(fromDate);
+  if(!result.date){
+    showAlert(`Fin de saison atteinte (${DATA.seasonEndDate}) — aucune nouvelle session n'a été créée automatiquement. Tu peux ajuster la date de fin dans Réglages si besoin.`);
+    return;
+  }
+  const session = startNewSession(result.date);
+  if(DATA.autoPublishSessions) session.published = true;
+  if(result.skipped.length){
+    showAlert(`Prochaine session créée automatiquement pour le ${result.date} — ${result.skipped.length>1?'les dates suivantes étaient bloquées et ont été sautées':'la date '+result.skipped[0]+' était bloquée et a été sautée'} : ${result.skipped.join(', ')}.`);
   }
 }
 
@@ -2963,6 +3003,10 @@ function adminSettingsSectionHTML(){
   html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
   html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
   html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
+  const calSummary = DATA.autoStartSessions
+    ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
+    : 'Démarrage manuel (par défaut)';
+  html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
   html += `<div class="card">
     <h3>🔗 Partage</h3>
     <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
@@ -3164,6 +3208,70 @@ function openScoreEntryModal(){
 }
 function saveScoreEntryForm(){
   DATA.allowPlayerScoreEntry = document.getElementById('setAllowPlayerScoreEntry').checked;
+}
+
+// ---- Pop-up : Calendrier de saison ----
+let SEASON_CAL_STATE = null;
+function openSeasonCalendarModal(){
+  SEASON_CAL_STATE = {
+    startDate: DATA.seasonStartDate || '',
+    endDate: DATA.seasonEndDate || '',
+    blockedDates: (DATA.blockedDates || []).slice().sort(),
+    autoStart: !!DATA.autoStartSessions,
+    autoPublish: !!DATA.autoPublishSessions,
+    newBlockedDate: ''
+  };
+  showFormModal('Calendrier de saison', seasonCalendarFormHTML, saveSeasonCalendarForm);
+}
+function seasonCalendarFormHTML(){
+  const st = SEASON_CAL_STATE;
+  return `
+    <div class="row">
+      <div class="field" style="flex:1;min-width:160px;"><label>Début de saison</label><input type="date" id="seasonStart" value="${st.startDate}" onchange="SEASON_CAL_STATE.startDate=this.value;"></div>
+      <div class="field" style="flex:1;min-width:160px;"><label>Fin de saison (optionnel)</label><input type="date" id="seasonEnd" value="${st.endDate}" onchange="SEASON_CAL_STATE.endDate=this.value;"></div>
+    </div>
+    <p class="small">Laisse « Fin de saison » vide pour une saison sans fin définie.</p>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:10px;">
+      <input type="checkbox" ${st.autoStart?'checked':''} style="width:auto;" onchange="SEASON_CAL_STATE.autoStart=this.checked;render();">
+      <span class="small">Démarrer automatiquement la prochaine session dès que je clique « Terminer la session »</span>
+    </label>
+    ${st.autoStart ? `
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
+      <input type="checkbox" ${st.autoPublish?'checked':''} style="width:auto;" onchange="SEASON_CAL_STATE.autoPublish=this.checked;">
+      <span class="small">Publier automatiquement cette session aux joueurs (sinon elle reste en préparation, à publier toi-même)</span>
+    </label>` : ''}
+    <h3 style="margin-top:16px;">Dates bloquées (congés, jours fériés)</h3>
+    <div class="row" style="margin-bottom:8px;">
+      <input type="date" id="newBlockedDate" value="${st.newBlockedDate}" onchange="SEASON_CAL_STATE.newBlockedDate=this.value;">
+      <button class="btn btn-secondary" onclick="addBlockedDate()">Ajouter</button>
+    </div>
+    <table>
+      <tr><th>Date</th><th></th></tr>
+      ${st.blockedDates.map(d=>`<tr><td>${d}</td><td><button class="btn-ghost" onclick="removeBlockedDate('${d}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button></td></tr>`).join('')}
+      ${st.blockedDates.length===0 ? `<tr><td colspan="2" class="empty">Aucune date bloquée</td></tr>` : ''}
+    </table>`;
+}
+function addBlockedDate(){
+  const st = SEASON_CAL_STATE;
+  const val = document.getElementById('newBlockedDate').value;
+  if(!val) return;
+  if(!st.blockedDates.includes(val)){ st.blockedDates.push(val); st.blockedDates.sort(); }
+  st.newBlockedDate = '';
+  render();
+}
+function removeBlockedDate(d){
+  const st = SEASON_CAL_STATE;
+  st.blockedDates = st.blockedDates.filter(x=>x!==d);
+  render();
+}
+function saveSeasonCalendarForm(){
+  const st = SEASON_CAL_STATE;
+  DATA.seasonStartDate = st.startDate || null;
+  DATA.seasonEndDate = st.endDate || null;
+  DATA.blockedDates = st.blockedDates.slice();
+  DATA.autoStartSessions = st.autoStart;
+  DATA.autoPublishSessions = st.autoStart ? st.autoPublish : false;
+  SEASON_CAL_STATE = null;
 }
 function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
@@ -3775,6 +3883,11 @@ function migrateData(){
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
+  if(DATA.seasonStartDate === undefined) DATA.seasonStartDate = null;
+  if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
+  if(DATA.blockedDates === undefined) DATA.blockedDates = [];
+  if(DATA.autoStartSessions === undefined) DATA.autoStartSessions = false;
+  if(DATA.autoPublishSessions === undefined) DATA.autoPublishSessions = false;
   if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
   if(DATA.manualMatchupTemplate4 === undefined) DATA.manualMatchupTemplate4 = [];
   if(DATA.manualMatchCount5 === undefined) DATA.manualMatchCount5 = 10;
