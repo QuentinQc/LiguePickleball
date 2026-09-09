@@ -1491,17 +1491,28 @@ function adminAllPeopleHTML(){
   const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.player_id).map(l=>l.player_id));
   const linkedSubIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.substitute_id).map(l=>l.substitute_id));
   const openSessionForBadge = currentOpenSession();
-  const regulars = DATA.players.map(p=>({
-    id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
-    absent: !!(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)),
-    group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-    linked: linkedPlayerIds.has(p.id), openModal: `openPlayerDetailModal('${p.id}')`
-  }));
-  const subs = (DATA.substitutePool||[]).map(s=>({
-    id: s.id, name: s.name, type: 'remplacant', injured: false, absent: false,
-    group: null, rating: null,
-    linked: linkedSubIds.has(s.id), openModal: `openSubstituteDetailModal('${s.id}')`
-  }));
+  const isAdminAccount = (link)=>{
+    if(!link) return false;
+    const pr = ALL_PROFILES.find(x=>x.id===link.profile_id);
+    return pr && pr.role === 'admin';
+  };
+  const regulars = DATA.players.map(p=>{
+    const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
+    return {
+      id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
+      absent: !!(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)),
+      group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
+      linked: linkedPlayerIds.has(p.id), isAdmin: isAdminAccount(link), openModal: `openPlayerDetailModal('${p.id}')`
+    };
+  });
+  const subs = (DATA.substitutePool||[]).map(s=>{
+    const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===s.id);
+    return {
+      id: s.id, name: s.name, type: 'remplacant', injured: false, absent: false,
+      group: null, rating: null,
+      linked: linkedSubIds.has(s.id), isAdmin: isAdminAccount(link), openModal: `openSubstituteDetailModal('${s.id}')`
+    };
+  });
   const all = regulars.concat(subs).sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   return `<div class="card">
     <h2>Tous <span class="small">(${all.length})</span></h2>
@@ -1509,7 +1520,7 @@ function adminAllPeopleHTML(){
     <table>
       <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
       ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
-        <td>${escapeHTML(x.name)}</td>
+        <td>${escapeHTML(x.name)}${x.isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
         <td>${x.type==='regulier' ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-yellow">Remplaçant</span>'}</td>
         <td>${x.injured ? '<span class="tag tag-down">🤕 Blessé</span> ' : ''}${x.absent ? '<span class="tag tag-orange">🚫 Absent</span> ' : ''}${(!x.group && x.type==='regulier' && !x.injured) ? '<span class="tag tag-stay">⏳ En attente</span>' : ''}</td>
         <td>${x.group ? escapeHTML(x.group.name) : '—'}</td>
