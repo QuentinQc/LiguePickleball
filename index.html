@@ -217,6 +217,11 @@ async function saveData(){
   }
 }
 async function loadMyOrganizations(profileId){
+  if(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin){
+    const { data, error } = await sb.from('organizations').select('id, name').order('created_at', { ascending:true });
+    MY_ORGANIZATIONS = error ? [] : (data || []);
+    return;
+  }
   const { data, error } = await sb.from('organization_admins').select('organization_id, organizations(id, name)').eq('profile_id', profileId);
   MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
 }
@@ -1366,7 +1371,7 @@ function renderAdmin(){
         </div>
       </div>` : '';
     app.innerHTML = `
-      ${topbarHTML('Espace administrateur')}
+      ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''))}
       ${storageBannerHTML()}
       ${orgSwitcher0}
       <div class="card">
@@ -1405,7 +1410,7 @@ function renderAdmin(){
       </div>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur', modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>')}
+    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>')}
     ${storageBannerHTML()}
     ${orgSwitcher}
     ${leagueSwitcher}
