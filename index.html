@@ -186,6 +186,7 @@ let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
+let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
 
 // ---------- stockage (Supabase) ----------
 let STORAGE_OK = null; // null=inconnu, true/false une fois vérifié
@@ -1046,7 +1047,8 @@ function storageBannerHTML(){
 }
 
 function render(){
-  if(!SESSION_USER){ renderLogin(); }
+  if(PASSWORD_RECOVERY_MODE){ renderSetNewPassword(); }
+  else if(!SESSION_USER){ renderLogin(); }
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
   else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'player' && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
   else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'substitute' && MY_LINK_IN_CURRENT_LEAGUE){ renderSubstitute(MY_LINK_IN_CURRENT_LEAGUE.substitute_id); }
@@ -1083,6 +1085,33 @@ function topbarHTML(subtitle, extraControls){
 function escapeHTML(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ---- Login (Supabase Auth : courriel + mot de passe) ----
+// ---- Définir un nouveau mot de passe (après avoir cliqué le lien reçu par courriel) ----
+function renderSetNewPassword(){
+  app.innerHTML = `
+    ${topbarHTML('Nouveau mot de passe')}
+    ${storageBannerHTML()}
+    <div class="card">
+      <h2>Choisis un nouveau mot de passe</h2>
+      ${VIEW.error ? `<p class="small" style="color:var(--danger);">${escapeHTML(VIEW.error)}</p>` : ''}
+      ${VIEW.info ? `<p class="small" style="color:var(--ball);">${escapeHTML(VIEW.info)}</p>` : ''}
+      <div class="field"><label>Nouveau mot de passe</label><input id="newPassword" type="password" placeholder="6 caractères minimum"></div>
+      <div class="field"><label>Confirme le nouveau mot de passe</label><input id="newPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
+      <button class="btn btn-primary" onclick="onSetNewPassword()">Enregistrer le nouveau mot de passe</button>
+    </div>`;
+}
+async function onSetNewPassword(){
+  const password = document.getElementById('newPassword').value;
+  const passwordConfirm = document.getElementById('newPasswordConfirm').value;
+  if(!password || password.length < 6){ VIEW.error = 'Le mot de passe doit contenir au moins 6 caractères.'; render(); return; }
+  if(password !== passwordConfirm){ VIEW.error = 'Les deux mots de passe ne correspondent pas.'; render(); return; }
+  VIEW.error = null; VIEW.info = 'Mise à jour…'; render();
+  const { error } = await sb.auth.updateUser({ password });
+  if(error){ VIEW.info = null; VIEW.error = error.message; render(); return; }
+  PASSWORD_RECOVERY_MODE = false;
+  VIEW = {};
+  const { data: { user } } = await sb.auth.getUser();
+  await onAuthResolved(user);
+}
 function renderLogin(){
   const mode = VIEW.loginMode || 'signin'; // 'signin' | 'signup' | 'reset'
   app.innerHTML = `
@@ -1103,6 +1132,8 @@ function renderLogin(){
         <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" placeholder="Prénom Nom"></div>
         <div class="field"><label>Courriel</label><input id="signupEmail" type="email" placeholder="toi@exemple.com"></div>
         <div class="field"><label>Mot de passe</label><input id="signupPassword" type="password" placeholder="6 caractères minimum"></div>
+        <div class="field"><label>Confirme ton mot de passe</label><input id="signupPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
+        <div class="field"><label>Confirme le mot de passe</label><input id="signupPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
         <button class="btn btn-primary" onclick="onSignUp()">Créer mon compte</button>
         <p class="small">Un administrateur devra ensuite associer ton compte à un joueur de la ligue.</p>
       ` : `
@@ -1122,10 +1153,12 @@ async function onSignUp(){
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
+  const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
   if(!name){ VIEW.error='Entre ton nom.'; render(); return; }
   if(!email || !password){ VIEW.error='Courriel et mot de passe requis.'; render(); return; }
+  if(password !== passwordConfirm){ VIEW.error='Les deux mots de passe ne correspondent pas.'; render(); return; }
   VIEW.error=null; VIEW.info='Création du compte…'; render();
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined } } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname } });
   if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
   VIEW.info = "Compte créé ! Vérifie tes courriels pour confirmer ton adresse, puis connecte-toi. Un administrateur devra ensuite associer ton compte à ton profil de joueur.";
   VIEW.loginMode = 'signin';
@@ -1144,7 +1177,7 @@ async function onResetPassword(){
   const email = document.getElementById('resetEmail').value.trim();
   if(!email){ VIEW.error='Entre ton courriel.'; render(); return; }
   VIEW.error=null; VIEW.info='Envoi en cours…'; render();
-  const { error } = await sb.auth.resetPasswordForEmail(email);
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
   if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
   VIEW.info = "Si ce courriel correspond à un compte, un lien de réinitialisation vient d'être envoyé.";
   render();
@@ -3093,25 +3126,21 @@ function settingsRow(icon, title, summary, onClickFn){
   </div>`;
 }
 function adminSettingsSectionHTML(){
-  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const matchupSummary = DATA.matchupMode==='manual'
-    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
-    : 'Automatique — génération et rotation par l\'app';
-  let html = '';
-  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle';
+  const sub = VIEW.settingsSubTab || 'organisation';
+  const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
+  if(sub==='ligue') html += settingsLigueTabHTML();
+  else if(sub==='jeu') html += settingsJeuTabHTML();
+  else if(sub==='avance') html += settingsAvanceTabHTML();
+  else html += settingsOrganisationTabHTML();
+  return html;
+}
+function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
+
+function settingsOrganisationTabHTML(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  let html = '';
   html += settingsRow('🏢', 'Organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
-  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
-  html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
-  html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
-  html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
-  html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
-  const calSummary = DATA.autoStartSessions
-    ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
-    : 'Démarrage manuel (par défaut)';
-  html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
   html += `<div class="card">
     <h3>🔗 Partage</h3>
     <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
@@ -3119,6 +3148,39 @@ function adminSettingsSectionHTML(){
     <p class="small" style="margin-top:10px;">Ce lien-ci associe automatiquement toute nouvelle personne qui s'inscrit à ton organisation (utile si tu gères plusieurs organisations séparées).</p>
     <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
   </div>`;
+  html += `<div class="card">
+    <button class="btn-ghost" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
+    <p class="small" style="margin-top:8px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
+  </div>`;
+  return html;
+}
+function settingsLigueTabHTML(){
+  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
+  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle';
+  const calSummary = DATA.autoStartSessions
+    ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
+    : 'Démarrage manuel (par défaut)';
+  let html = '';
+  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
+  html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
+  html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
+  return html;
+}
+function settingsJeuTabHTML(){
+  const matchupSummary = DATA.matchupMode==='manual'
+    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
+    : 'Automatique — génération et rotation par l\'app';
+  let html = '';
+  html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
+  html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
+  html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
+  html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
+  return html;
+}
+function settingsAvanceTabHTML(){
+  let html = '';
+  html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
   html += `<div class="card">
     <h3>💾 Sauvegarde</h3>
     <p class="small">Filet de sécurité manuel, en plus de la sauvegarde automatique en ligne.</p>
@@ -3128,15 +3190,9 @@ function adminSettingsSectionHTML(){
       <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
     </div>
   </div>`;
-  html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
-  html += `<div class="card">
-    <button class="btn-ghost" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
-    <p class="small" style="margin-top:8px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
-  </div>`;
   return html;
 }
 
-// ---- Pop-up : Informations générales ----
 // ---- Pop-up : Organisation ----
 function openOrganizationModal(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
@@ -4052,6 +4108,13 @@ function migrateData(){
   (DATA.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
 }
 async function boot(){
+  // Enregistré avant tout appel à getSession(), pour ne jamais manquer
+  // l'événement PASSWORD_RECOVERY si les jetons sont déjà dans l'URL.
+  sb.auth.onAuthStateChange((event, newSession)=>{
+    if(event === 'SIGNED_OUT'){ SESSION_USER = null; CURRENT_PROFILE = null; render(); }
+    if(event === 'PASSWORD_RECOVERY'){ PASSWORD_RECOVERY_MODE = true; render(); }
+  });
+
   // Les données ne sont chargées qu'une fois connecté et une ligue choisie
   // (voir onAuthResolved) — avant ça, DATA reste vide et l'écran de connexion
   // s'affiche avec un titre générique.
@@ -4060,17 +4123,12 @@ async function boot(){
     if(data) SIGNUP_ORG_NAME = data.name;
   }
   const { data: { session } } = await sb.auth.getSession();
+  if(PASSWORD_RECOVERY_MODE){ render(); return; } // déjà intercepté par l'événement ci-dessus
   if(session && session.user){
     await onAuthResolved(session.user);
   } else {
     render();
   }
-
-  // Recharge automatiquement le profil quand l'état de connexion change
-  // (ex: après confirmation d'un lien de réinitialisation de mot de passe).
-  sb.auth.onAuthStateChange((event, newSession)=>{
-    if(event === 'SIGNED_OUT'){ SESSION_USER = null; CURRENT_PROFILE = null; render(); }
-  });
 }
 boot();
 </script>
