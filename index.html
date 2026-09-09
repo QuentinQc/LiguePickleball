@@ -3238,6 +3238,10 @@ function settingsLigueTabHTML(){
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
   html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
+  html += `<div class="card">
+    <button class="btn-ghost" onclick="onDeleteLeague()" style="color:var(--danger);background:rgba(233,85,107,0.10);">🗑️ Supprimer cette ligue</button>
+    <p class="small" style="margin-top:8px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, groupes, historique et statistiques. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
+  </div>`;
   return html;
 }
 function settingsJeuTabHTML(){
@@ -3271,9 +3275,14 @@ function settingsAvanceTabHTML(){
 // ---- Pop-up : Organisation ----
 function openOrganizationModal(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  const canDelete = MY_ORGANIZATIONS.length > 1;
   const html = `
     <div class="field"><label>Nom de l'organisation</label><input id="setOrgName" value="${escapeHTML(currentOrg ? currentOrg.name : '')}"></div>
-    <p class="small">Ce nom identifie ton organisation dans le sélecteur (si tu en gères plusieurs) et n'a aucun lien avec le nom d'une ligue précise.</p>`;
+    <p class="small">Ce nom identifie ton organisation dans le sélecteur (si tu en gères plusieurs) et n'a aucun lien avec le nom d'une ligue précise.</p>
+    <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+      <button class="btn-ghost" ${canDelete?'':'disabled title="Impossible de supprimer ta seule organisation"'} onclick="closeModal();onDeleteOrganization()" style="color:var(--danger);background:rgba(233,85,107,0.10);">🗑️ Supprimer cette organisation</button>
+      <p class="small" style="margin-top:8px;">${canDelete ? `Supprime définitivement « ${escapeHTML(currentOrg?currentOrg.name:'')} » et toutes ses ligues.` : "Tu ne peux pas supprimer ta seule organisation."}</p>
+    </div>`;
   showFormModal('Organisation', html, saveOrganizationForm);
 }
 function saveOrganizationForm(){
@@ -3285,6 +3294,51 @@ function saveOrganizationForm(){
     const org = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
     if(org){ org.name = name; render(); }
   })();
+}
+// Supprime une ligue et tout ce qui lui est propre (données, liens de
+// comptes). Les comptes des joueurs eux-mêmes ne sont pas touchés.
+async function deleteLeagueCascade(leagueId){
+  await sb.from('profile_players').delete().eq('league_id', leagueId);
+  await sb.from('league_data').delete().eq('league_id', leagueId);
+  const { error } = await sb.from('leagues').delete().eq('id', leagueId);
+  return error;
+}
+function onDeleteLeague(){
+  const league = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  if(!league) return;
+  showPrompt(`Pour confirmer la suppression définitive de « ${league.name} », retape exactement son nom :`, '', async (typed)=>{
+    if(typed !== league.name){ showAlert("Le nom ne correspond pas — rien n'a été supprimé."); return; }
+    const error = await deleteLeagueCascade(league.id);
+    if(error){ showAlert("Erreur lors de la suppression : " + error.message); return; }
+    await loadLeagues();
+    const remaining = myOrgLeagues();
+    if(remaining.length === 0){
+      CURRENT_LEAGUE_ID = null;
+      DATA = defaultData();
+      VIEW = { tab:'session' };
+      render();
+    } else {
+      await switchToLeague(remaining[0].id);
+    }
+  });
+}
+function onDeleteOrganization(){
+  const org = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  if(!org) return;
+  if(MY_ORGANIZATIONS.length <= 1){ showAlert("Tu ne peux pas supprimer ta seule organisation."); return; }
+  showPrompt(`Pour confirmer la suppression définitive de « ${org.name} » et de toutes ses ligues, retape exactement son nom :`, '', async (typed)=>{
+    if(typed !== org.name){ showAlert("Le nom ne correspond pas — rien n'a été supprimé."); return; }
+    showAlert("Suppression en cours…");
+    const { data: orgLeagues } = await sb.from('leagues').select('id').eq('organization_id', org.id);
+    for(const l of (orgLeagues||[])){ await deleteLeagueCascade(l.id); }
+    // Détache les comptes en attente rattachés à cette organisation, pour ne
+    // pas bloquer la suppression (leur compte n'est pas supprimé).
+    await sb.from('profiles').update({ organization_id: null }).eq('organization_id', org.id);
+    const { error } = await sb.from('organizations').delete().eq('id', org.id);
+    if(error){ showAlert("Erreur lors de la suppression : " + error.message); return; }
+    await loadMyOrganizations(CURRENT_PROFILE.id);
+    await switchToOrganization(MY_ORGANIZATIONS[0].id);
+  });
 }
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
