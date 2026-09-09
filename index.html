@@ -2681,9 +2681,10 @@ function onFinalize(){
   const open = currentOpenSession();
   const incomplete = open.groupsData.some(gd=>gd.matches.some(m=>m.scoreA===null || m.scoreB===null));
   const afterFinalize = ()=>{
+    const finishedDate = open.date;
     finalizeSession(open);
     if(DATA.autoStartSessions){
-      autoStartNextSession();
+      autoStartNextSession(finishedDate);
     }
     saveAndRender();
   };
@@ -2696,8 +2697,11 @@ function onFinalize(){
 // Tente de créer automatiquement la prochaine session, selon le calendrier
 // de saison (dates bloquées, fin de saison). Avertit si des dates ont été
 // sautées, ou si la fin de saison est atteinte.
-function autoStartNextSession(){
-  const fromDate = nextSessionDate();
+function autoStartNextSession(lastSessionDate){
+  // Une semaine après la session qu'on vient de terminer — pas "aujourd'hui",
+  // sinon terminer une session le jour même en recréerait une à la même date.
+  const base = new Date(lastSessionDate + 'T00:00:00');
+  const fromDate = fmtDate(new Date(base.getFullYear(), base.getMonth(), base.getDate() + 7));
   const result = nextValidSessionDate(fromDate);
   if(!result.date){
     showAlert(`Fin de saison atteinte (${DATA.seasonEndDate}) — aucune nouvelle session n'a été créée automatiquement. Tu peux ajuster la date de fin dans Réglages si besoin.`);
