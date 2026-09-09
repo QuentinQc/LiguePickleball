@@ -220,21 +220,30 @@ async function loadMyOrganizations(profileId){
   MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
 }
 async function loadLeagues(){
-  let q = sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
-  if(CURRENT_ORGANIZATION_ID) q = q.eq('organization_id', CURRENT_ORGANIZATION_ID);
-  const { data, error } = await q;
+  const { data, error } = await sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
   LEAGUES = error ? [] : (data || []);
 }
-// Réordonne les ligues par glisser-déposer et sauvegarde le nouvel ordre.
+// Ligues de l'organisation actuellement sélectionnée (vue admin uniquement) —
+// LEAGUES lui-même reste complet (toutes les ligues visibles, utile aussi
+// pour le sélecteur de ligue côté joueur qui peut couvrir plusieurs
+// organisations avec le même compte).
+function myOrgLeagues(){
+  return LEAGUES.filter(l=>l.organization_id === CURRENT_ORGANIZATION_ID);
+}
+// Réordonne les ligues (de l'organisation actuelle) par glisser-déposer et
+// sauvegarde le nouvel ordre.
 async function reorderLeague(draggedId, targetId){
   if(!draggedId || draggedId===targetId) return;
-  const list = LEAGUES.slice();
+  const list = myOrgLeagues();
   const fromIdx = list.findIndex(l=>l.id===draggedId);
   if(fromIdx===-1) return;
   const [moved] = list.splice(fromIdx,1);
   const targetIdx = list.findIndex(l=>l.id===targetId);
   list.splice(targetIdx===-1 ? list.length : targetIdx, 0, moved);
-  LEAGUES = list;
+  // Remplace, dans LEAGUES, les ligues de cette organisation par la nouvelle
+  // liste ordonnée — les ligues des autres organisations restent inchangées.
+  const otherLeagues = LEAGUES.filter(l=>l.organization_id !== CURRENT_ORGANIZATION_ID);
+  LEAGUES = otherLeagues.concat(list);
   render(); // mise à jour immédiate à l'écran, sauvegarde en arrière-plan
   const updates = list.map((l,i)=> sb.from('leagues').update({ order_index: i+1 }).eq('id', l.id));
   await Promise.all(updates);
@@ -258,7 +267,7 @@ function onLeagueDrop(ev, targetLeagueId){
 }
 async function createLeague(name, scheduleLabel, format){
   if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation sélectionnée — impossible de créer une ligue."); return null; }
-  const nextOrder = LEAGUES.reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
+  const nextOrder = myOrgLeagues().reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
   const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder, organization_id: CURRENT_ORGANIZATION_ID }).select().single();
   if(error){ showAlert("Erreur lors de la création : " + error.message); return null; }
   const fresh = defaultData();
@@ -315,13 +324,14 @@ async function switchToOrganization(orgId){
   CURRENT_ORGANIZATION_ID = orgId;
   CURRENT_LEAGUE_ID = null;
   await loadLeagues();
-  if(LEAGUES.length === 0){
+  const orgLeagues = myOrgLeagues();
+  if(orgLeagues.length === 0){
     DATA = defaultData();
     VIEW = { tab:'session' };
     render();
     return;
   }
-  await switchToLeague(LEAGUES[0].id);
+  await switchToLeague(orgLeagues[0].id);
 }
 // Vérifie si le compte admin courant est lui-même lié à un joueur dans cette ligue.
 async function refreshMyLinkForCurrentLeague(){
@@ -1167,7 +1177,8 @@ async function onAuthResolved(user){
     CURRENT_ORGANIZATION_ID = (CURRENT_ORGANIZATION_ID && MY_ORGANIZATIONS.some(o=>o.id===CURRENT_ORGANIZATION_ID)) ? CURRENT_ORGANIZATION_ID : MY_ORGANIZATIONS[0].id;
     await loadLeagues();
     await loadMyLeagueLinks(profile.id); // pour le sélecteur de ligue dans sa propre vue joueur
-    if(LEAGUES.length === 0){
+    const orgLeagues = myOrgLeagues();
+    if(orgLeagues.length === 0){
       // Aucune ligue n'existe encore : l'admin devra en créer une.
       CURRENT_LEAGUE_ID = null;
       DATA = defaultData();
@@ -1175,7 +1186,7 @@ async function onAuthResolved(user){
       render();
       return;
     }
-    const target = (CURRENT_LEAGUE_ID && LEAGUES.some(l=>l.id===CURRENT_LEAGUE_ID)) ? CURRENT_LEAGUE_ID : LEAGUES[0].id;
+    const target = (CURRENT_LEAGUE_ID && orgLeagues.some(l=>l.id===CURRENT_LEAGUE_ID)) ? CURRENT_LEAGUE_ID : orgLeagues[0].id;
     await switchToLeague(target);
     return;
   }
@@ -1319,7 +1330,7 @@ function renderAdmin(){
     <div class="card">
       <label style="display:block;margin-bottom:6px;">Ligue actuelle <span class="small">(glisse-dépose pour réordonner, sur ordinateur)</span></label>
       <div class="row" style="gap:6px;">
-        ${LEAGUES.map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" draggable="true"
+        ${myOrgLeagues().map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" draggable="true"
           ondragstart="onLeagueDragStart(event,'${l.id}')"
           ondragover="onLeagueDragOver(event)"
           ondragleave="onLeagueDragLeave(event)"
