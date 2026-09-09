@@ -4151,7 +4151,7 @@ function previousGroupSessionHTML(me){
 }
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
-  const groupMembers = playersInGroup(me.groupId).sort((a,b)=>a.name.localeCompare(b.name));
+  const groupMembers = playersInGroup(me.groupId).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
   const open = currentOpenSession();
   let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
     <table>
