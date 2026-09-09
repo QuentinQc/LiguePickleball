@@ -4120,20 +4120,34 @@ function previousGroupSessionHTML(me){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
   const s = closed.find(sess => sess.standingsByGroup && sess.standingsByGroup[me.groupId]);
   if(!s) return '';
-  const g = groupById(me.groupId);
-  const rows = s.standingsByGroup[me.groupId];
-  const myIndex = rows.findIndex(r=>r.playerId===me.id);
-  if(myIndex === -1) return '';
-  const myRow = rows[myIndex];
-  return `<div class="card">
-    <h3>Mon résultat — session précédente</h3>
-    <p class="small">${escapeHTML(g ? g.name : '')} — ${s.date}</p>
-    <div class="stat-chips">
-      <div class="stat-chip"><span class="stat-label">Position</span><span class="stat-value">${myIndex+1}/${rows.length}</span></div>
-      <div class="stat-chip"><span class="stat-label">V-D</span><span class="stat-value">${myRow.wins}-${myRow.losses}</span></div>
-      <div class="stat-chip"><span class="stat-label">Points</span><span class="stat-value">${myRow.pf}</span></div>
+  const gid = playerSessionGroupId(s, me.id) || me.groupId;
+  const g = groupById(gid);
+  const rows = s.standingsByGroup[gid];
+  if(!rows || rows.length===0) return '';
+  const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===gid) : null;
+  const subValues = new Set(gd && gd.substitutes ? Object.values(gd.substitutes) : []);
+  let html = `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">Mon groupe — session précédente (${s.date})</h3>
+      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}','${gid}')">🎾 Mes matchs</button>
     </div>
-  </div>`;
+    <table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th><th>Cote</th><th></th></tr>`;
+  rows.forEach((r,i)=>{
+    const isGuest = isGuestId(r.playerId);
+    const isSub = !isGuest && subValues.has(r.playerId);
+    const mv = (s.movements||[]).find(m=>m.playerId===r.playerId && m.fromGroupId===gid);
+    let tag;
+    if(isGuest){ tag = `<span class="tag tag-stay">invité</span>`; }
+    else {
+      const moveTag = mv ? (mv.toGroupId===groupAbove(gid) ? `<span class="tag tag-up">monte</span>` : `<span class="tag tag-down">descend</span>`) : `<span class="tag tag-stay">reste</span>`;
+      tag = isSub ? moveTag + ` <span class="small">(remplaçant)</span>` : moveTag;
+    }
+    const rating = ratingOf(r.playerId);
+    const avg = r.avgPts !== null && r.avgPts !== undefined ? r.avgPts.toFixed(1) : '—';
+    html += `<tr class="${r.playerId===me.id?'me':''}"><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}${r.playerId===me.id?' <span class="small">(toi)</span>':''}</td><td>${r.pf}</td><td>${avg}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td>${rating.toFixed(2)}</td><td>${tag}</td></tr>`;
+  });
+  html += `</table></div>`;
+  return html;
 }
 function playerGroupHTML(me){
   const g = groupById(me.groupId);
