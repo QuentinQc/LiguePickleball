@@ -487,6 +487,37 @@ function firstLossIndex(matches, pid){
   return Infinity;
 }
 
+// Critères de départage disponibles — chacun retourne un nombre négatif si
+// "a" doit être classé avant "b" selon ce critère seul, 0 si égalité.
+const TIEBREAK_CRITERIA = {
+  points: { label: '🎯 Total de points marqués', cmp: (a,b)=> b.pf - a.pf },
+  wins: { label: '🏆 Victoires', cmp: (a,b)=> b.wins - a.wins },
+  diff: { label: '➕➖ Différentiel de points (marqués − accordés)', cmp: (a,b)=> b.diff - a.diff },
+  h2h: { label: '🤝 Face-à-face direct', cmp: (a,b,matches)=> -headToHead(matches, a.playerId, b.playerId) },
+  rating: { label: '📊 Cote actuelle (le mieux coté gagne l\'égalité)', cmp: (a,b)=> ratingOf(b.playerId) - ratingOf(a.playerId) },
+  firstLoss: { label: '⏱️ A perdu son premier match le plus tard', cmp: (a,b,matches)=> firstLossIndex(matches,b.playerId) - firstLossIndex(matches,a.playerId) }
+};
+function defaultTiebreakCriteria(){
+  return [
+    { key:'points', enabled:true },
+    { key:'wins', enabled:true },
+    { key:'h2h', enabled:true },
+    { key:'firstLoss', enabled:true },
+    { key:'diff', enabled:false },
+    { key:'rating', enabled:false }
+  ];
+}
+// Complète la liste enregistrée avec tout critère manquant (ex: ajouté dans
+// une mise à jour future de l'app), désactivé par défaut, sans perdre l'ordre
+// choisi par l'admin pour les critères déjà connus.
+function normalizedTiebreakCriteria(){
+  const existing = (DATA.tiebreakCriteria && DATA.tiebreakCriteria.length) ? DATA.tiebreakCriteria : defaultTiebreakCriteria();
+  const keys = existing.map(c=>c.key);
+  const merged = existing.map(c=>({ key:c.key, enabled:!!c.enabled }));
+  Object.keys(TIEBREAK_CRITERIA).forEach(k=>{ if(!keys.includes(k)) merged.push({ key:k, enabled:false }); });
+  return merged;
+}
+
 function computeStandings(groupPlayers, matches){
   const stats = {};
   groupPlayers.forEach(pid => stats[pid] = { wins:0, losses:0, pf:0, pa:0, played:0, scheduled:0 });
@@ -504,16 +535,16 @@ function computeStandings(groupPlayers, matches){
     diff: stats[pid].pf - stats[pid].pa,
     avgPts: stats[pid].played > 0 ? (stats[pid].pf / stats[pid].played) : null
   }));
-  // Classement : 1) total de points  2) nombre de victoires  3) face-à-face direct
-  // 4) le premier des deux à avoir perdu un match est départagé en dernier (perd le bris d'égalité)
+  // Classement : selon l'ordre de critères activés dans Réglages → Jeu
+  // (par défaut : points, victoires, face-à-face, premier match perdu).
+  const order = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>c.key);
   rows.sort((a,b)=>{
-    if(b.pf !== a.pf) return b.pf - a.pf;
-    if(b.wins !== a.wins) return b.wins - a.wins;
-    const h2h = headToHead(matches, a.playerId, b.playerId);
-    if(h2h !== 0) return -h2h;
-    const fa = firstLossIndex(matches, a.playerId);
-    const fb = firstLossIndex(matches, b.playerId);
-    if(fa !== fb) return fb - fa; // celui qui a perdu le plus tard (ou jamais) est classé devant
+    for(const key of order){
+      const crit = TIEBREAK_CRITERIA[key];
+      if(!crit) continue;
+      const result = crit.cmp(a,b,matches);
+      if(result !== 0) return result;
+    }
     return 0;
   });
   return rows;
@@ -3178,6 +3209,8 @@ function settingsJeuTabHTML(){
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
   html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
   html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
+  const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
+  html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
   return html;
 }
 function settingsAvanceTabHTML(){
@@ -3395,6 +3428,36 @@ function openScoreEntryModal(){
 }
 function saveScoreEntryForm(){
   DATA.allowPlayerScoreEntry = document.getElementById('setAllowPlayerScoreEntry').checked;
+}
+
+// ---- Pop-up : Ordre de départage ----
+let TIEBREAK_STATE = null;
+function openTiebreakModal(){
+  TIEBREAK_STATE = normalizedTiebreakCriteria();
+  showFormModal('Ordre de départage', tiebreakFormHTML, saveTiebreakForm);
+}
+function tiebreakFormHTML(){
+  return `
+    <p class="small">Quand deux joueurs sont à égalité, l'app utilise les critères activés ci-dessous, dans l'ordre, jusqu'à ce qu'un les départage. Coche/décoche pour activer, utilise les flèches pour réordonner.</p>
+    ${TIEBREAK_STATE.map((c,i)=>`
+      <div class="row" style="align-items:center;gap:8px;margin-bottom:6px;background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 10px;">
+        <input type="checkbox" ${c.enabled?'checked':''} style="width:auto;" onchange="toggleTiebreakCriterion(${i})">
+        <span style="flex:1;">${TIEBREAK_CRITERIA[c.key].label}</span>
+        <button class="btn-ghost" ${i===0?'disabled':''} onclick="moveTiebreakCriterion(${i},-1)">▲</button>
+        <button class="btn-ghost" ${i===TIEBREAK_STATE.length-1?'disabled':''} onclick="moveTiebreakCriterion(${i},1)">▼</button>
+      </div>`).join('')}
+    <p class="small" style="margin-top:8px;">Si tous les critères activés sont encore à égalité, les deux joueurs gardent leur position relative actuelle.</p>`;
+}
+function toggleTiebreakCriterion(i){ TIEBREAK_STATE[i].enabled = !TIEBREAK_STATE[i].enabled; render(); }
+function moveTiebreakCriterion(i, dir){
+  const j = i+dir;
+  if(j<0 || j>=TIEBREAK_STATE.length) return;
+  const tmp = TIEBREAK_STATE[i]; TIEBREAK_STATE[i] = TIEBREAK_STATE[j]; TIEBREAK_STATE[j] = tmp;
+  render();
+}
+function saveTiebreakForm(){
+  DATA.tiebreakCriteria = TIEBREAK_STATE.map(c=>({ key:c.key, enabled:c.enabled }));
+  TIEBREAK_STATE = null;
 }
 
 // ---- Pop-up : Calendrier de saison ----
@@ -4085,6 +4148,7 @@ function migrateData(){
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
   if(DATA.seasonStartDate === undefined) DATA.seasonStartDate = null;
+  if(DATA.tiebreakCriteria === undefined) DATA.tiebreakCriteria = defaultTiebreakCriteria();
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
   if(DATA.autoStartSessions === undefined) DATA.autoStartSessions = false;
