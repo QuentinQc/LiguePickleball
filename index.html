@@ -4105,7 +4105,7 @@ function modalHTML(){
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
         <button class="btn btn-primary" onclick="modalFormSaveClick()">Enregistrer</button>
       </div>` : ''}`;
-    return `<div style="${overlay}"><div style="${box}">${inner}</div></div>`;
+    return `<div style="${overlay}" onclick="if(event.target===this) closeModal()"><div style="${box}">${inner}</div></div>`;
   }
   const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:380px;width:100%;border:1px solid rgba(255,255,255,0.15);';
   let inner = `<p style="margin:0 0 14px;white-space:pre-line;">${escapeHTML(MODAL.message)}</p>`;
@@ -4126,7 +4126,7 @@ function modalHTML(){
   } else { // alert
     inner += `<div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
   }
-  return `<div style="${overlay}"><div style="${box}">${inner}</div></div>`;
+  return `<div style="${overlay}" onclick="if(event.target===this) closeModal()"><div style="${box}">${inner}</div></div>`;
 }
 
 // ---------- sauvegarde manuelle (fonctionne peu importe l'environnement) ----------
