@@ -45,9 +45,16 @@ p{margin:4px 0;line-height:1.4;}
 .btn-secondary{background:transparent;color:var(--line);border:1px solid rgba(255,255,255,0.25);}
 .btn-secondary:hover{border-color:var(--ball);color:var(--ball);}
 .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
-.btn-ghost{display:inline-block;background:rgba(255,255,255,0.08);color:var(--line);border:none;border-radius:999px;padding:5px 12px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;text-decoration:none;cursor:pointer;transition:background .15s ease, color .15s ease, opacity .15s ease;margin:2px 3px 2px 0;}
+.btn-danger:hover{background:rgba(233,85,107,0.12);}
+.btn-ghost{display:inline-block;background:rgba(255,255,255,0.08);color:var(--line);border:none;border-radius:999px;padding:7px 14px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:13px;text-decoration:none;cursor:pointer;transition:background .15s ease, color .15s ease, opacity .15s ease;margin:2px 4px 2px 0;}
 .btn-ghost:hover{background:rgba(255,255,255,0.16);color:var(--ball);}
 .btn-ghost:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-ghost-danger{display:inline-block;background:rgba(233,85,107,0.12);color:var(--danger);border:none;border-radius:999px;padding:7px 14px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:13px;text-decoration:none;cursor:pointer;transition:background .15s ease, opacity .15s ease;margin:2px 4px 2px 0;}
+.btn-ghost-danger:hover{background:rgba(233,85,107,0.22);}
+.btn-ghost-danger:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-icon{display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);color:var(--line);border:none;border-radius:10px;width:38px;height:38px;font-size:15px;cursor:pointer;transition:background .15s ease,opacity .15s ease;margin:2px;}
+.btn-icon:hover{background:rgba(255,255,255,0.16);color:var(--ball);}
+.btn-icon:disabled{opacity:0.35;cursor:not-allowed;}
 input,select{font-family:var(--font-body);font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.2);color:var(--text);}
 input::placeholder{color:var(--muted);}
 input:focus,select:focus{outline:2px solid var(--ball);outline-offset:1px;}
@@ -2109,7 +2116,7 @@ function adminAccountsHTML(){
             </select>
             <button class="btn-ghost" onclick="relinkAccount('${profile.id}')">relier</button>
           </td>
-          <td><button class="btn-ghost" onclick="unlinkAccount('${profile.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">délier</button></td>
+          <td><button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}')">délier</button></td>
         </tr>`).join('')}
       </table>
     </div>`;
@@ -2240,7 +2247,7 @@ function adminGroupsHTML(){
       <div class="row" style="justify-content:space-between;">
         <h2>${escapeHTML(g.name)} <span class="small">(${displayCount} joueur${displayCount>1?'s':''})</span></h2>
         <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
-        <button class="btn-ghost" onclick="deleteGroup('${g.id}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">supprimer</button>
+        <button class="btn-ghost-danger" onclick="deleteGroup('${g.id}')">supprimer</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       <table>
@@ -3134,7 +3141,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
       <h3 style="margin:0;">Session du ${s.date}</h3>
       <div class="row" style="gap:8px;">
         <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})">🎾 Matchs${viewerPlayerId ? ' de mon groupe' : ''}</button>
-        ${withDelete ? `<button class="btn-ghost" style="color:var(--danger);" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
+        ${withDelete ? `<button class="btn-ghost-danger" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
       </div>
     </div>`;
   groupsSorted().forEach(g=>{
@@ -3222,8 +3229,9 @@ function settingsOrganisationTabHTML(){
     <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
   </div>`;
   html += `<div class="card">
-    <button class="btn-ghost" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
-    <p class="small" style="margin-top:8px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
+    <h3>➕ Nouvelle organisation</h3>
+    <p class="small" style="margin-bottom:10px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
+    <button class="btn btn-secondary" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
   </div>`;
   return html;
 }
@@ -3237,10 +3245,15 @@ function settingsLigueTabHTML(){
   let html = '';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
-  html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
   html += `<div class="card">
-    <button class="btn-ghost" onclick="onDeleteLeague()" style="color:var(--danger);background:rgba(233,85,107,0.10);">🗑️ Supprimer cette ligue</button>
-    <p class="small" style="margin-top:8px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, groupes, historique et statistiques. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
+    <h3>➕ Nouvelle ligue</h3>
+    <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
+    <button class="btn btn-secondary" onclick="onCreateLeague()">Créer une nouvelle ligue</button>
+  </div>`;
+  html += `<div class="card">
+    <h3 style="color:var(--danger);">🗑️ Zone dangereuse</h3>
+    <p class="small" style="margin-bottom:10px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, groupes, historique et statistiques. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
+    <button class="btn btn-danger" onclick="onDeleteLeague()">Supprimer cette ligue</button>
   </div>`;
   return html;
 }
@@ -3280,8 +3293,9 @@ function openOrganizationModal(){
     <div class="field"><label>Nom de l'organisation</label><input id="setOrgName" value="${escapeHTML(currentOrg ? currentOrg.name : '')}"></div>
     <p class="small">Ce nom identifie ton organisation dans le sélecteur (si tu en gères plusieurs) et n'a aucun lien avec le nom d'une ligue précise.</p>
     <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-      <button class="btn-ghost" ${canDelete?'':'disabled title="Impossible de supprimer ta seule organisation"'} onclick="closeModal();onDeleteOrganization()" style="color:var(--danger);background:rgba(233,85,107,0.10);">🗑️ Supprimer cette organisation</button>
-      <p class="small" style="margin-top:8px;">${canDelete ? `Supprime définitivement « ${escapeHTML(currentOrg?currentOrg.name:'')} » et toutes ses ligues.` : "Tu ne peux pas supprimer ta seule organisation."}</p>
+      <h3 style="color:var(--danger);font-size:14px;">🗑️ Zone dangereuse</h3>
+      <p class="small" style="margin-bottom:10px;">${canDelete ? `Supprime définitivement « ${escapeHTML(currentOrg?currentOrg.name:'')} » et toutes ses ligues.` : "Tu ne peux pas supprimer ta seule organisation."}</p>
+      <button class="btn btn-danger" ${canDelete?'':'disabled title="Impossible de supprimer ta seule organisation"'} onclick="closeModal();onDeleteOrganization()">Supprimer cette organisation</button>
     </div>`;
   showFormModal('Organisation', html, saveOrganizationForm);
 }
@@ -3537,8 +3551,8 @@ function tiebreakFormHTML(){
       <div class="row" style="align-items:center;gap:8px;margin-bottom:6px;background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 10px;">
         <input type="checkbox" ${c.enabled?'checked':''} style="width:auto;" onchange="toggleTiebreakCriterion(${i})">
         <span style="flex:1;">${TIEBREAK_CRITERIA[c.key].label}</span>
-        <button class="btn-ghost" ${i===0?'disabled':''} onclick="moveTiebreakCriterion(${i},-1)">▲</button>
-        <button class="btn-ghost" ${i===TIEBREAK_STATE.length-1?'disabled':''} onclick="moveTiebreakCriterion(${i},1)">▼</button>
+        <button class="btn-icon" ${i===0?'disabled':''} onclick="moveTiebreakCriterion(${i},-1)">▲</button>
+        <button class="btn-icon" ${i===TIEBREAK_STATE.length-1?'disabled':''} onclick="moveTiebreakCriterion(${i},1)">▼</button>
       </div>`).join('')}
     <p class="small" style="margin-top:8px;">Si tous les critères activés sont encore à égalité, les deux joueurs gardent leur position relative actuelle.</p>`;
 }
@@ -3591,7 +3605,7 @@ function seasonCalendarFormHTML(){
     </div>
     <table>
       <tr><th>Date</th><th></th></tr>
-      ${st.blockedDates.map(d=>`<tr><td>${d}</td><td><button class="btn-ghost" onclick="removeBlockedDate('${d}')" style="color:var(--danger);background:rgba(233,85,107,0.12);">retirer</button></td></tr>`).join('')}
+      ${st.blockedDates.map(d=>`<tr><td>${d}</td><td><button class="btn-ghost-danger" onclick="removeBlockedDate('${d}')">retirer</button></td></tr>`).join('')}
       ${st.blockedDates.length===0 ? `<tr><td colspan="2" class="empty">Aucune date bloquée</td></tr>` : ''}
     </table>`;
 }
