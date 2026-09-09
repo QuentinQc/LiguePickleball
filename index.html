@@ -2709,9 +2709,13 @@ function autoStartNextSession(lastSessionDate){
   }
   const session = startNewSession(result.date);
   if(DATA.autoPublishSessions) session.published = true;
-  if(result.skipped.length){
-    showAlert(`Prochaine session créée automatiquement pour le ${result.date} — ${result.skipped.length>1?'les dates suivantes étaient bloquées et ont été sautées':'la date '+result.skipped[0]+' était bloquée et a été sautée'} : ${result.skipped.join(', ')}.`);
-  }
+  // On bascule directement sur la nouvelle session, pour que ce soit visible
+  // à l'écran tout de suite plutôt que de rester sur la session terminée.
+  VIEW = { tab:'session', sessionSubTab:'groupes' };
+  const skipNote = result.skipped.length
+    ? ` (${result.skipped.length>1 ? 'les dates suivantes étaient bloquées et ont été sautées' : 'la date '+result.skipped[0]+' était bloquée et a été sautée'} : ${result.skipped.join(', ')})`
+    : '';
+  showAlert(`✅ Session terminée — la prochaine a été créée automatiquement pour le ${result.date}${DATA.autoPublishSessions ? ', et publiée aux joueurs' : ''}.${skipNote}`);
 }
 
 // ---------- Rapports (statistiques calculées à partir de l'historique) ----------
