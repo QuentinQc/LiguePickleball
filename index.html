@@ -184,6 +184,8 @@ let LEAGUES = [];              // toutes les ligues (admins) ou non utilisé (jo
 let CURRENT_LEAGUE_ID = null;  // ligue actuellement affichée
 let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
+let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
+let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
 
 // ---------- stockage (Supabase) ----------
 let STORAGE_OK = null; // null=inconnu, true/false une fois vérifié
@@ -213,8 +215,14 @@ async function saveData(){
     console.error('Erreur de sauvegarde', e);
   }
 }
+async function loadMyOrganizations(profileId){
+  const { data, error } = await sb.from('organization_admins').select('organization_id, organizations(id, name)').eq('profile_id', profileId);
+  MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
+}
 async function loadLeagues(){
-  const { data, error } = await sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
+  let q = sb.from('leagues').select('*').order('order_index', { ascending:true, nullsFirst:false }).order('created_at', { ascending:true });
+  if(CURRENT_ORGANIZATION_ID) q = q.eq('organization_id', CURRENT_ORGANIZATION_ID);
+  const { data, error } = await q;
   LEAGUES = error ? [] : (data || []);
 }
 // Réordonne les ligues par glisser-déposer et sauvegarde le nouvel ordre.
@@ -249,8 +257,9 @@ function onLeagueDrop(ev, targetLeagueId){
   reorderLeague(draggedId, targetLeagueId);
 }
 async function createLeague(name, scheduleLabel, format){
+  if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation sélectionnée — impossible de créer une ligue."); return null; }
   const nextOrder = LEAGUES.reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
-  const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder }).select().single();
+  const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder, organization_id: CURRENT_ORGANIZATION_ID }).select().single();
   if(error){ showAlert("Erreur lors de la création : " + error.message); return null; }
   const fresh = defaultData();
   fresh.leagueName = name;
@@ -300,6 +309,19 @@ async function switchToLeague(leagueId){
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
+}
+// Change l'organisation affichée par un admin qui en gère plusieurs.
+async function switchToOrganization(orgId){
+  CURRENT_ORGANIZATION_ID = orgId;
+  CURRENT_LEAGUE_ID = null;
+  await loadLeagues();
+  if(LEAGUES.length === 0){
+    DATA = defaultData();
+    VIEW = { tab:'session' };
+    render();
+    return;
+  }
+  await switchToLeague(LEAGUES[0].id);
 }
 // Vérifie si le compte admin courant est lui-même lié à un joueur dans cette ligue.
 async function refreshMyLinkForCurrentLeague(){
@@ -1128,10 +1150,22 @@ async function onAuthResolved(user){
     return;
   }
   CURRENT_PROFILE = profile;
-  await loadLeagues();
 
   if(profile.role === 'admin'){
     SESSION_USER = { role:'admin', email: profile.email };
+    await loadMyOrganizations(profile.id);
+    if(MY_ORGANIZATIONS.length === 0){
+      // Un admin sans organisation (cas rare/legacy) : filet de sécurité.
+      CURRENT_ORGANIZATION_ID = null;
+      LEAGUES = [];
+      CURRENT_LEAGUE_ID = null;
+      DATA = defaultData();
+      VIEW = { tab:'session' };
+      render();
+      return;
+    }
+    CURRENT_ORGANIZATION_ID = (CURRENT_ORGANIZATION_ID && MY_ORGANIZATIONS.some(o=>o.id===CURRENT_ORGANIZATION_ID)) ? CURRENT_ORGANIZATION_ID : MY_ORGANIZATIONS[0].id;
+    await loadLeagues();
     await loadMyLeagueLinks(profile.id); // pour le sélecteur de ligue dans sa propre vue joueur
     if(LEAGUES.length === 0){
       // Aucune ligue n'existe encore : l'admin devra en créer une.
@@ -1147,6 +1181,8 @@ async function onAuthResolved(user){
   }
 
   // Joueur ou remplaçant : on regarde dans quelle(s) ligue(s) ce compte est lié.
+  CURRENT_ORGANIZATION_ID = null;
+  await loadLeagues();
   await loadMyLeagueLinks(profile.id);
   if(MY_LEAGUE_LINKS.length === 0){
     SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
@@ -1206,8 +1242,23 @@ async function onCreateMyOwnOrganization(){
     if(error){ showAlert("Erreur lors de la création : " + error.message); return; }
     const { error: err2 } = await sb.from('profiles').update({ role:'admin', organization_id: org.id }).eq('id', CURRENT_PROFILE.id);
     if(err2){ showAlert("Erreur lors de la mise à jour du compte : " + err2.message); return; }
+    const { error: err3 } = await sb.from('organization_admins').insert({ profile_id: CURRENT_PROFILE.id, organization_id: org.id });
+    if(err3){ showAlert("Erreur lors de la liaison à l'organisation : " + err3.message); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
+  });
+}
+// Un admin déjà en poste crée une organisation supplémentaire (et y reste
+// admin en plus de ses organisations actuelles).
+async function onCreateOrganization(){
+  showPrompt("Nom de la nouvelle organisation :", '', async (name)=>{
+    if(!name || !name.trim()) return;
+    const { data: org, error } = await sb.from('organizations').insert({ name: name.trim() }).select().single();
+    if(error){ showAlert("Erreur lors de la création : " + error.message); return; }
+    const { error: err2 } = await sb.from('organization_admins').insert({ profile_id: CURRENT_PROFILE.id, organization_id: org.id });
+    if(err2){ showAlert("Erreur lors de la liaison à l'organisation : " + err2.message); return; }
+    await loadMyOrganizations(CURRENT_PROFILE.id);
+    await switchToOrganization(org.id);
   });
 }
 async function logout(){
@@ -1219,6 +1270,8 @@ async function logout(){
   CURRENT_LEAGUE_ID = null;
   MY_LEAGUE_LINKS = [];
   MY_LINK_IN_CURRENT_LEAGUE = null;
+  MY_ORGANIZATIONS = [];
+  CURRENT_ORGANIZATION_ID = null;
   DATA = null;
   VIEW = {};
   render();
@@ -1227,13 +1280,21 @@ async function logout(){
 // ---- Admin ----
 function renderAdmin(){
   if(!CURRENT_LEAGUE_ID){
-    // Aucune ligue n'existe encore.
+    // Aucune ligue n'existe encore (dans cette organisation).
+    const orgSwitcher0 = MY_ORGANIZATIONS.length > 1 ? `
+      <div class="card">
+        <label style="display:block;margin-bottom:6px;">Organisation actuelle</label>
+        <div class="row" style="gap:6px;">
+          ${MY_ORGANIZATIONS.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')}
+        </div>
+      </div>` : '';
     app.innerHTML = `
       ${topbarHTML('Espace administrateur')}
       ${storageBannerHTML()}
+      ${orgSwitcher0}
       <div class="card">
         <h2>Bienvenue !</h2>
-        <p class="small">Aucune ligue n'a encore été créée. Commence par en créer une pour pouvoir ajouter des groupes et des joueurs.</p>
+        <p class="small">Aucune ligue n'a encore été créée dans cette organisation. Commence par en créer une pour pouvoir ajouter des groupes et des joueurs.</p>
         <button class="btn btn-primary" onclick="onCreateLeague()">Créer ma première ligue</button>
       </div>`;
     return;
@@ -1246,6 +1307,13 @@ function renderAdmin(){
       <button class="active" disabled>Admin</button>
       ${canViewAsPlayer ? `<button onclick="toggleAdminPlayerView()">Joueur</button>` : ''}
       ${canViewAsSub ? `<button onclick="toggleAdminSubView()">Remplaçant</button>` : ''}
+    </div>` : '';
+  const orgSwitcher = MY_ORGANIZATIONS.length > 1 ? `
+    <div class="card">
+      <label style="display:block;margin-bottom:6px;">Organisation actuelle</label>
+      <div class="row" style="gap:6px;">
+        ${MY_ORGANIZATIONS.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')}
+      </div>
     </div>` : '';
   const leagueSwitcher = `
     <div class="card">
@@ -1262,6 +1330,7 @@ function renderAdmin(){
   app.innerHTML = `
     ${topbarHTML('Espace administrateur', modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>')}
     ${storageBannerHTML()}
+    ${orgSwitcher}
     ${leagueSwitcher}
     <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
@@ -3047,6 +3116,10 @@ function adminSettingsSectionHTML(){
     </div>
   </div>`;
   html += `<div class="card"><button class="btn-ghost" onclick="onCreateLeague()">➕ Créer une nouvelle ligue</button></div>`;
+  html += `<div class="card">
+    <button class="btn-ghost" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
+    <p class="small" style="margin-top:8px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
+  </div>`;
   return html;
 }
 
