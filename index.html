@@ -197,6 +197,8 @@ let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de
 
 // ---------- stockage (Supabase) ----------
 let STORAGE_OK = null; // null=inconnu, true/false une fois vérifié
+let OFFLINE_MODE = false; // vrai quand on affiche une copie locale (pas de connexion)
+let OFFLINE_CACHED_AT = null;
 let SAVE_ERROR = null;
 
 async function loadData(leagueId){
@@ -204,12 +206,35 @@ async function loadData(leagueId){
     const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
     if(error) throw error;
     STORAGE_OK = true;
-    return (data && data.data && Object.keys(data.data).length>0) ? data.data : null;
+    OFFLINE_MODE = false;
+    const result = (data && data.data && Object.keys(data.data).length>0) ? data.data : null;
+    if(result) cacheDataLocally(leagueId, result);
+    return result;
   }catch(e){
     console.error('Erreur de chargement', e);
     STORAGE_OK = false;
+    // Repli sur la dernière copie connue (vue lors d'une connexion précédente
+    // sur cet appareil), pour éviter d'afficher une ligue vide.
+    const cached = getCachedDataLocally(leagueId);
+    if(cached){
+      OFFLINE_MODE = true;
+      OFFLINE_CACHED_AT = cached.cachedAt;
+      return cached.data;
+    }
+    OFFLINE_MODE = false;
     return null;
   }
+}
+// ---- Cache local (hors ligne) : garde une copie des dernières données vues
+// sur cet appareil, pour pouvoir au moins les consulter sans connexion. ----
+function cacheDataLocally(leagueId, data){
+  try{ localStorage.setItem('cachedData_'+leagueId, JSON.stringify({ data, cachedAt: new Date().toISOString() })); }catch(e){}
+}
+function getCachedDataLocally(leagueId){
+  try{
+    const raw = localStorage.getItem('cachedData_'+leagueId);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
 }
 async function saveData(){
   if(!CURRENT_LEAGUE_ID) return;
@@ -1081,6 +1106,13 @@ function applyRatingUpdates(session){
 const app = document.getElementById('app');
 
 function storageBannerHTML(){
+  if(OFFLINE_MODE){
+    const when = OFFLINE_CACHED_AT ? new Date(OFFLINE_CACHED_AT).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' }) : '';
+    return `<div class="card" style="border-color:#FF9F0A;background:rgba(255,159,10,0.12);">
+      <strong style="color:#FF9F0A;">📴 Hors ligne — dernières données vues${when ? ' ('+when+')' : ''}</strong>
+      <p class="small">Impossible de joindre le serveur en ce moment. Tu vois ci-dessous les dernières données enregistrées sur cet appareil — la saisie de scores et toute autre modification sont désactivées jusqu'au retour de la connexion.</p>
+    </div>`;
+  }
   if(STORAGE_OK === false){
     return `<div class="card" style="border-color:var(--danger);background:rgba(233,85,107,0.12);">
       <strong style="color:var(--danger);">Connexion à la base de données indisponible</strong>
@@ -1370,6 +1402,8 @@ async function logout(){
   MY_ORGANIZATIONS = [];
   CURRENT_ORGANIZATION_ID = null;
   SUPER_ADMIN_MODE = false;
+  OFFLINE_MODE = false;
+  OFFLINE_CACHED_AT = null;
   ALL_ORGANIZATIONS = [];
   DATA = null;
   VIEW = {};
@@ -4118,19 +4152,21 @@ function playerGroupHTML(me){
     html += `<div class="card">
       <h3>Ma présence — session du ${open.date}</h3>
       <p class="small">${absent ? "Tu es indiqué(e) comme absent(e) pour cette session." : "Indique ici si tu seras absent(e) pour cette session, avant que les matchs soient finalisés."}</p>
-      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${me.id}')">${absent ? 'Je serai présent(e) finalement' : 'Je serai absent(e) pour cette session'}</button>
+      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" ${OFFLINE_MODE?'disabled title="Hors ligne — réessaie une fois la connexion revenue"':''} onclick="toggleAbsence('${me.id}')">${absent ? 'Je serai présent(e) finalement' : 'Je serai absent(e) pour cette session'}</button>
     </div>`;
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
     if(!open.published){
       html += `<div class="card"><p class="small">La session du ${open.date} est en préparation. Tes matchs seront visibles ici une fois qu'un administrateur l'aura publiée.</p></div>`;
     } else if(gd && gd.matches.length){
       html += `<div class="card"><h3>Matchs de la session en cours (${open.date})</h3>`;
-      if(DATA.allowPlayerScoreEntry){
+      if(DATA.allowPlayerScoreEntry && !OFFLINE_MODE){
         html += `<p class="small">Tu peux entrer les scores directement ci-dessous.</p>`;
+      } else if(DATA.allowPlayerScoreEntry && OFFLINE_MODE){
+        html += `<p class="small" style="color:#FF9F0A;">📴 Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</p>`;
       }
       gd.matches.forEach((m,mi)=>{
         const mine = m.teamA.includes(me.id) || m.teamB.includes(me.id);
-        const scoreDisplay = DATA.allowPlayerScoreEntry
+        const scoreDisplay = (DATA.allowPlayerScoreEntry && !OFFLINE_MODE)
           ? `<input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${me.groupId}','${mi}','A',this.value)"> : <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${me.groupId}','${mi}','B',this.value)">`
           : `${m.scoreA===null?'—':m.scoreA} : ${m.scoreB===null?'—':m.scoreB}`;
         html += `<div class="match-row ${mine?'me':''}">
