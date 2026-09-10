@@ -2286,8 +2286,9 @@ function bracketDisplayHTML(t){
       ${t.bracket.rounds.map((round,ri)=>`
         <div class="bracket-round-col">
           <div class="bracket-round-title">${bracketRoundLabel(ri,lastIndex)}</div>
-          <div class="row" style="justify-content:center;">
+          <div class="row" style="justify-content:center;flex-wrap:wrap;gap:6px;">
             <button class="format-chip" onclick="openEditRoundFormatModal('${t.id}',${ri})">⚙️ ${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : 'Format'}</button>
+            <button class="btn-ghost" style="padding:5px 10px;font-size:11px;margin:0 auto 10px;" onclick="simulateSingleRound('${t.id}',${ri})">🧪 Simuler</button>
           </div>
           ${round.matches.map((m,mi)=>{
             const aName = teamName(m.teamAId), bName = teamName(m.teamBId);
@@ -2455,7 +2456,10 @@ function poolsDisplayHTML(t){
     <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.</p>
     ${t.pools.map(pool=>{
       const standings = computePoolStandings(pool);
-      return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
+      return `<div class="row" style="justify-content:space-between;align-items:center;margin:14px 0 6px;">
+        <h4 style="margin:0;">${escapeHTML(pool.name)}</h4>
+        <button class="btn-ghost" onclick="simulateSinglePool('${t.id}','${pool.id}')">🧪 Simuler cette poule</button>
+      </div>
         ${pool.matches.map((m,mi)=>{
           const games = m.games && m.games.length ? m.games : newEmptyGames(1);
           const tally = computeGamesWinner(games, m.teamAId, m.teamBId);
@@ -2517,33 +2521,70 @@ function autoFormTeamsForSimulation(t){
     }
   }
 }
+function simulateOnePool(t, pool){
+  pool.matches.forEach(m=>{
+    const alreadyPlayed = (m.games||[]).some(g=>g.scoreA!==null);
+    if(alreadyPlayed) return; // déjà joué : on ne l'écrase pas
+    const teamA = t.teams.find(x=>x.id===m.teamAId);
+    const teamB = t.teams.find(x=>x.id===m.teamBId);
+    m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, t.poolsMatchFormat);
+  });
+}
+function simulateSinglePool(tournamentId, poolId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.pools) return;
+  const pool = t.pools.find(p=>p.id===poolId);
+  if(!pool) return;
+  showConfirm(`Simuler seulement la « ${pool.name} » avec des scores aléatoires ?`, ()=>{
+    pool.matches.forEach(m=>{ m.games = newEmptyGames(t.poolsMatchFormat?t.poolsMatchFormat.bestOf:1); });
+    simulateOnePool(t, pool);
+    saveAndRender();
+  });
+}
 function simulatePoolMatches(t){
-  t.pools.forEach(pool=>{
-    pool.matches.forEach(m=>{
-      const alreadyPlayed = (m.games||[]).some(g=>g.scoreA!==null);
-      if(alreadyPlayed) return; // déjà joué : on ne l'écrase pas
-      const teamA = t.teams.find(x=>x.id===m.teamAId);
-      const teamB = t.teams.find(x=>x.id===m.teamBId);
-      m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, t.poolsMatchFormat);
-    });
+  t.pools.forEach(pool=> simulateOnePool(t, pool));
+}
+function simulateOneRound(t, ri){
+  const round = t.bracket.rounds[ri];
+  round.matches.forEach((m, mi)=>{
+    if(m.winnerTeamId) return; // déjà résolu (bye ou déjà joué)
+    if(!m.teamAId || !m.teamBId) return; // en attente d'une ronde précédente
+    const teamA = t.teams.find(x=>x.id===m.teamAId);
+    const teamB = t.teams.find(x=>x.id===m.teamBId);
+    const roundFormat = round.matchFormat || t.matchFormat;
+    m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, roundFormat);
+    const result = computeGamesWinner(m.games, m.teamAId, m.teamBId);
+    m.winnerTeamId = result.winnerTeamId;
+    if(ri < t.bracket.rounds.length-1){
+      const nextMatch = t.bracket.rounds[ri+1].matches[Math.floor(mi/2)];
+      if(mi%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
+    }
   });
 }
 function simulateBracketMatches(t){
-  t.bracket.rounds.forEach((round, ri)=>{
-    round.matches.forEach((m, mi)=>{
-      if(m.winnerTeamId) return; // déjà résolu (bye ou déjà joué)
-      if(!m.teamAId || !m.teamBId) return; // en attente, sera rempli par la ronde précédente dans cette même passe
-      const teamA = t.teams.find(x=>x.id===m.teamAId);
-      const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const roundFormat = round.matchFormat || t.matchFormat;
-      m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, roundFormat);
-      const result = computeGamesWinner(m.games, m.teamAId, m.teamBId);
-      m.winnerTeamId = result.winnerTeamId;
-      if(ri < t.bracket.rounds.length-1){
-        const nextMatch = t.bracket.rounds[ri+1].matches[Math.floor(mi/2)];
-        if(mi%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
-      }
+  t.bracket.rounds.forEach((round, ri)=> simulateOneRound(t, ri));
+}
+// Simule seulement une ronde précise du bracket (doit déjà avoir ses deux
+// équipes déterminées par la ronde précédente).
+function simulateSingleRound(tournamentId, roundIndex){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.bracket) return;
+  const round = t.bracket.rounds[roundIndex];
+  const realMatches = round.matches.filter(m=>!m.isBye);
+  if(realMatches.some(m=> !m.teamAId || !m.teamBId)){
+    showAlert("Certains affrontements de cette ronde ne sont pas encore déterminés — complète (ou simule) la ronde précédente d'abord.");
+    return;
+  }
+  showConfirm(`Simuler seulement « ${bracketRoundLabel(roundIndex, t.bracket.rounds.length-1)} » avec des scores aléatoires ?`, ()=>{
+    round.matches.forEach(m=>{
+      if(m.isBye) return;
+      m.games = newEmptyGames(round.matchFormat ? round.matchFormat.bestOf : 1);
+      m.winnerTeamId = null;
     });
+    simulateOneRound(t, roundIndex);
+    const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
+    t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
+    saveAndRender();
   });
 }
 function resetBracketResultsKeepingStructure(bracket){
