@@ -1872,16 +1872,16 @@ function convertSubstituteToPlayer(subId){
 function editSubstituteInPool(id){
   const s = (DATA.substitutePool||[]).find(x=>x.id===id);
   if(!s) return;
-  showPrompt('Nom :', s.name, (name)=>{
-    if(!name || !name.trim()) return;
-    s.name = name.trim();
-    showPrompt('Courriel (laisser vide pour aucun) :', s.email||'', (email)=>{
-      s.email = email && email.trim() ? email.trim() : undefined;
-      showPrompt('Notes (laisser vide pour aucune) :', s.notes||'', (notes)=>{
-        s.notes = notes && notes.trim() ? notes.trim() : undefined;
-        saveAndRender();
-      });
-    });
+  const html = `
+    <div class="field"><label>Nom</label><input id="editSubName" value="${escapeHTML(s.name)}"></div>
+    <div class="field"><label>Courriel</label><input id="editSubEmail" type="email" value="${escapeHTML(s.email||'')}"></div>
+    <div class="field"><label>Notes</label><input id="editSubNotes" value="${escapeHTML(s.notes||'')}"></div>`;
+  showFormModal('Modifier ' + s.name, html, ()=>{
+    const name = document.getElementById('editSubName').value.trim();
+    if(!name){ showAlert("Le nom est requis."); return false; }
+    s.name = name;
+    s.email = document.getElementById('editSubEmail').value.trim();
+    s.notes = document.getElementById('editSubNotes').value.trim();
   });
 }
 function removeSubstituteFromPool(id){
