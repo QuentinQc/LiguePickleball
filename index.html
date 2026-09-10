@@ -116,6 +116,11 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .bracket-round-col{display:flex;flex-direction:column;justify-content:space-around;min-width:190px;flex-shrink:0;}
 .bracket-round-title{font-family:var(--font-display);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);text-align:center;margin-bottom:10px;}
 .bracket-match{background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 10px;margin:10px 0;}
+.format-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(207,234,92,0.10);color:var(--ball);border:1px solid rgba(207,234,92,0.35);border-radius:999px;padding:5px 12px;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s ease;margin:0 auto 10px;}
+.format-chip:hover{background:rgba(207,234,92,0.2);}
+.pool-match-card{background:rgba(255,255,255,0.04);border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+.pool-match-card .pool-team-name{font-weight:600;font-size:14px;}
+.pool-game-inputs{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;}
 .bracket-match .team-line{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px;}
 .bracket-match .team-line.won{font-weight:700;color:var(--ball);}
 .match-row:last-child{border-bottom:none;}
@@ -2260,8 +2265,8 @@ function bracketDisplayHTML(t){
       ${t.bracket.rounds.map((round,ri)=>`
         <div class="bracket-round-col">
           <div class="bracket-round-title">${bracketRoundLabel(ri,lastIndex)}</div>
-          <div class="row" style="justify-content:center;margin-bottom:8px;">
-            <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="openEditRoundFormatModal('${t.id}',${ri})">${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : '⚙️'}</button>
+          <div class="row" style="justify-content:center;">
+            <button class="format-chip" onclick="openEditRoundFormatModal('${t.id}',${ri})">⚙️ ${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : 'Format'}</button>
           </div>
           ${round.matches.map((m,mi)=>{
             const aName = teamName(m.teamAId), bName = teamName(m.teamBId);
@@ -2420,11 +2425,13 @@ function poolsDisplayHTML(t){
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Poules</h3>
       <div class="row" style="gap:6px;">
-        <button class="btn-ghost" onclick="openGeneratePoolsModal('${t.id}')">⚙️ Régler le nombre de poules</button>
         <button class="btn btn-primary" onclick="finalizePoolsAndGenerateBracket('${t.id}')">${t.bracket ? '🔄 Regénérer le bracket final' : '🏆 Générer le bracket final'}</button>
       </div>
     </div>
-    <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.${t.poolsMatchFormat ? ` Format : ${t.poolsMatchFormat.pointsToWin} points${t.poolsMatchFormat.bestOf>1?' · Meilleur de '+t.poolsMatchFormat.bestOf:''}.` : ''}</p>
+    <div class="row" style="justify-content:center;margin:6px 0 4px;">
+      <button class="format-chip" onclick="openGeneratePoolsModal('${t.id}')">⚙️ ${t.poolsMatchFormat ? t.poolsMatchFormat.pointsToWin+' pts'+(t.poolsMatchFormat.bestOf>1?' · Bo'+t.poolsMatchFormat.bestOf:'') : 'Format des poules'}</button>
+    </div>
+    <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.</p>
     ${t.pools.map(pool=>{
       const standings = computePoolStandings(pool);
       return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
@@ -2432,12 +2439,14 @@ function poolsDisplayHTML(t){
           const games = m.games && m.games.length ? m.games : newEmptyGames(1);
           const tally = computeGamesWinner(games, m.teamAId, m.teamBId);
           const showTally = games.length > 1;
-          return `<div style="margin-bottom:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+          const aWon = tally.winnerTeamId && tally.winnerTeamId===m.teamAId;
+          const bWon = tally.winnerTeamId && tally.winnerTeamId===m.teamBId;
+          return `<div class="pool-match-card">
             <div class="row" style="justify-content:space-between;">
-              <span>${escapeHTML(teamName(m.teamAId))}${showTally?` <span class="small">(${tally.winsA})</span>`:''}</span>
-              <span>${escapeHTML(teamName(m.teamBId))}${showTally?` <span class="small">(${tally.winsB})</span>`:''}</span>
+              <span class="pool-team-name" style="${aWon?'color:var(--ball);':''}">${escapeHTML(teamName(m.teamAId))}${showTally?` <span class="small">(${tally.winsA})</span>`:''}</span>
+              <span class="pool-team-name" style="text-align:right;${bWon?'color:var(--ball);':''}">${escapeHTML(teamName(m.teamBId))}${showTally?` <span class="small">(${tally.winsB})</span>`:''}</span>
             </div>
-            <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:4px;">
+            <div class="pool-game-inputs">
               ${games.map((g,gi)=>`<span class="row" style="gap:4px;align-items:center;">
                 ${games.length>1?`<span class="small">J${gi+1}</span>`:''}
                 <input class="pill-input" type="number" min="0" value="${g.scoreA===null?'':g.scoreA}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},${gi},'A',this.value)">
