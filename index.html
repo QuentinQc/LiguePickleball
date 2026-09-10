@@ -2124,7 +2124,8 @@ function propagateByeWinners(rounds){
     }
   }
 }
-function buildSingleElimBracket(teams){
+function buildSingleElimBracket(teams, defaultFormat){
+  const fmt = defaultFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
   const seeded = teams.slice().sort((a,b)=>{
     const as = typeof a.seed==='number' ? a.seed : -Infinity;
     const bs = typeof b.seed==='number' ? b.seed : -Infinity;
@@ -2140,13 +2141,13 @@ function buildSingleElimBracket(teams){
     const a = teamsInSlots[i], b = teamsInSlots[i+1];
     round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye: (!a || !b) });
   }
-  const rounds = [{ roundNumber:1, matches: round1Matches }];
+  const rounds = [{ roundNumber:1, matches: round1Matches, matchFormat: {...fmt} }];
   let prevCount = round1Matches.length;
   let roundNum = 2;
   while(prevCount > 1){
     const matches = [];
     for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye:false }); }
-    rounds.push({ roundNumber: roundNum, matches });
+    rounds.push({ roundNumber: roundNum, matches, matchFormat: {...fmt} });
     prevCount = matches.length;
     roundNum++;
   }
@@ -2164,7 +2165,7 @@ function generateBracket(tournamentId){
   }
   const msg = t.bracket ? "Regénérer le bracket effacera tous les résultats déjà entrés. Continuer ?" : "Générer le bracket avec les équipes actuelles ?";
   showConfirm(msg, ()=>{
-    t.bracket = buildSingleElimBracket(t.teams);
+    t.bracket = buildSingleElimBracket(t.teams, t.matchFormat);
     t.status = 'in_progress';
     saveAndRender();
   });
@@ -2187,6 +2188,36 @@ function setBracketMatchScore(tournamentId, roundIndex, matchIndex, which, value
   const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
   t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
   saveData();
+}
+function openEditRoundFormatModal(tournamentId, roundIndex){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.bracket) return;
+  const round = t.bracket.rounds[roundIndex];
+  const fmt = round.matchFormat || t.matchFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
+  const lastIndex = t.bracket.rounds.length-1;
+  const html = `
+    <p class="small">Format des matchs pour : <strong>${bracketRoundLabel(roundIndex,lastIndex)}</strong></p>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="roundPoints" type="number" min="1" value="${fmt.pointsToWin}"></div>
+      <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
+        <select id="roundBestOf">
+          <option value="1" ${fmt.bestOf===1?'selected':''}>1 match</option>
+          <option value="3" ${fmt.bestOf===3?'selected':''}>Meilleur de 3</option>
+          <option value="5" ${fmt.bestOf===5?'selected':''}>Meilleur de 5</option>
+        </select>
+      </div>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="roundWinByTwo" ${fmt.winByTwo?'checked':''} style="width:auto;">
+      <span class="small">Gagner par 2 points d'écart</span>
+    </label>`;
+  showFormModal('Format de match — ' + bracketRoundLabel(roundIndex,lastIndex), html, ()=>{
+    round.matchFormat = {
+      pointsToWin: Math.max(1, parseInt(document.getElementById('roundPoints').value,10) || 11),
+      bestOf: parseInt(document.getElementById('roundBestOf').value,10) || 1,
+      winByTwo: document.getElementById('roundWinByTwo').checked
+    };
+  });
 }
 function bracketRoundLabel(r, lastIndex){
   const remaining = lastIndex - r;
@@ -2212,6 +2243,9 @@ function bracketDisplayHTML(t){
       ${t.bracket.rounds.map((round,ri)=>`
         <div class="bracket-round-col">
           <div class="bracket-round-title">${bracketRoundLabel(ri,lastIndex)}</div>
+          <div class="row" style="justify-content:center;margin-bottom:8px;">
+            <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="openEditRoundFormatModal('${t.id}',${ri})">${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : '⚙️'}</button>
+          </div>
           ${round.matches.map((m,mi)=>{
             const aName = teamName(m.teamAId), bName = teamName(m.teamBId);
             const aWon = m.winnerTeamId && m.winnerTeamId===m.teamAId;
@@ -2235,14 +2269,36 @@ function openGeneratePoolsModal(tournamentId){
   const maxPools = Math.max(2, Math.floor(t.teams.length/2));
   const currentNumPools = t.pools ? t.pools.length : 2;
   const currentAdvance = t.poolsConfig ? t.poolsConfig.advancePerPool : 2;
+  const pf = t.poolsMatchFormat || t.matchFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
   const html = `
     ${t.pools ? `<p class="small" style="color:var(--danger);">⚠️ Des poules existent déjà — régénérer effacera tous les scores de poules déjà entrés${t.bracket ? ' ainsi que le bracket final' : ''}.</p>` : ''}
     <div class="field"><label>Nombre de poules</label><input id="numPools" type="number" min="2" max="${maxPools}" value="${currentNumPools}"></div>
     <div class="field"><label>Équipes qui avancent par poule</label><input id="advancePerPool" type="number" min="1" value="${currentAdvance}"></div>
-    <p class="small">Chaque poule joue un tout-contre-tous ; les meilleures équipes de chaque poule (victoires puis différentiel de points) avancent ensuite au bracket final.</p>`;
+    <h3 style="margin-top:12px;">Format des matchs de poules</h3>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="poolsPoints" type="number" min="1" value="${pf.pointsToWin}"></div>
+      <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
+        <select id="poolsBestOf">
+          <option value="1" ${pf.bestOf===1?'selected':''}>1 match</option>
+          <option value="3" ${pf.bestOf===3?'selected':''}>Meilleur de 3</option>
+          <option value="5" ${pf.bestOf===5?'selected':''}>Meilleur de 5</option>
+        </select>
+      </div>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="poolsWinByTwo" ${pf.winByTwo?'checked':''} style="width:auto;">
+      <span class="small">Gagner par 2 points d'écart</span>
+    </label>
+    <p class="small" style="margin-top:10px;">Chaque poule joue un tout-contre-tous ; les meilleures équipes de chaque poule (victoires puis différentiel de points) avancent ensuite au bracket final.</p>`;
   showFormModal(t.pools ? 'Régénérer les poules' : 'Générer les poules', html, ()=>{
     const numPools = Math.max(2, parseInt(document.getElementById('numPools').value,10) || 2);
     const advancePerPool = Math.max(1, parseInt(document.getElementById('advancePerPool').value,10) || 2);
+    const poolsMatchFormat = {
+      pointsToWin: Math.max(1, parseInt(document.getElementById('poolsPoints').value,10) || 11),
+      bestOf: parseInt(document.getElementById('poolsBestOf').value,10) || 1,
+      winByTwo: document.getElementById('poolsWinByTwo').checked
+    };
+    t.poolsMatchFormat = poolsMatchFormat;
     generatePools(t.id, numPools, advancePerPool);
   });
 }
@@ -2315,7 +2371,7 @@ function finalizePoolsAndGenerateBracket(tournamentId){
   });
   const msg = t.bracket ? "Regénérer le bracket final effacera les résultats déjà entrés. Continuer ?" : `Générer le bracket final avec les ${advancing.length} équipes qualifiées ?`;
   showConfirm(msg, ()=>{
-    t.bracket = buildSingleElimBracket(advancing);
+    t.bracket = buildSingleElimBracket(advancing, t.matchFormat);
     t.status = 'in_progress';
     saveAndRender();
   });
@@ -2331,7 +2387,7 @@ function poolsDisplayHTML(t){
         <button class="btn btn-primary" onclick="finalizePoolsAndGenerateBracket('${t.id}')">${t.bracket ? '🔄 Regénérer le bracket final' : '🏆 Générer le bracket final'}</button>
       </div>
     </div>
-    <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.</p>
+    <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.${t.poolsMatchFormat ? ` Format : ${t.poolsMatchFormat.pointsToWin} points${t.poolsMatchFormat.bestOf>1?' · Meilleur de '+t.poolsMatchFormat.bestOf:''}.` : ''}</p>
     ${t.pools.map(pool=>{
       const standings = computePoolStandings(pool);
       return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
@@ -2376,7 +2432,7 @@ function simulatePoolMatches(t){
       if(m.scoreA!==null && m.scoreB!==null) return; // déjà joué : on ne l'écrase pas
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.matchFormat?t.matchFormat.pointsToWin:11);
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.poolsMatchFormat?t.poolsMatchFormat.pointsToWin:11);
       m.scoreA = scoreA; m.scoreB = scoreB;
     });
   });
@@ -2388,7 +2444,8 @@ function simulateBracketMatches(t){
       if(!m.teamAId || !m.teamBId) return; // en attente, sera rempli par la ronde précédente dans cette même passe
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.matchFormat?t.matchFormat.pointsToWin:11);
+      const roundFormat = round.matchFormat || t.matchFormat;
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, roundFormat?roundFormat.pointsToWin:11);
       m.scoreA = scoreA; m.scoreB = scoreB;
       m.winnerTeamId = scoreA > scoreB ? m.teamAId : m.teamBId;
       if(ri < t.bracket.rounds.length-1){
@@ -2420,9 +2477,9 @@ function simulateTournament(tournamentId){
           if(team) advancing.push({ ...team, seed: (t.teams.length*10) - rank });
         });
       });
-      t.bracket = buildSingleElimBracket(advancing);
+      t.bracket = buildSingleElimBracket(advancing, t.matchFormat);
     } else if(!t.bracket){
-      t.bracket = buildSingleElimBracket(t.teams);
+      t.bracket = buildSingleElimBracket(t.teams, t.matchFormat);
     }
     simulateBracketMatches(t);
     t.status = 'completed';
