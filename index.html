@@ -2011,7 +2011,8 @@ function formTeamsFormHTML(){
   const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
   const pairedIds = new Set(st.pairs.flat());
   const unpaired = t.participants.filter(p=>!pairedIds.has(p.id) && p.id !== st.pending);
-  let html = `<p class="small">Clique sur deux joueurs pour les jumeler en équipe.${st.pending ? ' En attente d\'un ou une partenaire pour <strong>'+escapeHTML((t.participants.find(p=>p.id===st.pending)||{}).name||'')+'</strong>…' : ''}</p>`;
+  let html = (t && (t.pools || t.bracket)) ? `<p class="small" style="color:var(--danger);">⚠️ Des poules ou un bracket existent déjà pour ce tournoi — modifier les équipes ne les mettra pas à jour automatiquement ; tu devras les régénérer après.</p>` : '';
+  html += `<p class="small">Clique sur deux joueurs pour les jumeler en équipe.${st.pending ? ' En attente d\'un ou une partenaire pour <strong>'+escapeHTML((t.participants.find(p=>p.id===st.pending)||{}).name||'')+'</strong>…' : ''}</p>`;
   html += `<h3 style="margin-top:12px;">Équipes formées</h3>`;
   html += st.pairs.length ? st.pairs.map((pair,i)=>{
     const names = pair.map(id=>{ const p = t.participants.find(x=>x.id===id); return p?p.name:'?'; });
@@ -2185,11 +2186,14 @@ function openGeneratePoolsModal(tournamentId){
   if(!t) return;
   if(!t.teams || t.teams.length < 4){ showAlert("Il faut au moins 4 équipes pour des poules."); return; }
   const maxPools = Math.max(2, Math.floor(t.teams.length/2));
+  const currentNumPools = t.pools ? t.pools.length : 2;
+  const currentAdvance = t.poolsConfig ? t.poolsConfig.advancePerPool : 2;
   const html = `
-    <div class="field"><label>Nombre de poules</label><input id="numPools" type="number" min="2" max="${maxPools}" value="2"></div>
-    <div class="field"><label>Équipes qui avancent par poule</label><input id="advancePerPool" type="number" min="1" value="2"></div>
+    ${t.pools ? `<p class="small" style="color:var(--danger);">⚠️ Des poules existent déjà — régénérer effacera tous les scores de poules déjà entrés${t.bracket ? ' ainsi que le bracket final' : ''}.</p>` : ''}
+    <div class="field"><label>Nombre de poules</label><input id="numPools" type="number" min="2" max="${maxPools}" value="${currentNumPools}"></div>
+    <div class="field"><label>Équipes qui avancent par poule</label><input id="advancePerPool" type="number" min="1" value="${currentAdvance}"></div>
     <p class="small">Chaque poule joue un tout-contre-tous ; les meilleures équipes de chaque poule (victoires puis différentiel de points) avancent ensuite au bracket final.</p>`;
-  showFormModal('Générer les poules', html, ()=>{
+  showFormModal(t.pools ? 'Régénérer les poules' : 'Générer les poules', html, ()=>{
     const numPools = Math.max(2, parseInt(document.getElementById('numPools').value,10) || 2);
     const advancePerPool = Math.max(1, parseInt(document.getElementById('advancePerPool').value,10) || 2);
     generatePools(t.id, numPools, advancePerPool);
@@ -2271,13 +2275,16 @@ function finalizePoolsAndGenerateBracket(tournamentId){
 }
 function poolsDisplayHTML(t){
   if(!t.pools) return '';
-  const allComplete = t.pools.every(pool=> pool.matches.every(m=> m.scoreA!==null && m.scoreB!==null));
   const teamName = (id)=>{ const team=(t.teams||[]).find(x=>x.id===id); return team?team.memberNames.join(' & '):'?'; };
   return `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Poules</h3>
-      <button class="btn ${allComplete?'btn-primary':'btn-secondary'}" ${allComplete?'':'disabled title="Complète tous les matchs de poules d\'abord"'} onclick="finalizePoolsAndGenerateBracket('${t.id}')">${t.bracket ? '🔄 Regénérer le bracket final' : '🏆 Générer le bracket final'}</button>
+      <div class="row" style="gap:6px;">
+        <button class="btn-ghost" onclick="openGeneratePoolsModal('${t.id}')">⚙️ Régler le nombre de poules</button>
+        <button class="btn btn-primary" onclick="finalizePoolsAndGenerateBracket('${t.id}')">${t.bracket ? '🔄 Regénérer le bracket final' : '🏆 Générer le bracket final'}</button>
+      </div>
     </div>
+    <p class="small">« Générer le bracket final » vérifie que tous les matchs de poules sont complétés et t'avertit sinon.</p>
     ${t.pools.map(pool=>{
       const standings = computePoolStandings(pool);
       return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
