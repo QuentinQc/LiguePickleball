@@ -2124,6 +2124,23 @@ function propagateByeWinners(rounds){
     }
   }
 }
+// Calcule qui gagne un affrontement (peut être composé de plusieurs joutes,
+// ex: meilleur de 3) à partir de ses joutes déjà jouées.
+function computeGamesWinner(games, teamAId, teamBId){
+  const winsNeeded = Math.ceil((games||[]).length/2) || 1;
+  let winsA=0, winsB=0;
+  (games||[]).forEach(g=>{
+    if(g.scoreA===null || g.scoreB===null || g.scoreA===g.scoreB) return;
+    if(g.scoreA > g.scoreB) winsA++; else winsB++;
+  });
+  let winnerTeamId = null;
+  if(winsA>=winsNeeded) winnerTeamId = teamAId;
+  else if(winsB>=winsNeeded) winnerTeamId = teamBId;
+  return { winnerTeamId, winsA, winsB };
+}
+function newEmptyGames(bestOf){
+  return Array.from({ length: bestOf||1 }, ()=>({ scoreA:null, scoreB:null }));
+}
 function buildSingleElimBracket(teams, defaultFormat){
   const fmt = defaultFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
   const seeded = teams.slice().sort((a,b)=>{
@@ -2139,14 +2156,14 @@ function buildSingleElimBracket(teams, defaultFormat){
   const round1Matches = [];
   for(let i=0;i<teamsInSlots.length;i+=2){
     const a = teamsInSlots[i], b = teamsInSlots[i+1];
-    round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye: (!a || !b) });
+    round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, games: newEmptyGames(fmt.bestOf), winnerTeamId:null, isBye: (!a || !b) });
   }
   const rounds = [{ roundNumber:1, matches: round1Matches, matchFormat: {...fmt} }];
   let prevCount = round1Matches.length;
   let roundNum = 2;
   while(prevCount > 1){
     const matches = [];
-    for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye:false }); }
+    for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, games: newEmptyGames(fmt.bestOf), winnerTeamId:null, isBye:false }); }
     rounds.push({ roundNumber: roundNum, matches, matchFormat: {...fmt} });
     prevCount = matches.length;
     roundNum++;
@@ -2170,20 +2187,20 @@ function generateBracket(tournamentId){
     saveAndRender();
   });
 }
-function setBracketMatchScore(tournamentId, roundIndex, matchIndex, which, value){
+function setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, which, value){
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
   const m = t.bracket.rounds[roundIndex].matches[matchIndex];
-  if(which==='A') m.scoreA = value===''?null:Number(value);
-  else m.scoreB = value===''?null:Number(value);
-  if(m.scoreA!==null && m.scoreB!==null && m.scoreA!==m.scoreB && m.teamAId && m.teamBId){
-    m.winnerTeamId = m.scoreA > m.scoreB ? m.teamAId : m.teamBId;
-    if(roundIndex < t.bracket.rounds.length-1){
-      const nextMatch = t.bracket.rounds[roundIndex+1].matches[Math.floor(matchIndex/2)];
-      if(matchIndex%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
-    }
-  } else {
-    m.winnerTeamId = null;
+  if(!m.games) m.games = newEmptyGames(1);
+  const g = m.games[gameIndex];
+  if(!g) return;
+  if(which==='A') g.scoreA = value===''?null:Number(value);
+  else g.scoreB = value===''?null:Number(value);
+  const result = (m.teamAId && m.teamBId) ? computeGamesWinner(m.games, m.teamAId, m.teamBId) : { winnerTeamId:null };
+  m.winnerTeamId = result.winnerTeamId;
+  if(m.winnerTeamId && roundIndex < t.bracket.rounds.length-1){
+    const nextMatch = t.bracket.rounds[roundIndex+1].matches[Math.floor(matchIndex/2)];
+    if(matchIndex%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
   }
   const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
   t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
@@ -2251,9 +2268,19 @@ function bracketDisplayHTML(t){
             const aWon = m.winnerTeamId && m.winnerTeamId===m.teamAId;
             const bWon = m.winnerTeamId && m.winnerTeamId===m.teamBId;
             const canScore = m.teamAId && m.teamBId && !m.isBye;
+            const games = m.games && m.games.length ? m.games : newEmptyGames(1);
+            const tally = canScore ? computeGamesWinner(games, m.teamAId, m.teamBId) : { winsA:0, winsB:0 };
+            const showTally = canScore && games.length > 1;
             return `<div class="bracket-match">
-              <div class="team-line ${aWon?'won':''}"><span>${escapeHTML(aName)}</span>${canScore ? `<input class="pill-input" style="width:34px;" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},'A',this.value)">` : (m.isBye && m.teamAId ? '<span class="small">bye</span>' : '')}</div>
-              <div class="team-line ${bWon?'won':''}"><span>${escapeHTML(bName)}</span>${canScore ? `<input class="pill-input" style="width:34px;" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},'B',this.value)">` : (m.isBye && m.teamBId ? '<span class="small">bye</span>' : '')}</div>
+              <div class="team-line ${aWon?'won':''}"><span>${escapeHTML(aName)}</span>${showTally ? `<span class="small">${tally.winsA}</span>` : ''}</div>
+              <div class="team-line ${bWon?'won':''}"><span>${escapeHTML(bName)}</span>${showTally ? `<span class="small">${tally.winsB}</span>` : ''}</div>
+              ${canScore ? games.map((g,gi)=>`
+                <div class="row" style="gap:4px;align-items:center;margin-top:4px;">
+                  ${games.length>1 ? `<span class="small" style="width:16px;">J${gi+1}</span>` : ''}
+                  <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreA===null?'':g.scoreA}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},${gi},'A',this.value)">
+                  <span class="small">:</span>
+                  <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreB===null?'':g.scoreB}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},${gi},'B',this.value)">
+                </div>`).join('') : (m.isBye && (m.teamAId||m.teamBId) ? '<span class="small">(bye)</span>' : '')}
             </div>`;
           }).join('')}
         </div>`).join('')}
@@ -2323,7 +2350,7 @@ function generatePools(tournamentId, numPools, advancePerPool){
   pools.forEach(pool=>{
     for(let i=0;i<pool.teamIds.length;i++){
       for(let j=i+1;j<pool.teamIds.length;j++){
-        pool.matches.push({ id: uid('pm'), teamAId: pool.teamIds[i], teamBId: pool.teamIds[j], scoreA:null, scoreB:null });
+        pool.matches.push({ id: uid('pm'), teamAId: pool.teamIds[i], teamBId: pool.teamIds[j], games: newEmptyGames(t.poolsMatchFormat?t.poolsMatchFormat.bestOf:1) });
       }
     }
   });
@@ -2337,29 +2364,39 @@ function computePoolStandings(pool){
   const stats = {};
   pool.teamIds.forEach(id=> stats[id] = { wins:0, losses:0, pf:0, pa:0 });
   pool.matches.forEach(m=>{
-    if(m.scoreA===null || m.scoreB===null) return;
-    stats[m.teamAId].pf += m.scoreA; stats[m.teamAId].pa += m.scoreB;
-    stats[m.teamBId].pf += m.scoreB; stats[m.teamBId].pa += m.scoreA;
-    if(m.scoreA > m.scoreB){ stats[m.teamAId].wins++; stats[m.teamBId].losses++; }
-    else if(m.scoreB > m.scoreA){ stats[m.teamBId].wins++; stats[m.teamAId].losses++; }
+    const games = m.games || [];
+    let pfA=0, paA=0;
+    games.forEach(g=>{
+      if(g.scoreA===null || g.scoreB===null) return;
+      pfA += g.scoreA; paA += g.scoreB;
+    });
+    if(pfA===0 && paA===0) return; // rien de joué encore
+    const result = computeGamesWinner(games, m.teamAId, m.teamBId);
+    stats[m.teamAId].pf += pfA; stats[m.teamAId].pa += paA;
+    stats[m.teamBId].pf += paA; stats[m.teamBId].pa += pfA;
+    if(result.winnerTeamId===m.teamAId){ stats[m.teamAId].wins++; stats[m.teamBId].losses++; }
+    else if(result.winnerTeamId===m.teamBId){ stats[m.teamBId].wins++; stats[m.teamAId].losses++; }
   });
   return pool.teamIds.map(id=>({ teamId:id, ...stats[id], diff: stats[id].pf-stats[id].pa }))
     .sort((a,b)=> b.wins-a.wins || b.diff-a.diff || b.pf-a.pf);
 }
-function setPoolMatchScore(tournamentId, poolId, matchIndex, which, value){
+function setPoolMatchScore(tournamentId, poolId, matchIndex, gameIndex, which, value){
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
   const pool = t.pools.find(p=>p.id===poolId);
   if(!pool) return;
   const m = pool.matches[matchIndex];
-  if(which==='A') m.scoreA = value===''?null:Number(value);
-  else m.scoreB = value===''?null:Number(value);
+  if(!m.games) m.games = newEmptyGames(1);
+  const g = m.games[gameIndex];
+  if(!g) return;
+  if(which==='A') g.scoreA = value===''?null:Number(value);
+  else g.scoreB = value===''?null:Number(value);
   saveData();
 }
 function finalizePoolsAndGenerateBracket(tournamentId){
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
-  const allComplete = t.pools.every(pool=> pool.matches.every(m=> m.scoreA!==null && m.scoreB!==null));
+  const allComplete = t.pools.every(pool=> pool.matches.every(m=> computeGamesWinner(m.games, m.teamAId, m.teamBId).winnerTeamId));
   if(!allComplete){ showAlert("Tous les matchs de poules doivent être complétés avant de générer le bracket final."); return; }
   const advancing = [];
   t.pools.forEach(pool=>{
@@ -2391,11 +2428,25 @@ function poolsDisplayHTML(t){
     ${t.pools.map(pool=>{
       const standings = computePoolStandings(pool);
       return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
-        ${pool.matches.map((m,mi)=>`<div class="match-row" style="margin-bottom:6px;">
-          <div class="team">${escapeHTML(teamName(m.teamAId))}</div>
-          <div class="vs"><input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},'A',this.value)"> : <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},'B',this.value)"></div>
-          <div class="team" style="text-align:right;">${escapeHTML(teamName(m.teamBId))}</div>
-        </div>`).join('')}
+        ${pool.matches.map((m,mi)=>{
+          const games = m.games && m.games.length ? m.games : newEmptyGames(1);
+          const tally = computeGamesWinner(games, m.teamAId, m.teamBId);
+          const showTally = games.length > 1;
+          return `<div style="margin-bottom:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div class="row" style="justify-content:space-between;">
+              <span>${escapeHTML(teamName(m.teamAId))}${showTally?` <span class="small">(${tally.winsA})</span>`:''}</span>
+              <span>${escapeHTML(teamName(m.teamBId))}${showTally?` <span class="small">(${tally.winsB})</span>`:''}</span>
+            </div>
+            <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:4px;">
+              ${games.map((g,gi)=>`<span class="row" style="gap:4px;align-items:center;">
+                ${games.length>1?`<span class="small">J${gi+1}</span>`:''}
+                <input class="pill-input" type="number" min="0" value="${g.scoreA===null?'':g.scoreA}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},${gi},'A',this.value)">
+                <span class="small">:</span>
+                <input class="pill-input" type="number" min="0" value="${g.scoreB===null?'':g.scoreB}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},${gi},'B',this.value)">
+              </span>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
         <table style="margin-top:6px;">
           <tr><th>Équipe</th><th>V-D</th><th>Diff.</th></tr>
           ${standings.map((r,ri)=>`<tr class="${ri<t.poolsConfig.advancePerPool?'me':''}"><td>${escapeHTML(teamName(r.teamId))}${ri<t.poolsConfig.advancePerPool?' <span class="tag tag-green">qualifié</span>':''}</td><td>${r.wins}-${r.losses}</td><td>${r.diff>0?'+':''}${r.diff}</td></tr>`).join('')}
@@ -2404,14 +2455,24 @@ function poolsDisplayHTML(t){
   </div>`;
 }
 // ---- Mode test : simule tout le tournoi avec des scores aléatoires ----
-function simulateMatchScore(seedA, seedB, pointsToWin){
+function simulateMatchGames(seedA, seedB, format){
+  const fmt = format || { pointsToWin:11, bestOf:1, winByTwo:true };
+  const bestOf = fmt.bestOf || 1;
+  const winsNeeded = Math.ceil(bestOf/2);
   const sa = typeof seedA==='number' ? seedA : RATING_DEFAULT;
   const sb = typeof seedB==='number' ? seedB : RATING_DEFAULT;
   const expectedA = 1 / (1 + Math.pow(10, (sb-sa)/RATING_SCALE));
-  const aWins = Math.random() < expectedA;
-  const winnerScore = pointsToWin || 11;
-  const loserScore = Math.floor(Math.random()*Math.max(1,winnerScore-2)); // sous la barre, pour un peu de suspense
-  return aWins ? { scoreA: winnerScore, scoreB: loserScore } : { scoreA: loserScore, scoreB: winnerScore };
+  const games = [];
+  let winsA=0, winsB=0;
+  while(winsA<winsNeeded && winsB<winsNeeded && games.length<bestOf){
+    const aWins = Math.random() < expectedA;
+    const winnerScore = fmt.pointsToWin || 11;
+    const loserScore = Math.floor(Math.random()*Math.max(1,winnerScore-2)); // sous la barre, pour un peu de suspense
+    games.push(aWins ? { scoreA:winnerScore, scoreB:loserScore } : { scoreA:loserScore, scoreB:winnerScore });
+    if(aWins) winsA++; else winsB++;
+  }
+  while(games.length < bestOf) games.push({ scoreA:null, scoreB:null }); // joutes non jouées (ex: 2-0 dans un Bo3)
+  return games;
 }
 function autoFormTeamsForSimulation(t){
   if(t.teamFormat === 'singles'){
@@ -2429,11 +2490,11 @@ function autoFormTeamsForSimulation(t){
 function simulatePoolMatches(t){
   t.pools.forEach(pool=>{
     pool.matches.forEach(m=>{
-      if(m.scoreA!==null && m.scoreB!==null) return; // déjà joué : on ne l'écrase pas
+      const alreadyPlayed = (m.games||[]).some(g=>g.scoreA!==null);
+      if(alreadyPlayed) return; // déjà joué : on ne l'écrase pas
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.poolsMatchFormat?t.poolsMatchFormat.pointsToWin:11);
-      m.scoreA = scoreA; m.scoreB = scoreB;
+      m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, t.poolsMatchFormat);
     });
   });
 }
@@ -2445,9 +2506,9 @@ function simulateBracketMatches(t){
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
       const roundFormat = round.matchFormat || t.matchFormat;
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, roundFormat?roundFormat.pointsToWin:11);
-      m.scoreA = scoreA; m.scoreB = scoreB;
-      m.winnerTeamId = scoreA > scoreB ? m.teamAId : m.teamBId;
+      m.games = simulateMatchGames(teamA?teamA.seed:null, teamB?teamB.seed:null, roundFormat);
+      const result = computeGamesWinner(m.games, m.teamAId, m.teamBId);
+      m.winnerTeamId = result.winnerTeamId;
       if(ri < t.bracket.rounds.length-1){
         const nextMatch = t.bracket.rounds[ri+1].matches[Math.floor(mi/2)];
         if(mi%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
