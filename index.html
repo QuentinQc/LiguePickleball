@@ -77,6 +77,11 @@ tr.me{background:rgba(207,234,92,0.1);}
 .avatar-circle{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:19px;flex-shrink:0;}
 .modal-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 .stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;}
+.champion-card{background:linear-gradient(135deg, rgba(255,214,10,0.18), rgba(207,234,92,0.10));border:1px solid rgba(255,214,10,0.4);border-radius:18px;padding:26px 20px;text-align:center;}
+.champion-card .trophy{font-size:44px;line-height:1;margin-bottom:6px;}
+.champion-card .champion-label{font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#FFD60A;margin-bottom:6px;}
+.champion-card .champion-name{font-size:26px;font-weight:800;color:var(--line);margin-bottom:4px;}
+.champion-card .runner-up{margin-top:14px;font-size:13px;color:var(--muted);}
 .stat-chip{display:flex;flex-direction:column;background:rgba(255,255,255,0.05);border-radius:12px;padding:9px 16px;min-width:84px;}
 .stat-chip .stat-label{font-family:var(--font-display);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:2px;}
 .stat-chip .stat-value{font-size:17px;font-weight:700;color:var(--line);}
@@ -1929,6 +1934,7 @@ function tournamentDetailHTML(tournamentId){
   if(!t) return `<div class="card"><p class="empty">Tournoi introuvable.</p><button class="btn-ghost" onclick="backToTournamentList()">← Retour</button></div>`;
   return `
     <button class="btn-ghost" onclick="backToTournamentList()">← Tous les tournois</button>
+    ${tournamentChampionHTML(t)}
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
         <h2 style="margin:0;">${escapeHTML(t.name)}</h2>
@@ -2269,6 +2275,26 @@ function bracketRoundLabel(r, lastIndex){
   if(remaining===2) return 'Quart de finale';
   return `Ronde ${r+1}`;
 }
+// Carte de célébration affichée une fois le tournoi terminé.
+function tournamentChampionHTML(t){
+  if(t.status !== 'completed' || !t.bracket) return '';
+  const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
+  const finalMatch = lastRound.matches[0];
+  if(!finalMatch || !finalMatch.winnerTeamId) return '';
+  const teamName = (id)=>{
+    if(!id) return '—';
+    const team = (t.teams||[]).find(x=>x.id===id);
+    return team ? team.memberNames.join(' & ') : '?';
+  };
+  const championId = finalMatch.winnerTeamId;
+  const runnerUpId = championId===finalMatch.teamAId ? finalMatch.teamBId : finalMatch.teamAId;
+  return `<div class="champion-card">
+    <div class="trophy">🏆</div>
+    <div class="champion-label">Champion du tournoi</div>
+    <div class="champion-name">${escapeHTML(teamName(championId))}</div>
+    <div class="runner-up">Finaliste : ${escapeHTML(teamName(runnerUpId))}</div>
+  </div>`;
+}
 function bracketDisplayHTML(t){
   if(!t.bracket) return '';
   const teamName = (id)=>{
@@ -2312,7 +2338,6 @@ function bracketDisplayHTML(t){
           }).join('')}
         </div>`).join('')}
     </div></div>
-    ${t.status==='completed' ? `<p class="small" style="color:var(--ball);margin-top:10px;">🏆 Tournoi terminé !</p>` : ''}
   </div>`;
 }
 // ---- Poules puis élimination ----
