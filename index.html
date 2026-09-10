@@ -1432,7 +1432,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
+  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['tournois','Tournois'],['rapports','Rapports'],['reglages','Réglages']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const modeSwitch = (canViewAsPlayer || canViewAsSub) ? `
@@ -1478,6 +1478,7 @@ function renderAdmin(){
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
+  else if(VIEW.tab==='tournois') c.innerHTML = adminTournamentsSectionHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
 }
@@ -1739,6 +1740,242 @@ function convertProspectToPlayer(prospectId){
     openPlayerDetailModal(newPlayer.id);
   });
 }
+
+// ==================== TOURNOIS (Phase 1 — fondations) ====================
+const TOURNAMENT_FORMAT_LABELS = { single_elim:'Élimination simple', double_elim:'Double élimination', pools_then_elim:'Poules puis élimination' };
+const TOURNAMENT_TEAM_LABELS = { singles:'Simple (1 contre 1)', doubles_fixed:'Doubles — partenaires fixes', doubles_rotating:'Doubles — partenaires rotatifs' };
+
+function adminTournamentsSectionHTML(){
+  if(VIEW.tournamentsSubTab === 'detail' && VIEW.currentTournamentId){
+    return tournamentDetailHTML(VIEW.currentTournamentId);
+  }
+  return tournamentListHTML();
+}
+function tournamentListHTML(){
+  const tournaments = (DATA.tournaments||[]).slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Tournois</h2>
+        <button class="btn btn-primary" onclick="openCreateTournamentModal()">➕ Créer un tournoi</button>
+      </div>
+      <p class="small">Organise un événement ponctuel séparé de l'échelle régulière — élimination simple, double élimination, ou poules suivies d'un bracket.</p>
+    </div>
+    ${tournaments.map(t=>`
+      <div class="card clickable-row" onclick="openTournamentDetail('${t.id}')">
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-weight:700;font-size:16px;">${escapeHTML(t.name)}</div>
+            <div class="small">${t.date||''} · ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} · ${TOURNAMENT_TEAM_LABELS[t.teamFormat]||t.teamFormat}${t.affectsRating ? ' · 📊 Impacte la cote' : ''}</div>
+          </div>
+          <span class="tag ${t.status==='completed'?'tag-green':(t.status==='in_progress'?'tag-yellow':'tag-stay')}">${t.status==='completed'?'Terminé':(t.status==='in_progress'?'En cours':'Brouillon')}</span>
+        </div>
+      </div>`).join('')}
+    ${tournaments.length===0 ? `<div class="card"><p class="empty">Aucun tournoi pour l'instant</p></div>` : ''}`;
+}
+function openCreateTournamentModal(){
+  const html = `
+    <div class="field"><label>Nom du tournoi</label><input id="newTournamentName" placeholder="ex: Tournoi d'automne"></div>
+    <div class="field"><label>Date</label><input id="newTournamentDate" type="date" value="${fmtDate(new Date())}"></div>
+    <div class="field">
+      <label>Format du tournoi</label>
+      <select id="newTournamentFormat">
+        <option value="single_elim">Élimination simple</option>
+        <option value="double_elim">Double élimination</option>
+        <option value="pools_then_elim">Poules puis élimination</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Format des équipes</label>
+      <select id="newTournamentTeamFormat">
+        <option value="singles">Simple (1 contre 1)</option>
+        <option value="doubles_fixed" selected>Doubles — partenaires fixes</option>
+        <option value="doubles_rotating">Doubles — partenaires rotatifs</option>
+      </select>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
+      <input type="checkbox" id="newTournamentAffectsRating" style="width:auto;">
+      <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
+    </label>`;
+  showFormModal('Créer un tournoi', html, saveNewTournamentForm);
+}
+function saveNewTournamentForm(){
+  const name = document.getElementById('newTournamentName').value.trim();
+  if(!name){ showAlert("Le nom du tournoi est requis."); return false; }
+  const date = document.getElementById('newTournamentDate').value || fmtDate(new Date());
+  const format = document.getElementById('newTournamentFormat').value;
+  const teamFormat = document.getElementById('newTournamentTeamFormat').value;
+  const affectsRating = document.getElementById('newTournamentAffectsRating').checked;
+  const t = {
+    id: uid('trn'), name, date, format, teamFormat, affectsRating,
+    status: 'draft',
+    participants: [], // {id, type:'player'|'substitute'|'guest', refId, name, seed}
+    createdAt: new Date().toISOString()
+  };
+  DATA.tournaments = DATA.tournaments || [];
+  DATA.tournaments.push(t);
+  VIEW = { tab:'tournois', tournamentsSubTab:'detail', currentTournamentId: t.id };
+}
+function openTournamentDetail(id){
+  VIEW.tournamentsSubTab = 'detail';
+  VIEW.currentTournamentId = id;
+  render();
+}
+function backToTournamentList(){
+  VIEW.tournamentsSubTab = null;
+  VIEW.currentTournamentId = null;
+  render();
+}
+function openEditTournamentModal(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  const html = `
+    <div class="field"><label>Nom du tournoi</label><input id="editTournamentName" value="${escapeHTML(t.name)}"></div>
+    <div class="field"><label>Date</label><input id="editTournamentDate" type="date" value="${t.date}"></div>
+    <div class="field">
+      <label>Format du tournoi</label>
+      <select id="editTournamentFormat">
+        <option value="single_elim" ${t.format==='single_elim'?'selected':''}>Élimination simple</option>
+        <option value="double_elim" ${t.format==='double_elim'?'selected':''}>Double élimination</option>
+        <option value="pools_then_elim" ${t.format==='pools_then_elim'?'selected':''}>Poules puis élimination</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Format des équipes</label>
+      <select id="editTournamentTeamFormat">
+        <option value="singles" ${t.teamFormat==='singles'?'selected':''}>Simple (1 contre 1)</option>
+        <option value="doubles_fixed" ${t.teamFormat==='doubles_fixed'?'selected':''}>Doubles — partenaires fixes</option>
+        <option value="doubles_rotating" ${t.teamFormat==='doubles_rotating'?'selected':''}>Doubles — partenaires rotatifs</option>
+      </select>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
+      <input type="checkbox" id="editTournamentAffectsRating" ${t.affectsRating?'checked':''} style="width:auto;">
+      <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
+    </label>
+    <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+      <button class="btn btn-danger" onclick="closeModal();onDeleteTournament('${t.id}')">Supprimer ce tournoi</button>
+    </div>`;
+  showFormModal('Modifier le tournoi', html, ()=>{
+    const name = document.getElementById('editTournamentName').value.trim();
+    if(!name){ showAlert("Le nom est requis."); return false; }
+    t.name = name;
+    t.date = document.getElementById('editTournamentDate').value || t.date;
+    t.format = document.getElementById('editTournamentFormat').value;
+    t.teamFormat = document.getElementById('editTournamentTeamFormat').value;
+    t.affectsRating = document.getElementById('editTournamentAffectsRating').checked;
+  });
+}
+function onDeleteTournament(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  showConfirm(`Supprimer définitivement le tournoi « ${t.name} » ?`, ()=>{
+    DATA.tournaments = DATA.tournaments.filter(x=>x.id!==tournamentId);
+    VIEW = { tab:'tournois' };
+    saveAndRender();
+  });
+}
+function tournamentDetailHTML(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return `<div class="card"><p class="empty">Tournoi introuvable.</p><button class="btn-ghost" onclick="backToTournamentList()">← Retour</button></div>`;
+  return `
+    <button class="btn-ghost" onclick="backToTournamentList()">← Tous les tournois</button>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">${escapeHTML(t.name)}</h2>
+        <button class="btn-ghost" onclick="openEditTournamentModal('${t.id}')">✏️ Modifier</button>
+      </div>
+      <p class="small">${t.date} · ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} · ${TOURNAMENT_TEAM_LABELS[t.teamFormat]||t.teamFormat}${t.affectsRating ? ' · 📊 Impacte la cote' : ' · Séparé de la cote habituelle'}</p>
+    </div>
+    <div class="card">
+      <h3>Participants <span class="small">(${t.participants.length})</span></h3>
+      <p class="small">Sélectionne les joueurs réguliers et remplaçants qui participent, et ajoute au besoin des invités externes (sans compte).</p>
+      <div class="action-grid">
+        <button class="action-btn" onclick="openSelectParticipantsModal('${t.id}')"><span class="icon">👥</span> Choisir les participants</button>
+        <button class="action-btn" onclick="openAddGuestToTournamentModal('${t.id}')"><span class="icon">➕</span> Ajouter un invité externe</button>
+      </div>
+      <table>
+        <tr><th>Nom</th><th>Type</th><th></th></tr>
+        ${t.participants.map(p=>`<tr>
+          <td>${escapeHTML(p.name)}</td>
+          <td>${p.type==='player' ? '<span class="tag tag-green">Régulier</span>' : (p.type==='substitute' ? '<span class="tag tag-yellow">Remplaçant</span>' : '<span class="tag tag-stay">Invité externe</span>')}</td>
+          <td><button class="btn-ghost-danger" onclick="removeTournamentParticipant('${t.id}','${p.id}')">retirer</button></td>
+        </tr>`).join('')}
+        ${t.participants.length===0 ? `<tr><td colspan="3" class="empty">Aucun participant pour l'instant</td></tr>` : ''}
+      </table>
+    </div>
+    <div class="card">
+      <h3>Bracket</h3>
+      <p class="small">La génération du bracket arrive dans la prochaine étape de construction.</p>
+    </div>`;
+}
+let TOURNAMENT_SELECT_STATE = null;
+function openSelectParticipantsModal(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  TOURNAMENT_SELECT_STATE = {
+    tournamentId,
+    selectedPlayerIds: new Set(t.participants.filter(p=>p.type==='player').map(p=>p.refId)),
+    selectedSubIds: new Set(t.participants.filter(p=>p.type==='substitute').map(p=>p.refId))
+  };
+  showFormModal('Choisir les participants', selectParticipantsFormHTML, saveSelectParticipantsForm);
+}
+function selectParticipantsFormHTML(){
+  const st = TOURNAMENT_SELECT_STATE;
+  return `
+    <h3 style="margin-top:0;">Joueurs réguliers</h3>
+    ${DATA.players.map(p=>`
+      <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
+        <input type="checkbox" style="width:auto;" ${st.selectedPlayerIds.has(p.id)?'checked':''} onchange="toggleTournamentSelectPlayer('${p.id}')">
+        <span>${escapeHTML(p.name)}</span>
+      </label>`).join('')}
+    ${DATA.players.length===0 ? `<p class="small">Aucun joueur régulier.</p>` : ''}
+    ${(DATA.substitutePool||[]).length ? `<h3>Remplaçants</h3>
+    ${(DATA.substitutePool||[]).map(s=>`
+      <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
+        <input type="checkbox" style="width:auto;" ${st.selectedSubIds.has(s.id)?'checked':''} onchange="toggleTournamentSelectSub('${s.id}')">
+        <span>${escapeHTML(s.name)}</span>
+      </label>`).join('')}` : ''}`;
+}
+function toggleTournamentSelectPlayer(pid){
+  const st = TOURNAMENT_SELECT_STATE;
+  if(st.selectedPlayerIds.has(pid)) st.selectedPlayerIds.delete(pid); else st.selectedPlayerIds.add(pid);
+}
+function toggleTournamentSelectSub(sid){
+  const st = TOURNAMENT_SELECT_STATE;
+  if(st.selectedSubIds.has(sid)) st.selectedSubIds.delete(sid); else st.selectedSubIds.add(sid);
+}
+function saveSelectParticipantsForm(){
+  const st = TOURNAMENT_SELECT_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  if(!t){ TOURNAMENT_SELECT_STATE = null; return; }
+  // Retire les participants réguliers/remplaçants décochés, garde les invités externes intacts.
+  t.participants = t.participants.filter(p=>p.type==='guest');
+  st.selectedPlayerIds.forEach(pid=>{
+    const p = DATA.players.find(x=>x.id===pid);
+    if(p) t.participants.push({ id: uid('tp'), type:'player', refId: pid, name: p.name, seed: ratingOf(pid) });
+  });
+  st.selectedSubIds.forEach(sid=>{
+    const s = (DATA.substitutePool||[]).find(x=>x.id===sid);
+    if(s) t.participants.push({ id: uid('tp'), type:'substitute', refId: sid, name: s.name, seed: null });
+  });
+  TOURNAMENT_SELECT_STATE = null;
+}
+function openAddGuestToTournamentModal(tournamentId){
+  showPrompt("Nom de l'invité externe :", '', (name)=>{
+    if(!name || !name.trim()) return;
+    const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+    if(!t) return;
+    t.participants.push({ id: uid('tp'), type:'guest', refId:null, name:name.trim(), seed:null });
+    saveAndRender();
+  });
+}
+function removeTournamentParticipant(tournamentId, participantId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  t.participants = t.participants.filter(p=>p.id!==participantId);
+  saveAndRender();
+}
+// ==================== FIN TOURNOIS (Phase 1) ====================
 function setSubsSort(col){
   if((VIEW.subsSortBy||'name') === col){ VIEW.subsSortDir = (VIEW.subsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
   else { VIEW.subsSortBy = col; VIEW.subsSortDir = 'asc'; }
@@ -4460,6 +4697,7 @@ function migrateData(){
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
   if(DATA.prospects === undefined) DATA.prospects = [];
+  if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.autoStartSessions === undefined) DATA.autoStartSessions = false;
   if(DATA.autoPublishSessions === undefined) DATA.autoPublishSessions = false;
   if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
