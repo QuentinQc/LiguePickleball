@@ -1800,6 +1800,20 @@ function openCreateTournamentModal(){
         <option value="doubles_rotating">Doubles — partenaires rotatifs</option>
       </select>
     </div>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="newTournamentPoints" type="number" min="1" value="11"></div>
+      <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
+        <select id="newTournamentBestOf">
+          <option value="1">1 match</option>
+          <option value="3" selected>Meilleur de 3</option>
+          <option value="5">Meilleur de 5</option>
+        </select>
+      </div>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="newTournamentWinByTwo" checked style="width:auto;">
+      <span class="small">Gagner par 2 points d'écart</span>
+    </label>
     <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
       <input type="checkbox" id="newTournamentAffectsRating" style="width:auto;">
       <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
@@ -1813,8 +1827,13 @@ function saveNewTournamentForm(){
   const format = document.getElementById('newTournamentFormat').value;
   const teamFormat = document.getElementById('newTournamentTeamFormat').value;
   const affectsRating = document.getElementById('newTournamentAffectsRating').checked;
+  const matchFormat = {
+    pointsToWin: Math.max(1, parseInt(document.getElementById('newTournamentPoints').value,10) || 11),
+    bestOf: parseInt(document.getElementById('newTournamentBestOf').value,10) || 1,
+    winByTwo: document.getElementById('newTournamentWinByTwo').checked
+  };
   const t = {
-    id: uid('trn'), name, date, format, teamFormat, affectsRating,
+    id: uid('trn'), name, date, format, teamFormat, affectsRating, matchFormat,
     status: 'draft',
     participants: [], // {id, type:'player'|'substitute'|'guest', refId, name, seed}
     createdAt: new Date().toISOString()
@@ -1855,6 +1874,20 @@ function openEditTournamentModal(tournamentId){
         <option value="doubles_rotating" ${t.teamFormat==='doubles_rotating'?'selected':''}>Doubles — partenaires rotatifs</option>
       </select>
     </div>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="editTournamentPoints" type="number" min="1" value="${t.matchFormat?t.matchFormat.pointsToWin:11}"></div>
+      <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
+        <select id="editTournamentBestOf">
+          <option value="1" ${t.matchFormat&&t.matchFormat.bestOf===1?'selected':''}>1 match</option>
+          <option value="3" ${!t.matchFormat||t.matchFormat.bestOf===3?'selected':''}>Meilleur de 3</option>
+          <option value="5" ${t.matchFormat&&t.matchFormat.bestOf===5?'selected':''}>Meilleur de 5</option>
+        </select>
+      </div>
+    </div>
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="editTournamentWinByTwo" ${!t.matchFormat||t.matchFormat.winByTwo?'checked':''} style="width:auto;">
+      <span class="small">Gagner par 2 points d'écart</span>
+    </label>
     <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
       <input type="checkbox" id="editTournamentAffectsRating" ${t.affectsRating?'checked':''} style="width:auto;">
       <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
@@ -1870,6 +1903,11 @@ function openEditTournamentModal(tournamentId){
     t.format = document.getElementById('editTournamentFormat').value;
     t.teamFormat = document.getElementById('editTournamentTeamFormat').value;
     t.affectsRating = document.getElementById('editTournamentAffectsRating').checked;
+    t.matchFormat = {
+      pointsToWin: Math.max(1, parseInt(document.getElementById('editTournamentPoints').value,10) || 11),
+      bestOf: parseInt(document.getElementById('editTournamentBestOf').value,10) || 1,
+      winByTwo: document.getElementById('editTournamentWinByTwo').checked
+    };
   });
 }
 function onDeleteTournament(tournamentId){
@@ -1892,6 +1930,7 @@ function tournamentDetailHTML(tournamentId){
         <button class="btn-ghost" onclick="openEditTournamentModal('${t.id}')">✏️ Modifier</button>
       </div>
       <p class="small">${t.date} · ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} · ${TOURNAMENT_TEAM_LABELS[t.teamFormat]||t.teamFormat}${t.affectsRating ? ' · 📊 Impacte la cote' : ' · Séparé de la cote habituelle'}</p>
+      <p class="small">${t.matchFormat ? `${t.matchFormat.pointsToWin} points${t.matchFormat.winByTwo ? ' (gagner par 2)' : ''} · ${t.matchFormat.bestOf===1?'1 match':'Meilleur de '+t.matchFormat.bestOf}` : ''}</p>
     </div>
     <div class="card">
       <h3>🧪 Mode test</h3>
@@ -2309,13 +2348,13 @@ function poolsDisplayHTML(t){
   </div>`;
 }
 // ---- Mode test : simule tout le tournoi avec des scores aléatoires ----
-function simulateMatchScore(seedA, seedB){
+function simulateMatchScore(seedA, seedB, pointsToWin){
   const sa = typeof seedA==='number' ? seedA : RATING_DEFAULT;
   const sb = typeof seedB==='number' ? seedB : RATING_DEFAULT;
   const expectedA = 1 / (1 + Math.pow(10, (sb-sa)/RATING_SCALE));
   const aWins = Math.random() < expectedA;
-  const winnerScore = 11;
-  const loserScore = Math.floor(Math.random()*9); // 0-8, pour un peu de suspense
+  const winnerScore = pointsToWin || 11;
+  const loserScore = Math.floor(Math.random()*Math.max(1,winnerScore-2)); // sous la barre, pour un peu de suspense
   return aWins ? { scoreA: winnerScore, scoreB: loserScore } : { scoreA: loserScore, scoreB: winnerScore };
 }
 function autoFormTeamsForSimulation(t){
@@ -2337,7 +2376,7 @@ function simulatePoolMatches(t){
       if(m.scoreA!==null && m.scoreB!==null) return; // déjà joué : on ne l'écrase pas
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null);
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.matchFormat?t.matchFormat.pointsToWin:11);
       m.scoreA = scoreA; m.scoreB = scoreB;
     });
   });
@@ -2349,7 +2388,7 @@ function simulateBracketMatches(t){
       if(!m.teamAId || !m.teamBId) return; // en attente, sera rempli par la ronde précédente dans cette même passe
       const teamA = t.teams.find(x=>x.id===m.teamAId);
       const teamB = t.teams.find(x=>x.id===m.teamBId);
-      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null);
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null, t.matchFormat?t.matchFormat.pointsToWin:11);
       m.scoreA = scoreA; m.scoreB = scoreB;
       m.winnerTeamId = scoreA > scoreB ? m.teamAId : m.teamBId;
       if(ri < t.bracket.rounds.length-1){
@@ -5123,6 +5162,9 @@ function migrateData(){
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
   if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
+  (DATA.tournaments||[]).forEach(t=>{
+    if(!t.matchFormat) t.matchFormat = { pointsToWin: 11, bestOf: 1, winByTwo: true };
+  });
   if(DATA.autoStartSessions === undefined) DATA.autoStartSessions = false;
   if(DATA.autoPublishSessions === undefined) DATA.autoPublishSessions = false;
   if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
