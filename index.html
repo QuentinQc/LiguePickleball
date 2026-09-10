@@ -1521,9 +1521,9 @@ function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 // Onglet « Joueurs » unifié : sous-onglets Tous les joueurs et Remplaçants.
 function adminPlayersSectionHTML(){
   const sub = VIEW.playersSubTab || 'tous';
-  const subTabs = [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants']];
+  const subTabs = [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
   let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
-  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : adminAllPeopleHTML());
+  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : adminAllPeopleHTML()));
   return html;
 }
 // Vue combinée en lecture seule : réguliers et remplaçants ensemble, avec
@@ -1627,6 +1627,117 @@ function adminSubstitutePoolHTML(){
       </table>
       <p class="small">Ces personnes apparaissent automatiquement comme choix rapides dans le menu de remplaçant, lors d'une absence en session.</p>
     </div>`;
+}
+function adminProspectsHTML(){
+  const sortBy = VIEW.prospectsSortBy || 'name';
+  const sortDir = VIEW.prospectsSortDir || 'asc';
+  const pool = (DATA.prospects || []).slice().sort((a,b)=>{
+    const av = (a[sortBy] || '').toString().toLowerCase();
+    const bv = (b[sortBy] || '').toString().toLowerCase();
+    const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
+    return sortDir==='asc' ? cmp : -cmp;
+  });
+  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
+  return `
+    <div class="card">
+      <h3>Ajouter un prospect</h3>
+      <p class="small">Des personnes intéressées à éventuellement rejoindre la ligue — elles ne font partie d'aucun groupe et n'ont pas de cote tant qu'elles ne sont pas converties en joueur régulier.</p>
+      <div class="row">
+        <input id="newProspectName" placeholder="Nom" style="flex:1;min-width:120px;">
+        <input id="newProspectEmail" type="email" placeholder="Courriel (optionnel)" style="flex:1;min-width:160px;">
+        <input id="newProspectPhone" placeholder="Téléphone (optionnel)" style="flex:1;min-width:140px;">
+        <input id="newProspectNotes" placeholder="Notes (optionnel)" style="flex:1;min-width:160px;">
+        <button class="btn btn-secondary" onclick="addProspectToPool()">Ajouter</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Prospects <span class="small">(${pool.length})</span></h2>
+      <p class="small">Clique sur un prospect pour le modifier, le convertir en joueur régulier, ou le retirer.</p>
+      <table>
+        <tr>
+          <th class="sortable" onclick="setProspectsSort('name')">Nom${arrow('name')}</th>
+          <th class="sortable" onclick="setProspectsSort('email')">Courriel${arrow('email')}</th>
+          <th class="sortable" onclick="setProspectsSort('phone')">Téléphone${arrow('phone')}</th>
+          <th class="sortable" onclick="setProspectsSort('notes')">Notes${arrow('notes')}</th>
+        </tr>
+        ${pool.map(p=>`<tr class="clickable-row" onclick="openProspectDetailModal('${p.id}')">
+          <td>${escapeHTML(p.name)}</td>
+          <td>${escapeHTML(p.email||'—')}</td>
+          <td>${escapeHTML(p.phone||'—')}</td>
+          <td>${escapeHTML(p.notes||'—')}</td>
+        </tr>`).join('')}
+        ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun prospect enregistré pour l'instant</td></tr>` : ''}
+      </table>
+    </div>`;
+}
+function setProspectsSort(col){
+  if(VIEW.prospectsSortBy === col){ VIEW.prospectsSortDir = VIEW.prospectsSortDir === 'asc' ? 'desc' : 'asc'; }
+  else { VIEW.prospectsSortBy = col; VIEW.prospectsSortDir = 'asc'; }
+  render();
+}
+function addProspectToPool(){
+  const name = document.getElementById('newProspectName').value.trim();
+  if(!name) return;
+  const email = document.getElementById('newProspectEmail').value.trim();
+  const phone = document.getElementById('newProspectPhone').value.trim();
+  const notes = document.getElementById('newProspectNotes').value.trim();
+  DATA.prospects = DATA.prospects || [];
+  DATA.prospects.push({ id: uid('pro'), name, email, phone, notes });
+  saveAndRender();
+}
+function prospectDetailModalHTML(prospectId){
+  const p = (DATA.prospects||[]).find(x=>x.id===prospectId);
+  if(!p) return `<p class="small">Prospect introuvable.</p>`;
+  return `
+    <p class="small">${escapeHTML(p.email||'Aucun courriel')} ${p.phone ? '· '+escapeHTML(p.phone) : ''} ${p.notes ? '· '+escapeHTML(p.notes) : ''}</p>
+    <div class="action-grid">
+      <button class="action-btn" onclick="closeModal();editProspectInPool('${prospectId}')"><span class="icon">✏️</span> Modifier</button>
+      <button class="action-btn" onclick="convertProspectToPlayer('${prospectId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
+      <button class="action-btn danger" onclick="closeModal();removeProspectFromPool('${prospectId}')"><span class="icon">🗑️</span> Retirer</button>
+    </div>`;
+}
+function openProspectDetailModal(prospectId){
+  const p = (DATA.prospects||[]).find(x=>x.id===prospectId);
+  if(!p) return;
+  showContentModal(escapeHTML(p.name), prospectDetailModalHTML(prospectId));
+}
+function editProspectInPool(prospectId){
+  const p = (DATA.prospects||[]).find(x=>x.id===prospectId);
+  if(!p) return;
+  const html = `
+    <div class="field"><label>Nom</label><input id="editProspectName" value="${escapeHTML(p.name)}"></div>
+    <div class="field"><label>Courriel</label><input id="editProspectEmail" type="email" value="${escapeHTML(p.email||'')}"></div>
+    <div class="field"><label>Téléphone</label><input id="editProspectPhone" value="${escapeHTML(p.phone||'')}"></div>
+    <div class="field"><label>Notes</label><input id="editProspectNotes" value="${escapeHTML(p.notes||'')}"></div>`;
+  showFormModal('Modifier ' + p.name, html, ()=>{
+    const name = document.getElementById('editProspectName').value.trim();
+    if(!name){ showAlert("Le nom est requis."); return false; }
+    p.name = name;
+    p.email = document.getElementById('editProspectEmail').value.trim();
+    p.phone = document.getElementById('editProspectPhone').value.trim();
+    p.notes = document.getElementById('editProspectNotes').value.trim();
+  });
+}
+function removeProspectFromPool(prospectId){
+  showConfirm("Retirer ce prospect de la liste ?", ()=>{
+    DATA.prospects = (DATA.prospects||[]).filter(x=>x.id!==prospectId);
+    saveAndRender();
+  });
+}
+// Convertit un prospect en joueur régulier : il rejoint la liste des
+// Réguliers, en attente d'assignation à un groupe.
+function convertProspectToPlayer(prospectId){
+  const p = (DATA.prospects||[]).find(x=>x.id===prospectId);
+  if(!p) return;
+  showConfirm(`Convertir ${p.name} en joueur régulier ? Il/elle rejoindra la liste des Réguliers, en attente d'assignation à un groupe.`, ()=>{
+    closeModal();
+    const newPlayer = { id: uid('p'), name: p.name, groupId: null, rating: RATING_DEFAULT, ratingGames: 0, order: 0, status: 'new' };
+    DATA.players = DATA.players || [];
+    DATA.players.push(newPlayer);
+    DATA.prospects = (DATA.prospects||[]).filter(x=>x.id!==prospectId);
+    saveAndRender();
+    openPlayerDetailModal(newPlayer.id);
+  });
 }
 function setSubsSort(col){
   if((VIEW.subsSortBy||'name') === col){ VIEW.subsSortDir = (VIEW.subsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
@@ -4348,6 +4459,7 @@ function migrateData(){
   if(DATA.tiebreakCriteria === undefined) DATA.tiebreakCriteria = defaultTiebreakCriteria();
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
+  if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.autoStartSessions === undefined) DATA.autoStartSessions = false;
   if(DATA.autoPublishSessions === undefined) DATA.autoPublishSessions = false;
   if(DATA.manualMatchCount4 === undefined) DATA.manualMatchCount4 = 6;
