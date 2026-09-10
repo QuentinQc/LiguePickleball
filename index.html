@@ -1894,6 +1894,14 @@ function tournamentDetailHTML(tournamentId){
       <p class="small">${t.date} · ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} · ${TOURNAMENT_TEAM_LABELS[t.teamFormat]||t.teamFormat}${t.affectsRating ? ' · 📊 Impacte la cote' : ' · Séparé de la cote habituelle'}</p>
     </div>
     <div class="card">
+      <h3>🧪 Mode test</h3>
+      <p class="small">Simule le tournoi au complet avec des scores aléatoires (pondérés selon la cote) — pratique pour prévisualiser comment tout se déroule avant l'événement réel.</p>
+      <div class="row" style="gap:6px;">
+        <button class="btn btn-secondary" onclick="simulateTournament('${t.id}')">🧪 Simuler le tournoi</button>
+        ${(t.pools || t.bracket) ? `<button class="btn-ghost-danger" onclick="resetTournamentResults('${t.id}')">↺ Réinitialiser les résultats</button>` : ''}
+      </div>
+    </div>
+    <div class="card">
       <h3>Participants <span class="small">(${t.participants.length})</span></h3>
       <p class="small">Sélectionne les joueurs réguliers et remplaçants qui participent, et ajoute au besoin des invités externes (sans compte).</p>
       <div class="action-grid">
@@ -2299,6 +2307,98 @@ function poolsDisplayHTML(t){
         </table>`;
     }).join('')}
   </div>`;
+}
+// ---- Mode test : simule tout le tournoi avec des scores aléatoires ----
+function simulateMatchScore(seedA, seedB){
+  const sa = typeof seedA==='number' ? seedA : RATING_DEFAULT;
+  const sb = typeof seedB==='number' ? seedB : RATING_DEFAULT;
+  const expectedA = 1 / (1 + Math.pow(10, (sb-sa)/RATING_SCALE));
+  const aWins = Math.random() < expectedA;
+  const winnerScore = 11;
+  const loserScore = Math.floor(Math.random()*9); // 0-8, pour un peu de suspense
+  return aWins ? { scoreA: winnerScore, scoreB: loserScore } : { scoreA: loserScore, scoreB: winnerScore };
+}
+function autoFormTeamsForSimulation(t){
+  if(t.teamFormat === 'singles'){
+    t.teams = t.participants.map(p=>({ id: uid('team'), memberIds:[p.id], memberNames:[p.name], seed: p.seed }));
+  } else {
+    const shuffled = t.participants.slice().sort(()=>Math.random()-0.5);
+    t.teams = [];
+    for(let i=0;i+1<shuffled.length;i+=2){
+      const pair = [shuffled[i], shuffled[i+1]];
+      const seeds = pair.map(p=> typeof p.seed==='number'?p.seed:RATING_DEFAULT);
+      t.teams.push({ id: uid('team'), memberIds: pair.map(p=>p.id), memberNames: pair.map(p=>p.name), seed:(seeds[0]+seeds[1])/2 });
+    }
+  }
+}
+function simulatePoolMatches(t){
+  t.pools.forEach(pool=>{
+    pool.matches.forEach(m=>{
+      if(m.scoreA!==null && m.scoreB!==null) return; // déjà joué : on ne l'écrase pas
+      const teamA = t.teams.find(x=>x.id===m.teamAId);
+      const teamB = t.teams.find(x=>x.id===m.teamBId);
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null);
+      m.scoreA = scoreA; m.scoreB = scoreB;
+    });
+  });
+}
+function simulateBracketMatches(t){
+  t.bracket.rounds.forEach((round, ri)=>{
+    round.matches.forEach((m, mi)=>{
+      if(m.winnerTeamId) return; // déjà résolu (bye ou déjà joué)
+      if(!m.teamAId || !m.teamBId) return; // en attente, sera rempli par la ronde précédente dans cette même passe
+      const teamA = t.teams.find(x=>x.id===m.teamAId);
+      const teamB = t.teams.find(x=>x.id===m.teamBId);
+      const { scoreA, scoreB } = simulateMatchScore(teamA?teamA.seed:null, teamB?teamB.seed:null);
+      m.scoreA = scoreA; m.scoreB = scoreB;
+      m.winnerTeamId = scoreA > scoreB ? m.teamAId : m.teamBId;
+      if(ri < t.bracket.rounds.length-1){
+        const nextMatch = t.bracket.rounds[ri+1].matches[Math.floor(mi/2)];
+        if(mi%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
+      }
+    });
+  });
+}
+function simulateTournament(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  if(t.format === 'double_elim'){ showAlert("La double élimination n'est pas encore disponible — impossible de la simuler pour l'instant."); return; }
+  if(t.participants.length < 2){ showAlert("Ajoute au moins 2 participants avant de simuler."); return; }
+  showConfirm("Simuler ce tournoi au complet avec des scores aléatoires (pondérés selon la cote de chacun) ? Utile pour prévisualiser le fonctionnement — écrase les scores déjà entrés. Pas pour un vrai tournoi !", ()=>{
+    if(!t.teams || t.teams.length===0) autoFormTeamsForSimulation(t);
+    if(!t.teams || t.teams.length < 2){ showAlert("Pas assez d'équipes pour simuler."); return; }
+    if(t.format === 'pools_then_elim'){
+      if(!t.pools){
+        const numPools = Math.max(2, Math.min(4, Math.floor(t.teams.length/4) || 2));
+        generatePools(t.id, numPools, 2);
+      }
+      simulatePoolMatches(t);
+      const advancing = [];
+      t.pools.forEach(pool=>{
+        const standings = computePoolStandings(pool);
+        standings.slice(0, t.poolsConfig.advancePerPool).forEach((row, rank)=>{
+          const team = t.teams.find(x=>x.id===row.teamId);
+          if(team) advancing.push({ ...team, seed: (t.teams.length*10) - rank });
+        });
+      });
+      t.bracket = buildSingleElimBracket(advancing);
+    } else if(!t.bracket){
+      t.bracket = buildSingleElimBracket(t.teams);
+    }
+    simulateBracketMatches(t);
+    t.status = 'completed';
+    saveAndRender();
+  });
+}
+function resetTournamentResults(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  showConfirm("Réinitialiser tous les résultats de ce tournoi (poules et bracket) ? Les participants et les équipes formées restent intacts.", ()=>{
+    t.pools = null;
+    t.bracket = null;
+    t.status = 'draft';
+    saveAndRender();
+  });
 }
 // ==================== FIN TOURNOIS (Phase 2) ====================
 function setSubsSort(col){
