@@ -111,6 +111,13 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .pill-input{width:64px;text-align:center;}
 .vs{font-family:var(--font-display);color:var(--muted);font-size:12px;padding:0 4px;}
 .match-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;}
+.bracket-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -18px;padding:8px 18px;}
+.bracket-columns{display:flex;gap:28px;align-items:stretch;min-width:min-content;}
+.bracket-round-col{display:flex;flex-direction:column;justify-content:space-around;min-width:190px;flex-shrink:0;}
+.bracket-round-title{font-family:var(--font-display);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);text-align:center;margin-bottom:10px;}
+.bracket-match{background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 10px;margin:10px 0;}
+.bracket-match .team-line{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px;}
+.bracket-match .team-line.won{font-weight:700;color:var(--ball);}
 .match-row:last-child{border-bottom:none;}
 .team{flex:1;min-width:120px;font-size:14px;}
 .empty{color:var(--muted);font-style:italic;font-size:14px;padding:10px 0;}
@@ -1904,9 +1911,20 @@ function tournamentDetailHTML(tournamentId){
       </table>
     </div>
     <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Équipes <span class="small">(${(t.teams||[]).length})</span></h3>
+        <button class="btn-ghost" onclick="openFormTeamsModal('${t.id}')">${t.teamFormat==='singles' ? '🔄 Actualiser' : '👫 Former les équipes'}</button>
+      </div>
+      ${t.teamFormat!=='singles' ? `<p class="small">Format doubles — jumelle les participants en équipes avant de générer le bracket.</p>` : ''}
+      ${(t.teams||[]).length ? `<div class="row" style="gap:6px;flex-wrap:wrap;">${t.teams.map(tm=>`<span class="tag tag-stay">${escapeHTML(tm.memberNames.join(' & '))}</span>`).join('')}</div>` : `<p class="small">Aucune équipe formée pour l'instant.</p>`}
+    </div>
+    ${t.pools ? poolsDisplayHTML(t) : ''}
+    ${t.bracket ? bracketDisplayHTML(t) : (!t.pools ? `
+    <div class="card">
       <h3>Bracket</h3>
-      <p class="small">La génération du bracket arrive dans la prochaine étape de construction.</p>
-    </div>`;
+      <p class="small">Une fois les équipes formées, génère le bracket — l'app place automatiquement les meilleures cotes pour éviter qu'elles se croisent trop tôt.</p>
+      <button class="btn btn-primary" onclick="generateBracket('${t.id}')">🏆 ${t.format==='pools_then_elim' ? 'Générer les poules' : 'Générer le bracket'}</button>
+    </div>` : '')}`;
 }
 let TOURNAMENT_SELECT_STATE = null;
 function openSelectParticipantsModal(tournamentId){
@@ -1975,7 +1993,307 @@ function removeTournamentParticipant(tournamentId, participantId){
   t.participants = t.participants.filter(p=>p.id!==participantId);
   saveAndRender();
 }
-// ==================== FIN TOURNOIS (Phase 1) ====================
+// ==================== TOURNOIS (Phase 2 — équipes + bracket) ====================
+let TEAM_FORM_STATE = null;
+function openFormTeamsModal(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  if(t.teamFormat === 'singles'){
+    t.teams = t.participants.map(p=>({ id: uid('team'), memberIds:[p.id], memberNames:[p.name], seed: p.seed }));
+    saveAndRender();
+    return;
+  }
+  TEAM_FORM_STATE = { tournamentId, pairs: (t.teams||[]).filter(tm=>tm.memberIds.length===2).map(tm=>tm.memberIds.slice()), pending: null };
+  showFormModal('Former les équipes (doubles)', formTeamsFormHTML, saveFormTeamsForm);
+}
+function formTeamsFormHTML(){
+  const st = TEAM_FORM_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const pairedIds = new Set(st.pairs.flat());
+  const unpaired = t.participants.filter(p=>!pairedIds.has(p.id) && p.id !== st.pending);
+  let html = `<p class="small">Clique sur deux joueurs pour les jumeler en équipe.${st.pending ? ' En attente d\'un ou une partenaire pour <strong>'+escapeHTML((t.participants.find(p=>p.id===st.pending)||{}).name||'')+'</strong>…' : ''}</p>`;
+  html += `<h3 style="margin-top:12px;">Équipes formées</h3>`;
+  html += st.pairs.length ? st.pairs.map((pair,i)=>{
+    const names = pair.map(id=>{ const p = t.participants.find(x=>x.id===id); return p?p.name:'?'; });
+    return `<div class="row" style="align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;">
+      <span>${escapeHTML(names[0])} &amp; ${escapeHTML(names[1])}</span>
+      <button class="btn-ghost-danger" onclick="removeTeamPair(${i})">défaire</button>
+    </div>`;
+  }).join('') : `<p class="small">Aucune équipe formée pour l'instant.</p>`;
+  html += `<h3 style="margin-top:12px;">Joueurs disponibles</h3>`;
+  html += unpaired.length ? unpaired.map(p=>`<button class="btn-ghost" style="${st.pending===p.id?'background:var(--ball);color:#0F3B3F;':''}" onclick="pickTeamMember('${p.id}')">${escapeHTML(p.name)}</button>`).join('') : `<p class="small">Tous les joueurs sont jumelés.</p>`;
+  return html;
+}
+function pickTeamMember(pid){
+  const st = TEAM_FORM_STATE;
+  if(st.pending === null){ st.pending = pid; }
+  else if(st.pending === pid){ st.pending = null; }
+  else { st.pairs.push([st.pending, pid]); st.pending = null; }
+  render();
+}
+function removeTeamPair(i){
+  TEAM_FORM_STATE.pairs.splice(i,1);
+  render();
+}
+function saveFormTeamsForm(){
+  const st = TEAM_FORM_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  if(!t){ TEAM_FORM_STATE=null; return; }
+  t.teams = st.pairs.map(pair=>{
+    const names = pair.map(id=>{ const p = t.participants.find(x=>x.id===id); return p?p.name:'?'; });
+    const seeds = pair.map(id=>{ const p = t.participants.find(x=>x.id===id); return (p && typeof p.seed==='number') ? p.seed : RATING_DEFAULT; });
+    return { id: uid('team'), memberIds: pair.slice(), memberNames: names, seed: (seeds[0]+seeds[1])/2 };
+  });
+  TEAM_FORM_STATE = null;
+}
+// Ordre standard de seeding (1 contre dernier, 2 contre avant-dernier, etc.)
+function standardBracketOrder(size){
+  let order = [0];
+  while(order.length < size){
+    const next = [];
+    const len = order.length*2;
+    order.forEach(pos=>{ next.push(pos); next.push(len-1-pos); });
+    order = next;
+  }
+  return order;
+}
+function propagateByeWinners(rounds){
+  for(let r=0; r<rounds.length; r++){
+    rounds[r].matches.forEach(m=>{
+      if(!m.winnerTeamId){
+        if(m.teamAId && !m.teamBId) m.winnerTeamId = m.teamAId;
+        else if(m.teamBId && !m.teamAId) m.winnerTeamId = m.teamBId;
+      }
+    });
+    if(r < rounds.length-1){
+      const nextRound = rounds[r+1];
+      rounds[r].matches.forEach((m,i)=>{
+        if(m.winnerTeamId){
+          const nextMatch = nextRound.matches[Math.floor(i/2)];
+          if(i%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
+        }
+      });
+    }
+  }
+}
+function buildSingleElimBracket(teams){
+  const seeded = teams.slice().sort((a,b)=>{
+    const as = typeof a.seed==='number' ? a.seed : -Infinity;
+    const bs = typeof b.seed==='number' ? b.seed : -Infinity;
+    return bs - as;
+  });
+  const n = seeded.length;
+  let bracketSize = 1;
+  while(bracketSize < n) bracketSize *= 2;
+  const slots = standardBracketOrder(bracketSize);
+  const teamsInSlots = slots.map(pos => pos < n ? seeded[pos] : null);
+  const round1Matches = [];
+  for(let i=0;i<teamsInSlots.length;i+=2){
+    const a = teamsInSlots[i], b = teamsInSlots[i+1];
+    round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye: (!a || !b) });
+  }
+  const rounds = [{ roundNumber:1, matches: round1Matches }];
+  let prevCount = round1Matches.length;
+  let roundNum = 2;
+  while(prevCount > 1){
+    const matches = [];
+    for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, scoreA:null, scoreB:null, winnerTeamId:null, isBye:false }); }
+    rounds.push({ roundNumber: roundNum, matches });
+    prevCount = matches.length;
+    roundNum++;
+  }
+  propagateByeWinners(rounds);
+  return { format:'single_elim', rounds };
+}
+function generateBracket(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  if(!t.teams || t.teams.length < 2){ showAlert("Il faut au moins 2 équipes — forme d'abord les équipes ci-dessus."); return; }
+  if(t.format === 'pools_then_elim'){ openGeneratePoolsModal(tournamentId); return; }
+  if(t.format !== 'single_elim'){
+    showAlert(`Le format « ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} » arrive dans une prochaine mise à jour — pour l'instant, seuls l'élimination simple et les poules puis élimination sont disponibles. Tu peux changer le format du tournoi dans « ✏️ Modifier » si tu veux commencer avec l'un de ceux-ci.`);
+    return;
+  }
+  const msg = t.bracket ? "Regénérer le bracket effacera tous les résultats déjà entrés. Continuer ?" : "Générer le bracket avec les équipes actuelles ?";
+  showConfirm(msg, ()=>{
+    t.bracket = buildSingleElimBracket(t.teams);
+    t.status = 'in_progress';
+    saveAndRender();
+  });
+}
+function setBracketMatchScore(tournamentId, roundIndex, matchIndex, which, value){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.bracket) return;
+  const m = t.bracket.rounds[roundIndex].matches[matchIndex];
+  if(which==='A') m.scoreA = value===''?null:Number(value);
+  else m.scoreB = value===''?null:Number(value);
+  if(m.scoreA!==null && m.scoreB!==null && m.scoreA!==m.scoreB && m.teamAId && m.teamBId){
+    m.winnerTeamId = m.scoreA > m.scoreB ? m.teamAId : m.teamBId;
+    if(roundIndex < t.bracket.rounds.length-1){
+      const nextMatch = t.bracket.rounds[roundIndex+1].matches[Math.floor(matchIndex/2)];
+      if(matchIndex%2===0) nextMatch.teamAId = m.winnerTeamId; else nextMatch.teamBId = m.winnerTeamId;
+    }
+  } else {
+    m.winnerTeamId = null;
+  }
+  const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
+  t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
+  saveData();
+}
+function bracketRoundLabel(r, lastIndex){
+  const remaining = lastIndex - r;
+  if(remaining===0) return 'Finale';
+  if(remaining===1) return 'Demi-finale';
+  if(remaining===2) return 'Quart de finale';
+  return `Ronde ${r+1}`;
+}
+function bracketDisplayHTML(t){
+  if(!t.bracket) return '';
+  const teamName = (id)=>{
+    if(!id) return '—';
+    const team = (t.teams||[]).find(x=>x.id===id);
+    return team ? team.memberNames.join(' & ') : '?';
+  };
+  const lastIndex = t.bracket.rounds.length-1;
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">Bracket</h3>
+      <button class="btn-ghost" onclick="generateBracket('${t.id}')">🔄 Regénérer</button>
+    </div>
+    <div class="bracket-scroll"><div class="bracket-columns">
+      ${t.bracket.rounds.map((round,ri)=>`
+        <div class="bracket-round-col">
+          <div class="bracket-round-title">${bracketRoundLabel(ri,lastIndex)}</div>
+          ${round.matches.map((m,mi)=>{
+            const aName = teamName(m.teamAId), bName = teamName(m.teamBId);
+            const aWon = m.winnerTeamId && m.winnerTeamId===m.teamAId;
+            const bWon = m.winnerTeamId && m.winnerTeamId===m.teamBId;
+            const canScore = m.teamAId && m.teamBId && !m.isBye;
+            return `<div class="bracket-match">
+              <div class="team-line ${aWon?'won':''}"><span>${escapeHTML(aName)}</span>${canScore ? `<input class="pill-input" style="width:34px;" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},'A',this.value)">` : (m.isBye && m.teamAId ? '<span class="small">bye</span>' : '')}</div>
+              <div class="team-line ${bWon?'won':''}"><span>${escapeHTML(bName)}</span>${canScore ? `<input class="pill-input" style="width:34px;" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},'B',this.value)">` : (m.isBye && m.teamBId ? '<span class="small">bye</span>' : '')}</div>
+            </div>`;
+          }).join('')}
+        </div>`).join('')}
+    </div></div>
+    ${t.status==='completed' ? `<p class="small" style="color:var(--ball);margin-top:10px;">🏆 Tournoi terminé !</p>` : ''}
+  </div>`;
+}
+// ---- Poules puis élimination ----
+function openGeneratePoolsModal(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  if(!t.teams || t.teams.length < 4){ showAlert("Il faut au moins 4 équipes pour des poules."); return; }
+  const maxPools = Math.max(2, Math.floor(t.teams.length/2));
+  const html = `
+    <div class="field"><label>Nombre de poules</label><input id="numPools" type="number" min="2" max="${maxPools}" value="2"></div>
+    <div class="field"><label>Équipes qui avancent par poule</label><input id="advancePerPool" type="number" min="1" value="2"></div>
+    <p class="small">Chaque poule joue un tout-contre-tous ; les meilleures équipes de chaque poule (victoires puis différentiel de points) avancent ensuite au bracket final.</p>`;
+  showFormModal('Générer les poules', html, ()=>{
+    const numPools = Math.max(2, parseInt(document.getElementById('numPools').value,10) || 2);
+    const advancePerPool = Math.max(1, parseInt(document.getElementById('advancePerPool').value,10) || 2);
+    generatePools(t.id, numPools, advancePerPool);
+  });
+}
+function generatePools(tournamentId, numPools, advancePerPool){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t) return;
+  const seeded = t.teams.slice().sort((a,b)=>{
+    const as = typeof a.seed==='number' ? a.seed : -Infinity;
+    const bs = typeof b.seed==='number' ? b.seed : -Infinity;
+    return bs - as;
+  });
+  const pools = [];
+  for(let i=0;i<numPools;i++) pools.push({ id: uid('pool'), name: 'Poule ' + String.fromCharCode(65+i), teamIds: [], matches: [] });
+  // Répartition en serpentin (1,2,3...N,N...3,2,1) pour équilibrer le niveau entre les poules.
+  let dir = 1, idx = 0;
+  seeded.forEach(team=>{
+    pools[idx].teamIds.push(team.id);
+    idx += dir;
+    if(idx === numPools){ idx = numPools-1; dir = -1; }
+    else if(idx < 0){ idx = 0; dir = 1; }
+  });
+  pools.forEach(pool=>{
+    for(let i=0;i<pool.teamIds.length;i++){
+      for(let j=i+1;j<pool.teamIds.length;j++){
+        pool.matches.push({ id: uid('pm'), teamAId: pool.teamIds[i], teamBId: pool.teamIds[j], scoreA:null, scoreB:null });
+      }
+    }
+  });
+  t.pools = pools;
+  t.poolsConfig = { advancePerPool };
+  t.bracket = null;
+  t.status = 'in_progress';
+  saveAndRender();
+}
+function computePoolStandings(pool){
+  const stats = {};
+  pool.teamIds.forEach(id=> stats[id] = { wins:0, losses:0, pf:0, pa:0 });
+  pool.matches.forEach(m=>{
+    if(m.scoreA===null || m.scoreB===null) return;
+    stats[m.teamAId].pf += m.scoreA; stats[m.teamAId].pa += m.scoreB;
+    stats[m.teamBId].pf += m.scoreB; stats[m.teamBId].pa += m.scoreA;
+    if(m.scoreA > m.scoreB){ stats[m.teamAId].wins++; stats[m.teamBId].losses++; }
+    else if(m.scoreB > m.scoreA){ stats[m.teamBId].wins++; stats[m.teamAId].losses++; }
+  });
+  return pool.teamIds.map(id=>({ teamId:id, ...stats[id], diff: stats[id].pf-stats[id].pa }))
+    .sort((a,b)=> b.wins-a.wins || b.diff-a.diff || b.pf-a.pf);
+}
+function setPoolMatchScore(tournamentId, poolId, matchIndex, which, value){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.pools) return;
+  const pool = t.pools.find(p=>p.id===poolId);
+  if(!pool) return;
+  const m = pool.matches[matchIndex];
+  if(which==='A') m.scoreA = value===''?null:Number(value);
+  else m.scoreB = value===''?null:Number(value);
+  saveData();
+}
+function finalizePoolsAndGenerateBracket(tournamentId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !t.pools) return;
+  const allComplete = t.pools.every(pool=> pool.matches.every(m=> m.scoreA!==null && m.scoreB!==null));
+  if(!allComplete){ showAlert("Tous les matchs de poules doivent être complétés avant de générer le bracket final."); return; }
+  const advancing = [];
+  t.pools.forEach(pool=>{
+    const standings = computePoolStandings(pool);
+    standings.slice(0, t.poolsConfig.advancePerPool).forEach((row, rank)=>{
+      const team = t.teams.find(x=>x.id===row.teamId);
+      if(team) advancing.push({ ...team, seed: (t.teams.length*10) - rank }); // priorité au rang de poule
+    });
+  });
+  const msg = t.bracket ? "Regénérer le bracket final effacera les résultats déjà entrés. Continuer ?" : `Générer le bracket final avec les ${advancing.length} équipes qualifiées ?`;
+  showConfirm(msg, ()=>{
+    t.bracket = buildSingleElimBracket(advancing);
+    t.status = 'in_progress';
+    saveAndRender();
+  });
+}
+function poolsDisplayHTML(t){
+  if(!t.pools) return '';
+  const allComplete = t.pools.every(pool=> pool.matches.every(m=> m.scoreA!==null && m.scoreB!==null));
+  const teamName = (id)=>{ const team=(t.teams||[]).find(x=>x.id===id); return team?team.memberNames.join(' & '):'?'; };
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">Poules</h3>
+      <button class="btn ${allComplete?'btn-primary':'btn-secondary'}" ${allComplete?'':'disabled title="Complète tous les matchs de poules d\'abord"'} onclick="finalizePoolsAndGenerateBracket('${t.id}')">${t.bracket ? '🔄 Regénérer le bracket final' : '🏆 Générer le bracket final'}</button>
+    </div>
+    ${t.pools.map(pool=>{
+      const standings = computePoolStandings(pool);
+      return `<h4 style="margin:14px 0 6px;">${escapeHTML(pool.name)}</h4>
+        ${pool.matches.map((m,mi)=>`<div class="match-row" style="margin-bottom:6px;">
+          <div class="team">${escapeHTML(teamName(m.teamAId))}</div>
+          <div class="vs"><input class="pill-input" type="number" min="0" value="${m.scoreA===null?'':m.scoreA}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},'A',this.value)"> : <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setPoolMatchScore('${t.id}','${pool.id}',${mi},'B',this.value)"></div>
+          <div class="team" style="text-align:right;">${escapeHTML(teamName(m.teamBId))}</div>
+        </div>`).join('')}
+        <table style="margin-top:6px;">
+          <tr><th>Équipe</th><th>V-D</th><th>Diff.</th></tr>
+          ${standings.map((r,ri)=>`<tr class="${ri<t.poolsConfig.advancePerPool?'me':''}"><td>${escapeHTML(teamName(r.teamId))}${ri<t.poolsConfig.advancePerPool?' <span class="tag tag-green">qualifié</span>':''}</td><td>${r.wins}-${r.losses}</td><td>${r.diff>0?'+':''}${r.diff}</td></tr>`).join('')}
+        </table>`;
+    }).join('')}
+  </div>`;
+}
+// ==================== FIN TOURNOIS (Phase 2) ====================
 function setSubsSort(col){
   if((VIEW.subsSortBy||'name') === col){ VIEW.subsSortDir = (VIEW.subsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
   else { VIEW.subsSortBy = col; VIEW.subsSortDir = 'asc'; }
