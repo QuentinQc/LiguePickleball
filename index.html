@@ -2217,8 +2217,10 @@ function openEditRoundFormatModal(tournamentId, roundIndex){
   const round = t.bracket.rounds[roundIndex];
   const fmt = round.matchFormat || t.matchFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
   const lastIndex = t.bracket.rounds.length-1;
+  const hasResults = round.matches.some(m=> (m.games||[]).some(g=>g.scoreA!==null));
   const html = `
     <p class="small">Format des matchs pour : <strong>${bracketRoundLabel(roundIndex,lastIndex)}</strong></p>
+    ${hasResults ? `<p class="small" style="color:var(--danger);">⚠️ Cette ronde a déjà des résultats — changer le nombre de matchs par affrontement effacera ces résultats (et ceux des rondes suivantes, qui en dépendent).</p>` : ''}
     <div class="row">
       <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="roundPoints" type="number" min="1" value="${fmt.pointsToWin}"></div>
       <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
@@ -2234,11 +2236,30 @@ function openEditRoundFormatModal(tournamentId, roundIndex){
       <span class="small">Gagner par 2 points d'écart</span>
     </label>`;
   showFormModal('Format de match — ' + bracketRoundLabel(roundIndex,lastIndex), html, ()=>{
-    round.matchFormat = {
+    const oldBestOf = fmt.bestOf || 1;
+    const newFormat = {
       pointsToWin: Math.max(1, parseInt(document.getElementById('roundPoints').value,10) || 11),
       bestOf: parseInt(document.getElementById('roundBestOf').value,10) || 1,
       winByTwo: document.getElementById('roundWinByTwo').checked
     };
+    round.matchFormat = newFormat;
+    if(newFormat.bestOf !== oldBestOf){
+      // Réinitialise les matchs de cette ronde pour le nouveau nombre de
+      // joutes, et efface les rondes suivantes qui en dépendaient — sinon
+      // l'étiquette de format et les résultats affichés ne concordent plus.
+      round.matches.forEach(m=>{
+        m.games = newEmptyGames(newFormat.bestOf);
+        if(!m.isBye) m.winnerTeamId = null;
+      });
+      for(let r=roundIndex+1; r<t.bracket.rounds.length; r++){
+        t.bracket.rounds[r].matches.forEach(m=>{
+          m.teamAId = null; m.teamBId = null; m.winnerTeamId = null;
+          m.games = newEmptyGames(t.bracket.rounds[r].matchFormat ? t.bracket.rounds[r].matchFormat.bestOf : 1);
+        });
+      }
+      propagateByeWinners(t.bracket.rounds);
+      t.status = 'in_progress';
+    }
   });
 }
 function bracketRoundLabel(r, lastIndex){
@@ -2525,6 +2546,17 @@ function simulateBracketMatches(t){
     });
   });
 }
+function resetBracketResultsKeepingStructure(bracket){
+  bracket.rounds.forEach((round, ri)=>{
+    round.matches.forEach(m=>{
+      if(m.isBye) return; // les byes n'ont pas de résultat à effacer
+      m.games = newEmptyGames(round.matchFormat ? round.matchFormat.bestOf : 1);
+      m.winnerTeamId = null;
+      if(ri>0){ m.teamAId = null; m.teamBId = null; } // seront repropagés depuis la ronde précédente
+    });
+  });
+  propagateByeWinners(bracket.rounds);
+}
 function simulateTournament(tournamentId){
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t) return;
@@ -2537,6 +2569,9 @@ function simulateTournament(tournamentId){
       if(!t.pools){
         const numPools = Math.max(2, Math.min(4, Math.floor(t.teams.length/4) || 2));
         generatePools(t.id, numPools, 2);
+      } else {
+        // Poules déjà générées : on efface les scores pour une vraie nouvelle simulation.
+        t.pools.forEach(pool=> pool.matches.forEach(m=>{ m.games = newEmptyGames(t.poolsMatchFormat?t.poolsMatchFormat.bestOf:1); }));
       }
       simulatePoolMatches(t);
       const advancing = [];
@@ -2547,9 +2582,14 @@ function simulateTournament(tournamentId){
           if(team) advancing.push({ ...team, seed: (t.teams.length*10) - rank });
         });
       });
+      // Note : regénère le bracket final au complet (les formats personnalisés
+      // ronde par ronde sur un bracket final précédent ne sont pas conservés
+      // ici, puisque la liste des équipes qualifiées peut changer).
       t.bracket = buildSingleElimBracket(advancing, t.matchFormat);
     } else if(!t.bracket){
       t.bracket = buildSingleElimBracket(t.teams, t.matchFormat);
+    } else {
+      resetBracketResultsKeepingStructure(t.bracket); // garde les formats personnalisés par ronde
     }
     simulateBracketMatches(t);
     t.status = 'completed';
