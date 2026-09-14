@@ -4215,6 +4215,7 @@ function deleteSession(sessionId){
 }
 function sessionSummaryHTML(s, withDelete, viewerPlayerId){
   const restrictGroupId = viewerPlayerId ? playerSessionGroupId(s, viewerPlayerId) : null;
+  const showRating = !viewerPlayerId || DATA.showRatingToPlayers; // toujours visible pour l'admin (pas de viewerPlayerId)
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Session du ${s.date}</h3>
@@ -4228,7 +4229,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
     if(!rows || rows.length===0) return;
     const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===g.id) : null;
     const subValues = new Set(gd && gd.substitutes ? Object.values(gd.substitutes) : []);
-    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3><table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th><th>Cote</th><th></th></tr>`;
+    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3><table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th>${showRating ? '<th>Cote</th>' : ''}<th></th></tr>`;
     rows.forEach((r,i)=>{
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
@@ -4249,7 +4250,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
       const deltaCell = typeof delta === 'number'
         ? `${currentRating!==null ? currentRating.toFixed(2)+' ' : ''}<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">(${delta>=0?'+':''}${delta.toFixed(3)})</span>`
         : (currentRating!==null ? currentRating.toFixed(2) : `<span class="small">—</span>`);
-      html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td><td>${deltaCell}</td><td>${tag}</td></tr>`;
+      html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td>${showRating ? `<td>${deltaCell}</td>` : ''}<td>${tag}</td></tr>`;
     });
     html += `</table>`;
   });
@@ -4347,6 +4348,7 @@ function settingsJeuTabHTML(){
   html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
   html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
+  html += settingsRow('👁️', 'Visibilité de la cote', DATA.showRatingToPlayers ? 'Visible par les joueurs' : 'Cachée aux joueurs (admins seulement)', "openRatingVisibilityModal()");
   return html;
 }
 function settingsAvanceTabHTML(){
@@ -4645,6 +4647,20 @@ function moveTiebreakCriterion(i, dir){
 function saveTiebreakForm(){
   DATA.tiebreakCriteria = TIEBREAK_STATE.map(c=>({ key:c.key, enabled:c.enabled }));
   TIEBREAK_STATE = null;
+}
+
+// ---- Pop-up : Visibilité de la cote ----
+function openRatingVisibilityModal(){
+  const html = `
+    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="setShowRating" ${DATA.showRatingToPlayers ? 'checked' : ''} style="width:auto;">
+      <span class="small">Les joueurs peuvent voir leur cote et celle des autres joueurs de leur groupe</span>
+    </label>
+    <p class="small" style="margin-top:8px;">Si désactivé, la cote reste utilisée normalement en arrière-plan (matchs équilibrés, classement, montées/descentes) — elle est seulement cachée dans l'affichage aux joueurs. Toi (admin) la vois toujours.</p>`;
+  showFormModal('Visibilité de la cote', html, saveRatingVisibilityForm);
+}
+function saveRatingVisibilityForm(){
+  DATA.showRatingToPlayers = document.getElementById('setShowRating').checked;
 }
 
 // ---- Pop-up : Calendrier de saison ----
@@ -5051,7 +5067,7 @@ function playerStatsTabHTML(me){
 
   let html = funHTML || `<div class="card"><p class="small">Continue à jouer pour débloquer tes statistiques de rivalité — reviens ici après quelques matchs !</p></div>`;
 
-  html += `<div class="card">
+  html += DATA.showRatingToPlayers ? `<div class="card">
     <h3>Ta cote</h3>
     <table>
       <tr><td class="small">Cote actuelle</td><td><strong>${(typeof me.rating==='number'?me.rating:RATING_DEFAULT).toFixed(2)}</strong></td></tr>
@@ -5059,7 +5075,7 @@ function playerStatsTabHTML(me){
       <tr><td class="small">Plus basse atteinte</td><td>${Math.min(...ratingHistory).toFixed(2)}</td></tr>
       <tr><td class="small">Matchs comptés vers ta cote</td><td>${typeof me.ratingGames==='number'?me.ratingGames:0}</td></tr>
     </table>
-  </div>`;
+  </div>` : '';
 
   if(r){
     html += `<div class="card">
@@ -5176,7 +5192,7 @@ function previousGroupSessionHTML(me){
       <h3 style="margin:0;">Mon groupe — session précédente (${s.date})</h3>
       <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}','${gid}')">🎾 Mes matchs</button>
     </div>
-    <table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th><th>Cote</th><th></th></tr>`;
+    <table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}<th></th></tr>`;
   rows.forEach((r,i)=>{
     const isGuest = isGuestId(r.playerId);
     const isSub = !isGuest && subValues.has(r.playerId);
@@ -5189,7 +5205,7 @@ function previousGroupSessionHTML(me){
     }
     const rating = ratingOf(r.playerId);
     const avg = r.avgPts !== null && r.avgPts !== undefined ? r.avgPts.toFixed(1) : '—';
-    html += `<tr class="${r.playerId===me.id?'me':''}"><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}${r.playerId===me.id?' <span class="small">(toi)</span>':''}</td><td>${r.pf}</td><td>${avg}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td>${rating.toFixed(2)}</td><td>${tag}</td></tr>`;
+    html += `<tr class="${r.playerId===me.id?'me':''}"><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}${r.playerId===me.id?' <span class="small">(toi)</span>':''}</td><td>${r.pf}</td><td>${avg}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td>${DATA.showRatingToPlayers ? `<td>${rating.toFixed(2)}</td>` : ''}<td>${tag}</td></tr>`;
   });
   html += `</table></div>`;
   return html;
@@ -5200,14 +5216,14 @@ function playerGroupHTML(me){
   const open = currentOpenSession();
   let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
     <table>
-      <tr><th>Nom</th><th>Cote</th></tr>
+      <tr><th>Nom</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}</tr>
       ${groupMembers.map(p=>{
         const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
-        return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td><td>${rating.toFixed(2)}</td></tr>`;
+        return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td>${DATA.showRatingToPlayers ? `<td>${rating.toFixed(2)}</td>` : ''}</tr>`;
       }).join('')}
-      ${groupMembers.length===0 ? `<tr><td colspan="2" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
+      ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
-    <button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>
+    ${DATA.showRatingToPlayers ? `<button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>` : ''}
     <button class="btn-ghost" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
   </div>`;
   html += previousGroupSessionHTML(me);
@@ -5395,6 +5411,7 @@ function migrateData(){
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
   if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
+  if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
   (DATA.tournaments||[]).forEach(t=>{
     if(!t.matchFormat) t.matchFormat = { pointsToWin: 11, bestOf: 1, winByTwo: true };
   });
