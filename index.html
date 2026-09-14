@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1242,8 +1243,8 @@ function renderLogin(){
         <div class="field"><label>Courriel</label><input id="resetEmail" type="email" placeholder="toi@exemple.com"></div>
         <button class="btn btn-primary" onclick="onResetPassword()">Envoyer le lien</button>
         <p class="small"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← Retour à la connexion</a></p>
-      ` : mode==='signup' ? `
-        ${SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Tu t'inscris pour rejoindre : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong></p>` : (SIGNUP_ORG_ID ? `<p class="small" style="color:var(--danger);">Ce lien d'inscription ne correspond à aucune organisation valide.</p>` : '')}
+      ` : mode==='signup' ? (SIGNUP_ORG_NAME ? `
+        <p class="small" style="color:var(--ball);">Tu t'inscris pour rejoindre : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong></p>
         <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" placeholder="Prénom Nom"></div>
         <div class="field"><label>Courriel</label><input id="signupEmail" type="email" placeholder="toi@exemple.com"></div>
         <div class="field"><label>Confirme ton courriel</label><input id="signupEmailConfirm" type="email" placeholder="Retape le même courriel"></div>
@@ -1252,6 +1253,10 @@ function renderLogin(){
         <button class="btn btn-primary" onclick="onSignUp()">Créer mon compte</button>
         <p class="small">Un administrateur devra ensuite associer ton compte à un joueur de la ligue.</p>
       ` : `
+        <p class="small">${SIGNUP_ORG_ID ? "Ce lien d'inscription ne correspond à aucune organisation valide." : "L'inscription se fait uniquement par invitation."} Si tu souhaites rejoindre une ligue sur cette app, contacte-nous par courriel.</p>
+        <a href="mailto:quentin.qc.carpentier@gmail.com?subject=Demande%20d'acc%C3%A8s%20-%20Dinkeo" class="btn btn-primary" style="display:block;text-align:center;text-decoration:none;">📧 Nous envoyer un courriel</a>
+        <p class="small" style="margin-top:10px;"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← J'ai déjà un compte</a></p>
+      `) : `
         <div class="field"><label>Courriel</label><input id="signinEmail" type="email" placeholder="toi@exemple.com"></div>
         <div class="field"><label>Mot de passe</label><input id="signinPassword" type="password" placeholder="••••••••"></div>
         <button class="btn btn-primary" onclick="onSignIn()">Se connecter</button>
