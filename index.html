@@ -139,6 +139,34 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 @media (max-width:520px){.grid2{grid-template-columns:1fr;}}
 .err{color:var(--danger);font-size:13px;margin-top:6px;}
+/* ---------- Écran de connexion : héro traditionnel (texte + formulaire côte à côte) ---------- */
+.login-hero{position:relative;display:grid;grid-template-columns:1.15fr 0.85fr;gap:44px;align-items:center;padding:40px 4px 16px;overflow:hidden;}
+.login-hero::before{content:'';position:absolute;top:-120px;left:-80px;width:420px;height:420px;background:radial-gradient(circle, rgba(207,234,92,0.16), transparent 70%);pointer-events:none;z-index:0;}
+.login-hero::after{content:'';position:absolute;bottom:-140px;right:-100px;width:380px;height:380px;background:radial-gradient(circle, rgba(233,106,60,0.12), transparent 70%);pointer-events:none;z-index:0;}
+.login-hero-copy{position:relative;z-index:1;}
+.login-hero-copy h1{font-family:var(--font-display);font-size:clamp(36px,6vw,58px);font-weight:800;line-height:1.02;letter-spacing:0.01em;margin:0 0 16px;color:var(--line);}
+.login-hero-copy h1 .accent{color:var(--ball);}
+.login-hero-copy p{font-size:16.5px;color:var(--muted);line-height:1.6;max-width:440px;margin:0 0 20px;}
+.login-hero-badges{display:flex;flex-wrap:wrap;gap:8px;}
+.login-card-wrap{position:relative;z-index:1;background:rgba(255,255,255,0.045);border:1px solid rgba(207,234,92,0.3);border-radius:20px;padding:28px;box-shadow:0 24px 60px -24px rgba(0,0,0,0.55);}
+@media (max-width:760px){
+  .login-hero{grid-template-columns:1fr;gap:22px;padding:20px 4px 8px;}
+  .login-hero-copy{order:2;text-align:center;}
+  .login-hero-copy p{margin-left:auto;margin-right:auto;}
+  .login-hero-badges{justify-content:center;}
+  .login-card-wrap{order:1;}
+}
+.feature-showcase{margin-top:36px;}
+.feature-showcase h2{font-family:var(--font-display);font-size:21px;text-align:center;margin:0 0 26px;color:var(--line);}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+.feature-block{background:rgba(255,255,255,0.035);border-radius:14px;padding:18px 20px;border-top:3px solid var(--ball);}
+.feature-block.accent-paddle{border-top-color:var(--paddle);}
+.feature-block.accent-neutral{border-top-color:rgba(255,255,255,0.25);}
+.feature-block .f-icon{font-size:21px;display:block;margin-bottom:9px;}
+.feature-block h3{font-family:var(--font-display);font-size:14.5px;text-transform:none;letter-spacing:0;margin:0 0 6px;color:var(--line);}
+.feature-block p{font-size:13px;color:var(--muted);line-height:1.5;margin:0;}
+.feature-block.feature-highlight{grid-column:span 2;background:linear-gradient(135deg, rgba(207,234,92,0.09), rgba(233,106,60,0.06));}
+@media (max-width:560px){.feature-block.feature-highlight{grid-column:span 1;}}
 .loading{color:var(--muted);text-align:center;padding:40px 0;font-family:var(--font-display);letter-spacing:0.1em;text-transform:uppercase;}
 
 /* ---------- Tableaux : défilement horizontal plutôt que colonnes écrasées ---------- */
@@ -1258,7 +1286,18 @@ function renderLogin(){
   app.innerHTML = `
     ${topbarHTML('Ligue de pickleball — format échelle, double')}
     ${storageBannerHTML()}
-    <div class="card">
+    <div class="login-hero">
+      <div class="login-hero-copy">
+        <h1>La ligue de <span class="accent">pickleball</span>, organisée.</h1>
+        <p>De l'échelle hebdomadaire aux tournois, toute ta ligue gérée à un seul endroit — sans feuille de calcul.</p>
+        <div class="login-hero-badges">
+          <span class="tag tag-green">🏆 Tournois</span>
+          <span class="tag tag-yellow">🪜 3 formats de ligue</span>
+          <span class="tag tag-stay">📊 Cote automatique</span>
+          <span class="tag tag-stay">📱 Accès mobile</span>
+        </div>
+      </div>
+      <div class="login-card-wrap">
       <div class="tabs">
         <div class="tab ${mode!=='signup'?'active':''}" onclick="setLoginMode('signin')">Connexion</div>
         <div class="tab ${mode==='signup'?'active':''}" onclick="setLoginMode('signup')">Créer un compte</div>
@@ -1289,6 +1328,52 @@ function renderLogin(){
       `}
       ${VIEW.error ? `<p class="err">${escapeHTML(VIEW.error)}</p>` : ''}
       ${VIEW.info ? `<p class="small" style="color:var(--ball);">${escapeHTML(VIEW.info)}</p>` : ''}
+      </div>
+    </div>
+    <div class="feature-showcase">
+      <h2>Ce que Dinkeo permet de faire</h2>
+      <div class="feature-grid">
+        <div class="feature-block feature-highlight">
+          <span class="f-icon">🏆</span>
+          <h3>Des tournois complets</h3>
+          <p>Élimination simple, poules puis élimination, bracket visuel, format de match ajustable ronde par ronde (points, meilleur de 3 ou 5) — et un mode test pour prévisualiser le tout avant le grand jour.</p>
+        </div>
+        <div class="feature-block">
+          <span class="f-icon">🪜</span>
+          <h3>Le format qui te convient</h3>
+          <p>Échelle classique avec montées et descentes, poules fixes, ou division unique à classement cumulatif.</p>
+        </div>
+        <div class="feature-block">
+          <span class="f-icon">📊</span>
+          <h3>Une cote qui s'ajuste seule</h3>
+          <p>Chaque match équilibre la cote de tes joueurs et suit leur progression au fil de la saison.</p>
+        </div>
+        <div class="feature-block accent-paddle">
+          <span class="f-icon">🤕</span>
+          <h3>Absences et blessures gérées seules</h3>
+          <p>Un joueur absent ou blessé bascule automatiquement, sans fausser le classement ni les montées/descentes.</p>
+        </div>
+        <div class="feature-block accent-paddle">
+          <span class="f-icon">🔄</span>
+          <h3>Remplaçants et prospects</h3>
+          <p>Un bassin de remplaçants prêts à dépanner, et une liste de gens intéressés à convertir en joueurs réguliers.</p>
+        </div>
+        <div class="feature-block accent-neutral">
+          <span class="f-icon">📅</span>
+          <h3>Des sessions qui s'enchaînent seules</h3>
+          <p>Programme un calendrier de saison avec congés, et laisse les sessions se créer automatiquement d'une semaine à l'autre.</p>
+        </div>
+        <div class="feature-block accent-neutral">
+          <span class="f-icon">🏢</span>
+          <h3>Plusieurs ligues, un seul compte</h3>
+          <p>Gère plusieurs organisations complètement séparées — un joueur peut même évoluer dans plus d'une avec le même compte.</p>
+        </div>
+        <div class="feature-block accent-neutral">
+          <span class="f-icon">📱</span>
+          <h3>Une vraie vue pour les joueurs</h3>
+          <p>Groupe, statistiques, historique, disponibilités — sur mobile comme sur ordinateur.</p>
+        </div>
+      </div>
     </div>
   `;
 }
