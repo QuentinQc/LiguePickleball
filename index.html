@@ -4309,16 +4309,17 @@ function settingsOrganisationTabHTML(){
   let html = '';
   html += settingsRow('🏢', 'Organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
   html += `<div class="card">
-    <h3>🔗 Partage</h3>
-    <p class="small">Copie le lien de l'app pour l'envoyer par texto, Messenger, courriel, etc.</p>
-    <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien de l'app</button>
-    <p class="small" style="margin-top:10px;">Ce lien-ci associe automatiquement toute nouvelle personne qui s'inscrit à ton organisation (utile si tu gères plusieurs organisations séparées).</p>
+    <h3>🔗 Inviter des joueurs dans ton organisation</h3>
+    <p class="small">Ce lien associe automatiquement toute personne qui l'utilise pour s'inscrire à ton organisation — c'est le lien à envoyer à tes joueurs (texto, courriel, etc.).</p>
     <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
   </div>`;
   html += `<div class="card">
     <h3>➕ Nouvelle organisation</h3>
     <p class="small" style="margin-bottom:10px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
-    <button class="btn btn-secondary" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation</button>
+    <button class="btn btn-secondary" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation moi-même</button>
+    ${(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) ? `
+    <p class="small" style="margin:14px 0 8px;">🛡️ Réservé aux super admins — envoie ce lien à quelqu'un d'autre pour qu'il démarre <strong>sa propre</strong> organisation indépendante (pas la tienne) — utile pour un autre gestionnaire de ligue qui voudrait utiliser l'app de son côté.</p>
+    <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien pour démarrer une nouvelle organisation</button>` : ''}
   </div>`;
   return html;
 }
