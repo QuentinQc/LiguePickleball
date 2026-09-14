@@ -403,6 +403,9 @@ async function refreshMyLinkForCurrentLeague(){
   MY_LINK_IN_CURRENT_LEAGUE = error ? null : data;
 }
 // Change la ligue affichée par un joueur qui joue dans plusieurs ligues.
+// Change de ligue affichée pour un compte qui joue dans plusieurs ligues —
+// peu importe s'il y est régulier ou remplaçant, chaque ligue est traitée
+// selon son propre type de lien (pas selon le rôle global du compte).
 async function switchMyLeague(leagueId){
   const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
   if(!link) return;
@@ -410,14 +413,18 @@ async function switchMyLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
+  const isSub = !!link.substitute_id;
   if(SESSION_USER.role === 'admin'){
-    // Un admin qui consulte sa propre vue joueur : on ne touche pas à son
-    // rôle, seulement à la ligue et au lien joueur affichés.
+    // Un admin qui consulte sa propre vue joueur/remplaçant : on ne touche
+    // pas à son rôle, seulement à la ligue et au type de lien affichés.
     MY_LINK_IN_CURRENT_LEAGUE = link;
+    ADMIN_VIEWING_AS = isSub ? 'substitute' : 'player';
+  } else if(isSub){
+    SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
   } else {
     SESSION_USER = { role:'player', playerId: link.player_id };
   }
-  VIEW = { tab:'classement' };
+  VIEW = { tab: isSub ? 'dispo' : 'classement' };
   render();
 }
 // Recharge à la fois le lien joueur de l'admin dans la ligue affichée et la
@@ -1326,7 +1333,10 @@ async function onAuthResolved(user){
     return;
   }
 
-  // Joueur ou remplaçant : on regarde dans quelle(s) ligue(s) ce compte est lié.
+  // Joueur ou remplaçant : on regarde dans quelle(s) ligue(s) ce compte est
+  // lié — peu importe le rôle global du compte, chaque ligue est traitée
+  // selon son propre type de lien (régulier ou remplaçant), pour qu'un
+  // compte puisse être régulier dans une ligue et remplaçant dans une autre.
   CURRENT_ORGANIZATION_ID = null;
   await loadLeagues();
   await loadMyLeagueLinks(profile.id);
@@ -1335,29 +1345,18 @@ async function onAuthResolved(user){
     render();
     return;
   }
-  if(profile.role === 'substitute'){
-    const subLink = MY_LEAGUE_LINKS.find(l=>l.league_id===CURRENT_LEAGUE_ID && l.substitute_id) || MY_LEAGUE_LINKS.find(l=>l.substitute_id);
-    if(!subLink){
-      SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
-      render();
-      return;
-    }
-    CURRENT_LEAGUE_ID = subLink.league_id;
-    const loadedSub = await loadData(CURRENT_LEAGUE_ID);
-    DATA = loadedSub || defaultData();
-    migrateData();
-    SESSION_USER = { role:'substitute', substituteId: subLink.substitute_id };
-    VIEW = { tab:'dispo' };
-    render();
-    return;
-  }
   const link = MY_LEAGUE_LINKS.find(l=>l.league_id===CURRENT_LEAGUE_ID) || MY_LEAGUE_LINKS[0];
   CURRENT_LEAGUE_ID = link.league_id;
   const loaded = await loadData(CURRENT_LEAGUE_ID);
   DATA = loaded || defaultData();
   migrateData();
-  SESSION_USER = { role:'player', playerId: link.player_id };
-  VIEW = { tab:'classement' };
+  if(link.substitute_id){
+    SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
+    VIEW = { tab:'dispo' };
+  } else {
+    SESSION_USER = { role:'player', playerId: link.player_id };
+    VIEW = { tab:'classement' };
+  }
   render();
 }
 async function loadMyLeagueLinks(profileId){
@@ -4810,18 +4809,18 @@ function renderSubstitute(subId){
       <button onclick="toggleAdminSubView()">Admin</button>
       <button class="active" disabled>Remplaçant</button>
     </div>` : '';
-  const subLinks = MY_LEAGUE_LINKS.filter(l=>l.substitute_id);
-  const subOrgCount = new Set(subLinks.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
-  const leagueSwitcher = subLinks.length > 1 ? `
+  const allLinks = MY_LEAGUE_LINKS;
+  const orgCount = new Set(allLinks.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
+  const leagueSwitcher = allLinks.length > 1 ? `
     <div class="card">
       <label style="display:block;margin-bottom:6px;">Ma ligue</label>
       <div class="row" style="gap:6px;">
-        ${subLinks.map(l=>{
+        ${allLinks.map(l=>{
           const lg = LEAGUES.find(x=>x.id===l.league_id);
           const active = l.league_id===CURRENT_LEAGUE_ID;
-          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMySubstituteLeague('${l.league_id}')">
-            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</span>
-            ${subOrgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMyLeague('${l.league_id}')">
+            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}${l.substitute_id ? ' 🔄' : ''}</span>
+            ${orgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
           </button>`;
         }).join('')}
       </div>
@@ -4837,15 +4836,6 @@ function renderSubstitute(subId){
   c.innerHTML = VIEW.tab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
-async function switchMySubstituteLeague(leagueId){
-  CURRENT_LEAGUE_ID = leagueId;
-  const loaded = await loadData(leagueId);
-  DATA = loaded || defaultData();
-  migrateData();
-  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
-  SESSION_USER = { role:'substitute', substituteId: link ? link.substitute_id : null };
-  render();
-}
 function substituteAvailabilityHTML(sub){
   const open = currentOpenSession();
   if(!open){
@@ -4944,7 +4934,7 @@ function renderPlayer(playerId){
           const lg = LEAGUES.find(x=>x.id===l.league_id);
           const active = l.league_id===CURRENT_LEAGUE_ID;
           return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMyLeague('${l.league_id}')">
-            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</span>
+            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}${l.substitute_id ? ' 🔄' : ''}</span>
             ${myOrgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
           </button>`;
         }).join('')}
