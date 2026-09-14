@@ -1228,6 +1228,31 @@ async function onSetNewPassword(){
   const { data: { user } } = await sb.auth.getUser();
   await onAuthResolved(user);
 }
+// Ouvre l'app Mail avec un gabarit de questions pré-rempli, pour les
+// visiteurs qui demandent l'accès sans avoir de lien d'inscription.
+function openAccessRequestEmail(){
+  const subject = "Demande d'accès - Dinkeo";
+  const body = [
+    "Bonjour,",
+    "",
+    "Je souhaiterais accéder à Dinkeo pour ma ligue de pickleball.",
+    "",
+    "Pourquoi souhaitez-vous y accéder ?",
+    "",
+    "",
+    "Quel type de ligue avez-vous (échelle, poules fixes, division unique, tournoi, etc.) ?",
+    "",
+    "",
+    "Combien de joueurs environ ?",
+    "",
+    "",
+    "Vos besoins particuliers :",
+    "",
+    "",
+    "Merci !"
+  ].join("\n");
+  window.location.href = "mailto:quentin.qc.carpentier@gmail.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+}
 function renderLogin(){
   const mode = VIEW.loginMode || 'signin'; // 'signin' | 'signup' | 'reset'
   app.innerHTML = `
@@ -1254,7 +1279,7 @@ function renderLogin(){
         <p class="small">Un administrateur devra ensuite associer ton compte à un joueur de la ligue.</p>
       ` : `
         <p class="small">${SIGNUP_ORG_ID ? "Ce lien d'inscription ne correspond à aucune organisation valide." : "L'inscription se fait uniquement par invitation."} Si tu souhaites rejoindre une ligue sur cette app, contacte-nous par courriel.</p>
-        <a href="mailto:quentin.qc.carpentier@gmail.com?subject=Demande%20d'acc%C3%A8s%20-%20Dinkeo" class="btn btn-primary" style="display:block;text-align:center;text-decoration:none;">📧 Nous envoyer un courriel</a>
+        <button class="btn btn-primary" onclick="openAccessRequestEmail()" style="width:100%;">📧 Nous envoyer un courriel</button>
         <p class="small" style="margin-top:10px;"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← J'ai déjà un compte</a></p>
       `) : `
         <div class="field"><label>Courriel</label><input id="signinEmail" type="email" placeholder="toi@exemple.com"></div>
