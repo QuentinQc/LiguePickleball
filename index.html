@@ -5161,11 +5161,7 @@ function playerGuideHTML(){
     <h3>Mon groupe</h3>
     <p class="small">Affiche tes coéquipiers avec leur cote, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
     <h3 style="margin-top:14px;">Déclarer une absence</h3>
-    <p class="small">Clique sur « Je serai absent(e) pour cette session » dans Mon groupe, avant que la session ne soit finalisée — ça laisse le temps à ton administrateur de trouver un remplaçant. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
-    <h3 style="margin-top:14px;">Vacances ou plusieurs sessions d'absence</h3>
-    <p class="small">Dans « 🌴 Absences prévues (vacances) », ajoute une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage, sans avoir à y penser chaque fois.</p>
-    <h3 style="margin-top:14px;">Blessure</h3>
-    <p class="small">Dans « Ma condition », indique si tu es blessé(e) — tu passes en attente d'assignation, hors de ton groupe, jusqu'à ce que tu te déclares rétabli(e).</p>
+    <p class="small">Dans la section « Absence » de Mon groupe, trois boutons ouvrent chacun un pop-up : « Une session » pour la session en cours (avant qu'elle ne soit finalisée, pour laisser le temps de trouver un remplaçant), « Plusieurs sessions » pour couvrir une plage de dates à l'avance (vacances), et « Blessure » pour te déclarer hors jeu. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
     <h3 style="margin-top:14px;">Voir tes matchs</h3>
     <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
     <h3 style="margin-top:14px;">Historique</h3>
@@ -5424,19 +5420,8 @@ function playerGroupHTML(me){
     <button class="btn-ghost" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
   </div>`;
   html += previousGroupSessionHTML(me);
-  html += `<div class="card">
-    <h3>Ma condition</h3>
-    <p class="small">${me.injured ? "Tu es indiqué(e) comme blessé(e) — en attente de retour, hors de ton groupe." : "Indique ici si tu es blessé(e) et hors jeu pour un moment."}</p>
-    <button class="btn ${me.injured ? 'btn-secondary' : 'btn-danger'}" ${OFFLINE_MODE?'disabled title="Hors ligne — réessaie une fois la connexion revenue"':''} onclick="toggleMyInjured('${me.id}')">${me.injured ? 'Je suis rétabli(e)' : 'Je suis blessé(e)'}</button>
-  </div>`;
-  html += plannedAbsencesCardHTML(me);
+  html += absenceCardHTML(me);
   if(open){
-    const absent = isAbsent(open, me.id);
-    html += `<div class="card">
-      <h3>Ma présence — session du ${open.date}</h3>
-      <p class="small">${absent ? "Tu es indiqué(e) comme absent(e) pour cette session." : "Indique ici si tu seras absent(e) pour cette session, avant que les matchs soient finalisés."}</p>
-      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" ${OFFLINE_MODE?'disabled title="Hors ligne — réessaie une fois la connexion revenue"':''} onclick="toggleAbsence('${me.id}')">${absent ? 'Je serai présent(e) finalement' : 'Je serai absent(e) pour cette session'}</button>
-    </div>`;
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
     if(!open.published){
       html += `<div class="card"><p class="small">La session du ${open.date} est en préparation. Tes matchs seront visibles ici une fois qu'un administrateur l'aura publiée.</p></div>`;
@@ -5463,30 +5448,63 @@ function playerGroupHTML(me){
   }
   return html;
 }
-function plannedAbsencesCardHTML(me){
-  const list = plannedAbsencesForPlayer(me.id);
+function absenceCardHTML(me){
+  const open = currentOpenSession();
+  const absentToday = open && isAbsent(open, me.id);
+  const planned = plannedAbsencesForPlayer(me.id);
+  const badges = [];
+  if(absentToday) badges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
+  if(planned.length) badges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''} d'absence</span>`);
+  if(me.injured) badges.push('<span class="tag tag-down">🤕 Blessé(e)</span>');
+  return `<div class="card">
+    <h3>Absence</h3>
+    <div class="modal-badges" style="margin-bottom:12px;">${badges.length ? badges.join('') : '<span class="small" style="color:var(--muted);">Aucune absence déclarée</span>'}</div>
+    <div class="action-grid">
+      <button class="action-btn" ${!open?'disabled title="Aucune session en cours"':''} onclick="openOneSessionAbsenceModal('${me.id}')"><span class="icon">🚫</span> Une session</button>
+      <button class="action-btn" onclick="openPlannedAbsenceModal('${me.id}')"><span class="icon">🌴</span> Plusieurs sessions</button>
+      <button class="action-btn" onclick="openInjuredModal('${me.id}')"><span class="icon">🤕</span> Blessure</button>
+    </div>
+  </div>`;
+}
+function openOneSessionAbsenceModal(playerId){
+  const open = currentOpenSession();
+  if(!open) return;
+  const absent = isAbsent(open, playerId);
+  const html = `
+    <p class="small" style="margin-bottom:14px;">${absent ? `Tu es indiqué(e) comme absent(e) pour la session du ${open.date}.` : `Indique ici si tu seras absent(e) pour la session du ${open.date}, avant que les matchs soient finalisés.`}</p>
+    <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" style="width:100%;" onclick="closeModal();toggleAbsence('${playerId}')">${absent ? 'Je serai présent(e) finalement' : 'Je serai absent(e) pour cette session'}</button>`;
+  showContentModal('Absence — une session', html);
+}
+function openInjuredModal(playerId){
+  const p = DATA.players.find(x=>x.id===playerId);
+  if(!p) return;
+  const html = `
+    <p class="small" style="margin-bottom:14px;">${p.injured ? "Tu es indiqué(e) comme blessé(e) — en attente de retour, hors de ton groupe." : "Tu passeras en attente d'assignation, hors de ton groupe, jusqu'à ce que tu te déclares rétabli(e)."}</p>
+    <button class="btn ${p.injured ? 'btn-secondary' : 'btn-danger'}" style="width:100%;" onclick="closeModal();toggleMyInjured('${playerId}')">${p.injured ? 'Je suis rétabli(e)' : 'Je suis blessé(e)'}</button>`;
+  showContentModal('Blessure', html);
+}
+function openPlannedAbsenceModal(playerId){
+  showContentModal('Absences prévues (vacances)', ()=>plannedAbsenceModalContentHTML(playerId));
+}
+function plannedAbsenceModalContentHTML(playerId){
+  const list = plannedAbsencesForPlayer(playerId);
   const rows = list.length ? list.map(a=>`
     <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
       <span class="small">${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</span>
       <button class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">retirer</button>
-    </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune absence prévue.</p>`;
-  return `<div class="card">
-    <h3>🌴 Absences prévues (vacances)</h3>
-    <p class="small">Couvre une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage.</p>
+    </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune absence prévue pour l'instant.</p>`;
+  return `
+    <p class="small" style="margin-bottom:10px;">Couvre une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage.</p>
     ${rows}
-    <button class="btn btn-secondary" style="margin-top:10px;" ${OFFLINE_MODE?'disabled title="Hors ligne"':''} onclick="openAddPlannedAbsenceModal('${me.id}')">+ Ajouter une plage d'absence</button>
-  </div>`;
+    <div class="field" style="margin-top:14px;"><label>Du</label><input id="paStart" type="date"></div>
+    <div class="field"><label>Au</label><input id="paEnd" type="date"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${playerId}')">Ajouter cette plage</button>`;
 }
-function openAddPlannedAbsenceModal(playerId){
-  const html = `
-    <div class="field"><label>Du</label><input id="paStart" type="date"></div>
-    <div class="field"><label>Au</label><input id="paEnd" type="date"></div>`;
-  showFormModal('Ajouter une plage d\'absence', html, ()=>{
-    const start = document.getElementById('paStart').value;
-    const end = document.getElementById('paEnd').value;
-    if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return false; }
-    addPlannedAbsence(playerId, start, end);
-  });
+function submitPlannedAbsence(playerId){
+  const start = document.getElementById('paStart').value;
+  const end = document.getElementById('paEnd').value;
+  if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return; }
+  addPlannedAbsence(playerId, start, end);
 }
 function playerHistoryHTML(me){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
