@@ -3014,7 +3014,7 @@ function playerDetailModalHTML(pid){
         <button class="action-btn" ${disableRole?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${profile.id}','${isAdmin?'player':'admin'}')"><span class="icon">${isAdmin?'⬇️':'👑'}</span> ${isAdmin?'Retirer admin':'Rendre admin'}</button>
         <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>
       </div>`;
-    html += playerNotesSectionHTML(profile.id);
+    html += playerNotesSectionHTML();
   } else {
     const pendingAccounts = ALL_PROFILES.filter(pr=>!LEAGUE_PLAYER_LINKS.some(l=>l.profile_id===pr.id));
     html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié.</p>`;
@@ -3030,66 +3030,100 @@ function playerDetailModalHTML(pid){
     }
   }
   html += `</div>`;
+  html += playerNotesSectionHTML();
   return html;
 }
 function openPlayerDetailModal(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
   const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===pid);
-  if(link){
-    loadPlayerNotes(link.profile_id).then(()=>{
-      showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
-    });
-    return;
-  }
-  CURRENT_PLAYER_NOTES = [];
-  showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
+  const loadPromise = link
+    ? loadPlayerNotesForProfile(link.profile_id)
+    : loadPlayerNotesForPlayer(CURRENT_LEAGUE_ID, pid);
+  loadPromise.then(()=>{
+    showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
+  });
 }
-async function loadPlayerNotes(profileId){
+async function loadPlayerNotesForProfile(profileId){
+  CURRENT_PLAYER_NOTES_SCOPE = { type:'profile', profileId };
   const { data, error } = await sb.from('player_notes').select('*').eq('profile_id', profileId).order('created_at', { ascending: false });
   CURRENT_PLAYER_NOTES = error ? [] : (data || []);
 }
-function playerNotesSectionHTML(profileId){
+async function loadPlayerNotesForPlayer(leagueId, playerId){
+  CURRENT_PLAYER_NOTES_SCOPE = { type:'player', playerId, leagueId };
+  const { data, error } = await sb.from('player_notes').select('*').eq('league_id', leagueId).eq('player_id', playerId).order('created_at', { ascending: false });
+  CURRENT_PLAYER_NOTES = error ? [] : (data || []);
+}
+// Dès qu'un joueur existant (avec peut-être des notes "en attente" propres à
+// cette ligue) est lié à un compte, on bascule ces notes vers le profil pour
+// qu'elles deviennent partagées dans l'organisation. Si ce même compte est
+// aussi lié à un joueur dans une autre ligue, les deux historiques fusionnent
+// naturellement sous le même profile_id.
+async function migratePlayerNotesToProfile(leagueId, playerId, profileId){
+  await sb.from('player_notes').update({ profile_id: profileId, player_id: null, league_id: null }).eq('league_id', leagueId).eq('player_id', playerId);
+}
+function playerNotesSectionHTML(){
   const notes = CURRENT_PLAYER_NOTES;
+  const scope = CURRENT_PLAYER_NOTES_SCOPE;
   const list = notes.length ? notes.map(n=>`
     <div class="note-card" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
       <div class="small" style="color:var(--muted);display:flex;justify-content:space-between;gap:8px;">
         <span>${escapeHTML(n.created_by_name||'Admin')} · ${new Date(n.created_at).toLocaleDateString()}</span>
-        <button class="btn-icon" title="Supprimer" onclick="deletePlayerNote('${n.id}','${profileId}')">🗑️</button>
+        <button class="btn-icon" title="Supprimer" onclick="deletePlayerNote('${n.id}')">🗑️</button>
       </div>
       <div style="margin-top:4px;white-space:pre-wrap;">${escapeHTML(n.content)}</div>
     </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune note pour l'instant.</p>`;
+  const helpText = scope && scope.type === 'profile'
+    ? "Visibles par tous les admins de l'organisation, sur toutes ses ligues."
+    : "En attente — propres à cette ligue tant qu'aucun compte n'est lié. Dès qu'un compte sera lié, elles deviendront partagées dans toute l'organisation.";
   return `
     <div class="modal-section">
       <h3>📝 Notes admin</h3>
-      <p class="small" style="margin-bottom:10px;color:var(--muted);">Visibles par tous les admins de l'organisation, sur toutes ses ligues.</p>
+      <p class="small" style="margin-bottom:10px;color:var(--muted);">${helpText}</p>
       ${list}
-      <textarea id="newPlayerNote_${profileId}" placeholder="Ajouter une note..." style="width:100%;min-height:60px;margin-top:6px;"></textarea>
-      <button class="btn btn-secondary" style="margin-top:8px;" onclick="addPlayerNote('${profileId}')">Ajouter la note</button>
+      <textarea id="newPlayerNoteInput" placeholder="Ajouter une note..." style="width:100%;min-height:60px;margin-top:6px;"></textarea>
+      <button class="btn btn-secondary" style="margin-top:8px;" onclick="addPlayerNote()">Ajouter la note</button>
     </div>`;
 }
-async function addPlayerNote(profileId){
-  const ta = document.getElementById('newPlayerNote_'+profileId);
+async function addPlayerNote(){
+  const scope = CURRENT_PLAYER_NOTES_SCOPE;
+  if(!scope) return;
+  const ta = document.getElementById('newPlayerNoteInput');
   const content = ta.value.trim();
   if(!content) return;
   const authorName = CURRENT_PROFILE ? (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email) : 'Admin';
-  const { error } = await sb.from('player_notes').insert({ profile_id: profileId, organization_id: CURRENT_ORGANIZATION_ID, content, created_by: CURRENT_PROFILE ? CURRENT_PROFILE.id : null, created_by_name: authorName });
-  if(error){ alert('Erreur: '+error.message); return; }
-  await loadPlayerNotes(profileId);
-  const pid = DATA.players.find(x=>LEAGUE_PLAYER_LINKS.find(l=>l.player_id===x.id && l.profile_id===profileId))?.id;
-  if(pid) openPlayerDetailModalRefresh(pid);
+  const row = {
+    organization_id: CURRENT_ORGANIZATION_ID,
+    content,
+    created_by: CURRENT_PROFILE ? CURRENT_PROFILE.id : null,
+    created_by_name: authorName,
+  };
+  if(scope.type === 'profile') row.profile_id = scope.profileId;
+  else { row.player_id = scope.playerId; row.league_id = scope.leagueId; }
+  const { error } = await sb.from('player_notes').insert(row);
+  if(error){ showAlert('Erreur : '+error.message); return; }
+  await reloadCurrentPlayerNotesAndRefresh(scope);
 }
-async function deletePlayerNote(noteId, profileId){
+async function deletePlayerNote(noteId){
+  const scope = CURRENT_PLAYER_NOTES_SCOPE;
   const { error } = await sb.from('player_notes').delete().eq('id', noteId);
-  if(error){ alert('Erreur: '+error.message); return; }
-  await loadPlayerNotes(profileId);
-  const pid = DATA.players.find(x=>LEAGUE_PLAYER_LINKS.find(l=>l.player_id===x.id && l.profile_id===profileId))?.id;
-  if(pid) openPlayerDetailModalRefresh(pid);
+  if(error){ showAlert('Erreur : '+error.message); return; }
+  await reloadCurrentPlayerNotesAndRefresh(scope);
 }
-function openPlayerDetailModalRefresh(pid){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
+async function reloadCurrentPlayerNotesAndRefresh(scope){
+  if(!scope) return;
+  let pid;
+  if(scope.type === 'profile'){
+    await loadPlayerNotesForProfile(scope.profileId);
+    pid = DATA.players.find(x=>LEAGUE_PLAYER_LINKS.find(l=>l.player_id===x.id && l.profile_id===scope.profileId))?.id;
+  } else {
+    await loadPlayerNotesForPlayer(scope.leagueId, scope.playerId);
+    pid = scope.playerId;
+  }
+  if(pid){
+    const p = DATA.players.find(x=>x.id===pid);
+    if(p) showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
+  }
 }
 function togglePlayerStatus(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -3121,6 +3155,7 @@ async function linkPlayerToAccountFromModal(pid){
   if(!profileId) return;
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: pid });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, pid, profileId);
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   openPlayerDetailModal(pid);
@@ -3186,7 +3221,8 @@ function editPlayerRating(pid){
 
 // ---- Comptes : lier les comptes créés (courriel/mot de passe) à des joueurs ----
 let ALL_PROFILES = [];
-let CURRENT_PLAYER_NOTES = []; // notes chargées pour le profil actuellement affiché dans la fiche joueur
+let CURRENT_PLAYER_NOTES = []; // notes chargées pour la fiche joueur actuellement affichée
+let CURRENT_PLAYER_NOTES_SCOPE = null; // {type:'profile', profileId} ou {type:'player', playerId, leagueId}
 let LEAGUE_PLAYER_LINKS = []; // profile_players de la ligue actuellement affichée
 let ALL_PROFILE_PLAYERS = []; // profile_players de TOUTES les ligues (pour gérer les ligues d'un joueur)
 async function loadAllProfiles(){
@@ -3361,6 +3397,7 @@ async function linkAccount(profileId){
   }
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, playerId, profileId);
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   render();
@@ -3385,6 +3422,7 @@ async function relinkAccount(profileId){
   }
   const { error } = await sb.from('profile_players').update({ player_id: playerId }).eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
   if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
+  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, playerId, profileId);
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   render();
