@@ -812,12 +812,40 @@ function matchesForGroup(session, gid){
 }
 function startNewSession(explicitDate){
   const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData: DATA.groups.map(g=>({ groupId:g.id, matches:[] })), movements: null, absences: [], published: false };
+  applyPlannedAbsencesToSession(session);
   DATA.sessions.push(session);
   DATA.groups.forEach(g=>{
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     gd.matches = matchesForGroup(session, g.id);
   });
   return session;
+}
+// ---- Absences planifiées (vacances) : un joueur peut couvrir une plage de
+// dates à l'avance. Appliquées automatiquement à toute nouvelle session dont
+// la date tombe dans la plage, sans devoir y penser session par session.
+function plannedAbsencesForPlayer(playerId){
+  return (DATA.plannedAbsences||[]).filter(a=>a.playerId===playerId).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+}
+function dateInPlannedAbsence(a, dateStr){ return dateStr >= a.startDate && dateStr <= a.endDate; }
+function applyPlannedAbsencesToSession(session){
+  (DATA.plannedAbsences||[]).forEach(a=>{
+    if(dateInPlannedAbsence(a, session.date) && !session.absences.includes(a.playerId)){
+      session.absences.push(a.playerId);
+    }
+  });
+}
+function addPlannedAbsence(playerId, startDate, endDate){
+  DATA.plannedAbsences = DATA.plannedAbsences || [];
+  DATA.plannedAbsences.push({ id: uid('pa'), playerId, startDate, endDate });
+  // Applique immédiatement à la session en cours si sa date tombe dans la plage.
+  const open = currentOpenSession();
+  if(open && dateInPlannedAbsence({startDate, endDate}, open.date) && !isAbsent(open, playerId)){
+    toggleAbsence(playerId);
+  }
+}
+function removePlannedAbsence(id){
+  DATA.plannedAbsences = (DATA.plannedAbsences||[]).filter(a=>a.id!==id);
+  saveAndRender();
 }
 function toggleAbsence(playerId){
   const open = currentOpenSession();
@@ -3003,6 +3031,15 @@ function playerDetailModalHTML(pid){
       <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette session'}</button>
     </div>`;
   }
+  const plannedAbs = plannedAbsencesForPlayer(pid);
+  html += `<div class="modal-section">
+    <h3>🌴 Absences prévues (vacances)</h3>
+    ${plannedAbs.length ? plannedAbs.map(a=>`
+      <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
+        <span class="small">${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</span>
+        <button class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}');openPlayerDetailModal('${pid}')">retirer</button>
+      </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune, déclarées par le joueur lui-même.</p>`}
+  </div>`;
   html += `<div class="modal-section"><h3>Compte lié</h3>`;
   if(profile){
     const isAdmin = profile.role === 'admin';
@@ -3147,6 +3184,20 @@ function togglePlayerInjured(pid){
   }
   saveAndRender();
   openPlayerDetailModal(pid);
+}
+// Même logique que togglePlayerInjured, mais pour l'auto-déclaration par le
+// joueur lui-même (pas de fiche admin à rouvrir après).
+function toggleMyInjured(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  if(!p.injured){
+    p.lastGroupId = p.groupId || p.lastGroupId || null;
+    p.groupId = null;
+    p.injured = true;
+  } else {
+    p.injured = false;
+  }
+  saveAndRender();
 }
 async function linkPlayerToAccountFromModal(pid){
   const select = document.getElementById('detailLinkSelect_'+pid);
@@ -5111,6 +5162,10 @@ function playerGuideHTML(){
     <p class="small">Affiche tes coéquipiers avec leur cote, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
     <h3 style="margin-top:14px;">Déclarer une absence</h3>
     <p class="small">Clique sur « Je serai absent(e) pour cette session » dans Mon groupe, avant que la session ne soit finalisée — ça laisse le temps à ton administrateur de trouver un remplaçant. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
+    <h3 style="margin-top:14px;">Vacances ou plusieurs sessions d'absence</h3>
+    <p class="small">Dans « 🌴 Absences prévues (vacances) », ajoute une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage, sans avoir à y penser chaque fois.</p>
+    <h3 style="margin-top:14px;">Blessure</h3>
+    <p class="small">Dans « Ma condition », indique si tu es blessé(e) — tu passes en attente d'assignation, hors de ton groupe, jusqu'à ce que tu te déclares rétabli(e).</p>
     <h3 style="margin-top:14px;">Voir tes matchs</h3>
     <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
     <h3 style="margin-top:14px;">Historique</h3>
@@ -5369,6 +5424,12 @@ function playerGroupHTML(me){
     <button class="btn-ghost" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
   </div>`;
   html += previousGroupSessionHTML(me);
+  html += `<div class="card">
+    <h3>Ma condition</h3>
+    <p class="small">${me.injured ? "Tu es indiqué(e) comme blessé(e) — en attente de retour, hors de ton groupe." : "Indique ici si tu es blessé(e) et hors jeu pour un moment."}</p>
+    <button class="btn ${me.injured ? 'btn-secondary' : 'btn-danger'}" ${OFFLINE_MODE?'disabled title="Hors ligne — réessaie une fois la connexion revenue"':''} onclick="toggleMyInjured('${me.id}')">${me.injured ? 'Je suis rétabli(e)' : 'Je suis blessé(e)'}</button>
+  </div>`;
+  html += plannedAbsencesCardHTML(me);
   if(open){
     const absent = isAbsent(open, me.id);
     html += `<div class="card">
@@ -5401,6 +5462,31 @@ function playerGroupHTML(me){
     }
   }
   return html;
+}
+function plannedAbsencesCardHTML(me){
+  const list = plannedAbsencesForPlayer(me.id);
+  const rows = list.length ? list.map(a=>`
+    <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
+      <span class="small">${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</span>
+      <button class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">retirer</button>
+    </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune absence prévue.</p>`;
+  return `<div class="card">
+    <h3>🌴 Absences prévues (vacances)</h3>
+    <p class="small">Couvre une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage.</p>
+    ${rows}
+    <button class="btn btn-secondary" style="margin-top:10px;" ${OFFLINE_MODE?'disabled title="Hors ligne"':''} onclick="openAddPlannedAbsenceModal('${me.id}')">+ Ajouter une plage d'absence</button>
+  </div>`;
+}
+function openAddPlannedAbsenceModal(playerId){
+  const html = `
+    <div class="field"><label>Du</label><input id="paStart" type="date"></div>
+    <div class="field"><label>Au</label><input id="paEnd" type="date"></div>`;
+  showFormModal('Ajouter une plage d\'absence', html, ()=>{
+    const start = document.getElementById('paStart').value;
+    const end = document.getElementById('paEnd').value;
+    if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return false; }
+    addPlannedAbsence(playerId, start, end);
+  });
 }
 function playerHistoryHTML(me){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
@@ -5551,6 +5637,7 @@ function migrateData(){
   if(DATA.tiebreakCriteria === undefined) DATA.tiebreakCriteria = defaultTiebreakCriteria();
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
+  if(DATA.plannedAbsences === undefined) DATA.plannedAbsences = [];
   if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
