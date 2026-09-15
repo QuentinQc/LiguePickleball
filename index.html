@@ -97,6 +97,24 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
+.hamburger-btn{background:none;border:none;color:var(--text);font-size:22px;line-height:1;cursor:pointer;padding:4px 10px 4px 0;flex-shrink:0;}
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;animation:drawerFadeIn .15s ease-out;}
+@keyframes drawerFadeIn{from{opacity:0;}to{opacity:1;}}
+.drawer-panel{width:78%;max-width:300px;height:100%;background:var(--court);border-right:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;box-shadow:6px 0 28px rgba(0,0,0,0.45);animation:drawerSlideIn .18s ease-out;overflow-y:auto;}
+@keyframes drawerSlideIn{from{transform:translateX(-100%);}to{transform:translateX(0);}}
+.drawer-header{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
+.drawer-header img{width:34px;height:34px;border-radius:8px;object-fit:cover;}
+.drawer-header h2{margin:0;font-size:15px;color:var(--line);}
+.drawer-nav{flex:1;padding:10px 0;}
+.drawer-item{display:flex;align-items:center;gap:14px;padding:13px 18px;cursor:pointer;border-left:3px solid transparent;font-family:var(--font-display);font-size:14px;letter-spacing:0.02em;text-transform:uppercase;color:var(--muted);}
+.drawer-item.active{background:rgba(255,255,255,0.06);border-left-color:var(--ball);color:var(--ball);}
+.drawer-item .drawer-icon{font-size:17px;width:20px;text-align:center;flex-shrink:0;}
+.drawer-footer{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;}
+.drawer-avatar{width:34px;height:34px;border-radius:50%;background:var(--ball);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--court);flex-shrink:0;}
+.drawer-account-info{flex:1;min-width:0;}
+.drawer-account-info .name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--line);}
+.drawer-account-info .email{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.drawer-logout-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;flex-shrink:0;}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
 .mode-switch{display:inline-flex;border-radius:999px;background:rgba(255,255,255,0.08);padding:3px;gap:2px;}
 .mode-switch button{border:none;background:transparent;color:var(--muted);font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .15s ease,color .15s ease;}
@@ -224,6 +242,7 @@ let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
+let DRAWER_OPEN = false; // tiroir de navigation latéral (remplace les onglets horizontaux)
 let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
 
 // ---------- stockage (Supabase) ----------
@@ -1214,19 +1233,56 @@ function render(){
   }
 }
 
-function topbarHTML(subtitle, extraControls){
+// navItems (optionnel) : tableau [[clé, label, icône]] pour le tiroir de
+// navigation latéral, qui remplace les onglets horizontaux. activeKey est
+// la clé active, setTabFn le nom de la fonction JS à appeler avec la clé
+// choisie (ex: 'setAdminTab').
+function topbarHTML(subtitle, extraControls, navItems, activeKey, setTabFn){
   return `
   <div class="topbar">
-    <div class="brand">
-      <div class="court-mark"><img src="${LOGO_DATA_URI}" alt="Logo"></div>
-      <div>
-        <h1>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h1>
-        <div class="small">${subtitle||''}</div>
+    <div class="row" style="gap:10px;align-items:center;">
+      ${navItems ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
+      <div class="brand">
+        <div class="court-mark"><img src="${LOGO_DATA_URI}" alt="Logo"></div>
+        <div>
+          <h1>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h1>
+          <div class="small">${subtitle||''}</div>
+        </div>
       </div>
     </div>
     <div class="row" style="gap:8px;align-items:center;">
       ${extraControls||''}
       ${SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
+    </div>
+  </div>
+  ${navItems ? drawerHTML(navItems, activeKey, setTabFn) : ''}`;
+}
+function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
+function closeDrawer(){ DRAWER_OPEN = false; render(); }
+function drawerHTML(navItems, activeKey, setTabFn){
+  if(!DRAWER_OPEN) return '';
+  const email = (CURRENT_PROFILE && CURRENT_PROFILE.email) || (SESSION_USER && SESSION_USER.email) || '';
+  const displayName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || email || '?';
+  const initial = displayName.trim().charAt(0).toUpperCase() || '?';
+  return `
+  <div class="drawer-overlay" onclick="if(event.target===this) closeDrawer()">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <img src="${LOGO_DATA_URI}" alt="Logo">
+        <h2>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h2>
+      </div>
+      <div class="drawer-nav">
+        ${navItems.map(([k,label,icon])=>`<div class="drawer-item ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}');closeDrawer();">${icon?`<span class="drawer-icon">${icon}</span>`:''}${escapeHTML(label)}</div>`).join('')}
+      </div>
+      ${SESSION_USER ? `
+      <div class="drawer-footer">
+        <div class="drawer-avatar">${escapeHTML(initial)}</div>
+        <div class="drawer-account-info">
+          <div class="name">${escapeHTML(displayName)}</div>
+          <div class="email">${escapeHTML(email)}</div>
+        </div>
+        <button class="drawer-logout-btn" title="Déconnexion" onclick="logout()">⎋</button>
+      </div>` : ''}
     </div>
   </div>`;
 }
@@ -1533,7 +1589,7 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['joueurs','Joueurs'],['session','Session'],['historique','Historique'],['tournois','Tournois'],['rapports','Rapports'],['reglages','Réglages']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const modeSwitch = (canViewAsPlayer || canViewAsSub) ? `
@@ -1568,11 +1624,10 @@ function renderAdmin(){
       </div>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>')}
+    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>', tabs, VIEW.tab, 'setAdminTab')}
     ${storageBannerHTML()}
     ${orgSwitcher}
     ${leagueSwitcher}
-    <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setAdminTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
@@ -5006,7 +5061,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const tabs = [['dispo','Disponibilité'],['historique','Historique']];
+  const tabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
   const modeSwitch = SESSION_USER.role === 'admin' ? `
     <div class="mode-switch">
       <button onclick="toggleAdminSubView()">Admin</button>
@@ -5029,10 +5084,9 @@ function renderSubstitute(subId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', modeSwitch)}
+    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', modeSwitch, tabs, VIEW.tab, 'setSubstituteTab')}
     ${storageBannerHTML()}
     ${leagueSwitcher}
-    <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setSubstituteTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
@@ -5122,7 +5176,7 @@ function renderPlayer(playerId){
     app.innerHTML = `${topbarHTML()}<div class="card"><p class="small">Ton profil de joueur est introuvable. Contacte un administrateur.</p></div>`;
     return;
   }
-  const tabs = [['classement','Mon groupe'],['stats','Statistiques'],['historique','Historique']];
+  const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜']];
   const modeSwitch = SESSION_USER.role === 'admin' ? `
     <div class="mode-switch">
       <button onclick="toggleAdminPlayerView()">Admin</button>
@@ -5144,10 +5198,9 @@ function renderPlayer(playerId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), modeSwitch + '<button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide</button>')}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), modeSwitch + '<button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide</button>', tabs, VIEW.tab, 'setPlayerTab')}
     ${storageBannerHTML()}
     ${leagueSwitcher}
-    <div class="tabs">${tabs.map(([k,l])=>`<div class="tab ${VIEW.tab===k?'active':''}" onclick="setPlayerTab('${k}')">${l}</div>`).join('')}</div>
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
