@@ -97,7 +97,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
 .tab{padding:9px 14px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--ball);border-bottom-color:var(--ball);}
-.hamburger-btn{background:none;border:none;color:var(--text);font-size:22px;line-height:1;cursor:pointer;padding:4px 10px 4px 0;flex-shrink:0;}
+.hamburger-btn{background:none;border:none;color:var(--text);font-size:26px;line-height:1;cursor:pointer;padding:8px 12px 8px 0;flex-shrink:0;min-height:44px;display:flex;align-items:center;}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;animation:drawerFadeIn .15s ease-out;}
 @keyframes drawerFadeIn{from{opacity:0;}to{opacity:1;}}
 .drawer-panel{width:78%;max-width:300px;height:100%;background:var(--court);border-right:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;box-shadow:6px 0 28px rgba(0,0,0,0.45);animation:drawerSlideIn .18s ease-out;overflow-y:auto;}
@@ -105,6 +105,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .drawer-header{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
 .drawer-header img{width:34px;height:34px;border-radius:8px;object-fit:cover;}
 .drawer-header h2{margin:0;font-size:15px;color:var(--line);}
+.drawer-extra{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:8px;}
+.drawer-extra .btn,.drawer-extra .btn-ghost,.drawer-extra .mode-switch{width:100%;}
 .drawer-nav{flex:1;padding:10px 0;}
 .drawer-item{display:flex;align-items:center;gap:14px;padding:13px 18px;cursor:pointer;border-left:3px solid transparent;font-family:var(--font-display);font-size:14px;letter-spacing:0.02em;text-transform:uppercase;color:var(--muted);}
 .drawer-item.active{background:rgba(255,255,255,0.06);border-left-color:var(--ball);color:var(--ball);}
@@ -200,6 +202,7 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .topbar{align-items:center;}
   .topbar h1{font-size:19px;}
   .topbar .small{display:none;} /* le sous-titre encombre sur petit écran, le contenu de la page suffit */
+  .hamburger-btn{font-size:30px;padding:8px 10px 8px 0;}
   .court-mark{width:44px;height:44px;font-size:14px;}
   th,td{padding:7px 6px;font-size:13px;}
   .tab{padding:9px 12px;font-size:12px;}
@@ -1250,16 +1253,17 @@ function topbarHTML(subtitle, extraControls, navItems, activeKey, setTabFn){
         </div>
       </div>
     </div>
+    ${navItems ? '' : `
     <div class="row" style="gap:8px;align-items:center;">
       ${extraControls||''}
       ${SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
-    </div>
+    </div>`}
   </div>
-  ${navItems ? drawerHTML(navItems, activeKey, setTabFn) : ''}`;
+  ${navItems ? drawerHTML(navItems, activeKey, setTabFn, extraControls) : ''}`;
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
 function closeDrawer(){ DRAWER_OPEN = false; render(); }
-function drawerHTML(navItems, activeKey, setTabFn){
+function drawerHTML(navItems, activeKey, setTabFn, extraControls){
   if(!DRAWER_OPEN) return '';
   const email = (CURRENT_PROFILE && CURRENT_PROFILE.email) || (SESSION_USER && SESSION_USER.email) || '';
   const displayName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || email || '?';
@@ -1271,6 +1275,7 @@ function drawerHTML(navItems, activeKey, setTabFn){
         <img src="${LOGO_DATA_URI}" alt="Logo">
         <h2>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h2>
       </div>
+      ${extraControls ? `<div class="drawer-extra" onclick="closeDrawer()">${extraControls}</div>` : ''}
       <div class="drawer-nav">
         ${navItems.map(([k,label,icon])=>`<div class="drawer-item ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}');closeDrawer();">${icon?`<span class="drawer-icon">${icon}</span>`:''}${escapeHTML(label)}</div>`).join('')}
       </div>
