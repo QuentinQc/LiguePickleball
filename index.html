@@ -132,7 +132,9 @@ tr.me{background:rgba(207,234,92,0.1);}
 .bottom-nav-item.raised{margin-top:-22px;}
 .bn-icon-circle{width:52px;height:52px;border-radius:50%;background:var(--ball);color:var(--court);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 8px 18px rgba(0,0,0,0.45);margin-bottom:2px;}
 .bottom-nav-item.raised .bn-label{color:var(--muted);}
-.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.topbar{display:flex;flex-direction:column;gap:4px;margin-bottom:18px;}
+.topbar-main{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.topbar-info{color:var(--muted);}
 .mode-switch{display:inline-flex;border-radius:999px;background:rgba(255,255,255,0.08);padding:3px;gap:2px;}
 .mode-switch button{border:none;background:transparent;color:var(--muted);font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .15s ease,color .15s ease;}
 .mode-switch button.active{background:var(--ball);color:var(--court);font-weight:700;}
@@ -227,9 +229,7 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .btn,.btn-secondary,.btn-primary,select,input{min-height:42px;}
   .row{gap:8px;}
   .row > .btn,.row > .btn-secondary,.row > .btn-primary{flex:1 1 auto;}
-  .topbar{align-items:center;}
   .topbar h1{font-size:19px;}
-  .topbar .small{display:none;} /* le sous-titre encombre sur petit écran, le contenu de la page suffit */
   .hamburger-btn{font-size:30px;padding:8px 10px 8px 0;}
   .court-mark{width:44px;height:44px;font-size:14px;}
   th,td{padding:7px 6px;font-size:13px;}
@@ -1305,26 +1305,23 @@ function topbarHTML(subtitle, contextHTML, extraControls, actionItems, viewSlide
     || '';
   const leagueTitle = DATA ? DATA.leagueName : 'Ligue de Pickleball';
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const leagueLine = [leagueTitle, scheduleLabel].filter(Boolean).join(' — ');
-  const subLine = [leagueLine, subtitle].filter(Boolean).join(' · ');
+  const infoLine = [orgName, scheduleLabel, subtitle].filter(Boolean).join(' · ');
   const showDrawer = contextHTML || !showInline;
   return `
   <div class="topbar">
-    <div class="row" style="gap:10px;align-items:center;">
-      ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
-      <div class="brand">
-        <div>
-          <h1>${escapeHTML(orgName || leagueTitle)}</h1>
-          <div class="small">${subLine}</div>
-        </div>
+    <div class="topbar-main">
+      <div class="row" style="gap:10px;align-items:center;">
+        ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
+        <h1 style="margin:0;">${escapeHTML(leagueTitle)}</h1>
+      </div>
+      <div class="row" style="gap:8px;align-items:center;">
+        ${viewSlide||''}
+        ${items}
+        ${extraControls||''}
+        ${showInline && SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
       </div>
     </div>
-    <div class="row" style="gap:8px;align-items:center;">
-      ${viewSlide||''}
-      ${items}
-      ${extraControls||''}
-      ${showInline && SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
-    </div>
+    ${infoLine ? `<div class="small topbar-info">${escapeHTML(infoLine)}</div>` : ''}
   </div>
   ${showDrawer ? drawerHTML(contextHTML) : ''}`;
 }
