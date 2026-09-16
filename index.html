@@ -1288,15 +1288,20 @@ function render(){
 // organisation/ligue, pour ne pas cacher la navigation principale.
 function topbarHTML(subtitle, contextHTML, extraControls, actionItems, viewSlide){
   const items = (actionItems||[]).map(a=>`<button class="btn-ghost" onclick="${a.onclick}">${a.icon?a.icon+' ':''}${escapeHTML(a.label)}</button>`).join('');
+  const currentLeagueMeta = (typeof LEAGUES !== 'undefined') ? LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) : null;
+  const orgName = (currentLeagueMeta && currentLeagueMeta.organizations && currentLeagueMeta.organizations.name)
+    || ((typeof MY_ORGANIZATIONS !== 'undefined' ? MY_ORGANIZATIONS : []).find(o=>o.id===CURRENT_ORGANIZATION_ID)||{}).name
+    || '';
+  const leagueTitle = DATA ? DATA.leagueName : 'Ligue de Pickleball';
+  const subLine = [orgName, subtitle].filter(Boolean).join(' · ');
   return `
   <div class="topbar">
     <div class="row" style="gap:10px;align-items:center;">
       ${contextHTML ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
       <div class="brand">
-        <div class="court-mark"><img src="${LOGO_DATA_URI}" alt="Logo"></div>
         <div>
-          <h1>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h1>
-          <div class="small">${subtitle||''}</div>
+          <h1>${escapeHTML(leagueTitle)}</h1>
+          <div class="small">${subLine}</div>
         </div>
       </div>
     </div>
