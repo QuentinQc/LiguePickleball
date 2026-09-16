@@ -1654,9 +1654,7 @@ function renderAdmin(){
     ...(canViewAsPlayer ? [{label:'Joueur', active:false, onclick:'toggleAdminPlayerView()'}] : []),
     ...(canViewAsSub ? [{label:'Remplaçant', active:false, onclick:'toggleAdminSubView()'}] : []),
   ]);
-  const actionItems = [
-    {icon:'📖', label:'Guide', onclick:'showAdminGuideModal()'},
-  ];
+  const actionItems = [];
   const isSuperAdmin = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
   const orgSwitcher = (MY_ORGANIZATIONS.length > 1 || isSuperAdmin) ? `
     <div class="drawer-extra-block">
@@ -4601,7 +4599,8 @@ function settingsRow(icon, title, summary, onClickFn){
 function adminSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'organisation';
   const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
-  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
+  let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
+  html += `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='ligue') html += settingsLigueTabHTML();
   else if(sub==='jeu') html += settingsJeuTabHTML();
   else if(sub==='avance') html += settingsAvanceTabHTML();
