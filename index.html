@@ -1954,7 +1954,7 @@ function convertProspectToPlayer(prospectId){
 
 // ==================== TOURNOIS (Phase 1 — fondations) ====================
 const TOURNAMENT_FORMAT_LABELS = { single_elim:'Élimination simple', double_elim:'Double élimination', pools_then_elim:'Poules puis élimination' };
-const TOURNAMENT_TEAM_LABELS = { singles:'Simple (1 contre 1)', doubles_fixed:'Doubles — partenaires fixes', doubles_rotating:'Doubles — partenaires rotatifs' };
+const TOURNAMENT_TEAM_LABELS = { singles:'Simple (1 contre 1)', doubles_fixed:'Doubles — partenaires fixes', doubles_rotating:'Doubles — partenaires rotatifs', mlp:'MLP (équipes mixtes)' };
 
 function adminTournamentsSectionHTML(){
   if(VIEW.tournamentsSubTab === 'detail' && VIEW.currentTournamentId){
@@ -1995,15 +1995,32 @@ function openCreateTournamentModal(){
         <option value="double_elim">Double élimination</option>
         <option value="pools_then_elim">Poules puis élimination</option>
       </select>
+      <p class="small" id="mlpFormatNote" style="display:none;color:var(--danger);">Le format MLP n'est pour l'instant supporté qu'en élimination simple.</p>
     </div>
     <div class="field">
       <label>Format des équipes</label>
-      <select id="newTournamentTeamFormat">
+      <select id="newTournamentTeamFormat" onchange="
+        document.getElementById('mlpRosterField').style.display=this.value==='mlp'?'block':'none';
+        document.getElementById('regularMatchFormatFields').style.display=this.value==='mlp'?'none':'block';
+        document.getElementById('mlpFormatNote').style.display=this.value==='mlp'?'block':'none';
+        if(this.value==='mlp'){ document.getElementById('newTournamentFormat').value='single_elim'; document.getElementById('newTournamentFormat').disabled=true; }
+        else { document.getElementById('newTournamentFormat').disabled=false; }
+      ">
         <option value="singles">Simple (1 contre 1)</option>
         <option value="doubles_fixed" selected>Doubles — partenaires fixes</option>
         <option value="doubles_rotating">Doubles — partenaires rotatifs</option>
+        <option value="mlp">MLP (équipes mixtes)</option>
       </select>
     </div>
+    <div class="field" id="mlpRosterField" style="display:none;">
+      <label>Composition des équipes MLP</label>
+      <select id="newTournamentMlpRosterSize">
+        <option value="4">2 hommes + 2 femmes (4 joutes : double féminin, double masculin, 2 mixtes)</option>
+        <option value="3">2 hommes + 1 femme (3 joutes : double masculin, 2 mixtes)</option>
+      </select>
+      <p class="small">Format fixe MLP : joutes à 11 points (gagner par 2), DreamBreaker (simple à 21, gagner par 2) si égalité 2-2 en composition à 4.</p>
+    </div>
+    <div id="regularMatchFormatFields">
     <div class="row">
       <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="newTournamentPoints" type="number" min="1" value="11"></div>
       <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
@@ -2018,6 +2035,7 @@ function openCreateTournamentModal(){
       <input type="checkbox" id="newTournamentWinByTwo" checked style="width:auto;">
       <span class="small">Gagner par 2 points d'écart</span>
     </label>
+    </div>
     <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
       <input type="checkbox" id="newTournamentAffectsRating" style="width:auto;">
       <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
@@ -2031,13 +2049,17 @@ function saveNewTournamentForm(){
   const format = document.getElementById('newTournamentFormat').value;
   const teamFormat = document.getElementById('newTournamentTeamFormat').value;
   const affectsRating = document.getElementById('newTournamentAffectsRating').checked;
-  const matchFormat = {
-    pointsToWin: Math.max(1, parseInt(document.getElementById('newTournamentPoints').value,10) || 11),
-    bestOf: parseInt(document.getElementById('newTournamentBestOf').value,10) || 1,
-    winByTwo: document.getElementById('newTournamentWinByTwo').checked
-  };
+  const mlpRosterSize = teamFormat==='mlp' ? parseInt(document.getElementById('newTournamentMlpRosterSize').value,10) : undefined;
+  const matchFormat = teamFormat==='mlp'
+    ? { pointsToWin: 11, bestOf: 1, winByTwo: true } // non utilisé directement (voir mlpGameFormatFor), gardé pour compatibilité
+    : {
+        pointsToWin: Math.max(1, parseInt(document.getElementById('newTournamentPoints').value,10) || 11),
+        bestOf: parseInt(document.getElementById('newTournamentBestOf').value,10) || 1,
+        winByTwo: document.getElementById('newTournamentWinByTwo').checked
+      };
   const t = {
-    id: uid('trn'), name, date, format, teamFormat, affectsRating, matchFormat,
+    id: uid('trn'), name, date, format: teamFormat==='mlp' ? 'single_elim' : format, teamFormat, affectsRating, matchFormat,
+    ...(mlpRosterSize ? { mlpRosterSize } : {}),
     status: 'draft',
     participants: [], // {id, type:'player'|'substitute'|'guest', refId, name, seed}
     createdAt: new Date().toISOString()
@@ -2064,20 +2086,35 @@ function openEditTournamentModal(tournamentId){
     <div class="field"><label>Date</label><input id="editTournamentDate" type="date" value="${t.date}"></div>
     <div class="field">
       <label>Format du tournoi</label>
-      <select id="editTournamentFormat">
+      <select id="editTournamentFormat" ${t.teamFormat==='mlp'?'disabled':''}>
         <option value="single_elim" ${t.format==='single_elim'?'selected':''}>Élimination simple</option>
         <option value="double_elim" ${t.format==='double_elim'?'selected':''}>Double élimination</option>
         <option value="pools_then_elim" ${t.format==='pools_then_elim'?'selected':''}>Poules puis élimination</option>
       </select>
+      ${t.teamFormat==='mlp' ? `<p class="small" style="color:var(--danger);">Le format MLP n'est pour l'instant supporté qu'en élimination simple.</p>` : ''}
     </div>
     <div class="field">
       <label>Format des équipes</label>
-      <select id="editTournamentTeamFormat">
+      <select id="editTournamentTeamFormat" onchange="
+        document.getElementById('editMlpRosterField').style.display=this.value==='mlp'?'block':'none';
+        document.getElementById('editRegularMatchFormatFields').style.display=this.value==='mlp'?'none':'block';
+        document.getElementById('editTournamentFormat').value=this.value==='mlp'?'single_elim':document.getElementById('editTournamentFormat').value;
+        document.getElementById('editTournamentFormat').disabled=(this.value==='mlp');
+      ">
         <option value="singles" ${t.teamFormat==='singles'?'selected':''}>Simple (1 contre 1)</option>
         <option value="doubles_fixed" ${t.teamFormat==='doubles_fixed'?'selected':''}>Doubles — partenaires fixes</option>
         <option value="doubles_rotating" ${t.teamFormat==='doubles_rotating'?'selected':''}>Doubles — partenaires rotatifs</option>
+        <option value="mlp" ${t.teamFormat==='mlp'?'selected':''}>MLP (équipes mixtes)</option>
       </select>
     </div>
+    <div class="field" id="editMlpRosterField" style="display:${t.teamFormat==='mlp'?'block':'none'};">
+      <label>Composition des équipes MLP</label>
+      <select id="editTournamentMlpRosterSize">
+        <option value="4" ${(t.mlpRosterSize||4)===4?'selected':''}>2 hommes + 2 femmes (4 joutes)</option>
+        <option value="3" ${t.mlpRosterSize===3?'selected':''}>2 hommes + 1 femme (3 joutes)</option>
+      </select>
+    </div>
+    <div id="editRegularMatchFormatFields" style="display:${t.teamFormat==='mlp'?'none':'block'};">
     <div class="row">
       <div class="field" style="flex:1;min-width:120px;"><label>Points par match</label><input id="editTournamentPoints" type="number" min="1" value="${t.matchFormat?t.matchFormat.pointsToWin:11}"></div>
       <div class="field" style="flex:1;min-width:120px;"><label>Matchs par affrontement</label>
@@ -2092,6 +2129,7 @@ function openEditTournamentModal(tournamentId){
       <input type="checkbox" id="editTournamentWinByTwo" ${!t.matchFormat||t.matchFormat.winByTwo?'checked':''} style="width:auto;">
       <span class="small">Gagner par 2 points d'écart</span>
     </label>
+    </div>
     <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
       <input type="checkbox" id="editTournamentAffectsRating" ${t.affectsRating?'checked':''} style="width:auto;">
       <span class="small">Les résultats de ce tournoi comptent dans la cote évolutive habituelle</span>
@@ -2104,14 +2142,18 @@ function openEditTournamentModal(tournamentId){
     if(!name){ showAlert("Le nom est requis."); return false; }
     t.name = name;
     t.date = document.getElementById('editTournamentDate').value || t.date;
-    t.format = document.getElementById('editTournamentFormat').value;
     t.teamFormat = document.getElementById('editTournamentTeamFormat').value;
+    t.format = t.teamFormat==='mlp' ? 'single_elim' : document.getElementById('editTournamentFormat').value;
     t.affectsRating = document.getElementById('editTournamentAffectsRating').checked;
-    t.matchFormat = {
-      pointsToWin: Math.max(1, parseInt(document.getElementById('editTournamentPoints').value,10) || 11),
-      bestOf: parseInt(document.getElementById('editTournamentBestOf').value,10) || 1,
-      winByTwo: document.getElementById('editTournamentWinByTwo').checked
-    };
+    if(t.teamFormat==='mlp'){
+      t.mlpRosterSize = parseInt(document.getElementById('editTournamentMlpRosterSize').value,10) || 4;
+    } else {
+      t.matchFormat = {
+        pointsToWin: Math.max(1, parseInt(document.getElementById('editTournamentPoints').value,10) || 11),
+        bestOf: parseInt(document.getElementById('editTournamentBestOf').value,10) || 1,
+        winByTwo: document.getElementById('editTournamentWinByTwo').checked
+      };
+    }
   });
 }
 function onDeleteTournament(tournamentId){
@@ -2135,15 +2177,15 @@ function tournamentDetailHTML(tournamentId){
         <button class="btn-ghost" onclick="openEditTournamentModal('${t.id}')">✏️ Modifier</button>
       </div>
       <p class="small">${t.date} · ${TOURNAMENT_FORMAT_LABELS[t.format]||t.format} · ${TOURNAMENT_TEAM_LABELS[t.teamFormat]||t.teamFormat}${t.affectsRating ? ' · 📊 Impacte la cote' : ' · Séparé de la cote habituelle'}</p>
-      <p class="small">${t.matchFormat ? `${t.matchFormat.pointsToWin} points${t.matchFormat.winByTwo ? ' (gagner par 2)' : ''} · ${t.matchFormat.bestOf===1?'1 match':'Meilleur de '+t.matchFormat.bestOf}` : ''}</p>
+      <p class="small">${t.teamFormat==='mlp' ? `MLP — ${mlpCompositionLabel(t.mlpRosterSize||4)} · joutes à 11 pts (gagner par 2), DreamBreaker à 21 si égalité` : (t.matchFormat ? `${t.matchFormat.pointsToWin} points${t.matchFormat.winByTwo ? ' (gagner par 2)' : ''} · ${t.matchFormat.bestOf===1?'1 match':'Meilleur de '+t.matchFormat.bestOf}` : '')}</p>
     </div>
     <div class="card">
       <h3>🧪 Mode test</h3>
-      <p class="small">Simule le tournoi au complet avec des scores aléatoires (pondérés selon la cote) — pratique pour prévisualiser comment tout se déroule avant l'événement réel.</p>
-      <div class="row" style="gap:6px;">
+      <p class="small">${t.teamFormat==='mlp' ? "La simulation automatique n'est pas encore disponible pour le format MLP — entre les scores manuellement." : "Simule le tournoi au complet avec des scores aléatoires (pondérés selon la cote) — pratique pour prévisualiser comment tout se déroule avant l'événement réel."}</p>
+      ${t.teamFormat!=='mlp' ? `<div class="row" style="gap:6px;">
         <button class="btn btn-secondary" onclick="simulateTournament('${t.id}')">🧪 Simuler le tournoi</button>
         ${(t.pools || t.bracket) ? `<button class="btn-ghost-danger" onclick="resetTournamentResults('${t.id}')">↺ Réinitialiser les résultats</button>` : ''}
-      </div>
+      </div>` : (t.bracket ? `<button class="btn-ghost-danger" onclick="resetTournamentResults('${t.id}')">↺ Réinitialiser les résultats</button>` : '')}
     </div>
     <div class="card">
       <h3>Participants <span class="small">(${t.participants.length})</span></h3>
@@ -2167,7 +2209,7 @@ function tournamentDetailHTML(tournamentId){
         <h3 style="margin:0;">Équipes <span class="small">(${(t.teams||[]).length})</span></h3>
         <button class="btn-ghost" onclick="openFormTeamsModal('${t.id}')">${t.teamFormat==='singles' ? '🔄 Actualiser' : '👫 Former les équipes'}</button>
       </div>
-      ${t.teamFormat!=='singles' ? `<p class="small">Format doubles — jumelle les participants en équipes avant de générer le bracket.</p>` : ''}
+      ${t.teamFormat==='mlp' ? `<p class="small">Format MLP — forme des équipes de ${mlpCompositionLabel(t.mlpRosterSize||4)} avant de générer le bracket.</p>` : (t.teamFormat!=='singles' ? `<p class="small">Format doubles — jumelle les participants en équipes avant de générer le bracket.</p>` : '')}
       ${(t.teams||[]).length ? `<div class="row" style="gap:6px;flex-wrap:wrap;">${t.teams.map(tm=>`<span class="tag tag-stay">${escapeHTML(tm.memberNames.join(' & '))}</span>`).join('')}</div>` : `<p class="small">Aucune équipe formée pour l'instant.</p>`}
     </div>
     ${t.pools ? poolsDisplayHTML(t) : ''}
@@ -2247,12 +2289,18 @@ function removeTournamentParticipant(tournamentId, participantId){
 }
 // ==================== TOURNOIS (Phase 2 — équipes + bracket) ====================
 let TEAM_FORM_STATE = null;
+let MLP_TEAM_FORM_STATE = null;
 function openFormTeamsModal(tournamentId){
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t) return;
   if(t.teamFormat === 'singles'){
     t.teams = t.participants.map(p=>({ id: uid('team'), memberIds:[p.id], memberNames:[p.name], seed: p.seed }));
     saveAndRender();
+    return;
+  }
+  if(t.teamFormat === 'mlp'){
+    MLP_TEAM_FORM_STATE = { tournamentId, rosterSize: t.mlpRosterSize || 4, teams: (t.teams||[]).map(tm=>({ name: tm.name, memberIds: tm.memberIds.slice() })), currentName:'', currentMembers: [] };
+    showFormModal('Former les équipes MLP', mlpFormTeamsFormHTML, saveMlpFormTeamsForm);
     return;
   }
   TEAM_FORM_STATE = { tournamentId, pairs: (t.teams||[]).filter(tm=>tm.memberIds.length===2).map(tm=>tm.memberIds.slice()), pending: null };
@@ -2299,6 +2347,107 @@ function saveFormTeamsForm(){
   });
   TEAM_FORM_STATE = null;
 }
+// ---- Formation d'équipes MLP (composition genrée : 2H+2F ou 2H+1F) ----
+function participantGender(t, participantId){
+  const part = t.participants.find(p=>p.id===participantId);
+  if(!part || part.type!=='player') return null;
+  const player = DATA.players.find(x=>x.id===part.refId);
+  return player ? (player.gender||null) : null;
+}
+function mlpGenderCounts(t, memberIds){
+  let m=0,f=0,other=0;
+  memberIds.forEach(id=>{
+    const g = participantGender(t, id);
+    if(g==='M') m++; else if(g==='F') f++; else other++;
+  });
+  return {m,f,other};
+}
+function mlpCompositionLabel(rosterSize){
+  return rosterSize===3 ? '2 hommes + 1 femme' : '2 hommes + 2 femmes';
+}
+function mlpCompositionValid(counts, rosterSize){
+  return rosterSize===3 ? (counts.m===2 && counts.f===1 && counts.other===0) : (counts.m===2 && counts.f===2 && counts.other===0);
+}
+function mlpFormTeamsFormHTML(){
+  const st = MLP_TEAM_FORM_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const assignedIds = new Set(st.teams.flatMap(tm=>tm.memberIds).concat(st.currentMembers));
+  const available = t.participants.filter(p=>!assignedIds.has(p.id));
+  const counts = mlpGenderCounts(t, st.currentMembers);
+  const valid = mlpCompositionValid(counts, st.rosterSize);
+  let html = (t && (t.pools || t.bracket)) ? `<p class="small" style="color:var(--danger);">⚠️ Un bracket existe déjà pour ce tournoi — modifier les équipes ne le mettra pas à jour automatiquement ; tu devras le régénérer après.</p>` : '';
+  html += `<p class="small">Composition requise par équipe : <strong>${mlpCompositionLabel(st.rosterSize)}</strong>. Clique sur le genre d'un participant pour le définir si besoin.</p>`;
+  html += `<h3 style="margin-top:12px;">Équipes formées</h3>`;
+  html += st.teams.length ? st.teams.map((tm,i)=>`
+    <div class="row" style="align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;">
+      <span><strong>${escapeHTML(tm.name)}</strong> — ${tm.memberIds.map(id=>escapeHTML((t.participants.find(p=>p.id===id)||{}).name||'?')).join(', ')}</span>
+      <button class="btn-ghost-danger" onclick="removeMlpTeam(${i})">défaire</button>
+    </div>`).join('') : `<p class="small">Aucune équipe formée pour l'instant.</p>`;
+  html += `<h3 style="margin-top:12px;">Nouvelle équipe</h3>
+    <input id="mlpNewTeamName" placeholder="Nom de l'équipe" value="${escapeHTML(st.currentName)}" oninput="MLP_TEAM_FORM_STATE.currentName=this.value" style="margin-bottom:8px;">
+    <p class="small">Sélectionnés : ${counts.m} homme(s), ${counts.f} femme(s)${counts.other?', '+counts.other+' genre non défini':''} — ${valid ? '✅ composition valide' : 'composition requise : '+mlpCompositionLabel(st.rosterSize)}</p>`;
+  html += st.currentMembers.length ? `<div class="row" style="gap:6px;margin-bottom:10px;">${st.currentMembers.map(id=>{
+    const p = t.participants.find(x=>x.id===id);
+    const g = participantGender(t,id);
+    return `<button class="btn-ghost" style="background:var(--ball);color:var(--court);" onclick="toggleMlpMember('${id}')">${escapeHTML(p?p.name:'?')} (${g==='F'?'F':g==='M'?'H':'?'})</button>`;
+  }).join('')}</div>` : '';
+  html += `<button class="btn btn-secondary" ${(!valid || !st.currentName.trim())?'disabled':''} onclick="commitMlpTeam()">+ Ajouter cette équipe</button>`;
+  html += `<h3 style="margin-top:14px;">Participants disponibles</h3>`;
+  html += available.length ? available.map(p=>{
+    const g = participantGender(t, p.id);
+    return `<div class="row" style="align-items:center;gap:6px;display:inline-flex;margin:2px;">
+      <button class="btn-ghost" onclick="toggleMlpMember('${p.id}')">${escapeHTML(p.name)}</button>
+      <select style="width:80px;" onchange="setParticipantGenderInline('${p.id}', this.value)">
+        <option value="" ${!g?'selected':''}>?</option>
+        <option value="F" ${g==='F'?'selected':''}>F</option>
+        <option value="M" ${g==='M'?'selected':''}>H</option>
+      </select>
+    </div>`;
+  }).join('') : `<p class="small">Tous les participants sont assignés à une équipe.</p>`;
+  return html;
+}
+function toggleMlpMember(pid){
+  const st = MLP_TEAM_FORM_STATE;
+  const idx = st.currentMembers.indexOf(pid);
+  if(idx>=0) st.currentMembers.splice(idx,1);
+  else if(st.currentMembers.length < st.rosterSize) st.currentMembers.push(pid);
+  render();
+}
+function setParticipantGenderInline(participantRefParticipantId, gender){
+  const st = MLP_TEAM_FORM_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const part = t.participants.find(p=>p.id===participantRefParticipantId);
+  if(!part || part.type!=='player') return;
+  const player = DATA.players.find(x=>x.id===part.refId);
+  if(!player) return;
+  player.gender = gender || null;
+  saveAndRender();
+}
+function commitMlpTeam(){
+  const st = MLP_TEAM_FORM_STATE;
+  const name = (document.getElementById('mlpNewTeamName')||{value:st.currentName}).value.trim();
+  if(!name || st.currentMembers.length!==st.rosterSize) return;
+  st.teams.push({ name, memberIds: st.currentMembers.slice() });
+  st.currentName = '';
+  st.currentMembers = [];
+  render();
+}
+function removeMlpTeam(i){
+  MLP_TEAM_FORM_STATE.teams.splice(i,1);
+  render();
+}
+function saveMlpFormTeamsForm(){
+  const st = MLP_TEAM_FORM_STATE;
+  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  if(!t){ MLP_TEAM_FORM_STATE=null; return; }
+  if(st.teams.length < 2){ showAlert("Forme au moins 2 équipes avant d'enregistrer."); return false; }
+  t.teams = st.teams.map(tm=>{
+    const names = tm.memberIds.map(id=>{ const p = t.participants.find(x=>x.id===id); return p?p.name:'?'; });
+    const seeds = tm.memberIds.map(id=>{ const p = t.participants.find(x=>x.id===id); return (p && typeof p.seed==='number') ? p.seed : RATING_DEFAULT; });
+    return { id: uid('team'), name: tm.name, memberIds: tm.memberIds.slice(), memberNames: names, seed: seeds.reduce((a,b)=>a+b,0)/seeds.length };
+  });
+  MLP_TEAM_FORM_STATE = null;
+}
 // Ordre standard de seeding (1 contre dernier, 2 contre avant-dernier, etc.)
 function standardBracketOrder(size){
   let order = [0];
@@ -2331,6 +2480,75 @@ function propagateByeWinners(rounds){
 }
 // Calcule qui gagne un affrontement (peut être composé de plusieurs joutes,
 // ex: meilleur de 3) à partir de ses joutes déjà jouées.
+// ---- Format MLP (Major League Pickleball) : équipes mixtes fixes, 4 joutes
+// genrées (double féminin, double masculin, 2 mixtes) + DreamBreaker (simple)
+// en cas d'égalité 2-2. Variante 3 joueurs (2H+1F) : 3 joutes, pas de
+// DreamBreaker possible (jamais d'égalité avec un nombre impair de joutes).
+function mlpGameTypesForRosterSize(rosterSize){
+  return rosterSize===3 ? ['mens','mixed1','mixed2'] : ['womens','mens','mixed1','mixed2'];
+}
+function newMLPGames(rosterSize){
+  return mlpGameTypesForRosterSize(rosterSize).map(type=>({ type, scoreA:null, scoreB:null }));
+}
+function mlpGameTypeLabel(type){
+  return { womens:'Double féminin', mens:'Double masculin', mixed1:'Mixte 1', mixed2:'Mixte 2', dreambreaker:'DreamBreaker (simple)' }[type] || type;
+}
+function participantNameById(t, id){
+  const p = (t.participants||[]).find(x=>x.id===id);
+  return p ? p.name : '?';
+}
+function mlpParticipantGender(t, participantId){
+  const part = (t.participants||[]).find(p=>p.id===participantId);
+  if(!part || part.type!=='player') return null;
+  const pl = DATA.players.find(x=>x.id===part.refId);
+  return pl ? (pl.gender||null) : null;
+}
+function mlpTeamGenderSplit(t, team){
+  const men = team.memberIds.filter(id=>mlpParticipantGender(t,id)==='M');
+  const women = team.memberIds.filter(id=>mlpParticipantGender(t,id)==='F');
+  return { men, women };
+}
+// Renvoie les 1 ou 2 ids de participant côté `team` pour une joute donnée,
+// ou null si la composition de l'équipe ne permet pas de la déterminer.
+function mlpGamePlayers(t, team, gameType){
+  if(!team) return null;
+  const { men, women } = mlpTeamGenderSplit(t, team);
+  if(gameType==='womens') return women.length>=2 ? [women[0], women[1]] : null;
+  if(gameType==='mens') return men.length>=2 ? [men[0], men[1]] : null;
+  if(gameType==='mixed1') return (men[0]!==undefined && women[0]!==undefined) ? [men[0], women[0]] : null;
+  if(gameType==='mixed2'){
+    const w = women.length>=2 ? women[1] : women[0];
+    return (men[1]!==undefined && w!==undefined) ? [men[1], w] : null;
+  }
+  if(gameType==='dreambreaker') return team.dreambreakerParticipantId ? [team.dreambreakerParticipantId] : null;
+  return null;
+}
+// Calcule le gagnant d'un affrontement MLP : majorité des joutes principales,
+// ou DreamBreaker en cas d'égalité 2-2 (composition à 4 uniquement).
+function computeMLPTieWinner(t, games, teamAId, teamBId){
+  const rosterSize = t.mlpRosterSize || 4;
+  const primaryTypes = mlpGameTypesForRosterSize(rosterSize);
+  const primaryGames = (games||[]).filter(g=>primaryTypes.includes(g.type));
+  let winsA=0, winsB=0;
+  primaryGames.forEach(g=>{
+    if(g.scoreA===null || g.scoreB===null || g.scoreA===g.scoreB) return;
+    if(g.scoreA > g.scoreB) winsA++; else winsB++;
+  });
+  const total = primaryTypes.length;
+  const majority = Math.floor(total/2) + 1;
+  let winnerTeamId = null;
+  let needsDreambreaker = false;
+  if(winsA>=majority) winnerTeamId = teamAId;
+  else if(winsB>=majority) winnerTeamId = teamBId;
+  else if((winsA+winsB)===total && winsA===winsB){
+    needsDreambreaker = true;
+    const db = (games||[]).find(g=>g.type==='dreambreaker');
+    if(db && db.scoreA!==null && db.scoreB!==null && db.scoreA!==db.scoreB){
+      winnerTeamId = db.scoreA > db.scoreB ? teamAId : teamBId;
+    }
+  }
+  return { winnerTeamId, winsA, winsB, needsDreambreaker };
+}
 function computeGamesWinner(games, teamAId, teamBId){
   const winsNeeded = Math.ceil((games||[]).length/2) || 1;
   let winsA=0, winsB=0;
@@ -2346,8 +2564,9 @@ function computeGamesWinner(games, teamAId, teamBId){
 function newEmptyGames(bestOf){
   return Array.from({ length: bestOf||1 }, ()=>({ scoreA:null, scoreB:null }));
 }
-function buildSingleElimBracket(teams, defaultFormat){
+function buildSingleElimBracket(teams, defaultFormat, mlpRosterSize){
   const fmt = defaultFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
+  const makeGames = ()=> mlpRosterSize ? newMLPGames(mlpRosterSize) : newEmptyGames(fmt.bestOf);
   const seeded = teams.slice().sort((a,b)=>{
     const as = typeof a.seed==='number' ? a.seed : -Infinity;
     const bs = typeof b.seed==='number' ? b.seed : -Infinity;
@@ -2361,14 +2580,14 @@ function buildSingleElimBracket(teams, defaultFormat){
   const round1Matches = [];
   for(let i=0;i<teamsInSlots.length;i+=2){
     const a = teamsInSlots[i], b = teamsInSlots[i+1];
-    round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, games: newEmptyGames(fmt.bestOf), winnerTeamId:null, isBye: (!a || !b) });
+    round1Matches.push({ id: uid('tm'), teamAId: a?a.id:null, teamBId: b?b.id:null, games: makeGames(), winnerTeamId:null, isBye: (!a || !b) });
   }
   const rounds = [{ roundNumber:1, matches: round1Matches, matchFormat: {...fmt} }];
   let prevCount = round1Matches.length;
   let roundNum = 2;
   while(prevCount > 1){
     const matches = [];
-    for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, games: newEmptyGames(fmt.bestOf), winnerTeamId:null, isBye:false }); }
+    for(let i=0;i<prevCount/2;i++){ matches.push({ id: uid('tm'), teamAId:null, teamBId:null, games: makeGames(), winnerTeamId:null, isBye:false }); }
     rounds.push({ roundNumber: roundNum, matches, matchFormat: {...fmt} });
     prevCount = matches.length;
     roundNum++;
@@ -2387,7 +2606,7 @@ function generateBracket(tournamentId){
   }
   const msg = t.bracket ? "Regénérer le bracket effacera tous les résultats déjà entrés. Continuer ?" : "Générer le bracket avec les équipes actuelles ?";
   showConfirm(msg, ()=>{
-    t.bracket = buildSingleElimBracket(t.teams, t.matchFormat);
+    t.bracket = buildSingleElimBracket(t.teams, t.matchFormat, t.teamFormat==='mlp' ? (t.mlpRosterSize||4) : null);
     t.status = 'in_progress';
     saveAndRender();
   });
@@ -2396,12 +2615,22 @@ function setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, w
   const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
   const m = t.bracket.rounds[roundIndex].matches[matchIndex];
-  if(!m.games) m.games = newEmptyGames(1);
+  if(!m.games) m.games = t.teamFormat==='mlp' ? newMLPGames(t.mlpRosterSize||4) : newEmptyGames(1);
   const g = m.games[gameIndex];
   if(!g) return;
   if(which==='A') g.scoreA = value===''?null:Number(value);
   else g.scoreB = value===''?null:Number(value);
-  const result = (m.teamAId && m.teamBId) ? computeGamesWinner(m.games, m.teamAId, m.teamBId) : { winnerTeamId:null };
+  let result;
+  if(t.teamFormat==='mlp'){
+    result = (m.teamAId && m.teamBId) ? computeMLPTieWinner(t, m.games, m.teamAId, m.teamBId) : { winnerTeamId:null, needsDreambreaker:false };
+    if(result.needsDreambreaker && !m.games.some(x=>x.type==='dreambreaker')){
+      m.games.push({ type:'dreambreaker', scoreA:null, scoreB:null });
+    } else if(!result.needsDreambreaker){
+      m.games = m.games.filter(x=>x.type!=='dreambreaker');
+    }
+  } else {
+    result = (m.teamAId && m.teamBId) ? computeGamesWinner(m.games, m.teamAId, m.teamBId) : { winnerTeamId:null };
+  }
   m.winnerTeamId = result.winnerTeamId;
   if(m.winnerTeamId && roundIndex < t.bracket.rounds.length-1){
     const nextMatch = t.bracket.rounds[roundIndex+1].matches[Math.floor(matchIndex/2)];
@@ -2507,14 +2736,17 @@ function bracketDisplayHTML(t){
         <div class="bracket-round-col">
           <div class="bracket-round-title">${bracketRoundLabel(ri,lastIndex)}</div>
           <div class="row" style="justify-content:center;flex-wrap:wrap;gap:6px;">
-            <button class="format-chip" onclick="openEditRoundFormatModal('${t.id}',${ri})">⚙️ ${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : 'Format'}</button>
-            <button class="btn-ghost" style="padding:5px 10px;font-size:11px;margin:0 auto 10px;" onclick="simulateSingleRound('${t.id}',${ri})">🧪 Simuler</button>
+            ${t.teamFormat!=='mlp' ? `<button class="format-chip" onclick="openEditRoundFormatModal('${t.id}',${ri})">⚙️ ${round.matchFormat ? round.matchFormat.pointsToWin+' pts'+(round.matchFormat.bestOf>1?' · Bo'+round.matchFormat.bestOf:'') : 'Format'}</button>` : `<span class="small" style="color:var(--muted);">Format MLP fixe (11 pts, DreamBreaker à 21)</span>`}
+            ${t.teamFormat!=='mlp' ? `<button class="btn-ghost" style="padding:5px 10px;font-size:11px;margin:0 auto 10px;" onclick="simulateSingleRound('${t.id}',${ri})">🧪 Simuler</button>` : ''}
           </div>
           ${round.matches.map((m,mi)=>{
             const aName = teamName(m.teamAId), bName = teamName(m.teamBId);
             const aWon = m.winnerTeamId && m.winnerTeamId===m.teamAId;
             const bWon = m.winnerTeamId && m.winnerTeamId===m.teamBId;
             const canScore = m.teamAId && m.teamBId && !m.isBye;
+            if(t.teamFormat==='mlp'){
+              return mlpBracketMatchHTML(t, ri, mi, m, aName, bName, aWon, bWon, canScore);
+            }
             const games = m.games && m.games.length ? m.games : newEmptyGames(1);
             const tally = canScore ? computeGamesWinner(games, m.teamAId, m.teamBId) : { winsA:0, winsB:0 };
             const showTally = canScore && games.length > 1;
@@ -2533,6 +2765,60 @@ function bracketDisplayHTML(t){
         </div>`).join('')}
     </div></div>
   </div>`;
+}
+// Carte d'affrontement MLP : une ligne par joute (avec les 2 joueurs concernés
+// de chaque côté), plus un sélecteur de joueur pour le DreamBreaker quand il
+// devient nécessaire.
+function mlpBracketMatchHTML(t, ri, mi, m, aName, bName, aWon, bWon, canScore){
+  if(!canScore){
+    return `<div class="bracket-match">
+      <div class="team-line ${aWon?'won':''}"><span>${escapeHTML(aName)}</span></div>
+      <div class="team-line ${bWon?'won':''}"><span>${escapeHTML(bName)}</span></div>
+      ${m.isBye && (m.teamAId||m.teamBId) ? '<span class="small">(bye)</span>' : ''}
+    </div>`;
+  }
+  const teamA = (t.teams||[]).find(x=>x.id===m.teamAId);
+  const teamB = (t.teams||[]).find(x=>x.id===m.teamBId);
+  const games = m.games && m.games.length ? m.games : newMLPGames(t.mlpRosterSize||4);
+  const tally = computeMLPTieWinner(t, games, m.teamAId, m.teamBId);
+  const pname = (id)=> participantNameById(t, id);
+  let html = `<div class="bracket-match">
+    <div class="team-line ${aWon?'won':''}"><span>${escapeHTML(aName)}</span><span class="small">${tally.winsA}</span></div>
+    <div class="team-line ${bWon?'won':''}"><span>${escapeHTML(bName)}</span><span class="small">${tally.winsB}</span></div>`;
+  games.forEach((g,gi)=>{
+    if(g.type==='dreambreaker'){
+      const needA = !teamA.dreambreakerParticipantId, needB = !teamB.dreambreakerParticipantId;
+      if(needA || needB){
+        html += `<div class="small" style="margin-top:6px;color:var(--danger);">DreamBreaker — choisis le ou la joueuse de chaque équipe :</div>`;
+        if(needA) html += `<select onchange="setMlpDreambreakerPlayer('${t.id}','${teamA.id}',this.value)"><option value="">— ${escapeHTML(aName)} : joueur/joueuse —</option>${teamA.memberIds.map(id=>`<option value="${id}">${escapeHTML(pname(id))}</option>`).join('')}</select>`;
+        if(needB) html += `<select onchange="setMlpDreambreakerPlayer('${t.id}','${teamB.id}',this.value)"><option value="">— ${escapeHTML(bName)} : joueur/joueuse —</option>${teamB.memberIds.map(id=>`<option value="${id}">${escapeHTML(pname(id))}</option>`).join('')}</select>`;
+        return;
+      }
+    }
+    const pairA = mlpGamePlayers(t, teamA, g.type);
+    const pairB = mlpGamePlayers(t, teamB, g.type);
+    const labelA = pairA ? pairA.map(pname).join(' & ') : '?';
+    const labelB = pairB ? pairB.map(pname).join(' & ') : '?';
+    html += `<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;">
+      <div class="small" style="color:var(--muted);">${mlpGameTypeLabel(g.type)}</div>
+      <div class="small">${escapeHTML(labelA)} <span style="opacity:0.6;">vs</span> ${escapeHTML(labelB)}</div>
+      <div class="row" style="gap:4px;align-items:center;margin-top:2px;">
+        <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreA===null?'':g.scoreA}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},${gi},'A',this.value)">
+        <span class="small">:</span>
+        <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreB===null?'':g.scoreB}" onchange="setBracketMatchScore('${t.id}',${ri},${mi},${gi},'B',this.value)">
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+function setMlpDreambreakerPlayer(tournamentId, teamId, participantId){
+  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  if(!t || !participantId) return;
+  const team = (t.teams||[]).find(x=>x.id===teamId);
+  if(!team) return;
+  team.dreambreakerParticipantId = participantId;
+  saveAndRender();
 }
 // ---- Poules puis élimination ----
 function openGeneratePoolsModal(tournamentId){
@@ -3054,10 +3340,15 @@ function adminPlayersHTML(){
           <option value="">— En attente (à placer plus tard) —</option>
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
+        <select id="newPlayerGender" title="Utilisé pour former des équipes MLP (double féminin/masculin/mixte)">
+          <option value="">Genre (optionnel)</option>
+          <option value="F">Femme</option>
+          <option value="M">Homme</option>
+        </select>
         <input id="newPlayerRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="Cote (${RATING_DEFAULT.toFixed(1)} par défaut)" style="width:170px;">
         <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
       </div>
-      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes.</p>
+      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes. Le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte).</p>
       ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
     </div>
     ${adminAccountsHTML()}
@@ -3127,6 +3418,7 @@ function playerDetailModalHTML(pid){
       <button class="action-btn" onclick="closeModal();renamePlayer('${pid}')"><span class="icon">✏️</span> Renommer</button>
       <button class="action-btn" onclick="closeModal();editPlayerRating('${pid}')"><span class="icon">📊</span> Modifier la cote</button>
       <button class="action-btn" onclick="closeModal();movePlayer('${pid}')"><span class="icon">🔀</span> Déplacer de groupe</button>
+      <button class="action-btn" onclick="cyclePlayerGender('${pid}')"><span class="icon">⚧️</span> Genre : ${p.gender==='F'?'Femme':p.gender==='M'?'Homme':'Non défini'}</button>
       <button class="action-btn" onclick="togglePlayerStatus('${pid}')"><span class="icon">${p.status==='new'?'✅':'🆕'}</span> ${p.status==='new' ? 'Marquer confirmé(e)' : 'Marquer nouveau/nouvelle'}</button>
       <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
       <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
@@ -3329,6 +3621,7 @@ function setRegularsSort(col){
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
   const groupEl = document.getElementById('newPlayerGroup');
+  const genderEl = document.getElementById('newPlayerGender');
   const ratingEl = document.getElementById('newPlayerRating');
   const rawName = nameEl.value.trim();
   const desiredGroupId = groupEl.value;
@@ -3341,8 +3634,17 @@ function addPlayerFromList(){
   }
   const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
   const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new', gender: genderEl.value || null });
   saveAndRender();
+}
+// Utilisé pour former des équipes de tournoi MLP (double féminin/masculin/
+// mixte) — n'affecte rien d'autre dans l'application.
+function cyclePlayerGender(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  p.gender = p.gender==='F' ? 'M' : (p.gender==='M' ? null : 'F');
+  saveAndRender();
+  openPlayerDetailModal(pid);
 }
 function renamePlayer(pid){
   const p = DATA.players.find(x=>x.id===pid);
