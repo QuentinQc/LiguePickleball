@@ -107,9 +107,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .drawer-header img{width:34px;height:34px;border-radius:8px;object-fit:cover;}
 .drawer-header h2{margin:0;font-size:15px;color:var(--line);}
 .drawer-extra{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:12px;}
-.drawer-extra .btn,.drawer-extra .btn-ghost,.drawer-extra .mode-switch{width:100%;}
+.drawer-extra .btn,.drawer-extra .btn-ghost{width:100%;}
 .drawer-extra-block label{font-size:12px;color:var(--muted);}
 .drawer-extra-block:not(:last-child){padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);}
+.drawer-actions{border-bottom:1px solid rgba(255,255,255,0.08);padding:6px 0;}
 .drawer-nav{flex:1;padding:10px 0;}
 .drawer-item{display:flex;align-items:center;gap:14px;padding:13px 18px;cursor:pointer;border-left:3px solid transparent;font-family:var(--font-display);font-size:14px;letter-spacing:0.02em;text-transform:uppercase;color:var(--muted);}
 .drawer-item.active{background:rgba(255,255,255,0.06);border-left-color:var(--ball);color:var(--ball);}
@@ -1248,8 +1249,11 @@ function render(){
 // navItems (optionnel) : tableau [[clé, label, icône]] pour le tiroir de
 // navigation latéral, qui remplace les onglets horizontaux. activeKey est
 // la clé active, setTabFn le nom de la fonction JS à appeler avec la clé
-// choisie (ex: 'setAdminTab').
-function topbarHTML(subtitle, extraControls, navItems, activeKey, setTabFn){
+// choisie (ex: 'setAdminTab'). actionItems (optionnel) : tableau
+// [{icon, label, onclick}] pour des actions ponctuelles (changer de vue,
+// ouvrir le guide) affichées comme des lignes de menu dans le tiroir plutôt
+// que des boutons pleine-largeur à côté des sélecteurs.
+function topbarHTML(subtitle, extraControls, navItems, activeKey, setTabFn, actionItems){
   return `
   <div class="topbar">
     <div class="row" style="gap:10px;align-items:center;">
@@ -1268,7 +1272,7 @@ function topbarHTML(subtitle, extraControls, navItems, activeKey, setTabFn){
       ${SESSION_USER ? `<button class="btn btn-secondary" onclick="logout()">Déconnexion</button>` : ''}
     </div>`}
   </div>
-  ${navItems ? drawerHTML(navItems, activeKey, setTabFn, extraControls) : ''}`;
+  ${navItems ? drawerHTML(navItems, activeKey, setTabFn, extraControls, actionItems) : ''}`;
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
 // items: [{key, icon, label, onclick}] — onclick est une chaîne JS (ex: "setPlayerTab('classement')").
@@ -1280,7 +1284,10 @@ function bottomNavHTML(items, activeKey){
   </div>`;
 }
 function closeDrawer(){ DRAWER_OPEN = false; render(); }
-function drawerHTML(navItems, activeKey, setTabFn, extraControls){
+// contextHTML : sélecteurs (organisation/ligue), affichés tels quels.
+// actionItems : [{icon, label, onclick}], affichés comme des lignes de menu
+// (même style que les sections de navigation) plutôt que des boutons.
+function drawerHTML(navItems, activeKey, setTabFn, contextHTML, actionItems){
   if(!DRAWER_OPEN) return '';
   const email = (CURRENT_PROFILE && CURRENT_PROFILE.email) || (SESSION_USER && SESSION_USER.email) || '';
   const displayName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || email || '?';
@@ -1292,7 +1299,8 @@ function drawerHTML(navItems, activeKey, setTabFn, extraControls){
         <img src="${LOGO_DATA_URI}" alt="Logo">
         <h2>${escapeHTML(DATA ? DATA.leagueName : 'Ligue de Pickleball')}</h2>
       </div>
-      ${extraControls ? `<div class="drawer-extra" onclick="closeDrawer()">${extraControls}</div>` : ''}
+      ${contextHTML ? `<div class="drawer-extra" onclick="closeDrawer()">${contextHTML}</div>` : ''}
+      ${actionItems && actionItems.length ? `<div class="drawer-actions">${actionItems.map(a=>`<div class="drawer-item" onclick="${a.onclick};closeDrawer();">${a.icon?`<span class="drawer-icon">${a.icon}</span>`:''}${escapeHTML(a.label)}</div>`).join('')}</div>` : ''}
       <div class="drawer-nav">
         ${navItems.map(([k,label,icon])=>`<div class="drawer-item ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}');closeDrawer();">${icon?`<span class="drawer-icon">${icon}</span>`:''}${escapeHTML(label)}</div>`).join('')}
       </div>
@@ -1614,12 +1622,11 @@ function renderAdmin(){
   const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
-  const modeSwitch = (canViewAsPlayer || canViewAsSub) ? `
-    <div class="mode-switch">
-      <button class="active" disabled>Admin</button>
-      ${canViewAsPlayer ? `<button onclick="toggleAdminPlayerView()">Joueur</button>` : ''}
-      ${canViewAsSub ? `<button onclick="toggleAdminSubView()">Remplaçant</button>` : ''}
-    </div>` : '';
+  const actionItems = [
+    ...(canViewAsPlayer ? [{icon:'🎾', label:'Voir comme joueur', onclick:'toggleAdminPlayerView()'}] : []),
+    ...(canViewAsSub ? [{icon:'🔄', label:'Voir comme remplaçant', onclick:'toggleAdminSubView()'}] : []),
+    {icon:'📖', label:'Guide', onclick:'showAdminGuideModal()'},
+  ];
   const isSuperAdmin = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
   const orgSwitcher = (MY_ORGANIZATIONS.length > 1 || isSuperAdmin) ? `
     <div class="drawer-extra-block">
@@ -1646,7 +1653,7 @@ function renderAdmin(){
       </div>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + modeSwitch + '<button class="btn-ghost" onclick="showAdminGuideModal()">📖 Guide</button>', tabs, VIEW.tab, 'setAdminTab')}
+    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher, tabs, VIEW.tab, 'setAdminTab', actionItems)}
     ${storageBannerHTML()}
     <div id="tabContent"></div>
   `;
@@ -5082,11 +5089,7 @@ function renderSubstitute(subId){
     return;
   }
   const tabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
-  const modeSwitch = SESSION_USER.role === 'admin' ? `
-    <div class="mode-switch">
-      <button onclick="toggleAdminSubView()">Admin</button>
-      <button class="active" disabled>Remplaçant</button>
-    </div>` : '';
+  const actionItems = SESSION_USER.role === 'admin' ? [{icon:'🛠️', label:'Vue admin', onclick:'toggleAdminSubView()'}] : [];
   const allLinks = MY_LEAGUE_LINKS;
   const orgCount = new Set(allLinks.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
   const leagueSwitcher = allLinks.length > 1 ? `
@@ -5104,7 +5107,7 @@ function renderSubstitute(subId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + modeSwitch, tabs, VIEW.tab, 'setSubstituteTab')}
+    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher, tabs, VIEW.tab, 'setSubstituteTab', actionItems)}
     ${storageBannerHTML()}
     <div id="tabContent"></div>
     ${bottomNavHTML(tabs.map(([k,l,icon])=>({key:k, icon, label:l, onclick:`setSubstituteTab('${k}')`})), VIEW.tab)}
@@ -5197,11 +5200,10 @@ function renderPlayer(playerId){
     return;
   }
   const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜']];
-  const modeSwitch = SESSION_USER.role === 'admin' ? `
-    <div class="mode-switch">
-      <button onclick="toggleAdminPlayerView()">Admin</button>
-      <button class="active" disabled>Joueur</button>
-    </div>` : '';
+  const actionItems = [
+    ...(SESSION_USER.role === 'admin' ? [{icon:'🛠️', label:'Vue admin', onclick:'toggleAdminPlayerView()'}] : []),
+    {icon:'📖', label:'Guide', onclick:'showPlayerGuideModal()'},
+  ];
   const myOrgCount = new Set(MY_LEAGUE_LINKS.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
   const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
     <div class="drawer-extra-block">
@@ -5218,7 +5220,7 @@ function renderPlayer(playerId){
       </div>
     </div>` : '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + modeSwitch + '<button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Guide</button>', tabs, VIEW.tab, 'setPlayerTab')}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher, tabs, VIEW.tab, 'setPlayerTab', actionItems)}
     ${storageBannerHTML()}
     <div id="tabContent"></div>
     ${bottomNavHTML([
