@@ -6053,7 +6053,7 @@ function renderPlayer(playerId){
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher, '', actionItems, viewSlide)}
     ${storageBannerHTML()}
-    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`, raised:true}])}
+    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
