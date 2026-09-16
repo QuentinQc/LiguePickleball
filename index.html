@@ -5295,13 +5295,17 @@ function settingsOrganisationTabHTML(){
 function settingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique' }[DATA.leagueFormat] || 'Échelle';
+  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP' }[DATA.leagueFormat] || 'Échelle';
   const calSummary = DATA.autoStartSessions
     ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
     : 'Démarrage manuel (par défaut)';
   let html = '';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
-  html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
+  if(DATA.leagueFormat === 'mlp'){
+    html += settingsRow('⚧️', 'Composition des équipes MLP', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()");
+  } else {
+    html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
+  }
   html += `<div class="card">
     <h3>➕ Nouvelle ligue</h3>
     <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
@@ -5410,6 +5414,21 @@ function onDeleteOrganization(){
     if(error){ showAlert("Erreur lors de la suppression : " + error.message); return; }
     await loadMyOrganizations(CURRENT_PROFILE.id);
     await switchToOrganization(MY_ORGANIZATIONS[0].id);
+  });
+}
+function openMlpRosterSizeModal(){
+  const teamsAffected = (DATA.mlpTeams||[]).length;
+  const html = `
+    <div class="field">
+      <label>Composition des équipes</label>
+      <select id="mlpRosterSizeSelect">
+        <option value="4" ${(DATA.mlpRosterSize||4)===4?'selected':''}>2 hommes + 2 femmes (4 joutes : double féminin, double masculin, 2 mixtes)</option>
+        <option value="3" ${DATA.mlpRosterSize===3?'selected':''}>2 hommes + 1 femme (3 joutes : double masculin, 2 mixtes)</option>
+      </select>
+    </div>
+    ${teamsAffected ? `<p class="small" style="color:var(--danger);">⚠️ ${teamsAffected} équipe(s) déjà formée(s) — vérifie leur composition dans l'onglet Équipes après ce changement, certaines pourraient devenir invalides.</p>` : ''}`;
+  showFormModal('Composition des équipes MLP', html, ()=>{
+    DATA.mlpRosterSize = parseInt(document.getElementById('mlpRosterSizeSelect').value,10) || 4;
   });
 }
 function openGeneralInfoModal(){
