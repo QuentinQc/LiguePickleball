@@ -195,18 +195,6 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 /* ---------- Tableaux : défilement horizontal plutôt que colonnes écrasées ---------- */
 @media (max-width:900px){
   table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
-  /* La première colonne (généralement le nom du joueur) reste visible pendant
-     qu'on glisse horizontalement pour voir le reste des colonnes. */
-  table th:first-child, table td:first-child{
-    position:sticky;
-    left:0;
-    z-index:2;
-    background:var(--court-light);
-    box-shadow:2px 0 6px -2px rgba(0,0,0,0.4);
-  }
-  table th:first-child{ background:var(--court-light); }
-  tr.me td:first-child{ background:#28615a; }
-  tr.clickable-row:hover td:first-child{ background:#1c5a62; }
 }
 
 /* ---------- Onglets : défilement horizontal au lieu d'un retour à la ligne serré ---------- */
