@@ -99,13 +99,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tab{padding:9px 18px;font-family:var(--font-display);font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-radius:999px;white-space:nowrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);transition:background .15s ease,color .15s ease;}
 .tab.active{color:var(--court);background:var(--ball);font-weight:700;border-color:var(--ball);}
 .tab:not(.active):hover{background:rgba(255,255,255,0.12);color:var(--line);}
-.tab-wheel-btn{display:none;}
-.wheel-picker{position:relative;height:230px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;}
-.wheel-picker::-webkit-scrollbar{display:none;}
-.wheel-pad{height:91px;}
-.wheel-item{scroll-snap-align:center;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-display);font-size:15px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;transition:color .15s ease,font-size .15s ease;}
-.wheel-item.active{color:var(--ball);font-size:20px;font-weight:700;}
-.wheel-center-band{position:absolute;top:50%;left:0;right:0;height:48px;transform:translateY(-50%);border-top:1px solid rgba(255,255,255,0.18);border-bottom:1px solid rgba(255,255,255,0.18);pointer-events:none;}
+
 .hamburger-btn{background:none;border:none;color:var(--text);font-size:26px;line-height:1;cursor:pointer;padding:8px 12px 8px 0;flex-shrink:0;min-height:44px;display:flex;align-items:center;}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;animation:drawerFadeIn .15s ease-out;}
 @keyframes drawerFadeIn{from{opacity:0;}to{opacity:1;}}
@@ -129,8 +123,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .drawer-account-info .name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--line);}
 .drawer-account-info .email{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .drawer-logout-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;flex-shrink:0;}
-.bottom-nav-spacer{height:74px;}
-.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:850;display:flex;justify-content:center;gap:4px;background:var(--court-light);border-top:1px solid rgba(255,255,255,0.08);padding:8px max(10px,env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,0.3);}
+.bottom-nav-spacer{height:0;}
+.bottom-nav{display:none;}
 .bottom-nav-item{background:none;border:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 18px;cursor:pointer;font-family:var(--font-body);border-radius:10px;min-width:64px;}
 .bottom-nav-item.active{color:var(--ball);}
 .bottom-nav-item .bn-icon{font-size:20px;line-height:1;}
@@ -223,7 +217,8 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 /* ---------- Mobile (écrans étroits) : cibles tactiles plus grandes, texte compact ---------- */
 @media (max-width:640px){
   .tabs{display:none;}
-  .tab-wheel-btn{display:flex;position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:400;align-items:center;gap:8px;background:var(--court-light);border:1px solid rgba(255,255,255,0.18);border-radius:999px;padding:11px 20px;color:var(--ball);font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:0.03em;box-shadow:0 8px 24px rgba(0,0,0,0.45);cursor:pointer;}
+  .bottom-nav-spacer{height:74px;}
+  .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:850;justify-content:center;gap:4px;background:var(--court-light);border-top:1px solid rgba(255,255,255,0.08);padding:8px max(10px,env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,0.3);overflow-x:auto;}
   #app{padding:14px 12px 50px;}
   h1{font-size:22px;}
   h2{font-size:17px;}
@@ -1337,33 +1332,16 @@ function viewSlideHTML(options){
     ${options.map(o=>`<button class="${o.active?'active':''}" ${o.active?'disabled':''} onclick="${o.onclick}">${escapeHTML(o.label)}</button>`).join('')}
   </div>`;
 }
-// Barre d'onglets horizontale classique, affichée directement sur la page
-// (navigation principale — remplace ce qui vivait dans le tiroir). Sur
-// mobile, un bouton « roue » la remplace visuellement (voir openTabWheel).
-let TAB_WHEEL_STATE = null;
-function tabsBarHTML(tabs, activeKey, setTabFn){
-  TAB_WHEEL_STATE = { tabs, activeKey, setTabFn };
-  const activeTab = tabs.find(t=>t[0]===activeKey) || tabs[0];
-  return `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}</div>
-  <button class="tab-wheel-btn" onclick="openTabWheel()">${activeTab[2]?activeTab[2]+' ':''}${escapeHTML(activeTab[1])} ▾</button>`;
-}
-function openTabWheel(){
-  if(!TAB_WHEEL_STATE) return;
-  showContentModal('Choisir une section', wheelPickerHTML);
-  setTimeout(()=>{
-    const el = document.getElementById('wheelItem_'+TAB_WHEEL_STATE.activeKey);
-    if(el) el.scrollIntoView({ block:'center' });
-  }, 30);
-}
-function wheelPickerHTML(){
-  const { tabs, activeKey, setTabFn } = TAB_WHEEL_STATE;
-  return `
-    <div class="wheel-picker" id="wheelPicker">
-      <div class="wheel-pad"></div>
-      ${tabs.map(([k,label,icon])=>`<div class="wheel-item ${k===activeKey?'active':''}" id="wheelItem_${k}" onclick="closeModal();${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}
-      <div class="wheel-pad"></div>
-      <div class="wheel-center-band"></div>
-    </div>`;
+// Barre d'onglets horizontale classique (pilules), affichée directement sur
+// la page — navigation principale sur ordinateur. Sur mobile, une barre du
+// bas avec icône + texte prend le relais pour chaque onglet (voir CSS
+// .bottom-nav, masquée sur ordinateur). extraItems (optionnel) permet
+// d'ajouter des actions supplémentaires à cette barre du bas (ex: Absence).
+function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
+  const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}</div>`;
+  const bottomItems = tabs.map(([k,label,icon])=>({key:k, icon, label, onclick:`${setTabFn}('${k}')`}));
+  if(extraItems) bottomItems.push(...extraItems);
+  return pillsHTML + bottomNavHTML(bottomItems, activeKey);
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
 // items: [{key, icon, label, onclick, raised?}] — onclick est une chaîne JS
@@ -5955,7 +5933,6 @@ function renderSubstitute(subId){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setSubstituteTab')}
     <div id="tabContent"></div>
-    ${bottomNavHTML(tabs.map(([k,l,icon])=>({key:k, icon, label:l, onclick:`setSubstituteTab('${k}')`})), VIEW.tab)}
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
@@ -6071,13 +6048,8 @@ function renderPlayer(playerId){
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher, '', actionItems, viewSlide)}
     ${storageBannerHTML()}
-    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab')}
+    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`, raised:true}])}
     <div id="tabContent"></div>
-    ${bottomNavHTML([
-      {key:'classement', icon:'🎾', label:'Mon groupe', onclick:"setPlayerTab('classement')"},
-      {key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`, raised:true},
-      {key:'historique', icon:'📜', label:'Historique', onclick:"setPlayerTab('historique')"},
-    ], VIEW.tab)}
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : playerGroupHTML(me));
@@ -6109,11 +6081,6 @@ function renderMlpPlayer(me){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab')}
     <div id="tabContent"></div>
-    ${bottomNavHTML([
-      {key:'equipe', icon:'👥', label:'Mon équipe', onclick:"setPlayerTab('equipe')"},
-      {key:'classement', icon:'📊', label:'Classement', onclick:"setPlayerTab('classement')"},
-      {key:'historique', icon:'📜', label:'Historique', onclick:"setPlayerTab('historique')"},
-    ], VIEW.tab)}
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : mlpPlayerTeamHTML(me));
