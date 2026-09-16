@@ -382,7 +382,7 @@ function onLeagueDrop(ev, targetLeagueId){
   const draggedId = ev.dataTransfer.getData('text/plain');
   reorderLeague(draggedId, targetLeagueId);
 }
-async function createLeague(name, scheduleLabel, format){
+async function createLeague(name, scheduleLabel, format, mlpRosterSize){
   if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation sélectionnée — impossible de créer une ligue."); return null; }
   const nextOrder = myOrgLeagues().reduce((m,l)=>Math.max(m, typeof l.order_index==='number'?l.order_index:0), 0) + 1;
   const { data, error } = await sb.from('leagues').insert({ name, schedule_label: scheduleLabel || null, order_index: nextOrder, organization_id: CURRENT_ORGANIZATION_ID }).select().single();
@@ -390,6 +390,11 @@ async function createLeague(name, scheduleLabel, format){
   const fresh = defaultData();
   fresh.leagueName = name;
   fresh.leagueFormat = format || 'ladder';
+  if(format==='mlp'){
+    fresh.mlpRosterSize = mlpRosterSize || 4;
+    fresh.mlpTeams = [];
+    fresh.mlpSessions = [];
+  }
   const { error: err2 } = await sb.from('league_data').insert({ league_id: data.id, data: fresh });
   if(err2){ showAlert("Erreur lors de la création : " + err2.message); return null; }
   await loadLeagues();
@@ -398,7 +403,8 @@ async function createLeague(name, scheduleLabel, format){
 const LEAGUE_FORMAT_HINTS = {
   ladder: "Les groupes montent/descendent automatiquement selon les résultats de chaque session — l'échelle classique.",
   pools: "Plusieurs groupes fixes qui ne bougent jamais, peu importe les résultats — utile pour des poules de niveau stable.",
-  single: "Un seul groupe pour tous les joueurs, avec un classement cumulatif sur toute la saison plutôt que des montées/descentes."
+  single: "Un seul groupe pour tous les joueurs, avec un classement cumulatif sur toute la saison plutôt que des montées/descentes.",
+  mlp: "Équipes mixtes fixes (2H+2F ou 2H+1F) qui s'affrontent en joutes genrées (double féminin, double masculin, mixtes) + DreamBreaker — classement par points cumulés sur la saison, comme le vrai MLP."
 };
 function onCreateLeague(){
   const html = `
@@ -406,13 +412,21 @@ function onCreateLeague(){
     <div class="field"><label>Jour et heure (optionnel)</label><input id="newLeagueSchedule" placeholder="ex: Mardi 19h"></div>
     <div class="field">
       <label>Format de ligue</label>
-      <select id="newLeagueFormat" onchange="document.getElementById('newLeagueFormatHint').textContent = ({ladder:'${LEAGUE_FORMAT_HINTS.ladder}',pools:'${LEAGUE_FORMAT_HINTS.pools}',single:'${LEAGUE_FORMAT_HINTS.single}'})[this.value]">
+      <select id="newLeagueFormat" onchange="document.getElementById('newLeagueFormatHint').textContent = ({ladder:'${LEAGUE_FORMAT_HINTS.ladder}',pools:'${LEAGUE_FORMAT_HINTS.pools}',single:'${LEAGUE_FORMAT_HINTS.single}',mlp:'${LEAGUE_FORMAT_HINTS.mlp}'})[this.value]; document.getElementById('newLeagueMlpRosterField').style.display = this.value==='mlp' ? 'block' : 'none';">
         <option value="ladder">Échelle — montées/descentes selon les résultats</option>
         <option value="pools">Poules fixes — groupes qui ne bougent jamais</option>
         <option value="single">Division unique — classement cumulatif de saison</option>
+        <option value="mlp">MLP — équipes mixtes, classement par points</option>
       </select>
     </div>
     <p class="small" id="newLeagueFormatHint">${LEAGUE_FORMAT_HINTS.ladder}</p>
+    <div class="field" id="newLeagueMlpRosterField" style="display:none;">
+      <label>Composition des équipes</label>
+      <select id="newLeagueMlpRosterSize">
+        <option value="4">2 hommes + 2 femmes (4 joutes)</option>
+        <option value="3">2 hommes + 1 femme (3 joutes)</option>
+      </select>
+    </div>
     <p class="small" style="color:var(--paddle);">Le format ne pourra pas être changé facilement après coup — choisis celui qui correspond à ta ligue.</p>`;
   showFormModal('Créer une nouvelle ligue', html, saveNewLeagueForm);
 }
@@ -421,8 +435,9 @@ function saveNewLeagueForm(){
   if(!name){ showAlert("Le nom de la ligue est requis."); return false; }
   const schedule = document.getElementById('newLeagueSchedule').value.trim();
   const format = document.getElementById('newLeagueFormat').value || 'ladder';
+  const mlpRosterSize = format==='mlp' ? parseInt(document.getElementById('newLeagueMlpRosterSize').value,10) : undefined;
   (async ()=>{
-    const id = await createLeague(name, schedule, format);
+    const id = await createLeague(name, schedule, format, mlpRosterSize);
     if(id){ await switchToLeague(id); }
   })();
 }
@@ -1646,7 +1661,10 @@ function renderAdmin(){
       </div>`;
     return;
   }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const isMlp = DATA.leagueFormat === 'mlp';
+  const tabs = isMlp
+    ? [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['session','Sessions','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Classement','📊'],['reglages','Réglages','⚙️']]
+    : [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -1686,7 +1704,16 @@ function renderAdmin(){
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
-  if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
+  if(isMlp){
+    if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
+    else if(VIEW.tab==='session') c.innerHTML = mlpSessionsSectionHTML();
+    else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
+    else if(VIEW.tab==='historique') c.innerHTML = mlpHistoryHTML();
+    else if(VIEW.tab==='tournois') c.innerHTML = adminTournamentsSectionHTML();
+    else if(VIEW.tab==='rapports') c.innerHTML = mlpStandingsHTML();
+    else c.innerHTML = adminSettingsSectionHTML();
+  }
+  else if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='tournois') c.innerHTML = adminTournamentsSectionHTML();
@@ -2549,6 +2576,341 @@ function computeMLPTieWinner(t, games, teamAId, teamBId){
   }
   return { winnerTeamId, winsA, winsB, needsDreambreaker };
 }
+// ==================== LIGUE MLP (format de saison) ====================
+// Contrairement au tournoi MLP (équipes éphémères tirées des participants),
+// ici les équipes sont persistantes (DATA.mlpTeams) et référencent les
+// joueurs directement (DATA.players), modifiables par l'admin à tout moment.
+function mlpPlayerGender(playerId){
+  const p = DATA.players.find(x=>x.id===playerId);
+  return p ? (p.gender||null) : null;
+}
+function mlpGenderCountsForIds(memberIds){
+  let m=0,f=0,other=0;
+  (memberIds||[]).forEach(id=>{
+    const g = mlpPlayerGender(id);
+    if(g==='M') m++; else if(g==='F') f++; else other++;
+  });
+  return {m,f,other};
+}
+function mlpLeagueTeamGenderSplit(team){
+  const men = team.memberIds.filter(id=>mlpPlayerGender(id)==='M');
+  const women = team.memberIds.filter(id=>mlpPlayerGender(id)==='F');
+  return { men, women };
+}
+function mlpLeagueGamePlayers(team, gameType){
+  if(!team) return null;
+  const { men, women } = mlpLeagueTeamGenderSplit(team);
+  if(gameType==='womens') return women.length>=2 ? [women[0], women[1]] : null;
+  if(gameType==='mens') return men.length>=2 ? [men[0], men[1]] : null;
+  if(gameType==='mixed1') return (men[0]!==undefined && women[0]!==undefined) ? [men[0], women[0]] : null;
+  if(gameType==='mixed2'){
+    const w = women.length>=2 ? women[1] : women[0];
+    return (men[1]!==undefined && w!==undefined) ? [men[1], w] : null;
+  }
+  if(gameType==='dreambreaker') return team.dreambreakerPlayerId ? [team.dreambreakerPlayerId] : null;
+  return null;
+}
+// Points de classement façon MLP réel : 3 pts victoire en règle, 2 pts
+// victoire au DreamBreaker, 1 pt défaite au DreamBreaker, 0 pt défaite en règle.
+function computeMLPTiePoints(tie, teamAId, teamBId){
+  const cfg = { mlpRosterSize: DATA.mlpRosterSize||4 };
+  const result = computeMLPTieWinner(cfg, tie.games, teamAId, teamBId);
+  if(!result.winnerTeamId) return { pointsA:null, pointsB:null, winnerTeamId:null };
+  const viaDreambreaker = (tie.games||[]).some(g=>g.type==='dreambreaker' && g.scoreA!==null && g.scoreB!==null);
+  const winPoints = viaDreambreaker ? 2 : 3;
+  const losePoints = viaDreambreaker ? 1 : 0;
+  return {
+    winnerTeamId: result.winnerTeamId,
+    pointsA: result.winnerTeamId===teamAId ? winPoints : losePoints,
+    pointsB: result.winnerTeamId===teamBId ? winPoints : losePoints
+  };
+}
+// ---- Gestion des équipes ----
+let MLP_LEAGUE_TEAM_STATE = null;
+function mlpTeamsSectionHTML(){
+  const rosterSize = DATA.mlpRosterSize || 4;
+  const teams = DATA.mlpTeams || [];
+  const assignedIds = new Set(teams.flatMap(tm=>tm.memberIds));
+  const unassigned = DATA.players.filter(p=>!assignedIds.has(p.id));
+  let html = `<div class="card">
+    <h2>Équipes MLP</h2>
+    <p class="small">Composition requise : <strong>${mlpCompositionLabel(rosterSize)}</strong>. Modifiable à tout moment — les affrontements déjà joués gardent leurs résultats.</p>
+    ${teams.length ? teams.map(tm=>{
+      const valid = mlpCompositionValid(mlpGenderCountsForIds(tm.memberIds), rosterSize);
+      return `<div class="card" style="background:rgba(255,255,255,0.03);margin-bottom:10px;">
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <strong>${escapeHTML(tm.name)}</strong>
+          <div class="row" style="gap:6px;">
+            <button class="btn-ghost" onclick="openCreateMlpLeagueTeamModal('${tm.id}')">✏️ Modifier</button>
+            <button class="btn-ghost-danger" onclick="removeMlpLeagueTeam('${tm.id}')">🗑️</button>
+          </div>
+        </div>
+        <p class="small">${tm.memberIds.map(id=>escapeHTML(playerName(id))).join(', ')} ${valid ? '' : '· ⚠️ composition invalide'}</p>
+      </div>`;
+    }).join('') : `<p class="small">Aucune équipe pour l'instant.</p>`}
+    <button class="btn btn-secondary" onclick="openCreateMlpLeagueTeamModal()">+ Créer une équipe</button>
+  </div>
+  <div class="card">
+    <h3>Joueurs non assignés</h3>
+    ${unassigned.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;">${unassigned.map(p=>`<span class="tag tag-stay">${escapeHTML(p.name)}${p.gender?' ('+(p.gender==='F'?'F':'H')+')':' (genre ?)'}</span>`).join('')}</div>` : `<p class="small">Tous les joueurs sont assignés à une équipe.</p>`}
+  </div>`;
+  return html;
+}
+function openCreateMlpLeagueTeamModal(editTeamId){
+  const existing = editTeamId ? (DATA.mlpTeams||[]).find(t=>t.id===editTeamId) : null;
+  MLP_LEAGUE_TEAM_STATE = { editTeamId: editTeamId||null, name: existing?existing.name:'', memberIds: existing?existing.memberIds.slice():[] };
+  showFormModal(existing ? "Modifier l'équipe" : 'Créer une équipe', mlpLeagueTeamFormHTML, saveMlpLeagueTeamForm);
+}
+function mlpLeagueTeamFormHTML(){
+  const st = MLP_LEAGUE_TEAM_STATE;
+  const rosterSize = DATA.mlpRosterSize || 4;
+  const assignedElsewhere = new Set((DATA.mlpTeams||[]).filter(t=>t.id!==st.editTeamId).flatMap(t=>t.memberIds));
+  const available = DATA.players.filter(p=>!assignedElsewhere.has(p.id) && !st.memberIds.includes(p.id));
+  const counts = mlpGenderCountsForIds(st.memberIds);
+  const valid = mlpCompositionValid(counts, rosterSize);
+  let html = `<input id="mlpTeamNameInput" placeholder="Nom de l'équipe" value="${escapeHTML(st.name)}" oninput="MLP_LEAGUE_TEAM_STATE.name=this.value" style="margin-bottom:10px;">`;
+  html += `<p class="small">Requis : <strong>${mlpCompositionLabel(rosterSize)}</strong> — sélectionnés : ${counts.m} homme(s), ${counts.f} femme(s)${counts.other?', '+counts.other+' genre non défini':''} ${valid?'✅':''}</p>`;
+  html += st.memberIds.length ? `<div class="row" style="gap:6px;margin-bottom:10px;">${st.memberIds.map(id=>{
+    const p = DATA.players.find(x=>x.id===id);
+    const g = mlpPlayerGender(id);
+    return `<button class="btn-ghost" style="background:var(--ball);color:var(--court);" onclick="toggleMlpLeagueTeamMember('${id}')">${escapeHTML(p?p.name:'?')} (${g==='F'?'F':g==='M'?'H':'?'})</button>`;
+  }).join('')}</div>` : '';
+  html += `<h3 style="margin-top:10px;">Joueurs disponibles</h3>`;
+  html += available.length ? available.map(p=>`
+    <div style="display:inline-flex;align-items:center;gap:4px;margin:2px;">
+      <button class="btn-ghost" ${st.memberIds.length>=rosterSize?'disabled':''} onclick="toggleMlpLeagueTeamMember('${p.id}')">${escapeHTML(p.name)}</button>
+      <select style="width:70px;" onchange="setPlayerGenderFromTeamForm('${p.id}',this.value)">
+        <option value="" ${!p.gender?'selected':''}>?</option>
+        <option value="F" ${p.gender==='F'?'selected':''}>F</option>
+        <option value="M" ${p.gender==='M'?'selected':''}>H</option>
+      </select>
+    </div>`).join('') : `<p class="small">Aucun joueur disponible.</p>`;
+  return html;
+}
+function toggleMlpLeagueTeamMember(pid){
+  const st = MLP_LEAGUE_TEAM_STATE;
+  const idx = st.memberIds.indexOf(pid);
+  if(idx>=0) st.memberIds.splice(idx,1);
+  else if(st.memberIds.length < (DATA.mlpRosterSize||4)) st.memberIds.push(pid);
+  render();
+}
+function setPlayerGenderFromTeamForm(pid, gender){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return;
+  p.gender = gender || null;
+  saveAndRender();
+}
+function saveMlpLeagueTeamForm(){
+  const st = MLP_LEAGUE_TEAM_STATE;
+  const name = (document.getElementById('mlpTeamNameInput')||{value:st.name}).value.trim();
+  if(!name){ showAlert("Le nom de l'équipe est requis."); return false; }
+  const counts = mlpGenderCountsForIds(st.memberIds);
+  if(!mlpCompositionValid(counts, DATA.mlpRosterSize||4)){ showAlert("Composition invalide : il faut "+mlpCompositionLabel(DATA.mlpRosterSize||4)+"."); return false; }
+  DATA.mlpTeams = DATA.mlpTeams || [];
+  if(st.editTeamId){
+    const tm = DATA.mlpTeams.find(t=>t.id===st.editTeamId);
+    if(tm){ tm.name = name; tm.memberIds = st.memberIds.slice(); }
+  } else {
+    DATA.mlpTeams.push({ id: uid('mlpteam'), name, memberIds: st.memberIds.slice(), dreambreakerPlayerId: null });
+  }
+  MLP_LEAGUE_TEAM_STATE = null;
+}
+function removeMlpLeagueTeam(teamId){
+  showConfirm("Retirer cette équipe ? Les affrontements déjà joués gardent leurs résultats, mais elle n'apparaîtra plus pour les prochaines sessions.", ()=>{
+    DATA.mlpTeams = (DATA.mlpTeams||[]).filter(t=>t.id!==teamId);
+    saveAndRender();
+  });
+}
+// ---- Sessions (affrontements planifiés manuellement) ----
+function mlpSessionsSectionHTML(){
+  const open = (DATA.mlpSessions||[]).find(s=>s.status==='open');
+  if(!open){
+    return `<div class="card">
+      <h3>Nouvelle session</h3>
+      <p class="small">Planifie manuellement les affrontements pour une nouvelle date de jeu.</p>
+      <input id="newMlpSessionDate" type="date" value="${fmtDate(new Date())}">
+      <button class="btn btn-secondary" onclick="startNewMlpSession()">Créer la session</button>
+    </div>`;
+  }
+  return mlpOpenSessionHTML(open);
+}
+function startNewMlpSession(){
+  if((DATA.mlpTeams||[]).length < 2){ showAlert("Crée au moins 2 équipes (onglet Équipes) avant de planifier une session."); return; }
+  const date = document.getElementById('newMlpSessionDate').value || fmtDate(new Date());
+  DATA.mlpSessions = DATA.mlpSessions || [];
+  DATA.mlpSessions.push({ id: uid('mlps'), date, status:'open', ties: [] });
+  saveAndRender();
+}
+function mlpOpenSessionHTML(session){
+  const teams = DATA.mlpTeams || [];
+  let html = `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3>Session du ${session.date}</h3>
+      <button class="btn-ghost-danger" onclick="deleteMlpSession('${session.id}')">Supprimer la session</button>
+    </div>
+    <div class="row" style="gap:6px;align-items:center;">
+      <select id="mlpTieTeamA"><option value="">— Équipe A —</option>${teams.map(t=>`<option value="${t.id}">${escapeHTML(t.name)}</option>`).join('')}</select>
+      <span class="small">contre</span>
+      <select id="mlpTieTeamB"><option value="">— Équipe B —</option>${teams.map(t=>`<option value="${t.id}">${escapeHTML(t.name)}</option>`).join('')}</select>
+      <button class="btn btn-secondary" onclick="addMlpTie('${session.id}')">+ Ajouter cet affrontement</button>
+    </div>
+  </div>`;
+  html += (session.ties||[]).map(tie=>mlpTieCardHTML(session, tie)).join('');
+  const allDecided = (session.ties||[]).length>0 && session.ties.every(tie=>tie.winnerTeamId);
+  html += `<div class="card">
+    <p class="small">${(session.ties||[]).length===0 ? "Ajoute au moins un affrontement." : (allDecided ? "Tous les affrontements sont terminés." : "Certains affrontements ne sont pas encore terminés.")}</p>
+    <button class="btn btn-primary" ${!allDecided?'disabled':''} onclick="closeMlpSession('${session.id}')">Clore la session</button>
+  </div>`;
+  return html;
+}
+function addMlpTie(sessionId){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
+  if(!session) return;
+  const teamAId = document.getElementById('mlpTieTeamA').value;
+  const teamBId = document.getElementById('mlpTieTeamB').value;
+  if(!teamAId || !teamBId || teamAId===teamBId){ showAlert("Choisis deux équipes différentes."); return; }
+  session.ties = session.ties || [];
+  session.ties.push({ id: uid('tie'), teamAId, teamBId, games: newMLPGames(DATA.mlpRosterSize||4), winnerTeamId:null, pointsA:null, pointsB:null });
+  saveAndRender();
+}
+function removeMlpTie(sessionId, tieId){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
+  if(!session) return;
+  session.ties = session.ties.filter(t=>t.id!==tieId);
+  saveAndRender();
+}
+function deleteMlpSession(sessionId){
+  showConfirm("Supprimer cette session et tous ses résultats ?", ()=>{
+    DATA.mlpSessions = (DATA.mlpSessions||[]).filter(s=>s.id!==sessionId);
+    saveAndRender();
+  });
+}
+function closeMlpSession(sessionId){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
+  if(!session) return;
+  session.status = 'closed';
+  saveAndRender();
+}
+function mlpTieCardHTML(session, tie){
+  const teamA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId);
+  const teamB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
+  const games = tie.games && tie.games.length ? tie.games : newMLPGames(DATA.mlpRosterSize||4);
+  const aWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamAId;
+  const bWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamBId;
+  let html = `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-weight:${aWon?'700':'400'};">${escapeHTML(teamA?teamA.name:'?')} ${tie.pointsA!==null?`<span class="tag tag-green">${tie.pointsA} pts</span>`:''}</div>
+        <div style="font-weight:${bWon?'700':'400'};">${escapeHTML(teamB?teamB.name:'?')} ${tie.pointsB!==null?`<span class="tag tag-green">${tie.pointsB} pts</span>`:''}</div>
+      </div>
+      <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')">🗑️</button>
+    </div>`;
+  if(!teamA || !teamB){ html += `</div>`; return html; }
+  games.forEach((g,gi)=>{
+    if(g.type==='dreambreaker'){
+      const needA = !teamA.dreambreakerPlayerId, needB = !teamB.dreambreakerPlayerId;
+      if(needA || needB){
+        html += `<div class="small" style="margin-top:6px;color:var(--danger);">DreamBreaker — choisis le ou la joueuse de chaque équipe :</div>`;
+        if(needA) html += `<select onchange="setMlpLeagueDreambreakerPlayer('${teamA.id}',this.value)"><option value="">— ${escapeHTML(teamA.name)} —</option>${teamA.memberIds.map(id=>`<option value="${id}">${escapeHTML(playerName(id))}</option>`).join('')}</select>`;
+        if(needB) html += `<select onchange="setMlpLeagueDreambreakerPlayer('${teamB.id}',this.value)"><option value="">— ${escapeHTML(teamB.name)} —</option>${teamB.memberIds.map(id=>`<option value="${id}">${escapeHTML(playerName(id))}</option>`).join('')}</select>`;
+        return;
+      }
+    }
+    const pairA = mlpLeagueGamePlayers(teamA, g.type);
+    const pairB = mlpLeagueGamePlayers(teamB, g.type);
+    const labelA = pairA ? pairA.map(playerName).join(' & ') : '?';
+    const labelB = pairB ? pairB.map(playerName).join(' & ') : '?';
+    html += `<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;">
+      <div class="small" style="color:var(--muted);">${mlpGameTypeLabel(g.type)}</div>
+      <div class="small">${escapeHTML(labelA)} <span style="opacity:0.6;">vs</span> ${escapeHTML(labelB)}</div>
+      <div class="row" style="gap:4px;align-items:center;margin-top:2px;">
+        <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreA===null?'':g.scoreA}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'A',this.value)">
+        <span class="small">:</span>
+        <input class="pill-input" style="width:34px;" type="number" min="0" value="${g.scoreB===null?'':g.scoreB}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'B',this.value)">
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+function setMlpLeagueDreambreakerPlayer(teamId, playerId){
+  if(!playerId) return;
+  const team = (DATA.mlpTeams||[]).find(t=>t.id===teamId);
+  if(!team) return;
+  team.dreambreakerPlayerId = playerId;
+  saveAndRender();
+}
+function setMlpTieScore(sessionId, tieId, gameIndex, which, value){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
+  if(!session) return;
+  const tie = session.ties.find(x=>x.id===tieId);
+  if(!tie) return;
+  if(!tie.games) tie.games = newMLPGames(DATA.mlpRosterSize||4);
+  const g = tie.games[gameIndex];
+  if(!g) return;
+  if(which==='A') g.scoreA = value===''?null:Number(value);
+  else g.scoreB = value===''?null:Number(value);
+  const cfg = { mlpRosterSize: DATA.mlpRosterSize||4 };
+  const result = computeMLPTieWinner(cfg, tie.games, tie.teamAId, tie.teamBId);
+  if(result.needsDreambreaker && !tie.games.some(x=>x.type==='dreambreaker')){
+    tie.games.push({ type:'dreambreaker', scoreA:null, scoreB:null });
+  } else if(!result.needsDreambreaker){
+    tie.games = tie.games.filter(x=>x.type!=='dreambreaker');
+  }
+  tie.winnerTeamId = result.winnerTeamId;
+  if(tie.winnerTeamId){
+    const pts = computeMLPTiePoints(tie, tie.teamAId, tie.teamBId);
+    tie.pointsA = pts.pointsA; tie.pointsB = pts.pointsB;
+  } else {
+    tie.pointsA = null; tie.pointsB = null;
+  }
+  saveAndRender();
+}
+// ---- Historique et classement ----
+function mlpHistoryHTML(){
+  const closed = (DATA.mlpSessions||[]).filter(s=>s.status==='closed').slice().reverse();
+  if(!closed.length) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
+  return closed.map(session=>`
+    <div class="card">
+      <h3>Session du ${session.date}</h3>
+      ${(session.ties||[]).map(tie=>{
+        const teamA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId);
+        const teamB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
+        return `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);">
+          <span>${escapeHTML(teamA?teamA.name:'?')} vs ${escapeHTML(teamB?teamB.name:'?')}</span>
+          <span class="small">${tie.pointsA}–${tie.pointsB} pts</span>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+function mlpStandingsHTML(){
+  const standings = {};
+  (DATA.mlpTeams||[]).forEach(t=>{ standings[t.id] = { teamId:t.id, name:t.name, points:0, played:0, wins:0, losses:0 }; });
+  (DATA.mlpSessions||[]).filter(s=>s.status==='closed').forEach(session=>{
+    (session.ties||[]).forEach(tie=>{
+      if(!tie.winnerTeamId) return;
+      [[tie.teamAId, tie.pointsA],[tie.teamBId, tie.pointsB]].forEach(([teamId,pts])=>{
+        if(!standings[teamId]){
+          const tm = (DATA.mlpTeams||[]).find(x=>x.id===teamId);
+          standings[teamId] = { teamId, name: tm?tm.name:'?', points:0, played:0, wins:0, losses:0 };
+        }
+        standings[teamId].points += (pts||0);
+        standings[teamId].played += 1;
+        if(tie.winnerTeamId===teamId) standings[teamId].wins += 1; else standings[teamId].losses += 1;
+      });
+    });
+  });
+  const rows = Object.values(standings).sort((a,b)=>b.points-a.points);
+  if(!rows.length) return `<div class="card"><p class="empty">Aucun classement pour l'instant — crée des équipes et joue des sessions.</p></div>`;
+  return `<div class="card">
+    <h2>Classement de la saison</h2>
+    <p class="small">3 pts pour une victoire en règle, 2 pts pour une victoire au DreamBreaker, 1 pt pour une défaite au DreamBreaker, 0 pt pour une défaite en règle.</p>
+    <table><tr><th>#</th><th>Équipe</th><th>J</th><th>V-D</th><th>Points</th></tr>
+    ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHTML(r.name)}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td><strong>${r.points}</strong></td></tr>`).join('')}
+    </table>
+  </div>`;
+}
+// ==================== FIN LIGUE MLP ====================
 function computeGamesWinner(games, teamAId, teamBId){
   const winsNeeded = Math.ceil((games||[]).length/2) || 1;
   let winsA=0, winsB=0;
@@ -5534,6 +5896,7 @@ function renderPlayer(playerId){
     app.innerHTML = `${topbarHTML()}<div class="card"><p class="small">Ton profil de joueur est introuvable. Contacte un administrateur.</p></div>`;
     return;
   }
+  if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
   const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜']];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
@@ -5570,8 +5933,64 @@ function renderPlayer(playerId){
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : playerGroupHTML(me));
 }
-function toggleAdminPlayerView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'player' ? null : 'player'; VIEW = { tab: ADMIN_VIEWING_AS ? 'classement' : 'groupes' }; render(); }
-function toggleAdminSubView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'substitute' ? null : 'substitute'; VIEW = { tab: ADMIN_VIEWING_AS ? 'dispo' : 'groupes' }; render(); }
+function renderMlpPlayer(me){
+  const tabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜']];
+  const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
+    {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
+    {label:'Joueur', active:true, onclick:''},
+  ]) : '';
+  const actionItems = [{icon:'📖', label:'Guide', onclick:'showPlayerGuideModal()'}];
+  const myOrgCount = new Set(MY_LEAGUE_LINKS.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
+  const leagueSwitcher = MY_LEAGUE_LINKS.length > 1 ? `
+    <div class="drawer-extra-block">
+      <label style="display:block;margin-bottom:6px;">Ma ligue</label>
+      <div class="row" style="gap:6px;">
+        ${MY_LEAGUE_LINKS.map(l=>{
+          const lg = LEAGUES.find(x=>x.id===l.league_id);
+          const active = l.league_id===CURRENT_LEAGUE_ID;
+          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMyLeague('${l.league_id}')">
+            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}${l.substitute_id ? ' 🔄' : ''}</span>
+            ${myOrgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+  app.innerHTML = `
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher, tabs, VIEW.tab, 'setPlayerTab', actionItems, viewSlide)}
+    ${storageBannerHTML()}
+    <div id="tabContent"></div>
+    ${bottomNavHTML([
+      {key:'equipe', icon:'👥', label:'Mon équipe', onclick:"setPlayerTab('equipe')"},
+      {key:'classement', icon:'📊', label:'Classement', onclick:"setPlayerTab('classement')"},
+      {key:'historique', icon:'📜', label:'Historique', onclick:"setPlayerTab('historique')"},
+    ], VIEW.tab)}
+  `;
+  const c = document.getElementById('tabContent');
+  c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : mlpPlayerTeamHTML(me));
+}
+function mlpPlayerTeamHTML(me){
+  const team = (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(me.id));
+  if(!team) return `<div class="card"><p class="empty">Tu n'es pas encore assigné(e) à une équipe — contacte un administrateur.</p></div>`;
+  let html = `<div class="card">
+    <h2>${escapeHTML(team.name)}</h2>
+    <p class="small">Coéquipiers : ${team.memberIds.map(id=>escapeHTML(playerName(id))+(id===me.id?' (toi)':'')).join(', ')}</p>
+  </div>`;
+  const open = (DATA.mlpSessions||[]).find(s=>s.status==='open');
+  if(open){
+    const myTies = (open.ties||[]).filter(t=>t.teamAId===team.id || t.teamBId===team.id);
+    if(myTies.length){
+      html += `<div class="card"><h3>Session du ${open.date}</h3>`;
+      myTies.forEach(tie=>{
+        const opp = (DATA.mlpTeams||[]).find(t=>t.id===(tie.teamAId===team.id?tie.teamBId:tie.teamAId));
+        html += `<p class="small">Contre <strong>${escapeHTML(opp?opp.name:'?')}</strong> — ${tie.winnerTeamId ? (tie.winnerTeamId===team.id?'Victoire ✅':'Défaite') : 'à venir'}</p>`;
+      });
+      html += `</div>`;
+    }
+  }
+  return html;
+}
+function toggleAdminPlayerView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'player' ? null : 'player'; VIEW = { tab: ADMIN_VIEWING_AS ? 'classement' : (DATA.leagueFormat==='mlp' ? 'equipes' : 'groupes') }; render(); }
+function toggleAdminSubView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'substitute' ? null : 'substitute'; VIEW = { tab: ADMIN_VIEWING_AS ? 'dispo' : (DATA.leagueFormat==='mlp' ? 'equipes' : 'groupes') }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGuideHTML(){
   return `
@@ -6086,6 +6505,9 @@ function migrateData(){
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
   if(DATA.blockedDates === undefined) DATA.blockedDates = [];
   if(DATA.plannedAbsences === undefined) DATA.plannedAbsences = [];
+  if(DATA.mlpTeams === undefined) DATA.mlpTeams = [];
+  if(DATA.mlpSessions === undefined) DATA.mlpSessions = [];
+  if(DATA.mlpRosterSize === undefined) DATA.mlpRosterSize = 4;
   if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
