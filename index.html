@@ -30,7 +30,7 @@
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--court);color:var(--text);font-family:var(--font-body);min-height:100%;}
 body{padding:0;}
-#app{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+#app{width:100%;padding:20px 24px 60px;}
 h1,h2,h3{font-family:var(--font-display);font-weight:800;letter-spacing:0.02em;margin:0 0 4px;text-transform:uppercase;}
 h1{font-size:28px;color:var(--ball);}
 h2{font-size:20px;color:var(--line);}
@@ -209,7 +209,7 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 
 /* ---------- Bureau (écrans larges) : plus d'air, colonnes qui ne s'étirent pas à l'infini ---------- */
 @media (min-width:900px){
-  #app{max-width:1080px;padding:32px 24px 70px;}
+  #app{padding:32px 32px 70px;}
   h1{font-size:32px;}
   .card{padding:20px 22px;}
   th,td{white-space:normal;}
@@ -1730,10 +1730,7 @@ function renderAdmin(){
           onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
       </div>
     </div>`;
-  const drawerSettings = `
-    <div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="logout()">🚪 Déconnexion</button>
-    </div>`;
+  const drawerSettings = '';
   app.innerHTML = `
     ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide)}
     ${storageBannerHTML()}
@@ -1773,10 +1770,7 @@ function renderMlpAdmin(){
         ${myOrgLeagues().map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
       </div>
     </div>`;
-  const drawerSettings = `
-    <div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="logout()">🚪 Déconnexion</button>
-    </div>`;
+  const drawerSettings = '';
   app.innerHTML = `
     ${topbarHTML('Ligue MLP — Espace administrateur', orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide)}
     ${storageBannerHTML()}
@@ -5939,10 +5933,7 @@ function renderSubstitute(subId){
         }).join('')}
       </div>
     </div>` : '';
-  const drawerSettings = `
-    <div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="logout()">🚪 Déconnexion</button>
-    </div>`;
+  const drawerSettings = '';
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide)}
     ${storageBannerHTML()}
@@ -6061,7 +6052,6 @@ function renderPlayer(playerId){
     <div class="drawer-extra-block">
       <label style="display:block;margin-bottom:6px;">Réglages</label>
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
-      <button class="btn-ghost" style="width:100%;text-align:left;margin-top:6px;" onclick="logout()">🚪 Déconnexion</button>
     </div>`;
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide)}
@@ -6097,7 +6087,6 @@ function renderMlpPlayer(me){
     <div class="drawer-extra-block">
       <label style="display:block;margin-bottom:6px;">Réglages</label>
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
-      <button class="btn-ghost" style="width:100%;text-align:left;margin-top:6px;" onclick="logout()">🚪 Déconnexion</button>
     </div>`;
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide)}
