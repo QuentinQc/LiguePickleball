@@ -1340,7 +1340,12 @@ function viewSlideHTML(options){
 function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
   const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}</div>`;
   const bottomItems = tabs.map(([k,label,icon])=>({key:k, icon, label, onclick:`${setTabFn}('${k}')`}));
-  if(extraItems) bottomItems.push(...extraItems);
+  if(extraItems && extraItems.length){
+    // Insérées au centre plutôt qu'à la fin, pour un équilibre visuel (ex :
+    // le bouton surélevé Absence entre les onglets plutôt que collé au bord).
+    const mid = Math.ceil(bottomItems.length / 2);
+    bottomItems.splice(mid, 0, ...extraItems);
+  }
   return pillsHTML + bottomNavHTML(bottomItems, activeKey);
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
