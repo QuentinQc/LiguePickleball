@@ -2864,7 +2864,12 @@ function setMlpTieScore(sessionId, tieId, gameIndex, which, value){
   } else {
     tie.pointsA = null; tie.pointsB = null;
   }
-  saveAndRender();
+  saveData();
+  // Redessiner après le tick courant (pas immédiatement) : sinon, remplacer
+  // toute la page pendant l'événement onchange peut voler le focus juste au
+  // moment où l'admin clique dans le champ suivant, donnant l'impression que
+  // rien ne se passe quand on saisit les scores.
+  setTimeout(render, 0);
 }
 // ---- Historique et classement ----
 function mlpHistoryHTML(){
