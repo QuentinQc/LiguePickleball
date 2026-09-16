@@ -95,10 +95,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .action-btn.danger:hover{background:rgba(233,85,107,0.18);}
 .modal-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:14px;margin-top:14px;}
 .modal-section h3{margin:0 0 10px;font-size:13px;}
-.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0;}
-.tab{padding:10px 16px;font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:10px 10px 0 0;position:relative;top:1px;transition:background .15s ease,color .15s ease;}
-.tab.active{color:var(--ball);background:var(--court-light);border-color:rgba(255,255,255,0.12);border-bottom:1px solid var(--court-light);}
-.tab:not(.active):hover{background:rgba(255,255,255,0.06);color:var(--line);}
+.tabs{display:flex;gap:2px;margin-bottom:18px;background:rgba(255,255,255,0.06);border-radius:999px;padding:4px;width:fit-content;max-width:100%;}
+.tab{padding:9px 18px;font-family:var(--font-display);font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-radius:999px;white-space:nowrap;transition:background .15s ease,color .15s ease;}
+.tab.active{color:var(--court);background:var(--ball);font-weight:700;}
+.tab:not(.active):hover{color:var(--line);}
 .hamburger-btn{background:none;border:none;color:var(--text);font-size:26px;line-height:1;cursor:pointer;padding:8px 12px 8px 0;flex-shrink:0;min-height:44px;display:flex;align-items:center;}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;animation:drawerFadeIn .15s ease-out;}
 @keyframes drawerFadeIn{from{opacity:0;}to{opacity:1;}}
