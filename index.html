@@ -1293,14 +1293,16 @@ function topbarHTML(subtitle, contextHTML, extraControls, actionItems, viewSlide
     || ((typeof MY_ORGANIZATIONS !== 'undefined' ? MY_ORGANIZATIONS : []).find(o=>o.id===CURRENT_ORGANIZATION_ID)||{}).name
     || '';
   const leagueTitle = DATA ? DATA.leagueName : 'Ligue de Pickleball';
-  const subLine = [orgName, subtitle].filter(Boolean).join(' · ');
+  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
+  const leagueLine = [leagueTitle, scheduleLabel].filter(Boolean).join(' — ');
+  const subLine = [leagueLine, subtitle].filter(Boolean).join(' · ');
   return `
   <div class="topbar">
     <div class="row" style="gap:10px;align-items:center;">
       ${contextHTML ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
       <div class="brand">
         <div>
-          <h1>${escapeHTML(leagueTitle)}</h1>
+          <h1>${escapeHTML(orgName || leagueTitle)}</h1>
           <div class="small">${subLine}</div>
         </div>
       </div>
