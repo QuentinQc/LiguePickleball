@@ -135,10 +135,12 @@ tr.me{background:rgba(207,234,92,0.1);}
 .topbar{margin-bottom:18px;background:linear-gradient(120deg, var(--court-light), var(--court));border-radius:14px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);}
 .topbar-main{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 .topbar-main-3col{display:grid;grid-template-columns:1fr auto 1fr;}
-.topbar-center-info{display:none;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:7px 18px;white-space:nowrap;}
-.topbar-center-info .tci-league{font-family:var(--font-display);color:var(--ball);font-weight:700;letter-spacing:0.03em;text-transform:uppercase;font-size:13px;}
-.topbar-center-info .tci-org,.topbar-center-info .tci-time{color:var(--muted);font-size:12px;}
-.topbar-center-info .tci-sep{color:rgba(255,255,255,0.25);font-size:11px;}
+.topbar-center-info{display:none;align-items:center;gap:8px;}
+.tci-chip{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:7px 14px;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease;font:inherit;color:inherit;}
+.tci-chip:not(.tci-chip-static):hover{background:rgba(255,255,255,0.16);border-color:rgba(255,255,255,0.3);}
+.tci-chip-static{cursor:default;}
+.tci-league{font-family:var(--font-display);color:var(--ball);font-weight:700;letter-spacing:0.03em;text-transform:uppercase;font-size:13px;}
+.tci-org,.tci-time{color:var(--muted);font-size:12px;}
 @media (min-width:900px){
   .topbar-center-info{display:inline-flex;}
 }
@@ -1291,7 +1293,7 @@ function render(){
 // Déconnexion — vit dans le tiroir (contextHTML), construit par l'appelant.
 // extraControls ne sert que pour la page de connexion (pas de session, donc
 // pas de tiroir) — ex: le bouton « Connexion ».
-function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagline){
+function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagline, switchContext){
   const showDrawer = !!contextHTML;
   if(brand){
     return `
@@ -1312,19 +1314,24 @@ function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagl
     || '';
   const leagueTitle = DATA ? DATA.leagueName : '';
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const centerParts = [
-    orgName ? `<span class="tci-org">${escapeHTML(orgName)}</span>` : '',
-    leagueTitle ? `<span class="tci-league">${escapeHTML(leagueTitle)}</span>` : '',
-    scheduleLabel ? `<span class="tci-time">🕐 ${escapeHTML(scheduleLabel)}</span>` : '',
-  ].filter(Boolean);
-  const centerInfo = centerParts.join('<span class="tci-sep">●</span>');
+  const canSwitchOrg = switchContext==='admin' && (MY_ORGANIZATIONS.length > 1 || (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin));
+  const canSwitchLeague = switchContext==='admin' ? (myOrgLeagues().length > 1) : (switchContext==='member' && MY_LEAGUE_LINKS.length > 1);
+  const centerChips = [
+    orgName ? (canSwitchOrg
+      ? `<button class="tci-chip" onclick="openOrgSwitcherPopover()"><span class="tci-org">🏢 ${escapeHTML(orgName)}</span></button>`
+      : `<span class="tci-chip tci-chip-static"><span class="tci-org">🏢 ${escapeHTML(orgName)}</span></span>`) : '',
+    leagueTitle ? (canSwitchLeague
+      ? `<button class="tci-chip" onclick="openLeagueSwitcherPopover('${switchContext}')"><span class="tci-league">🏆 ${escapeHTML(leagueTitle)}</span></button>`
+      : `<span class="tci-chip tci-chip-static"><span class="tci-league">🏆 ${escapeHTML(leagueTitle)}</span></span>`) : '',
+    scheduleLabel ? `<span class="tci-chip tci-chip-static"><span class="tci-time">🕐 ${escapeHTML(scheduleLabel)}</span></span>` : '',
+  ].filter(Boolean).join('');
   return `
   <div class="topbar">
     <div class="topbar-main topbar-main-3col">
       <div class="row" style="gap:8px;align-items:center;justify-self:start;">
         ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
       </div>
-      <div class="topbar-center-info" style="justify-self:center;">${centerInfo}</div>
+      <div class="topbar-center-info" style="justify-self:center;">${centerChips}</div>
       <div class="row" style="gap:8px;align-items:center;justify-self:end;">
         ${viewSlide||''}
         ${extraControls||''}
@@ -1361,6 +1368,24 @@ function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
   return pillsHTML + bottomNavHTML(bottomItems, activeKey);
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
+function openOrgSwitcherPopover(){
+  const isSuperAdmin = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
+  const orgs = (SUPER_ADMIN_MODE && isSuperAdmin) ? ALL_ORGANIZATIONS : MY_ORGANIZATIONS;
+  const html = `<div class="row" style="gap:6px;flex-wrap:wrap;">${orgs.map(o=>`<button class="${o.id===CURRENT_ORGANIZATION_ID?'btn btn-primary':'btn btn-secondary'}" onclick="closeModal();switchToOrganization('${o.id}')">${escapeHTML(o.name)}</button>`).join('')}</div>`;
+  showContentModal("Changer d'organisation", html);
+}
+function openLeagueSwitcherPopover(switchContext){
+  let leagues, fn;
+  if(switchContext==='admin'){
+    leagues = myOrgLeagues();
+    fn = 'switchToLeague';
+  } else {
+    leagues = MY_LEAGUE_LINKS.map(l=>LEAGUES.find(x=>x.id===l.league_id)).filter(Boolean);
+    fn = 'switchMyLeague';
+  }
+  const html = `<div class="row" style="gap:6px;flex-wrap:wrap;">${leagues.map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" onclick="closeModal();${fn}('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}</div>`;
+  showContentModal('Changer de ligue', html);
+}
 // items: [{key, icon, label, onclick, raised?}] — onclick est une chaîne JS
 // (ex: "setPlayerTab('classement')"). raised:true affiche l'icône dans un
 // cercle surélevé (action principale mise en avant, comme le QR code dans
@@ -1753,7 +1778,7 @@ function renderAdmin(){
     </div>`;
   const drawerSettings = '';
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide)}
+    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setAdminTab')}
     <div id="tabContent"></div>
@@ -1793,7 +1818,7 @@ function renderMlpAdmin(){
     </div>`;
   const drawerSettings = '';
   app.innerHTML = `
-    ${topbarHTML('Ligue MLP — Espace administrateur', orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide)}
+    ${topbarHTML('Ligue MLP — Espace administrateur', orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setAdminTab')}
     <div id="tabContent"></div>
@@ -5956,7 +5981,7 @@ function renderSubstitute(subId){
     </div>` : '';
   const drawerSettings = '';
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide)}
+    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setSubstituteTab')}
     <div id="tabContent"></div>
@@ -6075,7 +6100,7 @@ function renderPlayer(playerId){
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide)}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
     <div id="tabContent"></div>
@@ -6110,7 +6135,7 @@ function renderMlpPlayer(me){
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
     </div>`;
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide)}
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab')}
     <div id="tabContent"></div>
