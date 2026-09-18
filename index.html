@@ -282,6 +282,7 @@ let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
+let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation de la ligue affichée (partagées entre ses ligues)
 let DRAWER_OPEN = false; // tiroir de navigation latéral (remplace les onglets horizontaux)
 let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
 
@@ -338,6 +339,44 @@ async function saveData(){
     console.error('Erreur de sauvegarde', e);
   }
 }
+// ---- Vidéos : stockées au niveau de l'ORGANISATION (partagées entre toutes
+// ses ligues), pas dans les données d'une ligue précise. ----
+function currentLeagueOrgId(){
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  return (lg && lg.organization_id) || CURRENT_ORGANIZATION_ID || null;
+}
+async function loadOrgVideoData(orgId){
+  if(!orgId){ ORG_VIDEO_DATA = { folders: [], videos: [] }; return; }
+  try{
+    const { data, error } = await sb.from('organization_videos').select('data').eq('organization_id', orgId).single();
+    if(error){
+      if(error.code === 'PGRST116'){
+        // Aucune ligne pour cette organisation : on la crée (premier admin à utiliser la fonctionnalité).
+        const fresh = { folders: [], videos: [] };
+        await sb.from('organization_videos').insert({ organization_id: orgId, data: fresh });
+        ORG_VIDEO_DATA = fresh;
+        return;
+      }
+      throw error;
+    }
+    ORG_VIDEO_DATA = (data && data.data) ? data.data : { folders: [], videos: [] };
+  }catch(e){
+    console.error('Erreur de chargement des vidéos', e);
+    ORG_VIDEO_DATA = { folders: [], videos: [] };
+  }
+}
+async function saveOrgVideoData(){
+  const orgId = currentLeagueOrgId();
+  if(!orgId) return;
+  try{
+    const { error } = await sb.from('organization_videos').update({ data: ORG_VIDEO_DATA, updated_at: new Date().toISOString() }).eq('organization_id', orgId);
+    if(error) throw error;
+  }catch(e){
+    console.error('Erreur de sauvegarde des vidéos', e);
+    showAlert("La sauvegarde des vidéos a échoué : " + (e && e.message ? e.message : 'erreur inconnue'));
+  }
+}
+function saveOrgVideoDataAndRender(){ saveOrgVideoData(); render(); }
 async function loadMyOrganizations(profileId){
   const { data, error } = await sb.from('organization_admins').select('organization_id, organizations(id, name)').eq('profile_id', profileId);
   MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
@@ -466,6 +505,7 @@ async function switchToLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
+  await loadOrgVideoData(currentLeagueOrgId());
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
@@ -501,6 +541,7 @@ async function switchMyLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
+  await loadOrgVideoData(currentLeagueOrgId());
   const isSub = !!link.substitute_id;
   if(SESSION_USER.role === 'admin'){
     // Un admin qui consulte sa propre vue joueur/remplaçant : on ne touche
@@ -535,9 +576,7 @@ function defaultData(){
     groups: [ { id: uid('g'), name: 'Groupe 1', order: 1 } ],
     players: [],
     sessions: [],
-    substitutePool: [],
-    videos: [],
-    videoFolders: []
+    substitutePool: []
   };
 }
 
@@ -1650,6 +1689,7 @@ async function onAuthResolved(user){
   const loaded = await loadData(CURRENT_LEAGUE_ID);
   DATA = loaded || defaultData();
   migrateData();
+  await loadOrgVideoData(currentLeagueOrgId());
   if(link.substitute_id){
     SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
     VIEW = { tab:'dispo' };
@@ -1721,6 +1761,7 @@ async function logout(){
   OFFLINE_MODE = false;
   OFFLINE_CACHED_AT = null;
   ALL_ORGANIZATIONS = [];
+  ORG_VIDEO_DATA = { folders: [], videos: [] };
   DATA = null;
   VIEW = {};
   render();
@@ -5687,15 +5728,19 @@ function youtubeEmbedHTML(youtubeId, title){
   </div>`;
 }
 // ---- Dossiers de vidéos (arborescence simple, un parent par dossier) ----
-// La visibilité se configure sur le DOSSIER, pas sur chaque vidéo : toutes
-// les vidéos d'un dossier héritent de son réglage. Les vidéos à la racine
-// (aucun dossier) sont visibles par toute la ligue par défaut.
-function folderById(id){ return (DATA.videoFolders||[]).find(f=>f.id===id); }
+// Les vidéos et leurs dossiers appartiennent à l'ORGANISATION (ORG_VIDEO_DATA,
+// partagée entre toutes ses ligues), pas à une ligue précise. La visibilité
+// se configure sur le DOSSIER : à quelle(s) ligue(s) de l'organisation il est
+// rendu disponible. Un dossier à la racine (aucun parent) sans réglage propre
+// n'existe pas — seules les VIDÉOS peuvent être à la racine (aucun dossier),
+// et sont alors visibles par toute l'organisation, faute d'un dossier pour
+// restreindre leur accès.
+function folderById(id){ return (ORG_VIDEO_DATA.folders||[]).find(f=>f.id===id); }
 function foldersInParent(parentId){
-  return (DATA.videoFolders||[]).filter(f=>(f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name));
+  return (ORG_VIDEO_DATA.folders||[]).filter(f=>(f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name));
 }
 function videosInFolder(folderId){
-  return (DATA.videos||[]).filter(v=>(v.folderId||null)===(folderId||null));
+  return (ORG_VIDEO_DATA.videos||[]).filter(v=>(v.folderId||null)===(folderId||null));
 }
 function folderPath(folderId){
   const path = [];
@@ -5712,127 +5757,94 @@ function allFoldersFlat(){
   return result;
 }
 function setVideoFolder(folderId){ VIEW.videoFolderId = folderId || null; render(); }
-function folderVisibleToPlayer(f, player){
-  if(!f || !player) return false;
-  if(f.allLeague) return true;
-  if((f.playerIds||[]).includes(player.id)) return true;
-  if(DATA.leagueFormat === 'mlp'){
-    const team = (DATA.mlpTeams||[]).find(t=>(t.memberIds||[]).includes(player.id));
-    if(team && (f.entityIds||[]).includes(team.id)) return true;
-  } else {
-    if(player.groupId && (f.entityIds||[]).includes(player.groupId)) return true;
-  }
-  return false;
+function folderVisibleToLeague(f, leagueId){
+  if(!f || !leagueId) return false;
+  if(f.allOrg) return true;
+  return (f.leagueIds||[]).includes(leagueId);
 }
 function folderVisibilityLabel(f){
-  if(f.allLeague) return 'Toute la ligue';
-  const isMlp = DATA.leagueFormat === 'mlp';
-  const entities = isMlp ? (DATA.mlpTeams||[]) : (DATA.groups||[]);
-  const parts = [];
-  const entityNames = (f.entityIds||[]).map(id=>{ const e = entities.find(x=>x.id===id); return e ? e.name : null; }).filter(Boolean);
-  if(entityNames.length) parts.push(entityNames.join(', '));
-  const playerNames = (f.playerIds||[]).map(id=>playerName(id)).filter(Boolean);
-  if(playerNames.length) parts.push(playerNames.join(', '));
-  return parts.length ? parts.join(' · ') : 'Personne pour l\'instant (à configurer)';
+  if(f.allOrg) return "Toute l'organisation";
+  const names = (f.leagueIds||[]).map(id=>{ const l = LEAGUES.find(x=>x.id===id); return l ? l.name : null; }).filter(Boolean);
+  return names.length ? names.join(', ') : "Aucune ligue pour l'instant (à configurer)";
 }
-function videoVisibleToPlayer(v, player){
-  if(!v || !player) return false;
+function videoVisibleToLeague(v, leagueId){
+  if(!v || !leagueId) return false;
   const folderId = v.folderId || null;
-  if(!folderId) return true; // racine = toute la ligue
+  if(!folderId) return true; // racine = toute l'organisation
   const f = folderById(folderId);
   if(!f) return true; // dossier supprimé entretemps : on ne bloque pas l'accès
-  return folderVisibleToPlayer(f, player);
+  return folderVisibleToLeague(f, leagueId);
 }
 function videoEffectiveVisibilityLabel(v){
   const folderId = v.folderId || null;
-  if(!folderId) return 'Toute la ligue (racine)';
+  if(!folderId) return "Toute l'organisation (racine)";
   const f = folderById(folderId);
-  return f ? folderVisibilityLabel(f) : 'Toute la ligue (racine)';
+  return f ? folderVisibilityLabel(f) : "Toute l'organisation (racine)";
 }
 let VIDEO_FOLDER_FORM_STATE = null;
 function openAddVideoFolderModal(){
-  VIDEO_FOLDER_FORM_STATE = { id:null, name:'', parentId: VIEW.videoFolderId || null, allLeague:true, entityIds:[], playerIds:[] };
+  VIDEO_FOLDER_FORM_STATE = { id:null, name:'', parentId: VIEW.videoFolderId || null, allOrg:true, leagueIds:[] };
   showFormModal('Nouveau dossier', videoFolderFormHTML, saveVideoFolderForm);
 }
 function openEditVideoFolderModal(folderId){
   const f = folderById(folderId);
   if(!f) return;
-  VIDEO_FOLDER_FORM_STATE = { id:f.id, name:f.name, parentId: f.parentId||null, allLeague: !!f.allLeague, entityIds:(f.entityIds||[]).slice(), playerIds:(f.playerIds||[]).slice() };
+  VIDEO_FOLDER_FORM_STATE = { id:f.id, name:f.name, parentId: f.parentId||null, allOrg: !!f.allOrg, leagueIds:(f.leagueIds||[]).slice() };
   showFormModal('Modifier le dossier', videoFolderFormHTML, saveVideoFolderForm);
 }
 function videoFolderFormHTML(){
   const st = VIDEO_FOLDER_FORM_STATE;
   if(!st) return '';
-  const isMlp = DATA.leagueFormat === 'mlp';
-  const entities = isMlp ? (DATA.mlpTeams||[]) : groupsSorted();
-  const entityLabel = isMlp ? 'Par équipe' : 'Par groupe';
-  const players = (DATA.players||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const leagues = myOrgLeagues();
   return `
     <div class="field"><label>Nom du dossier</label><input id="videoFolderNameInput" placeholder="ex: Saison 2026" value="${escapeHTML(st.name)}" oninput="VIDEO_FOLDER_FORM_STATE.name=this.value"></div>
     <div class="field">
-      <label>Qui a accès à ce dossier (et à toutes les vidéos qu'il contient) ?</label>
+      <label>À quelle(s) ligue(s) de l'organisation ce dossier est-il rendu disponible ?</label>
       <label class="row" style="gap:8px;align-items:center;cursor:pointer;margin:4px 0 0;">
-        <input type="checkbox" ${st.allLeague?'checked':''} onchange="VIDEO_FOLDER_FORM_STATE.allLeague=this.checked;render();">
-        <span>Toute la ligue</span>
+        <input type="checkbox" ${st.allOrg?'checked':''} onchange="VIDEO_FOLDER_FORM_STATE.allOrg=this.checked;render();">
+        <span>Toutes les ligues de l'organisation</span>
       </label>
     </div>
-    ${!st.allLeague ? `
+    ${!st.allOrg ? `
     <div class="field">
-      <label>${entityLabel}</label>
-      <div style="max-height:140px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px;">
-        ${entities.length ? entities.map(e=>`
-          <label class="row" style="gap:8px;align-items:center;cursor:pointer;padding:3px 0;">
-            <input type="checkbox" ${st.entityIds.includes(e.id)?'checked':''} onchange="toggleVideoFolderFormEntity('${e.id}')">
-            <span>${escapeHTML(e.name)}</span>
-          </label>`).join('') : `<span class="small">${isMlp?'Aucune équipe':'Aucun groupe'} pour l'instant.</span>`}
-      </div>
-    </div>
-    <div class="field">
-      <label>Par joueur individuel</label>
+      <label>Ligues</label>
       <div style="max-height:180px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px;">
-        ${players.length ? players.map(p=>`
+        ${leagues.length ? leagues.map(l=>`
           <label class="row" style="gap:8px;align-items:center;cursor:pointer;padding:3px 0;">
-            <input type="checkbox" ${st.playerIds.includes(p.id)?'checked':''} onchange="toggleVideoFolderFormPlayer('${p.id}')">
-            <span>${escapeHTML(p.name)}</span>
-          </label>`).join('') : `<span class="small">Aucun joueur pour l'instant.</span>`}
+            <input type="checkbox" ${st.leagueIds.includes(l.id)?'checked':''} onchange="toggleVideoFolderFormLeague('${l.id}')">
+            <span>${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</span>
+          </label>`).join('') : `<span class="small">Aucune autre ligue dans cette organisation pour l'instant.</span>`}
       </div>
     </div>` : ''}
   `;
 }
-function toggleVideoFolderFormEntity(id){
+function toggleVideoFolderFormLeague(id){
   const st = VIDEO_FOLDER_FORM_STATE; if(!st) return;
-  const i = st.entityIds.indexOf(id);
-  if(i===-1) st.entityIds.push(id); else st.entityIds.splice(i,1);
-  render();
-}
-function toggleVideoFolderFormPlayer(id){
-  const st = VIDEO_FOLDER_FORM_STATE; if(!st) return;
-  const i = st.playerIds.indexOf(id);
-  if(i===-1) st.playerIds.push(id); else st.playerIds.splice(i,1);
+  const i = st.leagueIds.indexOf(id);
+  if(i===-1) st.leagueIds.push(id); else st.leagueIds.splice(i,1);
   render();
 }
 function saveVideoFolderForm(){
   const st = VIDEO_FOLDER_FORM_STATE;
   const name = document.getElementById('videoFolderNameInput').value.trim();
   if(!name){ showAlert('Donne un nom au dossier.'); return false; }
-  DATA.videoFolders = DATA.videoFolders || [];
+  ORG_VIDEO_DATA.folders = ORG_VIDEO_DATA.folders || [];
   if(st.id){
     const f = folderById(st.id);
     if(f){
       f.name = name;
-      f.allLeague = st.allLeague;
-      f.entityIds = st.allLeague ? [] : st.entityIds.slice();
-      f.playerIds = st.allLeague ? [] : st.playerIds.slice();
+      f.allOrg = st.allOrg;
+      f.leagueIds = st.allOrg ? [] : st.leagueIds.slice();
     }
   } else {
-    DATA.videoFolders.push({
+    ORG_VIDEO_DATA.folders.push({
       id: uid('vfo'), name, parentId: st.parentId || null,
-      allLeague: st.allLeague,
-      entityIds: st.allLeague ? [] : st.entityIds.slice(),
-      playerIds: st.allLeague ? [] : st.playerIds.slice()
+      allOrg: st.allOrg,
+      leagueIds: st.allOrg ? [] : st.leagueIds.slice()
     });
   }
   VIDEO_FOLDER_FORM_STATE = null;
+  saveOrgVideoData();
 }
 function onDeleteVideoFolder(folderId){
   if(foldersInParent(folderId).length || videosInFolder(folderId).length){
@@ -5840,8 +5852,8 @@ function onDeleteVideoFolder(folderId){
     return;
   }
   showConfirm('Supprimer ce dossier ?', ()=>{
-    DATA.videoFolders = (DATA.videoFolders||[]).filter(f=>f.id!==folderId);
-    saveAndRender();
+    ORG_VIDEO_DATA.folders = (ORG_VIDEO_DATA.folders||[]).filter(f=>f.id!==folderId);
+    saveOrgVideoDataAndRender();
   });
 }
 function videoBreadcrumbHTML(folderId){
@@ -5893,7 +5905,7 @@ function adminVideosSectionHTML(){
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
         <h3 style="margin:0;">🎬 Vidéos</h3>
-        <p class="small" style="margin:4px 0 0;">Crée des dossiers pour classer tes vidéos et choisis, sur chaque dossier, qui peut voir tout ce qu'il contient.</p>
+        <p class="small" style="margin:4px 0 0;">Ces vidéos appartiennent à l'organisation et sont partagées entre ses ligues. Crée des dossiers pour choisir à quelle(s) ligue(s) chacun est rendu disponible.</p>
       </div>
       <div class="row" style="gap:6px;">
         <button class="btn btn-secondary" onclick="openAddVideoFolderModal()">📁 Nouveau dossier</button>
@@ -5903,7 +5915,7 @@ function adminVideosSectionHTML(){
   </div>`;
   html += videoBreadcrumbHTML(currentFolderId);
   if(!currentFolderId){
-    html += `<p class="small" style="margin:-6px 0 12px;opacity:0.75;">Les vidéos placées ici, à la racine, sont visibles par toute la ligue. Crée un dossier pour en restreindre l'accès.</p>`;
+    html += `<p class="small" style="margin:-6px 0 12px;opacity:0.75;">Les vidéos placées ici, à la racine, sont visibles par toute l'organisation. Crée un dossier pour choisir des ligues précises.</p>`;
   }
   if(!subfolders.length && !videos.length){
     html += `<div class="card"><p class="empty">${currentFolderId ? 'Ce dossier est vide.' : 'Aucune vidéo ni dossier pour le moment.'}</p></div>`;
@@ -5913,8 +5925,8 @@ function adminVideosSectionHTML(){
   html += videos.map(v=>videoCardHTML(v)).join('');
   return html;
 }
-function playerVideosHTML(player){
-  const visible = (DATA.videos||[]).filter(v=>videoVisibleToPlayer(v, player));
+function playerVideosHTML(){
+  const visible = (ORG_VIDEO_DATA.videos||[]).filter(v=>videoVisibleToLeague(v, CURRENT_LEAGUE_ID));
   if(!visible.length) return `<div class="card"><p class="empty">Aucune vidéo disponible pour le moment.</p></div>`;
   const groups = {};
   visible.forEach(v=>{
@@ -5942,7 +5954,7 @@ function openAddVideoModal(){
   showFormModal('Ajouter une vidéo', videoFormHTML, saveVideoForm);
 }
 function openEditVideoModal(videoId){
-  const v = (DATA.videos||[]).find(x=>x.id===videoId);
+  const v = (ORG_VIDEO_DATA.videos||[]).find(x=>x.id===videoId);
   if(!v) return;
   VIDEO_FORM_STATE = { id:v.id, title:v.title, url:v.youtubeUrl, folderId: v.folderId || null };
   showFormModal('Modifier la vidéo', videoFormHTML, saveVideoForm);
@@ -5961,7 +5973,7 @@ function videoFormHTML(){
         <option value="" ${!st.folderId?'selected':''}>🎬 Racine (Vidéos)</option>
         ${folders.map(f=>`<option value="${f.id}" ${st.folderId===f.id?'selected':''}>${'— '.repeat(f.depth)}📁 ${escapeHTML(f.name)}</option>`).join('')}
       </select>
-      <p class="small" style="margin-top:6px;">👁️ Visible par : <strong>${escapeHTML(selectedFolder ? folderVisibilityLabel(selectedFolder) : 'Toute la ligue (racine)')}</strong> — se règle sur le dossier, pas sur la vidéo.</p>
+      <p class="small" style="margin-top:6px;">👁️ Disponible pour : <strong>${escapeHTML(selectedFolder ? folderVisibilityLabel(selectedFolder) : "Toute l'organisation (racine)")}</strong> — se règle sur le dossier, pas sur la vidéo.</p>
     </div>
   `;
 }
@@ -5973,19 +5985,20 @@ function saveVideoForm(){
   if(!title){ showAlert('Donne un titre à la vidéo.'); return false; }
   const youtubeId = extractYouTubeId(url);
   if(!youtubeId){ showAlert("Le lien YouTube ne semble pas valide. Colle le lien complet (ex: https://www.youtube.com/watch?v=XXXXXXXXXXX)."); return false; }
-  DATA.videos = DATA.videos || [];
+  ORG_VIDEO_DATA.videos = ORG_VIDEO_DATA.videos || [];
   if(st.id){
-    const v = DATA.videos.find(x=>x.id===st.id);
+    const v = ORG_VIDEO_DATA.videos.find(x=>x.id===st.id);
     if(v){ v.title = title; v.youtubeUrl = url; v.youtubeId = youtubeId; v.folderId = folderId; }
   } else {
-    DATA.videos.push({ id: uid('vid'), title, youtubeUrl: url, youtubeId, folderId, dateAdded: new Date().toISOString().slice(0,10) });
+    ORG_VIDEO_DATA.videos.push({ id: uid('vid'), title, youtubeUrl: url, youtubeId, folderId, dateAdded: new Date().toISOString().slice(0,10) });
   }
   VIDEO_FORM_STATE = null;
+  saveOrgVideoData();
 }
 function onDeleteVideo(videoId){
   showConfirm("Supprimer cette vidéo ?", ()=>{
-    DATA.videos = (DATA.videos||[]).filter(v=>v.id!==videoId);
-    saveAndRender();
+    ORG_VIDEO_DATA.videos = (ORG_VIDEO_DATA.videos||[]).filter(v=>v.id!==videoId);
+    saveOrgVideoDataAndRender();
   });
 }
 
@@ -7174,8 +7187,6 @@ function migrateData(){
   if(DATA.mlpSessions === undefined) DATA.mlpSessions = [];
   if(DATA.mlpRosterSize === undefined) DATA.mlpRosterSize = 4;
   if(DATA.prospects === undefined) DATA.prospects = [];
-  if(DATA.videos === undefined) DATA.videos = [];
-  if(DATA.videoFolders === undefined) DATA.videoFolders = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
   (DATA.tournaments||[]).forEach(t=>{
