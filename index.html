@@ -536,7 +536,8 @@ function defaultData(){
     players: [],
     sessions: [],
     substitutePool: [],
-    videos: []
+    videos: [],
+    videoFolders: []
   };
 }
 
@@ -5708,6 +5709,81 @@ function youtubeEmbedHTML(youtubeId, title){
     <iframe src="https://www.youtube.com/embed/${youtubeId}" title="${escapeHTML(title)}" style="position:absolute;inset:0;width:100%;height:100%;border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
   </div>`;
 }
+// ---- Dossiers de vidéos (arborescence simple, un parent par dossier) ----
+function folderById(id){ return (DATA.videoFolders||[]).find(f=>f.id===id); }
+function foldersInParent(parentId){
+  return (DATA.videoFolders||[]).filter(f=>(f.parentId||null)===(parentId||null)).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function videosInFolder(folderId){
+  return (DATA.videos||[]).filter(v=>(v.folderId||null)===(folderId||null));
+}
+function folderPath(folderId){
+  const path = [];
+  let cur = folderId ? folderById(folderId) : null;
+  while(cur){ path.unshift(cur); cur = cur.parentId ? folderById(cur.parentId) : null; }
+  return path;
+}
+function allFoldersFlat(){
+  const result = [];
+  function walk(parentId, depth){
+    foldersInParent(parentId).forEach(f=>{ result.push({ id:f.id, name:f.name, depth }); walk(f.id, depth+1); });
+  }
+  walk(null, 0);
+  return result;
+}
+function setVideoFolder(folderId){ VIEW.videoFolderId = folderId || null; render(); }
+function openAddVideoFolderModal(){
+  const parentId = VIEW.videoFolderId || null;
+  showPrompt('Nom du nouveau dossier :', '', (name)=>{
+    const trimmed = (name||'').trim();
+    if(!trimmed) return;
+    DATA.videoFolders = DATA.videoFolders || [];
+    DATA.videoFolders.push({ id: uid('vfo'), name: trimmed, parentId });
+    saveAndRender();
+  });
+}
+function openRenameVideoFolderModal(folderId){
+  const f = folderById(folderId);
+  if(!f) return;
+  showPrompt('Nouveau nom du dossier :', f.name, (name)=>{
+    const trimmed = (name||'').trim();
+    if(!trimmed) return;
+    f.name = trimmed;
+    saveAndRender();
+  });
+}
+function onDeleteVideoFolder(folderId){
+  if(foldersInParent(folderId).length || videosInFolder(folderId).length){
+    showAlert("Ce dossier n'est pas vide — déplace ou supprime d'abord les vidéos et sous-dossiers qu'il contient.");
+    return;
+  }
+  showConfirm('Supprimer ce dossier ?', ()=>{
+    DATA.videoFolders = (DATA.videoFolders||[]).filter(f=>f.id!==folderId);
+    saveAndRender();
+  });
+}
+function videoBreadcrumbHTML(folderId){
+  const path = folderPath(folderId);
+  const items = [{ id:null, name:'🎬 Vidéos' }].concat(path.map(f=>({ id:f.id, name:f.name })));
+  return `<div class="small" style="margin:-4px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+    ${items.map((it,i)=>`${i>0?'<span style="opacity:0.45;">›</span>':''}<span style="cursor:pointer;${i===items.length-1?'font-weight:600;':'text-decoration:underline;text-decoration-color:rgba(255,255,255,0.25);'}" onclick="setVideoFolder(${it.id?`'${it.id}'`:'null'})">${escapeHTML(it.name)}</span>`).join('')}
+  </div>`;
+}
+function videoFolderCardHTML(f){
+  const subCount = foldersInParent(f.id).length;
+  const vidCount = videosInFolder(f.id).length;
+  const countLabel = [vidCount ? `${vidCount} vidéo${vidCount>1?'s':''}` : null, subCount ? `${subCount} sous-dossier${subCount>1?'s':''}` : null].filter(Boolean).join(' · ') || 'vide';
+  return `<div class="card clickable-row" onclick="setVideoFolder('${f.id}')">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <div style="font-weight:600;">📁 ${escapeHTML(f.name)}</div>
+      <div class="row" style="gap:6px;align-items:center;" onclick="event.stopPropagation();">
+        <span class="small">${escapeHTML(countLabel)}</span>
+        <button class="btn-ghost" onclick="openRenameVideoFolderModal('${f.id}')">✏️</button>
+        <button class="btn-ghost" onclick="onDeleteVideoFolder('${f.id}')">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
 function videoCardHTML(v){
   const thumb = v.youtubeId ? `https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg` : '';
   return `<div class="card">
@@ -5726,37 +5802,63 @@ function videoCardHTML(v){
 }
 function adminVideosSectionHTML(){
   const isMlp = DATA.leagueFormat === 'mlp';
-  const videos = (DATA.videos||[]).slice().sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||''));
+  let currentFolderId = VIEW.videoFolderId || null;
+  if(currentFolderId && !folderById(currentFolderId)){ currentFolderId = null; VIEW.videoFolderId = null; }
+  const subfolders = foldersInParent(currentFolderId);
+  const videos = videosInFolder(currentFolderId).slice().sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||''));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
         <h3 style="margin:0;">🎬 Vidéos</h3>
-        <p class="small" style="margin:4px 0 0;">Colle un lien YouTube et choisis qui peut la voir : toute la ligue, un ${isMlp?'équipe':'groupe'} en particulier, ou des joueurs précis.</p>
+        <p class="small" style="margin:4px 0 0;">Classe tes vidéos en dossiers, colle un lien YouTube et choisis qui peut la voir : toute la ligue, un ${isMlp?'équipe':'groupe'} en particulier, ou des joueurs précis.</p>
       </div>
-      <button class="btn btn-primary" onclick="openAddVideoModal()">➕ Ajouter une vidéo</button>
+      <div class="row" style="gap:6px;">
+        <button class="btn btn-secondary" onclick="openAddVideoFolderModal()">📁 Nouveau dossier</button>
+        <button class="btn btn-primary" onclick="openAddVideoModal()">➕ Ajouter une vidéo</button>
+      </div>
     </div>
   </div>`;
-  if(!videos.length){ html += `<div class="card"><p class="empty">Aucune vidéo ajoutée pour le moment.</p></div>`; return html; }
+  html += videoBreadcrumbHTML(currentFolderId);
+  if(!subfolders.length && !videos.length){
+    html += `<div class="card"><p class="empty">${currentFolderId ? 'Ce dossier est vide.' : 'Aucune vidéo ni dossier pour le moment.'}</p></div>`;
+    return html;
+  }
+  html += subfolders.map(f=>videoFolderCardHTML(f)).join('');
   html += videos.map(v=>videoCardHTML(v)).join('');
   return html;
 }
 function playerVideosHTML(player){
-  const videos = (DATA.videos||[]).filter(v=>videoVisibleToPlayer(v, player)).sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||''));
-  if(!videos.length) return `<div class="card"><p class="empty">Aucune vidéo disponible pour le moment.</p></div>`;
-  return videos.map(v=>`<div class="card">
-    <h3 style="margin:0 0 10px;">${escapeHTML(v.title)}</h3>
-    ${youtubeEmbedHTML(v.youtubeId, v.title)}
-  </div>`).join('');
+  const visible = (DATA.videos||[]).filter(v=>videoVisibleToPlayer(v, player));
+  if(!visible.length) return `<div class="card"><p class="empty">Aucune vidéo disponible pour le moment.</p></div>`;
+  const groups = {};
+  visible.forEach(v=>{
+    const label = folderPath(v.folderId||null).map(f=>f.name).join(' › ');
+    const key = label || '__root__';
+    (groups[key] = groups[key] || { label, items: [] }).items.push(v);
+  });
+  const orderedKeys = Object.keys(groups).sort((a,b)=> a==='__root__' ? -1 : b==='__root__' ? 1 : a.localeCompare(b));
+  let html = '';
+  orderedKeys.forEach(key=>{
+    const g = groups[key];
+    if(g.label) html += `<div class="small" style="margin:16px 0 6px;font-weight:600;opacity:0.8;">📁 ${escapeHTML(g.label)}</div>`;
+    g.items.sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||'')).forEach(v=>{
+      html += `<div class="card">
+        <h3 style="margin:0 0 10px;">${escapeHTML(v.title)}</h3>
+        ${youtubeEmbedHTML(v.youtubeId, v.title)}
+      </div>`;
+    });
+  });
+  return html;
 }
 let VIDEO_FORM_STATE = null;
 function openAddVideoModal(){
-  VIDEO_FORM_STATE = { id:null, title:'', url:'', allLeague:true, entityIds:[], playerIds:[] };
+  VIDEO_FORM_STATE = { id:null, title:'', url:'', allLeague:true, entityIds:[], playerIds:[], folderId: VIEW.videoFolderId || null };
   showFormModal('Ajouter une vidéo', videoFormHTML, saveVideoForm);
 }
 function openEditVideoModal(videoId){
   const v = (DATA.videos||[]).find(x=>x.id===videoId);
   if(!v) return;
-  VIDEO_FORM_STATE = { id:v.id, title:v.title, url:v.youtubeUrl, allLeague: !!v.allLeague, entityIds:(v.entityIds||[]).slice(), playerIds:(v.playerIds||[]).slice() };
+  VIDEO_FORM_STATE = { id:v.id, title:v.title, url:v.youtubeUrl, allLeague: !!v.allLeague, entityIds:(v.entityIds||[]).slice(), playerIds:(v.playerIds||[]).slice(), folderId: v.folderId || null };
   showFormModal('Modifier la vidéo', videoFormHTML, saveVideoForm);
 }
 function videoFormHTML(){
@@ -5766,9 +5868,17 @@ function videoFormHTML(){
   const entities = isMlp ? (DATA.mlpTeams||[]) : groupsSorted();
   const entityLabel = isMlp ? 'Par équipe' : 'Par groupe';
   const players = (DATA.players||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const folders = allFoldersFlat();
   return `
     <div class="field"><label>Titre de la vidéo</label><input id="videoTitleInput" placeholder="ex: Points forts — session du 12 mars" value="${escapeHTML(st.title)}" oninput="VIDEO_FORM_STATE.title=this.value"></div>
     <div class="field"><label>Lien YouTube</label><input id="videoUrlInput" placeholder="https://www.youtube.com/watch?v=..." value="${escapeHTML(st.url)}" oninput="VIDEO_FORM_STATE.url=this.value"></div>
+    <div class="field">
+      <label>Dossier</label>
+      <select id="videoFolderSelect" onchange="VIDEO_FORM_STATE.folderId=this.value||null;">
+        <option value="" ${!st.folderId?'selected':''}>🎬 Racine (Vidéos)</option>
+        ${folders.map(f=>`<option value="${f.id}" ${st.folderId===f.id?'selected':''}>${'— '.repeat(f.depth)}📁 ${escapeHTML(f.name)}</option>`).join('')}
+      </select>
+    </div>
     <div class="field">
       <label>Qui peut voir cette vidéo ?</label>
       <label class="row" style="gap:8px;align-items:center;cursor:pointer;margin:4px 0 0;">
@@ -5815,6 +5925,7 @@ function saveVideoForm(){
   const st = VIDEO_FORM_STATE;
   const title = document.getElementById('videoTitleInput').value.trim();
   const url = document.getElementById('videoUrlInput').value.trim();
+  const folderId = document.getElementById('videoFolderSelect').value || null;
   if(!title){ showAlert('Donne un titre à la vidéo.'); return false; }
   const youtubeId = extractYouTubeId(url);
   if(!youtubeId){ showAlert("Le lien YouTube ne semble pas valide. Colle le lien complet (ex: https://www.youtube.com/watch?v=XXXXXXXXXXX)."); return false; }
@@ -5822,14 +5933,14 @@ function saveVideoForm(){
   if(st.id){
     const v = DATA.videos.find(x=>x.id===st.id);
     if(v){
-      v.title = title; v.youtubeUrl = url; v.youtubeId = youtubeId;
+      v.title = title; v.youtubeUrl = url; v.youtubeId = youtubeId; v.folderId = folderId;
       v.allLeague = st.allLeague;
       v.entityIds = st.allLeague ? [] : st.entityIds.slice();
       v.playerIds = st.allLeague ? [] : st.playerIds.slice();
     }
   } else {
     DATA.videos.push({
-      id: uid('vid'), title, youtubeUrl: url, youtubeId,
+      id: uid('vid'), title, youtubeUrl: url, youtubeId, folderId,
       dateAdded: new Date().toISOString().slice(0,10),
       allLeague: st.allLeague,
       entityIds: st.allLeague ? [] : st.entityIds.slice(),
@@ -7031,6 +7142,7 @@ function migrateData(){
   if(DATA.mlpRosterSize === undefined) DATA.mlpRosterSize = 4;
   if(DATA.prospects === undefined) DATA.prospects = [];
   if(DATA.videos === undefined) DATA.videos = [];
+  if(DATA.videoFolders === undefined) DATA.videoFolders = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
   (DATA.tournaments||[]).forEach(t=>{
