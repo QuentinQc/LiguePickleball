@@ -1923,8 +1923,11 @@ function adminAllPeopleHTML(){
   });
   const all = regulars.concat(subs).sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   return `<div class="card">
-    <h2>Tous <span class="small">(${all.length})</span></h2>
-    <p class="small">Réguliers et remplaçants ensemble — clique pour ouvrir la gestion de chacun.</p>
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Tous <span class="small">(${all.length})</span></h2>
+      <button class="btn btn-primary" onclick="openAddPersonModal()">➕ Ajouter une personne</button>
+    </div>
+    <p class="small">Réguliers et remplaçants ensemble — clique sur une ligne pour ouvrir la gestion de cette personne.</p>
     <table>
       <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
       ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
@@ -1938,6 +1941,92 @@ function adminAllPeopleHTML(){
       ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant</td></tr>` : ''}
     </table>
   </div>`;
+}
+// Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
+// ligue (échelle ou MLP), permet d'ajouter un régulier, un remplaçant ou un
+// prospect depuis un seul endroit, en choisissant le type d'abord.
+function openAddPersonModal(){
+  const groups = DATA.groups || [];
+  const html = `
+    <div class="field">
+      <label>Type de personne</label>
+      <select id="addPersonType" onchange="
+        document.getElementById('addPersonRegularFields').style.display = this.value==='regulier' ? 'block' : 'none';
+        document.getElementById('addPersonSubFields').style.display = this.value==='remplacant' ? 'block' : 'none';
+        document.getElementById('addPersonProspectFields').style.display = this.value==='prospect' ? 'block' : 'none';
+      ">
+        <option value="regulier">🎾 Joueur régulier</option>
+        <option value="remplacant">🔄 Remplaçant</option>
+        <option value="prospect">📇 Prospect</option>
+      </select>
+    </div>
+    <div class="field"><label>Nom</label><input id="addPersonName" placeholder="Nom"></div>
+    <div id="addPersonRegularFields">
+      ${groups.length ? `
+      <div class="field">
+        <label>Groupe</label>
+        <select id="addPersonGroup">
+          <option value="">— En attente (à placer plus tard) —</option>
+          ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
+        </select>
+      </div>` : ''}
+      <div class="field"><label>Genre (optionnel)</label>
+        <select id="addPersonGender">
+          <option value="">Non défini</option>
+          <option value="F">Femme</option>
+          <option value="M">Homme</option>
+        </select>
+      </div>
+      <div class="field"><label>Cote (optionnel)</label><input id="addPersonRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="${RATING_DEFAULT.toFixed(1)} par défaut"></div>
+    </div>
+    <div id="addPersonSubFields" style="display:none;">
+      <div class="field"><label>Courriel (optionnel)</label><input id="addPersonSubEmail" type="email"></div>
+      <div class="field"><label>Notes (optionnel)</label><input id="addPersonSubNotes"></div>
+    </div>
+    <div id="addPersonProspectFields" style="display:none;">
+      <div class="field"><label>Courriel (optionnel)</label><input id="addPersonProspectEmail" type="email"></div>
+      <div class="field"><label>Téléphone (optionnel)</label><input id="addPersonProspectPhone"></div>
+      <div class="field"><label>Notes (optionnel)</label><input id="addPersonProspectNotes"></div>
+    </div>`;
+  showFormModal('Ajouter une personne', html, ()=>{
+    const type = document.getElementById('addPersonType').value;
+    const rawName = document.getElementById('addPersonName').value.trim();
+    if(!rawName){ showAlert('Le nom est requis.'); return false; }
+    if(type==='regulier'){
+      const name = uniquePlayerName(rawName, DATA.players);
+      const groupEl = document.getElementById('addPersonGroup');
+      const desiredGroupId = groupEl ? groupEl.value : '';
+      const groupId = desiredGroupId || null;
+      const genderEl = document.getElementById('addPersonGender');
+      const ratingEl = document.getElementById('addPersonRating');
+      const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
+      const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
+      DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new', gender: genderEl.value || null });
+      if(groupId){
+        const count = DATA.players.filter(p=>p.groupId===groupId).length;
+        if(count > GROUP_MAX_PLAYERS()){
+          const desiredName = (DATA.groups.find(g=>g.id===groupId)||{}).name || 'ce groupe';
+          // Différée : la modale d'ajout se ferme d'abord, pour que cet avertissement
+          // ne soit pas immédiatement écrasé par cette fermeture.
+          setTimeout(()=>showAlert(`Attention : ${desiredName} a maintenant ${count} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`), 0);
+        }
+      }
+    } else if(type==='remplacant'){
+      const entry = { id: uid('sub'), name: rawName };
+      const email = document.getElementById('addPersonSubEmail').value.trim();
+      const notes = document.getElementById('addPersonSubNotes').value.trim();
+      if(email) entry.email = email;
+      if(notes) entry.notes = notes;
+      DATA.substitutePool = DATA.substitutePool || [];
+      DATA.substitutePool.push(entry);
+    } else {
+      const email = document.getElementById('addPersonProspectEmail').value.trim();
+      const phone = document.getElementById('addPersonProspectPhone').value.trim();
+      const notes = document.getElementById('addPersonProspectNotes').value.trim();
+      DATA.prospects = DATA.prospects || [];
+      DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
+    }
+  });
 }
 function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
 function setAdminTab(t){
