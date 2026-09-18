@@ -1314,11 +1314,15 @@ function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagl
     || '';
   const leagueTitle = DATA ? DATA.leagueName : '';
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const canSwitchOrg = switchContext==='admin' && (MY_ORGANIZATIONS.length > 1 || (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin));
+  const memberOrgCount = switchContext==='member' ? new Set(MY_LEAGUE_LINKS.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size : 0;
+  const canSwitchOrg = switchContext==='admin'
+    ? (MY_ORGANIZATIONS.length > 1 || (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin))
+    : (switchContext==='member' && memberOrgCount > 1);
   const canSwitchLeague = switchContext==='admin' ? (myOrgLeagues().length > 1) : (switchContext==='member' && MY_LEAGUE_LINKS.length > 1);
+  const orgClickHandler = switchContext==='admin' ? "openOrgSwitcherPopover()" : `openLeagueSwitcherPopover('${switchContext}')`;
   const centerChips = [
     orgName ? (canSwitchOrg
-      ? `<button class="tci-chip" onclick="openOrgSwitcherPopover()"><span class="tci-org">🏢 ${escapeHTML(orgName)}</span></button>`
+      ? `<button class="tci-chip" onclick="${orgClickHandler}"><span class="tci-org">🏢 ${escapeHTML(orgName)}</span></button>`
       : `<span class="tci-chip tci-chip-static"><span class="tci-org">🏢 ${escapeHTML(orgName)}</span></span>`) : '',
     leagueTitle ? (canSwitchLeague
       ? `<button class="tci-chip" onclick="openLeagueSwitcherPopover('${switchContext}')"><span class="tci-league">🏆 ${escapeHTML(leagueTitle)}</span></button>`
