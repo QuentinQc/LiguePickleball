@@ -535,7 +535,8 @@ function defaultData(){
     groups: [ { id: uid('g'), name: 'Groupe 1', order: 1 } ],
     players: [],
     sessions: [],
-    substitutePool: []
+    substitutePool: [],
+    videos: []
   };
 }
 
@@ -1747,7 +1748,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['videos','Vidéos','🎬'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -1792,6 +1793,7 @@ function renderAdmin(){
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='tournois') c.innerHTML = adminTournamentsSectionHTML();
+  else if(VIEW.tab==='videos') c.innerHTML = adminVideosSectionHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
 }
@@ -1799,7 +1801,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['videos','Vidéos','🎬'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -1831,6 +1833,7 @@ function renderMlpAdmin(){
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
   else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
+  else if(VIEW.tab==='videos') c.innerHTML = adminVideosSectionHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
 }
@@ -5668,6 +5671,180 @@ function settingsAvanceTabHTML(){
   return html;
 }
 
+// ==================== VIDÉOS (admin-only, visibilité ciblée) ====================
+// Un admin colle un lien YouTube (déjà mis en ligne par lui, non listé de préférence)
+// et choisit qui peut la voir : toute la ligue, un groupe/équipe en particulier,
+// et/ou des joueurs précis. Aucune intégration d'upload — juste le lien.
+function extractYouTubeId(url){
+  if(!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function videoVisibleToPlayer(v, player){
+  if(!v || !player) return false;
+  if(v.allLeague) return true;
+  if((v.playerIds||[]).includes(player.id)) return true;
+  if(DATA.leagueFormat === 'mlp'){
+    const team = (DATA.mlpTeams||[]).find(t=>(t.memberIds||[]).includes(player.id));
+    if(team && (v.entityIds||[]).includes(team.id)) return true;
+  } else {
+    if(player.groupId && (v.entityIds||[]).includes(player.groupId)) return true;
+  }
+  return false;
+}
+function videoVisibilityLabel(v){
+  if(v.allLeague) return 'Toute la ligue';
+  const isMlp = DATA.leagueFormat === 'mlp';
+  const entities = isMlp ? (DATA.mlpTeams||[]) : (DATA.groups||[]);
+  const parts = [];
+  const entityNames = (v.entityIds||[]).map(id=>{ const e = entities.find(x=>x.id===id); return e ? e.name : null; }).filter(Boolean);
+  if(entityNames.length) parts.push(entityNames.join(', '));
+  const playerNames = (v.playerIds||[]).map(id=>playerName(id)).filter(Boolean);
+  if(playerNames.length) parts.push(playerNames.join(', '));
+  return parts.length ? parts.join(' · ') : 'Personne pour l\'instant (à configurer)';
+}
+function youtubeEmbedHTML(youtubeId, title){
+  return `<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;">
+    <iframe src="https://www.youtube.com/embed/${youtubeId}" title="${escapeHTML(title)}" style="position:absolute;inset:0;width:100%;height:100%;border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  </div>`;
+}
+function videoCardHTML(v){
+  const thumb = v.youtubeId ? `https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg` : '';
+  return `<div class="card">
+    <div class="row" style="gap:12px;align-items:flex-start;flex-wrap:nowrap;">
+      ${thumb ? `<img src="${thumb}" style="width:120px;height:68px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="">` : ''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;">${escapeHTML(v.title)}</div>
+        <div class="small" style="margin:4px 0;">👁️ ${escapeHTML(videoVisibilityLabel(v))}</div>
+        <div class="row" style="gap:6px;margin-top:6px;">
+          <button class="btn-ghost" onclick="openEditVideoModal('${v.id}')">✏️ Modifier</button>
+          <button class="btn-ghost" onclick="onDeleteVideo('${v.id}')">🗑️ Supprimer</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function adminVideosSectionHTML(){
+  const isMlp = DATA.leagueFormat === 'mlp';
+  const videos = (DATA.videos||[]).slice().sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||''));
+  let html = `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h3 style="margin:0;">🎬 Vidéos</h3>
+        <p class="small" style="margin:4px 0 0;">Colle un lien YouTube et choisis qui peut la voir : toute la ligue, un ${isMlp?'équipe':'groupe'} en particulier, ou des joueurs précis.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddVideoModal()">➕ Ajouter une vidéo</button>
+    </div>
+  </div>`;
+  if(!videos.length){ html += `<div class="card"><p class="empty">Aucune vidéo ajoutée pour le moment.</p></div>`; return html; }
+  html += videos.map(v=>videoCardHTML(v)).join('');
+  return html;
+}
+function playerVideosHTML(player){
+  const videos = (DATA.videos||[]).filter(v=>videoVisibleToPlayer(v, player)).sort((a,b)=>(b.dateAdded||'').localeCompare(a.dateAdded||''));
+  if(!videos.length) return `<div class="card"><p class="empty">Aucune vidéo disponible pour le moment.</p></div>`;
+  return videos.map(v=>`<div class="card">
+    <h3 style="margin:0 0 10px;">${escapeHTML(v.title)}</h3>
+    ${youtubeEmbedHTML(v.youtubeId, v.title)}
+  </div>`).join('');
+}
+let VIDEO_FORM_STATE = null;
+function openAddVideoModal(){
+  VIDEO_FORM_STATE = { id:null, title:'', url:'', allLeague:true, entityIds:[], playerIds:[] };
+  showFormModal('Ajouter une vidéo', videoFormHTML, saveVideoForm);
+}
+function openEditVideoModal(videoId){
+  const v = (DATA.videos||[]).find(x=>x.id===videoId);
+  if(!v) return;
+  VIDEO_FORM_STATE = { id:v.id, title:v.title, url:v.youtubeUrl, allLeague: !!v.allLeague, entityIds:(v.entityIds||[]).slice(), playerIds:(v.playerIds||[]).slice() };
+  showFormModal('Modifier la vidéo', videoFormHTML, saveVideoForm);
+}
+function videoFormHTML(){
+  const st = VIDEO_FORM_STATE;
+  if(!st) return '';
+  const isMlp = DATA.leagueFormat === 'mlp';
+  const entities = isMlp ? (DATA.mlpTeams||[]) : groupsSorted();
+  const entityLabel = isMlp ? 'Par équipe' : 'Par groupe';
+  const players = (DATA.players||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return `
+    <div class="field"><label>Titre de la vidéo</label><input id="videoTitleInput" placeholder="ex: Points forts — session du 12 mars" value="${escapeHTML(st.title)}" oninput="VIDEO_FORM_STATE.title=this.value"></div>
+    <div class="field"><label>Lien YouTube</label><input id="videoUrlInput" placeholder="https://www.youtube.com/watch?v=..." value="${escapeHTML(st.url)}" oninput="VIDEO_FORM_STATE.url=this.value"></div>
+    <div class="field">
+      <label>Qui peut voir cette vidéo ?</label>
+      <label class="row" style="gap:8px;align-items:center;cursor:pointer;margin:4px 0 0;">
+        <input type="checkbox" ${st.allLeague?'checked':''} onchange="VIDEO_FORM_STATE.allLeague=this.checked;render();">
+        <span>Toute la ligue</span>
+      </label>
+    </div>
+    ${!st.allLeague ? `
+    <div class="field">
+      <label>${entityLabel}</label>
+      <div style="max-height:140px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px;">
+        ${entities.length ? entities.map(e=>`
+          <label class="row" style="gap:8px;align-items:center;cursor:pointer;padding:3px 0;">
+            <input type="checkbox" ${st.entityIds.includes(e.id)?'checked':''} onchange="toggleVideoFormEntity('${e.id}')">
+            <span>${escapeHTML(e.name)}</span>
+          </label>`).join('') : `<span class="small">${isMlp?'Aucune équipe':'Aucun groupe'} pour l'instant.</span>`}
+      </div>
+    </div>
+    <div class="field">
+      <label>Par joueur individuel</label>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px;">
+        ${players.length ? players.map(p=>`
+          <label class="row" style="gap:8px;align-items:center;cursor:pointer;padding:3px 0;">
+            <input type="checkbox" ${st.playerIds.includes(p.id)?'checked':''} onchange="toggleVideoFormPlayer('${p.id}')">
+            <span>${escapeHTML(p.name)}</span>
+          </label>`).join('') : `<span class="small">Aucun joueur pour l'instant.</span>`}
+      </div>
+    </div>` : ''}
+  `;
+}
+function toggleVideoFormEntity(id){
+  const st = VIDEO_FORM_STATE; if(!st) return;
+  const i = st.entityIds.indexOf(id);
+  if(i===-1) st.entityIds.push(id); else st.entityIds.splice(i,1);
+  render();
+}
+function toggleVideoFormPlayer(id){
+  const st = VIDEO_FORM_STATE; if(!st) return;
+  const i = st.playerIds.indexOf(id);
+  if(i===-1) st.playerIds.push(id); else st.playerIds.splice(i,1);
+  render();
+}
+function saveVideoForm(){
+  const st = VIDEO_FORM_STATE;
+  const title = document.getElementById('videoTitleInput').value.trim();
+  const url = document.getElementById('videoUrlInput').value.trim();
+  if(!title){ showAlert('Donne un titre à la vidéo.'); return false; }
+  const youtubeId = extractYouTubeId(url);
+  if(!youtubeId){ showAlert("Le lien YouTube ne semble pas valide. Colle le lien complet (ex: https://www.youtube.com/watch?v=XXXXXXXXXXX)."); return false; }
+  DATA.videos = DATA.videos || [];
+  if(st.id){
+    const v = DATA.videos.find(x=>x.id===st.id);
+    if(v){
+      v.title = title; v.youtubeUrl = url; v.youtubeId = youtubeId;
+      v.allLeague = st.allLeague;
+      v.entityIds = st.allLeague ? [] : st.entityIds.slice();
+      v.playerIds = st.allLeague ? [] : st.playerIds.slice();
+    }
+  } else {
+    DATA.videos.push({
+      id: uid('vid'), title, youtubeUrl: url, youtubeId,
+      dateAdded: new Date().toISOString().slice(0,10),
+      allLeague: st.allLeague,
+      entityIds: st.allLeague ? [] : st.entityIds.slice(),
+      playerIds: st.allLeague ? [] : st.playerIds.slice()
+    });
+  }
+  VIDEO_FORM_STATE = null;
+}
+function onDeleteVideo(videoId){
+  showConfirm("Supprimer cette vidéo ?", ()=>{
+    DATA.videos = (DATA.videos||[]).filter(v=>v.id!==videoId);
+    saveAndRender();
+  });
+}
+
 // ---- Pop-up : Organisation ----
 function openOrganizationModal(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
@@ -6237,7 +6414,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜']];
+  const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
     {label:'Joueur', active:true, onclick:''},
@@ -6269,10 +6446,10 @@ function renderPlayer(playerId){
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : playerGroupHTML(me));
+  c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : (VIEW.tab==='videos' ? playerVideosHTML(me) : playerGroupHTML(me)));
 }
 function renderMlpPlayer(me){
-  const tabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜']];
+  const tabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
     {label:'Joueur', active:true, onclick:''},
@@ -6304,7 +6481,7 @@ function renderMlpPlayer(me){
     <div id="tabContent"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : mlpPlayerTeamHTML(me));
+  c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : (VIEW.tab==='videos' ? playerVideosHTML(me) : mlpPlayerTeamHTML(me)));
 }
 function mlpPlayerTeamHTML(me){
   const team = (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(me.id));
@@ -6853,6 +7030,7 @@ function migrateData(){
   if(DATA.mlpSessions === undefined) DATA.mlpSessions = [];
   if(DATA.mlpRosterSize === undefined) DATA.mlpRosterSize = 4;
   if(DATA.prospects === undefined) DATA.prospects = [];
+  if(DATA.videos === undefined) DATA.videos = [];
   if(DATA.tournaments === undefined) DATA.tournaments = [];
   if(DATA.showRatingToPlayers === undefined) DATA.showRatingToPlayers = true;
   (DATA.tournaments||[]).forEach(t=>{
