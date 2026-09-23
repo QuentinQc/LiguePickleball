@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923133951">
+<meta name="app-build" content="20260923135558">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -247,6 +247,18 @@ tr.me{background:rgba(207,234,92,0.1);}
 @media (min-width:900px){
   .topbar-center-info{display:inline-flex;}
 }
+/* Interrupteur à glissière (on/off), pour les réglages booléens — plus clair
+   qu'une case à cocher pour ce genre de choix "activé / désactivé". */
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;}
+.switch-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
+.switch-row .switch-label{font-size:14px;color:var(--line);}
+.switch{position:relative;display:inline-block;width:46px;height:27px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;position:absolute;}
+.switch .switch-slider{position:absolute;inset:0;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.15);border-radius:999px;cursor:pointer;transition:background .18s ease;}
+.switch .switch-slider::before{content:"";position:absolute;height:19px;width:19px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .18s ease;box-shadow:0 1px 3px rgba(0,0,0,0.4);}
+.switch input:checked + .switch-slider{background:var(--ball);border-color:var(--ball);}
+.switch input:checked + .switch-slider::before{transform:translateX(19px);}
+.switch input:focus-visible + .switch-slider{outline:2px solid var(--ball);outline-offset:2px;}
 .mode-switch{display:inline-flex;border-radius:999px;background:rgba(255,255,255,0.08);padding:3px;gap:2px;}
 .mode-switch button{border:none;background:transparent;color:var(--muted);font-family:var(--font-display);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .15s ease,color .15s ease;}
 .mode-switch button.active{background:var(--ball);color:var(--court);font-weight:700;}
@@ -1011,7 +1023,10 @@ function playerName(id){
 function isGuestId(id){ return typeof id === 'string' && id.startsWith('guest::'); }
 function isSubPoolId(id){ return typeof id === 'string' && id.startsWith('sub::'); }
 // Vrai pour un invité anonyme OU un remplaçant régulier du bassin — les deux
-// sont exclus des montées/descentes, de la cote et des statistiques de rivalité.
+// sont exclus des montées/descentes et des statistiques de rivalité. Depuis
+// peu, un remplaçant N'EST PLUS exclu de la cote (voir findRatablePerson /
+// applyRatingUpdates, qui ne traitent que isGuestId à part) : seul l'invité
+// anonyme reste hors du système de cote.
 function isGuestOrSubId(id){ return isGuestId(id) || isSubPoolId(id); }
 function groupById(id){ return DATA.groups.find(g=>g.id===id); }
 // Retrouve, pour un joueur, le groupe et le classement obtenus lors de sa
@@ -1459,12 +1474,18 @@ const RATING_DEFAULT = 4.0;
 const RATING_MIN = 2.0;
 const RATING_MAX = 8.0;
 const RATING_SCALE = 0.5; // contrôle la sensibilité de la probabilité de victoire attendue
+// Un remplaçant régulier (bassin) accumule maintenant lui aussi une cote,
+// comme un joueur régulier — seul un invité anonyme (guest::) reste hors
+// système. On cherche donc dans les deux listes selon l'id.
+function findRatablePerson(pid){
+  return DATA.players.find(x=>x.id===pid) || (DATA.substitutePool||[]).find(x=>x.id===pid);
+}
 function ratingOf(pid){
-  const p = DATA.players.find(x=>x.id===pid);
+  const p = findRatablePerson(pid);
   return (p && typeof p.rating === 'number') ? p.rating : RATING_DEFAULT;
 }
 function ratingGamesOf(pid){
-  const p = DATA.players.find(x=>x.id===pid);
+  const p = findRatablePerson(pid);
   return (p && typeof p.ratingGames === 'number') ? p.ratingGames : 0;
 }
 // Facteur K plus grand pour les joueurs avec peu de matchs (cote encore
@@ -1483,7 +1504,11 @@ function applyRatingUpdates(session){
   const deltas = {};   // cumul des ajustements par joueur
   const gamesSnapshot = {};
   function getSnapshotRating(pid){
-    if(isGuestOrSubId(pid)) return null;
+    // Un invité anonyme (guest::) reste hors cote — on ne connaît pas son
+    // niveau et il n'a pas d'identité persistante. Un remplaçant (sub::), en
+    // revanche, a maintenant sa propre cote : on l'inclut dans le calcul de
+    // force d'équipe pour ne pas fausser l'ajustement de son ou sa partenaire.
+    if(isGuestId(pid)) return null;
     if(!(pid in snapshot)) snapshot[pid] = ratingOf(pid);
     return snapshot[pid];
   }
@@ -1509,13 +1534,13 @@ function applyRatingUpdates(session){
       // écrasante compte plus qu'une victoire serrée, et vice-versa pour la défaite.
       const actualA = Math.min(1, Math.max(0, 0.5 + (sa - sb) / (2 * target)));
       m.teamA.forEach(pid=>{
-        if(isGuestOrSubId(pid)) return;
+        if(isGuestId(pid)) return; // les remplaçants accumulent aussi une cote désormais
         const k = kFactorFor(getSnapshotGames(pid));
         deltas[pid] = (deltas[pid] || 0) + k * (actualA - expectedA);
         gamesSnapshot[pid] = getSnapshotGames(pid) + 1;
       });
       m.teamB.forEach(pid=>{
-        if(isGuestOrSubId(pid)) return;
+        if(isGuestId(pid)) return;
         const k = kFactorFor(getSnapshotGames(pid));
         deltas[pid] = (deltas[pid] || 0) + k * ((1-actualA) - (1-expectedA));
         gamesSnapshot[pid] = getSnapshotGames(pid) + 1;
@@ -1524,7 +1549,7 @@ function applyRatingUpdates(session){
   });
   session.ratingDeltas = {}; // pour pouvoir annuler l'effet de cette session plus tard
   Object.keys(deltas).forEach(pid=>{
-    const p = DATA.players.find(x=>x.id===pid);
+    const p = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
     if(!p) return;
     const before = ratingOf(pid);
     const applied = Math.round(deltas[pid] * 1000) / 1000;
@@ -2319,7 +2344,7 @@ function openAddPersonModal(){
         }
       }
     } else if(type==='remplacant'){
-      const entry = { id: uid('sub'), name: rawName };
+      const entry = { id: uid('sub'), name: rawName, rating: RATING_DEFAULT, ratingGames: 0 };
       const email = document.getElementById('addPersonSubEmail').value.trim();
       const notes = document.getElementById('addPersonSubNotes').value.trim();
       if(email) entry.email = email;
@@ -4150,7 +4175,7 @@ function addSubstituteToPool(){
   const notesEl = document.getElementById('newSubNotes');
   const name = nameEl.value.trim();
   if(!name) return;
-  const entry = { id: uid('sub'), name };
+  const entry = { id: uid('sub'), name, rating: RATING_DEFAULT, ratingGames: 0 };
   if(emailEl.value.trim()) entry.email = emailEl.value.trim();
   if(notesEl.value.trim()) entry.notes = notesEl.value.trim();
   DATA.substitutePool = DATA.substitutePool || [];
@@ -4174,6 +4199,10 @@ function substituteDetailModalHTML(subId){
       </div>
     </div>
     <p class="small" style="margin:10px 0;">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</span></div>
+      <div class="stat-chip"><span class="stat-label">Matchs comptés</span><span class="stat-value">${typeof s.ratingGames==='number'?s.ratingGames:0}</span></div>
+    </div>
     <div class="action-grid">
       <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">✏️</span> Modifier</button>
       <button class="action-btn" onclick="convertSubstituteToPlayer('${subId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
@@ -4222,14 +4251,20 @@ async function linkSubstituteAccount(subId){
 }
 // Convertit un joueur régulier en remplaçant : il quitte son groupe et la
 // liste des Réguliers, rejoint le bassin de Remplaçants. Son compte lié (s'il
-// y en a un) est migré avec lui. Sa cote/historique passés restent dans
-// l'historique déjà enregistré, mais il n'accumulera plus de cote à l'avenir.
+// y en a un) est migré avec lui. Sa cote actuelle le suit comme point de
+// départ dans le bassin — elle continue d'évoluer normalement au fil de ses
+// matchs en tant que remplaçant (voir applyRatingUpdates / findRatablePerson).
 function convertPlayerToSubstitute(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
-  showConfirm(`Convertir ${p.name} en remplaçant ? Il/elle quittera son groupe et la liste des Réguliers pour rejoindre le bassin de Remplaçants. Son historique de matchs passés reste dans l'historique, mais il/elle n'aura plus de cote évolutive à l'avenir.`, async ()=>{
+  showConfirm(`Convertir ${p.name} en remplaçant ? Il/elle quittera son groupe et la liste des Réguliers pour rejoindre le bassin de Remplaçants. Son historique de matchs passés reste dans l'historique, et sa cote actuelle le/la suit — elle continuera d'évoluer normalement en tant que remplaçant.`, async ()=>{
     closeModal();
-    const newSub = { id: uid('sub'), name: p.name };
+    const newSub = {
+      id: uid('sub'),
+      name: p.name,
+      rating: typeof p.rating === 'number' ? p.rating : RATING_DEFAULT,
+      ratingGames: typeof p.ratingGames === 'number' ? p.ratingGames : 0
+    };
     DATA.substitutePool = DATA.substitutePool || [];
     DATA.substitutePool.push(newSub);
     DATA.players = DATA.players.filter(x=>x.id!==pid);
@@ -4253,7 +4288,7 @@ function convertSubstituteToPlayer(subId){
   if(!s) return;
   showConfirm(`Convertir ${s.name} en joueur régulier ? Il/elle rejoindra la liste des Réguliers, en attente d'assignation à un groupe.`, async ()=>{
     closeModal();
-    const newPlayer = { id: uid('p'), name: s.name, groupId: null, rating: RATING_DEFAULT, ratingGames: 0, order: 0, status: 'new' };
+    const newPlayer = { id: uid('p'), name: s.name, groupId: null, rating: typeof s.rating === 'number' ? s.rating : RATING_DEFAULT, ratingGames: typeof s.ratingGames === 'number' ? s.ratingGames : 0, order: 0, status: 'new' };
     DATA.players = DATA.players || [];
     DATA.players.push(newPlayer);
     DATA.substitutePool = (DATA.substitutePool||[]).filter(x=>x.id!==subId);
@@ -5661,9 +5696,9 @@ function reportsListPrintableHTML(){
     </table>
     <p class="print-sub" style="margin-top:16px;">Remplaçants</p>
     <table class="print-table">
-      <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
-      ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
-      ${pool.length===0 ? `<tr><td colspan="3">Aucun</td></tr>` : ''}
+      <tr><th>Nom</th><th>Cote</th><th>Courriel</th><th>Notes</th></tr>
+      ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
+      ${pool.length===0 ? `<tr><td colspan="4">Aucun</td></tr>` : ''}
     </table>
   </div>`;
 }
@@ -5799,7 +5834,7 @@ function deleteSession(sessionId){
         else { skipped.push(pl.name); }
       });
       Object.keys(s.ratingDeltas||{}).forEach(pid=>{
-        const pl = DATA.players.find(p=>p.id===pid);
+        const pl = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
         if(!pl) return;
         pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
         pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - 1);
@@ -5844,7 +5879,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
       const scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
-      const currentPlayer = DATA.players.find(x=>x.id===r.playerId);
+      const currentPlayer = findRatablePerson(r.playerId); // joueur régulier OU remplaçant du bassin
       const currentRating = currentPlayer && typeof currentPlayer.rating === 'number' ? currentPlayer.rating : null;
       const deltaCell = typeof delta === 'number'
         ? `${currentRating!==null ? currentRating.toFixed(2)+' ' : ''}<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">(${delta>=0?'+':''}${delta.toFixed(3)})</span>`
@@ -5953,7 +5988,7 @@ function settingsJeuTabHTML(){
   html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
   html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
-  html += settingsRow('👁️', 'Visibilité de la cote', DATA.showRatingToPlayers ? 'Visible par les joueurs' : 'Cachée aux joueurs (admins seulement)', "openRatingVisibilityModal()");
+  html += settingsRow('👁️', 'Visibilité de la cote', `Joueurs : ${DATA.showRatingToPlayers ? 'visible' : 'cachée'} · Remplaçants : ${DATA.showRatingToSubs ? 'visible' : 'cachée'}`, "openRatingVisibilityModal()");
   return html;
 }
 function settingsAvanceTabHTML(){
@@ -6559,17 +6594,29 @@ function saveTiebreakForm(){
 }
 
 // ---- Pop-up : Visibilité de la cote ----
+// Rangée réutilisable "libellé + interrupteur on/off" pour les réglages
+// booléens (plus clair visuellement qu'une case à cocher).
+function switchRowHTML(id, checked, label){
+  return `<div class="switch-row">
+    <span class="switch-label">${label}</span>
+    <label class="switch">
+      <input type="checkbox" id="${id}" ${checked ? 'checked' : ''}>
+      <span class="switch-slider"></span>
+    </label>
+  </div>`;
+}
 function openRatingVisibilityModal(){
   const html = `
-    <label class="row" style="align-items:center;gap:8px;cursor:pointer;">
-      <input type="checkbox" id="setShowRating" ${DATA.showRatingToPlayers ? 'checked' : ''} style="width:auto;">
-      <span class="small">Les joueurs peuvent voir leur cote et celle des autres joueurs de leur groupe</span>
-    </label>
-    <p class="small" style="margin-top:8px;">Si désactivé, la cote reste utilisée normalement en arrière-plan (matchs équilibrés, classement, montées/descentes) — elle est seulement cachée dans l'affichage aux joueurs. Toi (admin) la vois toujours.</p>`;
+    ${switchRowHTML('setShowRating', DATA.showRatingToPlayers, 'Joueurs réguliers')}
+    <p class="small" style="margin:2px 0 10px;">Voient leur cote et celle des autres joueurs de leur groupe. Si désactivé, la cote reste utilisée normalement en arrière-plan (matchs équilibrés, classement, montées/descentes) — elle est seulement cachée dans l'affichage. Toi (admin) la vois toujours.</p>
+    <div class="card-divider"></div>
+    ${switchRowHTML('setShowSubRating', DATA.showRatingToSubs, 'Remplaçants')}
+    <p class="small" style="margin:2px 0 0;">Voient leur propre cote dans leur portail. Un remplaçant accumule une cote comme un joueur régulier (elle sert à équilibrer les matchs et à ajuster équitablement la cote de son ou sa partenaire) — ce réglage contrôle seulement si lui-même la voit affichée. Toi (admin) la vois toujours dans le détail de chaque remplaçant.</p>`;
   showFormModal('Visibilité de la cote', html, saveRatingVisibilityForm);
 }
 function saveRatingVisibilityForm(){
   DATA.showRatingToPlayers = document.getElementById('setShowRating').checked;
+  DATA.showRatingToSubs = document.getElementById('setShowSubRating').checked;
 }
 
 // ---- Pop-up : Calendrier de saison ----
@@ -6802,7 +6849,15 @@ function substituteHistoryHTML(sub){
   const groupCounts = {};
   appearances.forEach(a=>{ groupCounts[a.groupName] = (groupCounts[a.groupName]||0)+1; });
   const favoriteGroup = Object.keys(groupCounts).sort((a,b)=>groupCounts[b]-groupCounts[a])[0];
-  return `<div class="card">
+  const ratingCard = DATA.showRatingToSubs ? `<div class="card">
+    <h3>Ta cote</h3>
+    <table>
+      <tr><td class="small">Cote actuelle</td><td><strong>${(typeof sub.rating==='number'?sub.rating:RATING_DEFAULT).toFixed(2)}</strong></td></tr>
+      <tr><td class="small">Matchs comptés vers ta cote</td><td>${typeof sub.ratingGames==='number'?sub.ratingGames:0}</td></tr>
+    </table>
+    <p class="small" style="margin-top:8px;">Ta cote évolue au fil des matchs que tu dépannes, comme pour les joueurs réguliers.</p>
+  </div>` : '';
+  return `${ratingCard}<div class="card">
     <h3>Tes statistiques comme remplaçant</h3>
     <table>
       <tr><td class="small">Sessions dépannées</td><td>${appearances.length}</td></tr>
@@ -6963,8 +7018,9 @@ function ratingExplanationHTML(){
     Une victoire écrasante fait monter ta cote plus qu'une victoire arrachée. Une défaite serrée te coûte moins cher qu'une raclée.</p>
     <p><strong>3. Ton nombre de matchs joués</strong><br>
     Au début, ta cote bouge plus fort d'un match à l'autre. Plus tu accumules de matchs, plus elle se stabilise et bouge doucement.</p>
-    <h3 style="margin-top:14px;">Ce qui n'affecte pas ta cote</h3>
-    <p class="small">Un invité (quelqu'un hors de la ligue qui dépanne) n'a pas de cote — il ne fait ni monter ni descendre la tienne au-delà d'un match normal, et lui-même ne gagne ni ne perd rien.</p>
+    <h3 style="margin-top:14px;">Remplaçants et invités</h3>
+    <p class="small">Un <strong>remplaçant</strong> (dépanneur régulier du bassin) a lui aussi sa propre cote, qui compte normalement dans le calcul — ta cote bouge donc de façon juste selon son vrai niveau, que ce soit ton ou ta partenaire ou un adversaire.</p>
+    <p class="small">Un <strong>invité</strong> (quelqu'un hors de la ligue, sans compte, qui dépanne ponctuellement) n'a pas de cote — il ne fait ni monter ni descendre la tienne au-delà d'un match normal, et lui-même ne gagne ni ne perd rien.</p>
     <p class="small">Ta cote ne détermine pas directement tes montées/descentes de groupe — ce sont tes résultats de la session qui comptent pour ça. La cote, elle, te suit à long terme comme indicateur de progression.</p>
   `;
 }
@@ -7460,11 +7516,18 @@ function migrateData(){
   if(DATA.manualMatchCount5 === undefined) DATA.manualMatchCount5 = 10;
   if(DATA.manualMatchupTemplate5 === undefined) DATA.manualMatchupTemplate5 = [];
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
+  if(DATA.showRatingToSubs === undefined) DATA.showRatingToSubs = false;
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
     if(typeof p.ratingGames !== 'number') p.ratingGames = 0;
     if(p.status === undefined) p.status = 'confirmed';
     if(p.injured === undefined) p.injured = false;
+  });
+  // Les remplaçants accumulent maintenant eux aussi une cote (voir
+  // findRatablePerson) — on initialise les entrées existantes du bassin.
+  (DATA.substitutePool||[]).forEach(s=>{
+    if(typeof s.rating !== 'number') s.rating = RATING_DEFAULT;
+    if(typeof s.ratingGames !== 'number') s.ratingGames = 0;
   });
   // Ordre manuel au sein d'un groupe : si absent, on l'initialise selon
   // l'ordre alphabétique actuel, groupe par groupe.
