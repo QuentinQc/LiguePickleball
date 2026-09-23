@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923180648">
+<meta name="app-build" content="20260923185542">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -24,7 +24,7 @@
     var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
     var probeUrl = location.pathname + '?_probe=' + Date.now();
     fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
-      var m = html.match(/<meta name="app-build" content="([^"]+)">/);
+      var m = html.match(/<meta name="app-build" content="20260923185542"]+)">/);
       if(m && m[1] && m[1] !== CURRENT_BUILD){
         var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
         location.replace(freshUrl);
@@ -197,6 +197,26 @@ tr.me{background:rgba(207,234,92,0.1);}
 .action-btn.danger:hover{background:rgba(233,85,107,0.18);}
 .modal-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:14px;margin-top:14px;}
 .modal-section h3{margin:0 0 10px;font-size:13px;}
+.org-hero{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;}
+.org-hero-avatar{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:21px;flex-shrink:0;box-shadow:0 10px 22px -10px rgba(0,0,0,0.55);}
+.org-hero h2{margin:0 0 8px;font-size:22px;}
+.org-hero .stat-chips{margin:0;}
+.section-heading{display:flex;align-items:center;gap:10px;margin:0 0 4px;}
+.section-heading .icon-badge{width:36px;height:36px;border-radius:10px;background:rgba(207,234,92,0.12);color:var(--ball);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.member-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.member-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,0.03);flex-wrap:wrap;transition:background .15s ease;}
+.member-row:hover{background:rgba(255,255,255,0.06);}
+.member-avatar{width:38px;height:38px;border-radius:50%;background:rgba(207,234,92,0.14);color:var(--ball);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:13px;flex-shrink:0;}
+.member-info{flex:1 1 160px;min-width:140px;}
+.member-name{font-weight:600;}
+.member-leagues{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
+.member-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.account-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);flex-wrap:wrap;margin-bottom:8px;}
+.account-row.is-admin{background:rgba(207,234,92,0.06);}
+.account-row .member-info{flex:1 1 180px;min-width:160px;}
+.account-row .account-actions{display:flex;flex-direction:column;gap:6px;flex:1 1 220px;min-width:220px;}
+.account-row .account-actions .row{gap:6px;flex-wrap:nowrap;}
+.account-row select{flex:1;min-width:0;}
 .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
 .tab{padding:9px 18px;font-family:var(--font-display);font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-radius:999px;white-space:nowrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);transition:background .15s ease,color .15s ease;}
 .tab.active{color:var(--court);background:var(--ball);font-weight:700;border-color:var(--ball);}
@@ -5106,50 +5126,60 @@ function organizationAccountsHTML(){
     const disable = isAdmin && adminCount<=1;
     return `<button class="btn-ghost" ${disable?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${pr.id}','${isAdmin?'player':'admin'}')">${isAdmin?'retirer admin':'rendre admin'}</button>`;
   };
+  const initialsOf = (label)=> (label||'').split(/[ @]/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   let html = `<div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
-      <button class="btn-ghost" onclick="refreshAccountsTab()">rafraîchir</button>
+    <div class="section-heading" style="justify-content:space-between;">
+      <div class="row" style="gap:10px;align-items:center;">
+        <span class="icon-badge">🔑</span>
+        <h3 style="margin:0;">Comptes en attente <span class="small">(${pending.length})</span></h3>
+      </div>
+      <button class="btn-ghost" onclick="refreshAccountsTab()">↻ rafraîchir</button>
     </div>
-    <p class="small">Ces personnes ont créé un compte mais ne sont associées à un joueur dans aucune ligue de ton organisation. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
-    <table>
-      <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
-      ${pending.map(pr=>`<tr${pr.role==='admin' ? ' style="background:rgba(207,234,92,0.06);"' : ''}>
-        <td>${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
-        <td>${escapeHTML(pr.email)}</td>
-        <td>${pr.role==='admin'?'Admin':(pr.role==='substitute'?'Remplaçant':'Joueur')}<br>${roleButton(pr)}</td>
-        <td>
+    <p class="small" style="margin:8px 0 4px;">Ces personnes ont créé un compte mais ne sont associées à un joueur dans aucune ligue de ton organisation. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
+    <div class="member-list">
+      ${pending.map(pr=>`<div class="account-row${pr.role==='admin'?' is-admin':''}">
+        <div class="member-avatar">${escapeHTML(initialsOf(pr.display_name||pr.email))}</div>
+        <div class="member-info">
+          <div class="member-name">${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</div>
+          <div class="small">${escapeHTML(pr.email)} · ${pr.role==='admin'?'Admin':(pr.role==='substitute'?'Remplaçant':'Joueur')}</div>
+          <div style="margin-top:6px;">${roleButton(pr)}</div>
+        </div>
+        <div class="account-actions">
           <select id="linkSelect_${pr.id}">
             <option value="">— choisir une ligue et un joueur —</option>
             ${optionsFor(pr)}
           </select>
-          <button class="btn-ghost" onclick="linkAccount('${pr.id}')">lier</button>
-        </td>
-      </tr>`).join('')}
-      ${pending.length===0 ? `<tr><td colspan="4" class="empty">Aucun compte en attente</td></tr>` : ''}
-    </table>
+          <div class="row"><button class="btn btn-secondary" style="width:100%;" onclick="linkAccount('${pr.id}')">Lier ce compte</button></div>
+        </div>
+      </div>`).join('')}
+      ${pending.length===0 ? `<p class="empty">Aucun compte en attente</p>` : ''}
+    </div>
   </div>`;
   if(orphaned.length){
     html += `<div class="card">
-      <h2 style="color:var(--danger);">Comptes orphelins <span class="small">(${orphaned.length})</span></h2>
-      <p class="small">Le joueur associé à ces comptes a été retiré. Reconnecte-les à un joueur existant de la même ligue, ou supprime le lien.</p>
-      <table>
-        <tr><th>Courriel</th><th>Ligue</th><th>Rôle</th><th>Reconnecter à</th><th></th></tr>
-        ${orphaned.map(({profile, league})=>`<tr>
-          <td>${escapeHTML(profile.email)}</td>
-          <td>${escapeHTML(league.schedule_label || league.name)}</td>
-          <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
-          <td>
+      <div class="section-heading"><span class="icon-badge" style="background:rgba(233,85,107,0.14);color:var(--danger);">⚠️</span><h3 style="margin:0;color:var(--danger);">Comptes orphelins <span class="small" style="color:var(--muted);">(${orphaned.length})</span></h3></div>
+      <p class="small" style="margin:8px 0 4px;">Le joueur associé à ces comptes a été retiré. Reconnecte-les à un joueur existant de la même ligue, ou supprime le lien.</p>
+      <div class="member-list">
+        ${orphaned.map(({profile, league})=>`<div class="account-row">
+          <div class="member-avatar">${escapeHTML(initialsOf(profile.display_name||profile.email))}</div>
+          <div class="member-info">
+            <div class="member-name">${escapeHTML(profile.email)}</div>
+            <div class="small">${escapeHTML(league.schedule_label || league.name)} · ${profile.role==='admin' ? 'Admin' : 'Joueur'}</div>
+            <div style="margin-top:6px;">${roleButton(profile)}</div>
+          </div>
+          <div class="account-actions">
             <select id="relinkSelect_${profile.id}">
               <option value="">— choisir un joueur —</option>
               ${unlinkedPlayersByLeague(league.id).map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
               <option value="__new__">+ Créer un nouveau joueur « ${escapeHTML(profile.display_name||profile.email)} »</option>
             </select>
-            <button class="btn-ghost" onclick="relinkAccount('${profile.id}','${league.id}')">relier</button>
-          </td>
-          <td><button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}','${league.id}')">délier</button></td>
-        </tr>`).join('')}
-      </table>
+            <div class="row">
+              <button class="btn btn-secondary" style="flex:1;" onclick="relinkAccount('${profile.id}','${league.id}')">Relier</button>
+              <button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}','${league.id}')">Délier</button>
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>
     </div>`;
   }
   return html;
@@ -6268,12 +6298,41 @@ function openOrganizationPage(){
 }
 function closeOrganizationPage(){ ADMIN_SHOWING_ORG = false; render(); }
 function setOrgSubTab(t){ VIEW.orgSubTab = t; render(); }
+function organizationStatsSummary(){
+  const orgLeagues = myOrgLeagues();
+  const orgLeagueIds = new Set(orgLeagues.map(l=>l.id));
+  const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
+  const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
+  const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
+  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id)).length;
+  const members = organizationRosterEntries().length;
+  return { leagues: orgLeagues.length, members, pending };
+}
+function organizationHeroHTML(){
+  const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  const orgName = currentOrg ? currentOrg.name : 'Organisation';
+  const initials = orgName.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '🏢';
+  const stats = organizationStatsSummary();
+  return `<div class="org-hero">
+    <div class="org-hero-avatar">${escapeHTML(initials)}</div>
+    <div>
+      <div class="eyebrow">Organisation</div>
+      <h2>${escapeHTML(orgName)}</h2>
+      <div class="stat-chips">
+        <div class="stat-chip"><span class="stat-label">Ligues</span><span class="stat-value">${stats.leagues}</span></div>
+        <div class="stat-chip"><span class="stat-label">Membres</span><span class="stat-value">${stats.members}</span></div>
+        <div class="stat-chip"><span class="stat-label">Comptes en attente</span><span class="stat-value">${stats.pending}</span></div>
+      </div>
+    </div>
+  </div>`;
+}
 function renderOrganizationManagement(){
   const sub = VIEW.orgSubTab || 'general';
   const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['comptes','🔑 Comptes']];
   app.innerHTML = `
     ${topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null)}
     ${storageBannerHTML()}
+    ${organizationHeroHTML()}
     <div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setOrgSubTab('${k}')">${l}</div>`).join('')}</div>
     <div id="orgTabContent"></div>
   `;
@@ -6285,15 +6344,15 @@ function renderOrganizationManagement(){
 function organizationGeneralHTML(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
   let html = '';
-  html += settingsRow('🏢', 'Organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
+  html += settingsRow('🏢', 'Nom de l\'organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
   html += `<div class="card">
-    <h3>🔗 Inviter des joueurs dans ton organisation</h3>
+    <div class="section-heading"><span class="icon-badge">🔗</span><h3 style="margin:0;">Inviter des joueurs</h3></div>
     <p class="small">Ce lien associe automatiquement toute personne qui l'utilise pour s'inscrire à ton organisation — c'est le lien à envoyer à tes joueurs (texto, courriel, etc.).</p>
     <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
   </div>`;
   html += `<div class="card">
-    <h3>➕ Nouvelle organisation</h3>
-    <p class="small" style="margin-bottom:10px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
+    <div class="section-heading"><span class="icon-badge">➕</span><h3 style="margin:0;">Nouvelle organisation</h3></div>
+    <p class="small" style="margin:8px 0 10px;">Une organisation complètement séparée (ses propres ligues, joueurs, admins) — utile si tu gères aussi la ligue d'un autre club, par exemple. Tu resteras aussi admin de tes organisations actuelles.</p>
     <button class="btn btn-secondary" onclick="onCreateOrganization()">🏢 Créer une nouvelle organisation moi-même</button>
     ${(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) ? `
     <p class="small" style="margin:14px 0 8px;">🛡️ Réservé aux super admins — envoie ce lien à quelqu'un d'autre pour qu'il démarre <strong>sa propre</strong> organisation indépendante (pas la tienne) — utile pour un autre gestionnaire de ligue qui voudrait utiliser l'app de son côté.</p>
@@ -6309,24 +6368,31 @@ function organizationGeneralHTML(){
 function organizationMembersCardHTML(){
   const entries = organizationRosterEntries();
   ORG_ROSTER_ENTRIES_CACHE = entries;
+  const initialsOf = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   return `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">👥 Membres de l'organisation <span class="small">(${entries.length})</span></h3>
+    <div class="section-heading" style="justify-content:space-between;">
+      <div class="row" style="gap:10px;align-items:center;">
+        <span class="icon-badge">👥</span>
+        <h3 style="margin:0;">Membres de l'organisation <span class="small">(${entries.length})</span></h3>
+      </div>
       <button class="btn btn-secondary" onclick="openAddOrgMemberModal()">+ Nouvelle personne</button>
     </div>
-    <p class="small" style="margin:6px 0 10px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
-    <table>
-      <tr><th>Nom</th><th>Ligues</th><th></th></tr>
-      ${entries.map((e,i)=>`<tr>
-        <td>${escapeHTML(e.name)}${e.email?` <span class="small">(${escapeHTML(e.email)})</span>`:''}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</td>
-        <td>${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join(' ') : '<span class="small">— aucune ligue —</span>'}</td>
-        <td>
+    <p class="small" style="margin:8px 0 4px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
+    <div class="member-list">
+      ${entries.map((e,i)=>`<div class="member-row">
+        <div class="member-avatar">${escapeHTML(initialsOf(e.name))}</div>
+        <div class="member-info">
+          <div class="member-name">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+          ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
+          <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
+        </div>
+        <div class="member-actions">
           <button class="btn-ghost" onclick="openAssignMemberModal(${i})">+ Assigner</button>
           ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
-        </td>
-      </tr>`).join('')}
-      ${entries.length===0 ? `<tr><td colspan="3" class="empty">Aucun membre pour l'instant</td></tr>` : ''}
-    </table>
+        </div>
+      </div>`).join('')}
+      ${entries.length===0 ? `<p class="empty">Aucun membre pour l'instant</p>` : ''}
+    </div>
   </div>`;
 }
 function settingsLigueTabHTML(){
