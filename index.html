@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923175737">
+<meta name="app-build" content="20260923180648">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -533,6 +533,7 @@ let DATA = null;
 let SESSION_USER = null; // {role:'admin'|'player'|'pending', playerId?, email?, displayName?}
 let CURRENT_PROFILE = null;
 let ADMIN_VIEWING_AS = null; // null | 'player' | 'substitute'
+let ADMIN_SHOWING_ORG = false; // true = page pleine page « Organisation » affichée (voir openOrganizationPage)
 // Si le lien contient ?org=<id>, ce compte s'inscrit pour rejoindre cette
 // organisation précise (voir Réglages → lien d'inscription d'organisation).
 const SIGNUP_ORG_ID = new URLSearchParams(window.location.search).get('org') || null;
@@ -1639,6 +1640,7 @@ function render(){
   if(PASSWORD_RECOVERY_MODE){ renderSetNewPassword(); }
   else if(!SESSION_USER){ renderLogin(); }
   else if(SESSION_USER.role === 'pending'){ renderPending(); }
+  else if(SESSION_USER.role === 'admin' && ADMIN_SHOWING_ORG){ renderOrganizationManagement(); }
   else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'player' && MY_LINK_IN_CURRENT_LEAGUE){ renderPlayer(MY_LINK_IN_CURRENT_LEAGUE.player_id); }
   else if(SESSION_USER.role === 'admin' && ADMIN_VIEWING_AS === 'substitute' && MY_LINK_IN_CURRENT_LEAGUE){ renderSubstitute(MY_LINK_IN_CURRENT_LEAGUE.substitute_id); }
   else if(SESSION_USER.role === 'admin'){ renderAdmin(); }
@@ -2159,7 +2161,7 @@ function renderAdmin(){
     </div>`;
   const drawerSettings = `
     <div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationManagementModal()">🏢 Organisation (membres, invitations…)</button>
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationPage()">🏢 Organisation (membres, invitations…)</button>
     </div>`;
   app.innerHTML = `
     ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
@@ -2204,7 +2206,7 @@ function renderMlpAdmin(){
     </div>`;
   const drawerSettings = `
     <div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationManagementModal()">🏢 Organisation (membres, invitations…)</button>
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationPage()">🏢 Organisation (membres, invitations…)</button>
     </div>`;
   app.innerHTML = `
     ${topbarHTML('Ligue MLP — Espace administrateur', orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
@@ -6251,18 +6253,36 @@ function adminSettingsSectionHTML(){
   return html;
 }
 function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
-// Ouvre la gestion de l'organisation (membres, invitation, création d'une
-// autre organisation…) — accessible depuis le tiroir plutôt que noyée dans
-// les réglages de la ligue actuelle, puisqu'elle couvre TOUTES les ligues
-// de l'organisation plutôt qu'une seule.
-function openOrganizationManagementModal(){
+// Ouvre la gestion de l'organisation en PAGE PLEINE (pas une pop-up) — trop
+// de contenu (membres, comptes, invitation…) pour tenir dans une pop-up, et
+// les actions à l'intérieur (+ Assigner, + Nouvelle personne) ouvrent leur
+// propre pop-up sans faire disparaître le contexte. Accessible depuis le
+// tiroir plutôt que noyée dans les réglages de la ligue actuelle, puisque
+// ça couvre TOUTES les ligues de l'organisation plutôt qu'une seule.
+function openOrganizationPage(){
+  DRAWER_OPEN = false;
   Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(()=>{
-    MODAL = { kind:'content', title:'Organisation', htmlContent: settingsOrganisationTabHTML };
+    ADMIN_SHOWING_ORG = true;
     render();
   });
 }
-
-function settingsOrganisationTabHTML(){
+function closeOrganizationPage(){ ADMIN_SHOWING_ORG = false; render(); }
+function setOrgSubTab(t){ VIEW.orgSubTab = t; render(); }
+function renderOrganizationManagement(){
+  const sub = VIEW.orgSubTab || 'general';
+  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['comptes','🔑 Comptes']];
+  app.innerHTML = `
+    ${topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null)}
+    ${storageBannerHTML()}
+    <div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setOrgSubTab('${k}')">${l}</div>`).join('')}</div>
+    <div id="orgTabContent"></div>
+  `;
+  const c = document.getElementById('orgTabContent');
+  if(sub==='membres') c.innerHTML = organizationMembersCardHTML();
+  else if(sub==='comptes') c.innerHTML = organizationAccountsHTML();
+  else c.innerHTML = organizationGeneralHTML();
+}
+function organizationGeneralHTML(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
   let html = '';
   html += settingsRow('🏢', 'Organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
@@ -6279,8 +6299,6 @@ function settingsOrganisationTabHTML(){
     <p class="small" style="margin:14px 0 8px;">🛡️ Réservé aux super admins — envoie ce lien à quelqu'un d'autre pour qu'il démarre <strong>sa propre</strong> organisation indépendante (pas la tienne) — utile pour un autre gestionnaire de ligue qui voudrait utiliser l'app de son côté.</p>
     <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien pour démarrer une nouvelle organisation</button>` : ''}
   </div>`;
-  html += organizationMembersCardHTML();
-  html += organizationAccountsHTML();
   return html;
 }
 // ---- Membres de l'organisation : gérer une personne une seule fois, puis
