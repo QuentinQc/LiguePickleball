@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923142023">
+<meta name="app-build" content="20260923142708">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -200,6 +200,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
 .tab{padding:9px 18px;font-family:var(--font-display);font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-radius:999px;white-space:nowrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);transition:background .15s ease,color .15s ease;}
 .tab.active{color:var(--court);background:var(--ball);font-weight:700;border-color:var(--ball);}
+.tab.tab-action{color:var(--ball);border-color:rgba(207,234,92,0.35);background:rgba(207,234,92,0.08);margin-left:4px;}
 .tab:not(.active):hover{background:rgba(255,255,255,0.12);color:var(--line);}
 
 .hamburger-btn{background:none;border:none;color:var(--text);font-size:32px;line-height:1;cursor:pointer;padding:8px 12px 8px 0;flex-shrink:0;min-height:44px;display:flex;align-items:center;}
@@ -1679,7 +1680,11 @@ function viewSlideHTML(options){
 // .bottom-nav, masquée sur ordinateur). extraItems (optionnel) permet
 // d'ajouter des actions supplémentaires à cette barre du bas (ex: Absence).
 function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
-  const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}</div>`;
+  // extraItems (ex: Absence) doivent apparaître à la fois dans les pilules du
+  // haut (ordinateur) et dans la barre du bas (mobile) — avant, ils
+  // n'étaient ajoutés qu'à la barre du bas, donc invisibles sur ordinateur.
+  const extraPillsHTML = (extraItems||[]).map(it=>`<div class="tab tab-action" onclick="${it.onclick}">${it.icon?it.icon+' ':''}${escapeHTML(it.label)}</div>`).join('');
+  const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}${extraPillsHTML}</div>`;
   const bottomItems = tabs.map(([k,label,icon])=>({key:k, icon, label, onclick:`${setTabFn}('${k}')`}));
   if(extraItems && extraItems.length){
     // Insérées au centre plutôt qu'à la fin, pour un équilibre visuel (ex :
