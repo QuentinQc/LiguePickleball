@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923143858">
+<meta name="app-build" content="20260923174357">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -728,7 +728,27 @@ const LEAGUE_FORMAT_HINTS = {
   single: "Un seul groupe pour tous les joueurs, avec un classement cumulatif sur toute la saison plutôt que des montées/descentes.",
   mlp: "Équipes mixtes fixes (2H+2F ou 2H+1F) qui s'affrontent en joutes genrées (double féminin, double masculin, mixtes) + DreamBreaker — classement par points cumulés sur la saison, comme le vrai MLP."
 };
-function onCreateLeague(){
+let NEW_LEAGUE_MEMBER_CANDIDATES = [];
+async function onCreateLeague(){
+  // On rafraîchit le bassin de l'organisation avant d'ouvrir la modale, pour
+  // que la liste de sélection soit à jour même si l'admin n'est jamais passé
+  // par Réglages > Organisation (qui charge normalement ces données) cette
+  // session. Repose sur la vraie table org_members (+ repli par nom pour les
+  // personnes créées avant cette table) plutôt que sur les seuls comptes.
+  await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
+  const members = organizationRosterEntries();
+  NEW_LEAGUE_MEMBER_CANDIDATES = members;
+  const membersHTML = members.length ? `
+    <div class="field">
+      <label>Membres de l'organisation à ajouter comme joueurs (optionnel)</label>
+      <p class="small" style="margin:0 0 8px;">Coche les personnes à ajouter directement comme joueurs dans cette nouvelle ligue — pas besoin de les recréer après coup.</p>
+      <div class="card" style="max-height:220px;overflow-y:auto;padding:10px 12px;">
+        ${members.map((m,i)=>`<label class="row" style="align-items:center;gap:8px;margin-bottom:6px;">
+          <input type="checkbox" class="newLeagueMember" value="${i}" style="width:auto;">
+          <span>${escapeHTML(m.name)}${m.email?` <span class="small">(${escapeHTML(m.email)})</span>`:''}</span>
+        </label>`).join('')}
+      </div>
+    </div>` : `<p class="small">Aucun membre dans ton organisation pour l'instant — tu pourras en ajouter une fois la ligue créée (Réglages > Organisation).</p>`;
   const html = `
     <div class="field"><label>Nom de la ligue</label><input id="newLeagueName" placeholder="ex: Ligue du mardi"></div>
     <div class="field"><label>Jour et heure (optionnel)</label><input id="newLeagueSchedule" placeholder="ex: Mardi 19h"></div>
@@ -749,7 +769,9 @@ function onCreateLeague(){
         <option value="3">2 hommes + 1 femme (3 joutes)</option>
       </select>
     </div>
-    <p class="small" style="color:var(--paddle);">Le format ne pourra pas être changé facilement après coup — choisis celui qui correspond à ta ligue.</p>`;
+    <p class="small" style="color:var(--paddle);">Le format ne pourra pas être changé facilement après coup — choisis celui qui correspond à ta ligue.</p>
+    <div class="card-divider"></div>
+    ${membersHTML}`;
   showFormModal('Créer une nouvelle ligue', html, saveNewLeagueForm);
 }
 function saveNewLeagueForm(){
@@ -758,9 +780,21 @@ function saveNewLeagueForm(){
   const schedule = document.getElementById('newLeagueSchedule').value.trim();
   const format = document.getElementById('newLeagueFormat').value || 'ladder';
   const mlpRosterSize = format==='mlp' ? parseInt(document.getElementById('newLeagueMlpRosterSize').value,10) : undefined;
+  const selectedMembers = Array.from(document.querySelectorAll('.newLeagueMember:checked')).map(el=>NEW_LEAGUE_MEMBER_CANDIDATES[parseInt(el.value,10)]).filter(Boolean);
   (async ()=>{
     const id = await createLeague(name, schedule, format, mlpRosterSize);
-    if(id){ await switchToLeague(id); }
+    if(!id) return;
+    // Ajoutés un à la fois (plutôt qu'en parallèle) car chaque ajout relit
+    // puis réécrit tout le league_data de la nouvelle ligue — en parallèle,
+    // les écritures se piétineraient et certains joueurs seraient perdus.
+    for(const m of selectedMembers){
+      if(m.profileId){
+        await addPlayerToLeagueForProfile(id, m.profileId, m.name);
+      } else {
+        await addNamedEntryToLeague(id, m.name, 'joueur', m.email, m.orgMemberId);
+      }
+    }
+    await switchToLeague(id);
   })();
 }
 // Change la ligue affichée par un administrateur.
@@ -2408,6 +2442,12 @@ function setAdminTab(t){
   VIEW.tab=t;
   if(t==='joueurs'){
     Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(render);
+    return;
+  }
+  if(t==='reglages'){
+    // Réglages ouvre par défaut sur Organisation, qui affiche le bassin de
+    // membres de toute l'organisation — à charger avant le premier rendu.
+    Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(render);
     return;
   }
   render();
@@ -4761,6 +4801,31 @@ let CURRENT_PLAYER_NOTES = []; // notes chargées pour la fiche joueur actuellem
 let CURRENT_PLAYER_NOTES_SCOPE = null; // {type:'profile', profileId} ou {type:'player', playerId, leagueId}
 let LEAGUE_PLAYER_LINKS = []; // profile_players de la ligue actuellement affichée
 let ALL_PROFILE_PLAYERS = []; // profile_players de TOUTES les ligues (pour gérer les ligues d'un joueur)
+let ORG_ROSTER_BY_LEAGUE = {}; // { [leagueId]: { players, substitutePool } } — voir loadOrgRoster()
+let ORG_ROSTER_ENTRIES_CACHE = []; // dernière liste calculée par organizationRosterEntries(), indexée pour les boutons "+ Assigner"
+let ORG_MEMBERS = []; // table org_members de l'organisation actuelle — identité canonique, plus fiable que la fusion par nom
+async function loadOrgMembers(){
+  if(!CURRENT_ORGANIZATION_ID){ ORG_MEMBERS = []; return; }
+  const { data, error } = await sb.from('org_members').select('*').eq('organization_id', CURRENT_ORGANIZATION_ID).order('name');
+  ORG_MEMBERS = error ? [] : (data || []);
+}
+async function createOrgMember(name, email, notes, profileId){
+  const { data, error } = await sb.from('org_members').insert({ organization_id: CURRENT_ORGANIZATION_ID, name, email: email||null, notes: notes||null, profile_id: profileId||null }).select().single();
+  if(error){ showAlert("Erreur : " + error.message + (error.message && error.message.includes('org_members') ? " — la table org_members existe-t-elle encore dans Supabase ?" : "")); return null; }
+  ORG_MEMBERS.push(data);
+  return data;
+}
+async function deleteOrgMember(memberId){
+  const { error } = await sb.from('org_members').delete().eq('id', memberId);
+  if(error){ showAlert("Erreur : " + error.message); return; }
+  ORG_MEMBERS = ORG_MEMBERS.filter(m=>m.id!==memberId);
+  render();
+}
+function confirmDeleteOrgMember(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry || !entry.orgMemberId) return;
+  showConfirm(`Retirer ${entry.name} de la liste des membres de l'organisation ? (elle reste joueuse/remplaçante dans les ligues où elle est déjà — seule la fiche « membre » est supprimée)`, ()=>deleteOrgMember(entry.orgMemberId));
+}
 async function loadAllProfiles(){
   const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:true });
   ALL_PROFILES = error ? [] : (data || []);
@@ -4791,6 +4856,211 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
   const { error: err3 } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: newPlayer.id });
   if(err3){ showAlert("Erreur : " + err3.message); return null; }
   return newPlayer.id;
+}
+// Charge les joueurs/remplaçants de CHAQUE ligue de l'organisation (pas
+// seulement la ligue actuellement affichée), pour construire le bassin de
+// membres de l'organisation. La ligue déjà chargée (DATA) est réutilisée
+// telle quelle plutôt que relue, pour économiser un aller-retour.
+async function loadOrgRoster(){
+  const leagues = myOrgLeagues();
+  const results = await Promise.all(leagues.map(async l=>{
+    if(l.id === CURRENT_LEAGUE_ID && DATA) return { id:l.id, players: DATA.players||[], substitutePool: DATA.substitutePool||[] };
+    const { data } = await sb.from('league_data').select('data').eq('league_id', l.id).single();
+    const d = (data && data.data) || {};
+    return { id:l.id, players: d.players||[], substitutePool: d.substitutePool||[] };
+  }));
+  const byLeague = {};
+  results.forEach(r=>{ byLeague[r.id] = { players:r.players, substitutePool:r.substitutePool }; });
+  ORG_ROSTER_BY_LEAGUE = byLeague;
+}
+// Construit la liste des membres à partir de la VRAIE table org_members
+// (identité canonique — chaque joueur/remplaçant créé depuis ici porte un
+// orgMemberId qui pointe vers sa ligne). Les entrées créées avant cette
+// table (ou ajoutées directement dans une ligue, hors de cet écran) n'ont
+// pas cet identifiant : elles sont rattachées au mieux par compte lié, sinon
+// par nom — un repli de compatibilité, plus la source de vérité principale.
+function organizationRosterEntries(){
+  const leagues = myOrgLeagues();
+  const entries = [];
+  const byOrgMemberId = {};
+  const byProfileId = {};
+  const byNameLower = {};
+  ORG_MEMBERS.forEach(m=>{
+    const entry = { orgMemberId: m.id, name: m.name, email: m.email || null, profileId: m.profile_id || null, rows: [] };
+    entries.push(entry);
+    byOrgMemberId[m.id] = entry;
+    if(m.profile_id) byProfileId[m.profile_id] = entry;
+    const norm = m.name.trim().toLowerCase();
+    if(!byNameLower[norm]) byNameLower[norm] = entry;
+  });
+  const findOrCreateLegacyEntry = (profileId, name)=>{
+    if(profileId && byProfileId[profileId]) return byProfileId[profileId];
+    const norm = name.trim().toLowerCase();
+    if(byNameLower[norm]) return byNameLower[norm];
+    const entry = { orgMemberId:null, name, email:null, profileId: profileId||null, rows: [] };
+    entries.push(entry);
+    if(profileId) byProfileId[profileId] = entry;
+    byNameLower[norm] = entry;
+    return entry;
+  };
+  leagues.forEach(l=>{
+    const bucket = ORG_ROSTER_BY_LEAGUE[l.id];
+    if(!bucket) return;
+    const leagueLabel = l.schedule_label || l.name;
+    const addRow = (person, type)=>{
+      let entry;
+      if(person.orgMemberId && byOrgMemberId[person.orgMemberId]){
+        entry = byOrgMemberId[person.orgMemberId];
+      } else {
+        const link = ALL_PROFILE_PLAYERS.find(pp=>pp.league_id===l.id && pp.player_id===person.id);
+        const profileId = link ? link.profile_id : null;
+        entry = findOrCreateLegacyEntry(profileId, person.name);
+        if(profileId && !entry.profileId) entry.profileId = profileId;
+        if(!entry.email){
+          const profile = profileId ? ALL_PROFILES.find(pr=>pr.id===profileId) : null;
+          entry.email = (profile && profile.email) || person.email || null;
+        }
+      }
+      entry.rows.push({ leagueId:l.id, leagueLabel, type, refId: person.id });
+    };
+    (bucket.players||[]).forEach(p=>addRow(p, 'joueur'));
+    (bucket.substitutePool||[]).forEach(s=>addRow(s, 'remplaçant'));
+  });
+  entries.sort((a,b)=>a.name.localeCompare(b.name));
+  return entries;
+}
+// Crée un joueur ou remplaçant SANS compte requis, directement dans une
+// ligue donnée (pas nécessairement la ligue actuellement affichée) — même
+// logique que le formulaire « Ajouter une personne », généralisée à
+// n'importe quelle ligue de l'organisation.
+async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
+  const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+  if(error){ showAlert("Erreur : " + error.message); return null; }
+  const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
+  if(type==='remplacant'){
+    leagueData.substitutePool = leagueData.substitutePool || [];
+    const finalName = uniquePlayerName(name, leagueData.substitutePool);
+    const entry = { id: uid('sub'), name: finalName, rating: RATING_DEFAULT, ratingGames: 0 };
+    if(email) entry.email = email;
+    if(orgMemberId) entry.orgMemberId = orgMemberId;
+    leagueData.substitutePool.push(entry);
+  } else {
+    leagueData.players = leagueData.players || [];
+    leagueData.groups = leagueData.groups || [];
+    const groupId = firstGroupWithRoom(leagueData.groups, leagueData.players);
+    if(!groupId){ showAlert("Cette ligue n'a pas encore de groupe (ou tous sont pleins) — crée-en un d'abord (en y basculant)."); return null; }
+    const finalName = uniquePlayerName(name, leagueData.players);
+    const groupMembers = leagueData.players.filter(x=>x.groupId===groupId);
+    const nextOrder = groupMembers.reduce((m,x)=>Math.max(m, typeof x.order==='number'?x.order:0), 0) + 1;
+    const newPlayer = { id: uid('p'), name: finalName, groupId, order: nextOrder };
+    if(email) newPlayer.email = email;
+    if(orgMemberId) newPlayer.orgMemberId = orgMemberId;
+    leagueData.players.push(newPlayer);
+  }
+  const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  if(err2){ showAlert("Erreur : " + err2.message); return null; }
+  return true;
+}
+// Recharge tout ce qui a pu changer après un ajout/assignation en arrière-
+// plan (bassin, comptes) et, si la ligue actuellement affichée en fait
+// partie, ses propres données aussi — pour que l'écran reflète le résultat
+// sans devoir changer de ligue.
+async function refreshAfterOrgRosterChange(affectedLeagueIds){
+  await Promise.all([loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
+  if(CURRENT_LEAGUE_ID && affectedLeagueIds.includes(CURRENT_LEAGUE_ID)){
+    const loaded = await loadData(CURRENT_LEAGUE_ID);
+    if(loaded){ DATA = loaded; migrateData(); }
+  }
+  render();
+}
+function openAddOrgMemberModal(){
+  const leagues = myOrgLeagues();
+  const html = `
+    <div class="field"><label>Nom</label><input id="orgMemberName" placeholder="Prénom Nom"></div>
+    <div class="field"><label>Courriel (optionnel)</label><input id="orgMemberEmail" type="email" placeholder="toi@exemple.com"></div>
+    <div class="field">
+      <label>Type</label>
+      <select id="orgMemberType">
+        <option value="joueur">Joueur régulier</option>
+        <option value="remplacant">Remplaçant</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Ligue(s) où l'ajouter <span class="small">(optionnel — tu pourras aussi assigner plus tard)</span></label>
+      <div class="card" style="max-height:200px;overflow-y:auto;padding:10px 12px;">
+        ${leagues.map(l=>`<label class="row" style="align-items:center;gap:8px;margin-bottom:6px;">
+          <input type="checkbox" class="orgMemberLeague" value="${l.id}" style="width:auto;">
+          <span>${escapeHTML(l.schedule_label || l.name)}</span>
+        </label>`).join('')}
+      </div>
+    </div>`;
+  showFormModal('Nouvelle personne', html, saveAddOrgMemberForm);
+}
+function saveAddOrgMemberForm(){
+  const name = document.getElementById('orgMemberName').value.trim();
+  if(!name){ showAlert("Le nom est requis."); return false; }
+  const email = document.getElementById('orgMemberEmail').value.trim();
+  const type = document.getElementById('orgMemberType').value;
+  const leagueIds = Array.from(document.querySelectorAll('.orgMemberLeague:checked')).map(el=>el.value);
+  (async ()=>{
+    // La personne est d'abord créée une fois pour toutes dans org_members —
+    // c'est SON identifiant qui sera repris dans chaque ligue cochée, plutôt
+    // que de recréer une fiche indépendante à chaque fois.
+    const member = await createOrgMember(name, email, null, null);
+    if(!member) return;
+    for(const leagueId of leagueIds){ await addNamedEntryToLeague(leagueId, name, type, email, member.id); }
+    await refreshAfterOrgRosterChange(leagueIds);
+  })();
+}
+function openAssignMemberModal(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const alreadyIn = new Set(entry.rows.map(r=>r.leagueId));
+  const remaining = myOrgLeagues().filter(l=>!alreadyIn.has(l.id));
+  if(!remaining.length){ showAlert(`${entry.name} est déjà dans toutes les ligues de ton organisation.`); return; }
+  const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
+  const html = `
+    <p class="small">Ajoute ${escapeHTML(entry.name)} dans d'autres ligues de ton organisation.</p>
+    <div class="field">
+      <label>Type</label>
+      <select id="assignMemberType">
+        <option value="joueur" ${roleGuess==='joueur'?'selected':''}>Joueur régulier</option>
+        <option value="remplacant" ${roleGuess==='remplacant'?'selected':''}>Remplaçant</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Ligue(s)</label>
+      <div class="card" style="max-height:200px;overflow-y:auto;padding:10px 12px;">
+        ${remaining.map(l=>`<label class="row" style="align-items:center;gap:8px;margin-bottom:6px;">
+          <input type="checkbox" class="assignMemberLeague" value="${l.id}" style="width:auto;">
+          <span>${escapeHTML(l.schedule_label || l.name)}</span>
+        </label>`).join('')}
+      </div>
+    </div>`;
+  showFormModal(`Assigner ${entry.name}`, html, ()=>saveAssignMemberForm(entry));
+}
+function saveAssignMemberForm(entry){
+  const type = document.getElementById('assignMemberType').value;
+  const leagueIds = Array.from(document.querySelectorAll('.assignMemberLeague:checked')).map(el=>el.value);
+  if(!leagueIds.length){ showAlert("Choisis au moins une ligue."); return false; }
+  (async ()=>{
+    // Si cette personne n'a pas encore de ligne org_members (détectée par nom
+    // ou par compte, avant cette fonctionnalité), on lui en crée une
+    // maintenant plutôt que de continuer à deviner par nom.
+    let orgMemberId = entry.orgMemberId;
+    if(!orgMemberId){
+      const member = await createOrgMember(entry.name, entry.email, null, entry.profileId || null);
+      orgMemberId = member ? member.id : null;
+    }
+    for(const leagueId of leagueIds){
+      if(entry.profileId && type==='joueur'){
+        await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name);
+      } else {
+        await addNamedEntryToLeague(leagueId, entry.name, type, entry.email, orgMemberId);
+      }
+    }
+    await refreshAfterOrgRosterChange(leagueIds);
+  })();
 }
 async function removePlayerFromLeagueForProfile(leagueId, profileId){
   const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', leagueId);
@@ -5982,7 +6252,14 @@ function adminSettingsSectionHTML(){
   else html += settingsOrganisationTabHTML();
   return html;
 }
-function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
+function setSettingsSubTab2(t){
+  VIEW.settingsSubTab = t;
+  if(t==='organisation'){
+    Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(render);
+    return;
+  }
+  render();
+}
 
 function settingsOrganisationTabHTML(){
   const currentOrg = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
@@ -6001,7 +6278,36 @@ function settingsOrganisationTabHTML(){
     <p class="small" style="margin:14px 0 8px;">🛡️ Réservé aux super admins — envoie ce lien à quelqu'un d'autre pour qu'il démarre <strong>sa propre</strong> organisation indépendante (pas la tienne) — utile pour un autre gestionnaire de ligue qui voudrait utiliser l'app de son côté.</p>
     <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien pour démarrer une nouvelle organisation</button>` : ''}
   </div>`;
+  html += organizationMembersCardHTML();
   return html;
+}
+// ---- Membres de l'organisation : gérer une personne une seule fois, puis
+// l'assigner dans une ou plusieurs ligues, plutôt que de devoir la recréer
+// séparément dans chacune. Bassin construit en fusionnant, sur toutes les
+// ligues de l'organisation, les joueurs/remplaçants qui partagent le même
+// compte (profil lié) ou, à défaut, le même nom. Voir loadOrgRoster().
+function organizationMembersCardHTML(){
+  const entries = organizationRosterEntries();
+  ORG_ROSTER_ENTRIES_CACHE = entries;
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">👥 Membres de l'organisation <span class="small">(${entries.length})</span></h3>
+      <button class="btn btn-secondary" onclick="openAddOrgMemberModal()">+ Nouvelle personne</button>
+    </div>
+    <p class="small" style="margin:6px 0 10px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
+    <table>
+      <tr><th>Nom</th><th>Ligues</th><th></th></tr>
+      ${entries.map((e,i)=>`<tr>
+        <td>${escapeHTML(e.name)}${e.email?` <span class="small">(${escapeHTML(e.email)})</span>`:''}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</td>
+        <td>${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join(' ') : '<span class="small">— aucune ligue —</span>'}</td>
+        <td>
+          <button class="btn-ghost" onclick="openAssignMemberModal(${i})">+ Assigner</button>
+          ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
+        </td>
+      </tr>`).join('')}
+      ${entries.length===0 ? `<tr><td colspan="3" class="empty">Aucun membre pour l'instant</td></tr>` : ''}
+    </table>
+  </div>`;
 }
 function settingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
