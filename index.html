@@ -4,6 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="robots" content="noindex, nofollow, noarchive">
+<!-- Décourage la mise en cache agressive de la page (notamment en mode
+     "Ajouté à l'écran d'accueil" sur iOS, où Safari peut garder une
+     ancienne copie plus longtemps qu'un onglet normal). -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="app-build" content="20260923133329">
+<script>
+// iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
+// l'écran d'accueil, sans jamais refaire de vraie requête réseau au
+// relancement — les balises de cache seules n'y changent rien. On vérifie
+// donc activement, à chaque lancement, si une version plus récente existe
+// (requête réseau forcée, sans passer par le cache) et si oui, on force une
+// vraie navigation vers une URL "cache-bustée" pour obtenir la version
+// fraîche.
+(function(){
+  try{
+    var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
+    var probeUrl = location.pathname + '?_probe=' + Date.now();
+    fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
+      var m = html.match(/<meta name="app-build" content="([^"]+)">/);
+      if(m && m[1] && m[1] !== CURRENT_BUILD){
+        var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
+        location.replace(freshUrl);
+      }
+    }).catch(function(){ /* pas de réseau : on continue avec la copie actuelle */ });
+  }catch(e){}
+})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
