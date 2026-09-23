@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923142708">
+<meta name="app-build" content="20260923142918">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -425,6 +425,20 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .tabs::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.3);border-radius:4px;}
 .tabs::-webkit-scrollbar-track{background:transparent;}
 .tab{flex:0 0 auto;white-space:nowrap;}
+
+/* Sous-onglets internes à une section (ex: Réglages > Jeu/Avancé, Joueurs >
+   Tous/Réguliers/...). Contrairement à .tabs (barre principale, remplacée
+   par .bottom-nav sur mobile), ces sous-onglets n'ont pas d'équivalent dans
+   la barre du bas — ils doivent donc rester visibles et utilisables sur
+   mobile, avec un défilement horizontal plutôt qu'être cachés. */
+.subtabs{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.3) transparent;
+  -webkit-mask-image:linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+  mask-image:linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+.subtabs::-webkit-scrollbar{height:4px;}
+.subtabs::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.3);border-radius:4px;}
+.subtabs::-webkit-scrollbar-track{background:transparent;}
+.subtabs .tab{flex:0 0 auto;white-space:nowrap;}
 
 /* ---------- Bureau (écrans larges) : plus d'air, colonnes qui ne s'étirent pas à l'infini ---------- */
 @media (min-width:900px){
@@ -1825,7 +1839,7 @@ function openAccessRequestEmail(){
 function loginFormInnerHTML(){
   const mode = VIEW.loginMode || 'signin'; // 'signin' | 'signup' | 'reset'
   return `
-      <div class="tabs">
+      <div class="subtabs" style="margin-bottom:14px;">
         <div class="tab ${mode!=='signup'?'active':''}" onclick="setLoginMode('signin')">Connexion</div>
         <div class="tab ${mode==='signup'?'active':''}" onclick="setLoginMode('signup')">Créer un compte</div>
       </div>
@@ -2217,7 +2231,7 @@ function adminSessionSectionHTML(){
   }
   const sub = VIEW.sessionSubTab || 'groupes';
   const subTabs = [['groupes','Groupes'],['resultats','Résultats']];
-  html += `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
   return html;
 }
@@ -2226,7 +2240,7 @@ function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 function adminPlayersSectionHTML(){
   const sub = VIEW.playersSubTab || 'tous';
   const subTabs = [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
-  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : adminAllPeopleHTML()));
   return html;
 }
@@ -5543,7 +5557,7 @@ function computePlayerReports(){
 function adminReportsSectionHTML(){
   const sub = VIEW.reportsSubTab || 'liste';
   const subTabs = [['liste','Liste'],['session','Rapport de session']];
-  let html = `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setReportsSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setReportsSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'session' ? reportsSessionHTML() : reportsListHTML();
   return html;
 }
@@ -5937,7 +5951,7 @@ function adminSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'organisation';
   const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
-  html += `<div class="tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
+  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='ligue') html += settingsLigueTabHTML();
   else if(sub==='jeu') html += settingsJeuTabHTML();
   else if(sub==='avance') html += settingsAvanceTabHTML();
