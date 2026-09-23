@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923142918">
+<meta name="app-build" content="20260923143858">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -2181,7 +2181,24 @@ function renderMlpAdmin(){
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
 }
+// Réglages en ligue MLP — même structure à tiroirs (Organisation/Ligue/Jeu/
+// Avancé) que les autres formats, pour que rien ne soit injoignable selon le
+// format actif. Organisation et Avancé sont partagés tels quels (lien
+// d'invitation, sauvegarde, etc. ne dépendent pas du format) ; Ligue et Jeu
+// ont leur propre contenu, propre au format MLP (pas de taille de groupe, de
+// format de match à 4/5 joueurs ni de départage individuel en MLP).
 function mlpSettingsSectionHTML(){
+  const sub = VIEW.settingsSubTab || 'organisation';
+  const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
+  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
+  if(sub==='ligue') html += mlpSettingsLigueTabHTML();
+  else if(sub==='jeu') html += mlpSettingsJeuTabHTML();
+  else if(sub==='avance') html += settingsAvanceTabHTML();
+  else html += settingsOrganisationTabHTML();
+  return html;
+}
+function mlpSettingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
   let html = '';
@@ -2197,6 +2214,13 @@ function mlpSettingsSectionHTML(){
     <p class="small" style="margin-bottom:10px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, équipes, sessions et classement. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
     <button class="btn btn-danger" onclick="onDeleteLeague()">Supprimer cette ligue</button>
   </div>`;
+  return html;
+}
+function mlpSettingsJeuTabHTML(){
+  let html = '';
+  const totalPlayerTabs = playerTabDefs().length, hiddenPlayerTabsCount = (DATA.hiddenPlayerTabs||[]).length;
+  const totalSubTabs = subTabDefs().length, hiddenSubTabsCount = (DATA.hiddenSubTabs||[]).length;
+  html += settingsRow('🗂️', 'Onglets visibles', `Joueurs : ${hiddenPlayerTabsCount ? (totalPlayerTabs-hiddenPlayerTabsCount)+'/'+totalPlayerTabs+' onglets' : 'tous visibles'} · Remplaçants : ${hiddenSubTabsCount ? (totalSubTabs-hiddenSubTabsCount)+'/'+totalSubTabs+' onglets' : 'tous visibles'}`, "openTabVisibilityModal()");
   return html;
 }
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
