@@ -144,7 +144,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 @keyframes drawerFadeIn{from{opacity:0;}to{opacity:1;}}
 .drawer-panel{width:78%;max-width:300px;height:100%;background:var(--court);border-right:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;box-shadow:6px 0 28px rgba(0,0,0,0.45);animation:drawerSlideIn .18s ease-out;overflow-y:auto;}
 @keyframes drawerSlideIn{from{transform:translateX(-100%);}to{transform:translateX(0);}}
-.drawer-header{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
+.drawer-header{display:flex;align-items:center;gap:10px;padding:calc(20px + env(safe-area-inset-top)) 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
 .drawer-header img{width:34px;height:34px;border-radius:8px;object-fit:cover;}
 .drawer-header h2{margin:0;font-size:15px;color:var(--line);}
 .drawer-extra{padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:12px;}
@@ -156,7 +156,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .drawer-item{display:flex;align-items:center;gap:14px;padding:13px 18px;cursor:pointer;border-left:3px solid transparent;font-family:var(--font-display);font-size:14px;letter-spacing:0.02em;text-transform:uppercase;color:var(--muted);}
 .drawer-item.active{background:rgba(255,255,255,0.06);border-left-color:var(--ball);color:var(--ball);}
 .drawer-item .drawer-icon{font-size:17px;width:20px;text-align:center;flex-shrink:0;}
-.drawer-footer{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;}
+.drawer-footer{padding:14px 18px calc(14px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;}
 .drawer-avatar{width:34px;height:34px;border-radius:50%;background:var(--ball);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--court);flex-shrink:0;}
 .drawer-account-info{flex:1;min-width:0;}
 .drawer-account-info .name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--line);}
@@ -1624,7 +1624,7 @@ function openLeagueSwitcherPopover(switchContext){
 // cercle surélevé (action principale mise en avant, comme le QR code dans
 // l'app de référence).
 function bottomNavHTML(items, activeKey){
-  return `<div class="bottom-nav-spacer"></div><div class="bottom-nav">
+  return `<div class="bottom-nav">
     ${items.map(it=>it.raised ? `
       <button class="bottom-nav-item raised" onclick="${it.onclick}">
         <span class="bn-icon-circle">${it.icon}</span><span class="bn-label">${escapeHTML(it.label)}</span>
@@ -2021,6 +2021,7 @@ function renderAdmin(){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setAdminTab')}
     <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
@@ -2062,6 +2063,7 @@ function renderMlpAdmin(){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setAdminTab')}
     <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
@@ -6674,6 +6676,7 @@ function renderSubstitute(subId){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setSubstituteTab')}
     <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
@@ -6793,6 +6796,7 @@ function renderPlayer(playerId){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
     <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : (VIEW.tab==='videos' ? playerVideosHTML(me) : playerGroupHTML(me)));
@@ -6828,6 +6832,7 @@ function renderMlpPlayer(me){
     ${storageBannerHTML()}
     ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab')}
     <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
   c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : (VIEW.tab==='videos' ? playerVideosHTML(me) : mlpPlayerTeamHTML(me)));
