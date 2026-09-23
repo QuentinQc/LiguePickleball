@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923135558">
+<meta name="app-build" content="20260923140140">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -4205,6 +4205,7 @@ function substituteDetailModalHTML(subId){
     </div>
     <div class="action-grid">
       <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">✏️</span> Modifier</button>
+      <button class="action-btn" onclick="closeModal();editPlayerRating('${subId}')"><span class="icon">📊</span> Modifier la cote</button>
       <button class="action-btn" onclick="convertSubstituteToPlayer('${subId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
       <button class="action-btn danger" onclick="closeModal();removeSubstituteFromPool('${subId}')"><span class="icon">🗑️</span> Retirer</button>
     </div>
@@ -4678,7 +4679,7 @@ function renamePlayer(pid){
 // (2.0-8.0) et une confirmation renforcée si le joueur a déjà des matchs
 // comptabilisés (pour éviter d'écraser une cote gagnée par erreur).
 function applyRatingEdit(pid, rawValue){
-  const p = DATA.players.find(x=>x.id===pid);
+  const p = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
   if(!p) return;
   const value = parseFloat(String(rawValue).replace(',', '.'));
   if(isNaN(value)){ showAlert("Valeur invalide."); return; }
@@ -4687,7 +4688,7 @@ function applyRatingEdit(pid, rawValue){
   saveAndRender();
 }
 function editPlayerRating(pid){
-  const p = DATA.players.find(x=>x.id===pid);
+  const p = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
   if(!p) return;
   const current = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
   const games = typeof p.ratingGames === 'number' ? p.ratingGames : 0;
