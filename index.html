@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923140829">
+<meta name="app-build" content="20260923142023">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -5998,6 +5998,9 @@ function settingsJeuTabHTML(){
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
   html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
   html += settingsRow('👁️', 'Visibilité de la cote', `Joueurs : ${DATA.showRatingToPlayers ? 'visible' : 'cachée'} · Remplaçants : ${DATA.showRatingToSubs ? 'visible' : 'cachée'}`, "openRatingVisibilityModal()");
+  const totalPlayerTabs = playerTabDefs().length, hiddenPlayerTabs = (DATA.hiddenPlayerTabs||[]).length;
+  const totalSubTabs = subTabDefs().length, hiddenSubTabsCount = (DATA.hiddenSubTabs||[]).length;
+  html += settingsRow('🗂️', 'Onglets visibles', `Joueurs : ${hiddenPlayerTabs ? (totalPlayerTabs-hiddenPlayerTabs)+'/'+totalPlayerTabs+' onglets' : 'tous visibles'} · Remplaçants : ${hiddenSubTabsCount ? (totalSubTabs-hiddenSubTabsCount)+'/'+totalSubTabs+' onglets' : 'tous visibles'}`, "openTabVisibilityModal()");
   return html;
 }
 function settingsAvanceTabHTML(){
@@ -6614,6 +6617,46 @@ function switchRowHTML(id, checked, label){
     </label>
   </div>`;
 }
+// Liste des onglets possibles par rôle, selon le format de ligue actif —
+// sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
+function playerTabDefs(){
+  return DATA.leagueFormat === 'mlp'
+    ? [['equipe','Mon équipe'],['classement','Classement'],['historique','Historique'],['videos','Vidéos']]
+    : [['classement','Mon groupe'],['stats','Statistiques'],['historique','Historique'],['videos','Vidéos']];
+}
+function subTabDefs(){
+  return [['dispo','Disponibilité'],['historique','Historique']];
+}
+// Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
+// l'admin, sans jamais retourner une liste vide (filet de sécurité).
+function filterTabs(tabs, hiddenKeys){
+  const hidden = hiddenKeys || [];
+  const visible = tabs.filter(t => !hidden.includes(t[0]));
+  return visible.length ? visible : tabs;
+}
+let TAB_VIS_STATE = null;
+function openTabVisibilityModal(){
+  TAB_VIS_STATE = {
+    player: playerTabDefs().map(([key,label])=>({key, label, visible: !(DATA.hiddenPlayerTabs||[]).includes(key)})),
+    sub: subTabDefs().map(([key,label])=>({key, label, visible: !(DATA.hiddenSubTabs||[]).includes(key)})),
+  };
+  showFormModal('Onglets visibles', tabVisibilityFormHTML(), saveTabVisibilityForm);
+}
+function tabVisibilityFormHTML(){
+  return `
+    <p class="small" style="margin:0 0 10px;">Choisis quels onglets apparaissent dans le portail des joueurs réguliers et des remplaçants. Un rôle garde toujours au moins un onglet visible.</p>
+    <label style="display:block;margin-bottom:6px;font-weight:600;">Joueurs réguliers</label>
+    ${TAB_VIS_STATE.player.map(t=>switchRowHTML('tabvis_player_'+t.key, t.visible, t.label)).join('')}
+    <div class="card-divider"></div>
+    <label style="display:block;margin:10px 0 6px;font-weight:600;">Remplaçants</label>
+    ${TAB_VIS_STATE.sub.map(t=>switchRowHTML('tabvis_sub_'+t.key, t.visible, t.label)).join('')}
+  `;
+}
+function saveTabVisibilityForm(){
+  DATA.hiddenPlayerTabs = TAB_VIS_STATE.player.filter(t=>!document.getElementById('tabvis_player_'+t.key).checked).map(t=>t.key);
+  DATA.hiddenSubTabs = TAB_VIS_STATE.sub.filter(t=>!document.getElementById('tabvis_sub_'+t.key).checked).map(t=>t.key);
+  TAB_VIS_STATE = null;
+}
 function openRatingVisibilityModal(){
   const html = `
     ${switchRowHTML('setShowRating', DATA.showRatingToPlayers, 'Joueurs réguliers')}
@@ -6769,7 +6812,9 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const tabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
+  const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
+  const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminSubView()'},
     {label:'Remplaçant', active:true, onclick:''},
@@ -6794,12 +6839,12 @@ function renderSubstitute(subId){
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
-    ${tabsBarHTML(tabs, VIEW.tab, 'setSubstituteTab')}
+    ${tabsBarHTML(tabs, activeTab, 'setSubstituteTab')}
     <div id="tabContent"></div>
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
+  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
 function substituteAvailabilityHTML(sub){
@@ -6894,7 +6939,9 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const tabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
+  const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
     {label:'Joueur', active:true, onclick:''},
@@ -6922,15 +6969,17 @@ function renderPlayer(playerId){
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
-    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
+    ${tabsBarHTML(tabs, activeTab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
     <div id="tabContent"></div>
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='historique' ? playerHistoryHTML(me) : (VIEW.tab==='stats' ? playerStatsTabHTML(me) : (VIEW.tab==='videos' ? playerVideosHTML(me) : playerGroupHTML(me)));
+  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : playerGroupHTML(me)));
 }
 function renderMlpPlayer(me){
-  const tabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
+  const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminPlayerView()'},
     {label:'Joueur', active:true, onclick:''},
@@ -6958,12 +7007,12 @@ function renderMlpPlayer(me){
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}
-    ${tabsBarHTML(tabs, VIEW.tab, 'setPlayerTab')}
+    ${tabsBarHTML(tabs, activeTab, 'setPlayerTab')}
     <div id="tabContent"></div>
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = VIEW.tab==='classement' ? mlpStandingsHTML() : (VIEW.tab==='historique' ? mlpHistoryHTML() : (VIEW.tab==='videos' ? playerVideosHTML(me) : mlpPlayerTeamHTML(me)));
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : mlpPlayerTeamHTML(me)));
 }
 function mlpPlayerTeamHTML(me){
   const team = (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(me.id));
@@ -7526,6 +7575,8 @@ function migrateData(){
   if(DATA.manualMatchupTemplate5 === undefined) DATA.manualMatchupTemplate5 = [];
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   if(DATA.showRatingToSubs === undefined) DATA.showRatingToSubs = false;
+  if(DATA.hiddenPlayerTabs === undefined) DATA.hiddenPlayerTabs = [];
+  if(DATA.hiddenSubTabs === undefined) DATA.hiddenSubTabs = [];
   (DATA.players||[]).forEach(p=>{
     if(typeof p.rating !== 'number') p.rating = RATING_DEFAULT;
     if(typeof p.ratingGames !== 'number') p.ratingGames = 0;
