@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923133329">
+<meta name="app-build" content="20260923133951">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -31,6 +31,40 @@
       }
     }).catch(function(){ /* pas de réseau : on continue avec la copie actuelle */ });
   }catch(e){}
+})();
+</script>
+<script>
+// En-tête (menu ☰ + bascule Admin/Joueur) : se masque en glissant vers le
+// haut quand on descend dans la page, réapparaît dès qu'on remonte —
+// pratique sur mobile pour ne pas perdre d'espace tout en gardant le menu
+// accessible sans devoir remonter jusqu'en haut. Le .topbar étant recréé à
+// chaque rendu (innerHTML), on l'interroge à nouveau à chaque défilement
+// plutôt que de garder une référence, et on écoute une seule fois au
+// niveau de la fenêtre.
+(function(){
+  var lastY = window.scrollY || 0;
+  var ticking = false;
+  function onScroll(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar){ ticking = false; return; }
+    var y = window.scrollY || 0;
+    var delta = y - lastY;
+    if(y < 40){
+      topbar.classList.remove('topbar-hidden');
+    } else if(delta > 6){
+      topbar.classList.add('topbar-hidden');
+    } else if(delta < -6){
+      topbar.classList.remove('topbar-hidden');
+    }
+    lastY = y;
+    ticking = false;
+  }
+  window.addEventListener('scroll', function(){
+    if(!ticking){
+      window.requestAnimationFrame(onScroll);
+      ticking = true;
+    }
+  }, {passive:true});
 })();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -200,7 +234,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .bottom-nav-item.raised{margin-top:-22px;}
 .bn-icon-circle{width:52px;height:52px;border-radius:50%;background:var(--ball);color:var(--court);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 8px 18px rgba(0,0,0,0.45);margin-bottom:2px;}
 .bottom-nav-item.raised .bn-label{color:var(--muted);}
-.topbar{margin-bottom:18px;background:linear-gradient(120deg, var(--court-light), var(--court));border-radius:14px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);}
+.topbar{margin-bottom:18px;background:linear-gradient(120deg, var(--court-light), var(--court));border-radius:14px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);position:sticky;top:env(safe-area-inset-top);z-index:500;box-shadow:0 8px 18px -10px rgba(0,0,0,0.4);transition:transform .22s ease;}
+.topbar.topbar-hidden{transform:translateY(calc(-100% - env(safe-area-inset-top) - 24px));}
 .topbar-main{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 .topbar-main-3col{display:grid;grid-template-columns:1fr auto 1fr;}
 .topbar-center-info{display:none;align-items:center;gap:8px;}
