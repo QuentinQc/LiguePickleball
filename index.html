@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923140140">
+<meta name="app-build" content="20260923140829">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -2249,7 +2249,7 @@ function adminAllPeopleHTML(){
     const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===s.id);
     return {
       id: s.id, name: s.name, type: 'remplacant', injured: false, absent: false,
-      group: null, rating: null,
+      group: null, rating: typeof s.rating==='number' ? s.rating : RATING_DEFAULT,
       linked: linkedSubIds.has(s.id), isAdmin: isAdminAccount(link), openModal: `openSubstituteDetailModal('${s.id}')`
     };
   });
@@ -2374,8 +2374,14 @@ function adminSubstitutePoolHTML(){
   const sortBy = VIEW.subsSortBy || 'name';
   const sortDir = VIEW.subsSortDir || 'asc';
   const pool = (DATA.substitutePool || []).slice().sort((a,b)=>{
-    const av = (a[sortBy] || '').toString().toLowerCase();
-    const bv = (b[sortBy] || '').toString().toLowerCase();
+    let av, bv;
+    if(sortBy==='rating'){
+      av = typeof a.rating==='number' ? a.rating : RATING_DEFAULT;
+      bv = typeof b.rating==='number' ? b.rating : RATING_DEFAULT;
+    } else {
+      av = (a[sortBy] || '').toString().toLowerCase();
+      bv = (b[sortBy] || '').toString().toLowerCase();
+    }
     const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
     return sortDir==='asc' ? cmp : -cmp;
   });
@@ -2401,17 +2407,19 @@ function adminSubstitutePoolHTML(){
       <table>
         <tr>
           <th class="sortable" onclick="setSubsSort('name')">Nom${arrow('name')}</th>
+          <th class="sortable" onclick="setSubsSort('rating')">Cote${arrow('rating')}</th>
           <th class="sortable" onclick="setSubsSort('email')">Courriel${arrow('email')}</th>
           <th class="sortable" onclick="setSubsSort('notes')">Notes${arrow('notes')}</th>
           <th>Compte</th>
         </tr>
         ${pool.map(s=>`<tr class="clickable-row" onclick="openSubstituteDetailModal('${s.id}')">
           <td>${escapeHTML(s.name)}</td>
+          <td>${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</td>
           <td>${escapeHTML(s.email||'—')}</td>
           <td>${escapeHTML(s.notes||'—')}</td>
           <td>${linkedSubIds.has(s.id) ? '✅' : '—'}</td>
         </tr>`).join('')}
-        ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
+        ${pool.length===0 ? `<tr><td colspan="5" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
       </table>
       <p class="small">Ces personnes apparaissent automatiquement comme choix rapides dans le menu de remplaçant, lors d'une absence en session.</p>
     </div>`;
