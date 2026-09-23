@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923174357">
+<meta name="app-build" content="20260923175737">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -2157,7 +2157,10 @@ function renderAdmin(){
           onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
       </div>
     </div>`;
-  const drawerSettings = '';
+  const drawerSettings = `
+    <div class="drawer-extra-block">
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationManagementModal()">🏢 Organisation (membres, invitations…)</button>
+    </div>`;
   app.innerHTML = `
     ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
     ${storageBannerHTML()}
@@ -2199,7 +2202,10 @@ function renderMlpAdmin(){
         ${myOrgLeagues().map(l=>`<button class="${l.id===CURRENT_LEAGUE_ID?'btn btn-primary':'btn btn-secondary'}" onclick="switchToLeague('${l.id}')">${escapeHTML(l.name)}${l.schedule_label ? ' — '+escapeHTML(l.schedule_label) : ''}</button>`).join('')}
       </div>
     </div>`;
-  const drawerSettings = '';
+  const drawerSettings = `
+    <div class="drawer-extra-block">
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openOrganizationManagementModal()">🏢 Organisation (membres, invitations…)</button>
+    </div>`;
   app.innerHTML = `
     ${topbarHTML('Ligue MLP — Espace administrateur', orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
     ${storageBannerHTML()}
@@ -2222,14 +2228,13 @@ function renderMlpAdmin(){
 // ont leur propre contenu, propre au format MLP (pas de taille de groupe, de
 // format de match à 4/5 joueurs ni de départage individuel en MLP).
 function mlpSettingsSectionHTML(){
-  const sub = VIEW.settingsSubTab || 'organisation';
-  const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  const sub = VIEW.settingsSubTab || 'ligue';
+  const subTabs = [['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
   html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
-  if(sub==='ligue') html += mlpSettingsLigueTabHTML();
-  else if(sub==='jeu') html += mlpSettingsJeuTabHTML();
+  if(sub==='jeu') html += mlpSettingsJeuTabHTML();
   else if(sub==='avance') html += settingsAvanceTabHTML();
-  else html += settingsOrganisationTabHTML();
+  else html += mlpSettingsLigueTabHTML();
   return html;
 }
 function mlpSettingsLigueTabHTML(){
@@ -2442,12 +2447,6 @@ function setAdminTab(t){
   VIEW.tab=t;
   if(t==='joueurs'){
     Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(render);
-    return;
-  }
-  if(t==='reglages'){
-    // Réglages ouvre par défaut sur Organisation, qui affiche le bassin de
-    // membres de toute l'organisation — à charger avant le premier rendu.
-    Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(render);
     return;
   }
   render();
@@ -4464,7 +4463,6 @@ function adminPlayersHTML(){
       <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes. Le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte).</p>
       ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
     </div>
-    ${adminAccountsHTML()}
     <div class="card">
       <div class="row" style="justify-content:space-between;">
         <h2>Réguliers <span class="small">(${players.length})</span></h2>
@@ -4502,7 +4500,6 @@ function playerDetailModalHTML(pid){
   const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
   const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===pid);
   const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
-  const adminCount = ALL_PROFILES.filter(pr=>pr.role==='admin').length;
   const openSession = currentOpenSession();
   const absent = openSession ? isAbsent(openSession, pid) : false;
   const initials = p.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
@@ -4555,31 +4552,18 @@ function playerDetailModalHTML(pid){
         <button class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}');openPlayerDetailModal('${pid}')">retirer</button>
       </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune, déclarées par le joueur lui-même.</p>`}
   </div>`;
+  // Lecture seule ici — la liaison/déliaison d'un compte, le changement de
+  // rôle et la gestion multi-ligues se font maintenant uniquement depuis
+  // Organisation (menu ☰), pas depuis la fiche d'un joueur d'une ligue.
   html += `<div class="modal-section"><h3>Compte lié</h3>`;
   if(profile){
     const isAdmin = profile.role === 'admin';
-    const disableRole = isAdmin && adminCount<=1;
-    html += `
-      <p class="small" style="margin-bottom:10px;">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
-      <div class="action-grid">
-        <button class="action-btn" onclick="closeModal();openProfileLeaguesModal('${profile.id}','${escapeHTML(p.name).replace(/'/g,"\\'")}')"><span class="icon">🏆</span> Gérer ses ligues</button>
-        <button class="action-btn" ${disableRole?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${profile.id}','${isAdmin?'player':'admin'}')"><span class="icon">${isAdmin?'⬇️':'👑'}</span> ${isAdmin?'Retirer admin':'Rendre admin'}</button>
-        <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>
-      </div>`;
+    html += `<p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
+      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
     html += playerNotesSectionHTML();
   } else {
-    const pendingAccounts = ALL_PROFILES.filter(pr=>!LEAGUE_PLAYER_LINKS.some(l=>l.profile_id===pr.id));
-    html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié.</p>`;
-    if(pendingAccounts.length){
-      html += `
-        <select id="detailLinkSelect_${pid}">
-          <option value="">— choisir un compte en attente —</option>
-          ${pendingAccounts.map(pr=>`<option value="${pr.id}">${escapeHTML(pr.display_name||pr.email)} (${escapeHTML(pr.email)})</option>`).join('')}
-        </select>
-        <button class="btn btn-secondary" style="margin-top:8px;" onclick="linkPlayerToAccountFromModal('${pid}')">Lier ce compte</button>`;
-    } else {
-      html += `<p class="small">Aucun compte en attente à lier pour l'instant.</p>`;
-    }
+    html += `<p class="small">Aucun compte lié.</p>
+      <p class="small" style="color:var(--muted);">Pour lier un compte en attente à ce joueur : menu ☰ → Organisation.</p>`;
   }
   html += `</div>`;
   html += playerNotesSectionHTML();
@@ -4713,18 +4697,6 @@ function toggleMyInjured(pid){
     p.injured = false;
   }
   saveAndRender();
-}
-async function linkPlayerToAccountFromModal(pid){
-  const select = document.getElementById('detailLinkSelect_'+pid);
-  if(!select) return;
-  const profileId = select.value;
-  if(!profileId) return;
-  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: pid });
-  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, pid, profileId);
-  await loadAllProfiles();
-  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
-  openPlayerDetailModal(pid);
 }
 function setRegularsSort(col){
   if((VIEW.regularsSortBy||'name') === col){ VIEW.regularsSortDir = (VIEW.regularsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
@@ -4937,6 +4909,7 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
+  let createdId;
   if(type==='remplacant'){
     leagueData.substitutePool = leagueData.substitutePool || [];
     const finalName = uniquePlayerName(name, leagueData.substitutePool);
@@ -4944,6 +4917,7 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
     if(email) entry.email = email;
     if(orgMemberId) entry.orgMemberId = orgMemberId;
     leagueData.substitutePool.push(entry);
+    createdId = entry.id;
   } else {
     leagueData.players = leagueData.players || [];
     leagueData.groups = leagueData.groups || [];
@@ -4956,10 +4930,11 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
     if(email) newPlayer.email = email;
     if(orgMemberId) newPlayer.orgMemberId = orgMemberId;
     leagueData.players.push(newPlayer);
+    createdId = newPlayer.id;
   }
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
-  return true;
+  return createdId;
 }
 // Recharge tout ce qui a pu changer après un ajout/assignation en arrière-
 // plan (bassin, comptes) et, si la ligue actuellement affichée en fait
@@ -5095,14 +5070,35 @@ async function toggleProfileLeague(profileId, leagueId, checked, displayName){
   closeModal();
   openProfileLeaguesModal(profileId, displayName);
 }
-function adminAccountsHTML(){
-  const linkedProfileIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.profile_id));
-  const pending = ALL_PROFILES.filter(p=>!linkedProfileIds.has(p.id));
-  const unlinkedPlayers = DATA.players.filter(pl => !LEAGUE_PLAYER_LINKS.some(l=>l.player_id===pl.id));
-  const orphaned = LEAGUE_PLAYER_LINKS
-    .map(link=>({ link, profile: ALL_PROFILES.find(p=>p.id===link.profile_id) }))
-    .filter(x=>x.profile && !DATA.players.some(p=>p.id===x.link.player_id));
-  const adminCount = ALL_PROFILES.filter(p=>p.role==='admin').length;
+// Comptes gérés au niveau de l'organisation (pas d'une ligue précise) : un
+// compte en attente peut être lié à un joueur dans N'IMPORTE LAQUELLE des
+// ligues de l'organisation, choisie directement dans le menu déroulant
+// (un groupe par ligue). Auparavant cette section vivait dans l'onglet
+// Joueurs d'une ligue et ne voyait que les comptes/joueurs de CETTE ligue.
+function organizationAccountsHTML(){
+  const orgLeagues = myOrgLeagues();
+  const orgLeagueIds = new Set(orgLeagues.map(l=>l.id));
+  const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
+  const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
+  const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
+  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id));
+  const unlinkedPlayersByLeague = (leagueId)=>{
+    const bucket = ORG_ROSTER_BY_LEAGUE[leagueId] || { players: [] };
+    const linkedInLeague = new Set(orgLinks.filter(pp=>pp.league_id===leagueId).map(pp=>pp.player_id));
+    return (bucket.players||[]).filter(pl=>!linkedInLeague.has(pl.id));
+  };
+  const optionsFor = (pr)=> orgLeagues.map(l=>{
+    const label = l.schedule_label || l.name;
+    const unlinked = unlinkedPlayersByLeague(l.id);
+    return `<optgroup label="${escapeHTML(label)}">
+      ${unlinked.map(pl=>`<option value="${l.id}::${pl.id}">${escapeHTML(pl.name)}</option>`).join('')}
+      <option value="${l.id}::__new__">+ Créer un nouveau joueur « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
+    </optgroup>`;
+  }).join('');
+  const orphaned = orgLinks
+    .map(link=>({ link, profile: ALL_PROFILES.find(p=>p.id===link.profile_id), league: orgLeagues.find(l=>l.id===link.league_id) }))
+    .filter(x=>x.profile && x.league && !((ORG_ROSTER_BY_LEAGUE[x.link.league_id]||{}).players||[]).some(p=>p.id===x.link.player_id));
+  const adminCount = orgProfiles.filter(p=>p.role==='admin').length;
   const roleButton = (pr)=>{
     const isAdmin = pr.role === 'admin';
     const disable = isAdmin && adminCount<=1;
@@ -5113,7 +5109,7 @@ function adminAccountsHTML(){
       <h2>Comptes en attente <span class="small">(${pending.length})</span></h2>
       <button class="btn-ghost" onclick="refreshAccountsTab()">rafraîchir</button>
     </div>
-    <p class="small">Ces personnes ont créé un compte mais ne sont pas encore associées à un joueur de cette ligue. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
+    <p class="small">Ces personnes ont créé un compte mais ne sont associées à un joueur dans aucune ligue de ton organisation. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
     <table>
       <tr><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Associer à</th></tr>
       ${pending.map(pr=>`<tr${pr.role==='admin' ? ' style="background:rgba(207,234,92,0.06);"' : ''}>
@@ -5122,9 +5118,8 @@ function adminAccountsHTML(){
         <td>${pr.role==='admin'?'Admin':(pr.role==='substitute'?'Remplaçant':'Joueur')}<br>${roleButton(pr)}</td>
         <td>
           <select id="linkSelect_${pr.id}">
-            <option value="">— choisir un joueur —</option>
-            ${unlinkedPlayers.map(pl=>`<option value="${pl.id}">${escapeHTML(pl.name)}</option>`).join('')}
-            <option value="__new__">+ Créer un nouveau joueur « ${escapeHTML(pr.display_name||pr.email)} »</option>
+            <option value="">— choisir une ligue et un joueur —</option>
+            ${optionsFor(pr)}
           </select>
           <button class="btn-ghost" onclick="linkAccount('${pr.id}')">lier</button>
         </td>
@@ -5135,21 +5130,22 @@ function adminAccountsHTML(){
   if(orphaned.length){
     html += `<div class="card">
       <h2 style="color:var(--danger);">Comptes orphelins <span class="small">(${orphaned.length})</span></h2>
-      <p class="small">Le joueur associé à ces comptes a été retiré. Reconnecte-les à un joueur existant, ou supprime le lien.</p>
+      <p class="small">Le joueur associé à ces comptes a été retiré. Reconnecte-les à un joueur existant de la même ligue, ou supprime le lien.</p>
       <table>
-        <tr><th>Courriel</th><th>Rôle</th><th>Reconnecter à</th><th></th></tr>
-        ${orphaned.map(({profile})=>`<tr>
+        <tr><th>Courriel</th><th>Ligue</th><th>Rôle</th><th>Reconnecter à</th><th></th></tr>
+        ${orphaned.map(({profile, league})=>`<tr>
           <td>${escapeHTML(profile.email)}</td>
+          <td>${escapeHTML(league.schedule_label || league.name)}</td>
           <td>${profile.role==='admin' ? 'Admin' : 'Joueur'}<br>${roleButton(profile)}</td>
           <td>
             <select id="relinkSelect_${profile.id}">
               <option value="">— choisir un joueur —</option>
-              ${unlinkedPlayers.map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
+              ${unlinkedPlayersByLeague(league.id).map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
               <option value="__new__">+ Créer un nouveau joueur « ${escapeHTML(profile.display_name||profile.email)} »</option>
             </select>
-            <button class="btn-ghost" onclick="relinkAccount('${profile.id}')">relier</button>
+            <button class="btn-ghost" onclick="relinkAccount('${profile.id}','${league.id}')">relier</button>
           </td>
-          <td><button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}')">délier</button></td>
+          <td><button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}','${league.id}')">délier</button></td>
         </tr>`).join('')}
       </table>
     </div>`;
@@ -5185,61 +5181,64 @@ function setAccountRole(profileId, newRole){
     render();
   });
 }
-function refreshAccountsTab(){ loadAllProfiles().then(render); }
-async function linkAccount(profileId){
-  const select = document.getElementById('linkSelect_'+profileId);
-  const value = select.value;
-  if(!value) return;
-  let playerId = value;
-  if(value === '__new__'){
-    const pr = ALL_PROFILES.find(p=>p.id===profileId);
-    const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
-    if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
-    const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
-    const newPlayer = { id: uid('p'), name, groupId, order: nextOrderInGroup(groupId) };
-    DATA.players.push(newPlayer);
-    await saveData();
-    playerId = newPlayer.id;
-  }
-  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, player_id: playerId });
-  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, playerId, profileId);
-  await loadAllProfiles();
+function refreshAccountsTab(){ Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster()]).then(render); }
+// Recharge ce qui a pu changer après une action sur un compte, et si la
+// ligue concernée est celle actuellement affichée, ses propres données
+// aussi — pour que l'écran (et le classement/les groupes) reflète tout de
+// suite un joueur créé depuis cette action.
+async function refreshAfterAccountChange(profileId, leagueId){
+  await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster()]);
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
+  if(CURRENT_LEAGUE_ID === leagueId){
+    const loaded = await loadData(CURRENT_LEAGUE_ID);
+    if(loaded){ DATA = loaded; migrateData(); }
+  }
   render();
 }
+// La ligue à lier n'est plus fixée d'avance (CURRENT_LEAGUE_ID) : elle est
+// choisie dans le menu déroulant, encodée dans sa valeur en "leagueId::playerId".
+async function linkAccount(profileId){
+  const select = document.getElementById('linkSelect_'+profileId);
+  const raw = select.value;
+  if(!raw) return;
+  const sep = raw.indexOf('::');
+  const leagueId = raw.slice(0, sep);
+  const val = raw.slice(sep+2);
+  const pr = ALL_PROFILES.find(p=>p.id===profileId);
+  let playerId = val;
+  if(val === '__new__'){
+    playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+    if(!playerId) return;
+  }
+  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: playerId });
+  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+  await migratePlayerNotesToProfile(leagueId, playerId, profileId);
+  await refreshAfterAccountChange(profileId, leagueId);
+}
 // Reconnecte un compte dont le joueur associé a été retiré par erreur (le
-// lien existe déjà en base pour cette ligue, on met juste à jour vers quel
-// joueur il pointe, plutôt que de devoir délier puis relier séparément).
-async function relinkAccount(profileId){
+// lien existe déjà en base pour cette ligue précise, on met juste à jour
+// vers quel joueur il pointe, plutôt que de devoir délier puis relier).
+async function relinkAccount(profileId, leagueId){
   const select = document.getElementById('relinkSelect_'+profileId);
   const value = select.value;
   if(!value) return;
   let playerId = value;
   if(value === '__new__'){
     const pr = ALL_PROFILES.find(p=>p.id===profileId);
-    const groupId = firstGroupWithRoom(DATA.groups, DATA.players);
-    if(!groupId){ showAlert("Crée d'abord au moins un groupe (ou tous sont pleins à 5 joueurs)."); return; }
-    const name = uniquePlayerName(pr.display_name || pr.email, DATA.players);
-    const newPlayer = { id: uid('p'), name, groupId, order: nextOrderInGroup(groupId) };
-    DATA.players.push(newPlayer);
-    await saveData();
-    playerId = newPlayer.id;
+    playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+    if(!playerId) return;
   }
-  const { error } = await sb.from('profile_players').update({ player_id: playerId }).eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
+  const { error } = await sb.from('profile_players').update({ player_id: playerId }).eq('profile_id', profileId).eq('league_id', leagueId);
   if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
-  await migratePlayerNotesToProfile(CURRENT_LEAGUE_ID, playerId, profileId);
-  await loadAllProfiles();
-  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
-  render();
+  await migratePlayerNotesToProfile(leagueId, playerId, profileId);
+  await refreshAfterAccountChange(profileId, leagueId);
 }
-async function unlinkAccount(profileId){
+async function unlinkAccount(profileId, leagueId){
   showConfirm("Délier ce compte de son joueur pour cette ligue ? (Ses liens avec d'autres ligues, s'il y en a, ne sont pas touchés.)", async ()=>{
-    const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', CURRENT_LEAGUE_ID);
+    const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', leagueId);
     if(error){ showAlert("Erreur : " + error.message); return; }
-    await loadAllProfiles();
-    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
-    render();
+    if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId) ADMIN_VIEWING_AS = null;
+    await refreshAfterAccountChange(profileId, leagueId);
   });
 }
 
@@ -5636,7 +5635,7 @@ async function emailAbsenceReminder(){
     .filter(Boolean);
   const uniqueEmails = [...new Set(emails)];
   if(uniqueEmails.length === 0){
-    showAlert("Aucun courriel de joueur trouvé. Les joueurs doivent d'abord créer un compte et être associés dans l'onglet Comptes.");
+    showAlert("Aucun courriel de joueur trouvé. Les joueurs doivent d'abord créer un compte et être associés (menu ☰ → Organisation).");
     return;
   }
   const subject = `Rappel — Session du ${open.date}`;
@@ -6242,23 +6241,25 @@ function settingsRow(icon, title, summary, onClickFn){
   </div>`;
 }
 function adminSettingsSectionHTML(){
-  const sub = VIEW.settingsSubTab || 'organisation';
-  const subTabs = [['organisation','🏢 Organisation'],['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  const sub = VIEW.settingsSubTab || 'ligue';
+  const subTabs = [['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
   html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
-  if(sub==='ligue') html += settingsLigueTabHTML();
-  else if(sub==='jeu') html += settingsJeuTabHTML();
+  if(sub==='jeu') html += settingsJeuTabHTML();
   else if(sub==='avance') html += settingsAvanceTabHTML();
-  else html += settingsOrganisationTabHTML();
+  else html += settingsLigueTabHTML();
   return html;
 }
-function setSettingsSubTab2(t){
-  VIEW.settingsSubTab = t;
-  if(t==='organisation'){
-    Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(render);
-    return;
-  }
-  render();
+function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
+// Ouvre la gestion de l'organisation (membres, invitation, création d'une
+// autre organisation…) — accessible depuis le tiroir plutôt que noyée dans
+// les réglages de la ligue actuelle, puisqu'elle couvre TOUTES les ligues
+// de l'organisation plutôt qu'une seule.
+function openOrganizationManagementModal(){
+  Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(()=>{
+    MODAL = { kind:'content', title:'Organisation', htmlContent: settingsOrganisationTabHTML };
+    render();
+  });
 }
 
 function settingsOrganisationTabHTML(){
@@ -6279,6 +6280,7 @@ function settingsOrganisationTabHTML(){
     <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="copyAppLink()">🔗 Copier le lien pour démarrer une nouvelle organisation</button>` : ''}
   </div>`;
   html += organizationMembersCardHTML();
+  html += organizationAccountsHTML();
   return html;
 }
 // ---- Membres de l'organisation : gérer une personne une seule fois, puis
@@ -7105,13 +7107,13 @@ function settingsGuideHTML(){
     </div>
     <div class="card">
       <h3>Comptes, rôles et cote</h3>
-      <p class="small">Un compte doit être lié à un joueur (onglet Joueurs) avant d'accéder à sa vue joueur. Le rôle admin/joueur se change dans le pop-up du joueur lié. La cote évolue automatiquement après chaque match et est modifiable manuellement au besoin.</p>
+      <p class="small">Un compte doit être lié à un joueur (menu ☰ → Organisation) avant d'accéder à sa vue joueur. Le rôle admin/joueur se change au même endroit. La cote évolue automatiquement après chaque match et est modifiable manuellement au besoin.</p>
     </div>
     <div class="card">
       <h3>Dépannage courant</h3>
       <p class="small">• Mauvais nombre de matchs générés → vérifie le Mode test.<br>
       • Joueur qui ne voit pas ses matchs → vérifie que la session est publiée.<br>
-      • Compte orphelin → onglet Joueurs → Réguliers, section Comptes orphelins.</p>
+      • Compte orphelin → menu ☰ → Organisation, section Comptes orphelins.</p>
     </div>
     <div class="card">
       <button class="btn-ghost" onclick="showPlayerGuideModal()">📖 Aperçu du guide du joueur</button>
