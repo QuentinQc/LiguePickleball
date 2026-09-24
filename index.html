@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924183024">
+<meta name="app-build" content="20260924183958">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -6044,15 +6044,48 @@ function openPrintWindow(title, bodyHtml, landscape){
     .print-table th,.print-table td{border:1px solid #000;padding:8px 10px;font-size:13px;text-align:left;color:#000;}
     .print-table th{background:#fff;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;font-weight:700;}
     .print-score-box{display:inline-block;width:42px;height:24px;border:1px solid #000;vertical-align:middle;}
+    .print-toolbar{position:sticky;top:0;z-index:9999;display:flex;gap:8px;justify-content:flex-end;align-items:center;background:#f2f2f2;border-bottom:1px solid #ccc;padding:10px 12px;}
+    .print-toolbar button{font-size:15px;font-weight:600;padding:10px 16px;border-radius:8px;border:1px solid #999;background:#fff;color:#000;cursor:pointer;}
+    .print-toolbar button.primary{background:#111;color:#fff;border-color:#111;}
+    @media print{.print-toolbar{display:none !important;}}
     ${typeof MATCH_SHEET_CSS !== 'undefined' ? MATCH_SHEET_CSS : ''}
   `;
+  // Barre d'outils visible à l'écran (jamais imprimée) : dans l'app
+  // installée (mode standalone), cette page d'impression n'a ni barre
+  // d'adresse ni bouton retour du navigateur — sans ce bouton "Fermer",
+  // l'utilisateur resterait coincé dessus.
+  const toolbar = `<div class="print-toolbar">
+    <button type="button" onclick="window.print()">🖨️ Imprimer</button>
+    <button type="button" class="primary" onclick="closeThisPrintPage()">✕ Fermer</button>
+  </div>`;
+  // NB : on construit la balise de script en deux morceaux (concaténation)
+  // car cette séquence de caractères, même dans un commentaire ou une
+  // chaîne, fermerait prématurément CE bloc de script (celui de l'app)
+  // pour le parseur HTML — il ne comprend pas le JS, il cherche juste le
+  // texte brut.
+  const closeScriptBody = `
+    function closeThisPrintPage(){
+      try{ window.close(); }catch(e){}
+      setTimeout(function(){
+        // Si la fenêtre est toujours là (certains navigateurs/PWA refusent
+        // window.close ou ont réutilisé la même fenêtre), on retourne à
+        // l'app plutôt que de laisser la personne coincée sur cette page.
+        try{
+          if(window.opener){ window.opener.focus && window.opener.focus(); }
+          if(history.length>1){ history.back(); return; }
+        }catch(e){}
+        location.href = ${JSON.stringify(location.href)};
+      }, 150);
+    }
+  `;
+  const closeScript = '<' + 'script>' + closeScriptBody + '<' + '/script>';
   const w = window.open('', '_blank');
   if(!w){
     showAlert("Le navigateur a bloqué l'ouverture de la fenêtre d'impression. Autorise les fenêtres pop-up pour ce site, puis réessaie.");
     return;
   }
   w.document.open();
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>${css}</style></head><body>${bodyHtml}</body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>${css}</style></head><body>${toolbar}${bodyHtml}${closeScript}</body></html>`);
   w.document.close();
   w.focus();
   setTimeout(()=>{ w.print(); }, 250);
@@ -6136,30 +6169,29 @@ const MATCH_SHEET_CSS = `
   .ms-sit{font-size:var(--ms-sit-font,10.5px);font-weight:400;color:#666;white-space:nowrap;}
 `;
 // Paliers de compression pour la feuille de match (un match par ligne),
-// du plus grand (T0) au plus compact (T6). Chaque palier a été validé par
-// test réel (rendu + impression PDF portrait Lettre) en supposant des
-// marges d'imprimante DÉFAVORABLES (jusqu'à ~25mm/1po) plutôt que les
-// 12mm demandées par @page — beaucoup d'imprimantes/navigateurs (surtout
-// mobiles) ignorent partiellement la marge CSS et appliquent leur propre
-// marge par défaut, plus généreuse. Les seuils ci-dessous restent donc
-// sûrs même dans ce cas.
+// du plus grand (T0) au plus compact (T6). Un test réel sur iPad a montré
+// qu'une impression réelle (AirPrint) tient sur nettement moins de place
+// que les tests en local (marges/polices différentes) — ces paliers sont
+// donc volontairement resserrés et testés avec une marge défavorable de
+// 35 à 38mm (bien au-delà des marges habituelles) pour garder une bonne
+// marge de sécurité même sur un appareil dont on ne contrôle pas le rendu.
 const MATCH_SHEET_TIERS = [
-  { font:14,  numFont:12,  sitFont:10.5, padY:8,   padX:12, scoreW:40, scoreH:32, nameGap:2,    matchGap:4,   rowGap:6 },    // ≤11
-  { font:12.5,numFont:11,  sitFont:9.5,  padY:6,   padX:10, scoreW:34, scoreH:26, nameGap:1,    matchGap:2,   rowGap:5 },    // ≤13
-  { font:11,  numFont:10,  sitFont:9,    padY:4,   padX:8,  scoreW:28, scoreH:22, nameGap:0.5,  matchGap:1,   rowGap:4 },    // ≤16
-  { font:10,  numFont:9,   sitFont:8.5,  padY:3,   padX:7,  scoreW:24, scoreH:19, nameGap:0,    matchGap:0.5, rowGap:3 },    // ≤18
-  { font:9,   numFont:8.5, sitFont:8,    padY:2,   padX:6,  scoreW:20, scoreH:16, nameGap:0,    matchGap:0.5, rowGap:2.5 },  // ≤22
-  { font:8,   numFont:7.5, sitFont:7,    padY:1,   padX:4,  scoreW:16, scoreH:13, nameGap:0,    matchGap:0,   rowGap:1.5 },  // ≤26
-  { font:6.5, numFont:6,   sitFont:5.5,  padY:0.25,padX:2,  scoreW:11, scoreH:10, nameGap:0,    matchGap:0,   rowGap:0.5 },  // ≤30
+  { font:14,  numFont:11,  sitFont:9.5, padY:5,   padX:10, scoreW:34, scoreH:26, nameGap:1,   matchGap:2,   rowGap:4 },    // ≤10
+  { font:12.5,numFont:10,  sitFont:8.5, padY:3.5, padX:8,  scoreW:28, scoreH:22, nameGap:0.5, matchGap:1,   rowGap:3 },    // ≤13
+  { font:11,  numFont:9,   sitFont:8,   padY:2.5, padX:6,  scoreW:24, scoreH:18, nameGap:0,   matchGap:0.5, rowGap:2 },    // ≤16
+  { font:10,  numFont:8.5, sitFont:7.5, padY:1.5, padX:5,  scoreW:20, scoreH:15, nameGap:0,   matchGap:0,   rowGap:1.5 },  // ≤18
+  { font:9,   numFont:8,   sitFont:7,   padY:1,   padX:4,  scoreW:17, scoreH:13, nameGap:0,   matchGap:0,   rowGap:1 },    // ≤22
+  { font:8,   numFont:7,   sitFont:6.5, padY:0.5, padX:3,  scoreW:14, scoreH:11, nameGap:0,   matchGap:0,   rowGap:0.75 }, // ≤24
+  { font:7,   numFont:6.5, sitFont:6,   padY:0.25,padX:2,  scoreW:12, scoreH:10, nameGap:0,   matchGap:0,   rowGap:0.5 },  // au-delà (meilleur effort)
 ];
 function matchSheetTierFor(n){
-  if(n<=11) return MATCH_SHEET_TIERS[0];
+  if(n<=10) return MATCH_SHEET_TIERS[0];
   if(n<=13) return MATCH_SHEET_TIERS[1];
   if(n<=16) return MATCH_SHEET_TIERS[2];
   if(n<=18) return MATCH_SHEET_TIERS[3];
   if(n<=22) return MATCH_SHEET_TIERS[4];
-  if(n<=26) return MATCH_SHEET_TIERS[5];
-  return MATCH_SHEET_TIERS[6]; // meilleur effort au-delà de 30 matchs (rarissime)
+  if(n<=24) return MATCH_SHEET_TIERS[5];
+  return MATCH_SHEET_TIERS[6]; // meilleur effort au-delà de 24 matchs (rarissime)
 }
 function matchSheetRowStyleVars(n){
   const t = matchSheetTierFor(n);
