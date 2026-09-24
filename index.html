@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924150307">
+<meta name="app-build" content="20260924154314">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -24,7 +24,7 @@
     var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
     var probeUrl = location.pathname + '?_probe=' + Date.now();
     fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
-      var m = html.match(/<meta name="app-build" content="20260924150307"]+)">/);
+      var m = html.match(/<meta name="app-build" content="20260924154314"]+)">/);
       if(m && m[1] && m[1] !== CURRENT_BUILD){
         var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
         location.replace(freshUrl);
@@ -1622,8 +1622,12 @@ function toggleAbsence(playerId){
   if(becomingAbsent){
     open.absences.push(playerId);
     // Notifie les admins seulement quand le joueur déclare lui-même son
-    // absence (pas quand un admin la coche manuellement pour quelqu'un).
-    if(SESSION_USER && SESSION_USER.role==='player' && SESSION_USER.playerId===playerId){
+    // absence — soit via un vrai compte joueur, soit un admin qui bascule
+    // sur sa propre vue « Joueur » (pas quand un admin la coche
+    // manuellement pour quelqu'un d'autre).
+    const isSelfDeclared = (SESSION_USER && SESSION_USER.role==='player' && SESSION_USER.playerId===playerId)
+      || (SESSION_USER && SESSION_USER.role==='admin' && ADMIN_VIEWING_AS==='player' && MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.player_id===playerId);
+    if(isSelfDeclared){
       notifyAdminsPlayerAbsent(homeP && homeP.name, open.date);
     }
   } else {
@@ -7690,8 +7694,11 @@ function toggleSubAvailability(subId){
   if(idx===-1){
     open.availableSubs.push(subId);
     // Notifie les admins seulement quand c'est le remplaçant lui-même qui
-    // s'indique disponible (pas un admin qui teste/regarde en son nom).
-    if(SESSION_USER && SESSION_USER.role==='substitute' && SESSION_USER.substituteId===subId){
+    // s'indique disponible — soit via un vrai compte remplaçant, soit un
+    // admin qui bascule sur sa propre vue « Remplaçant ».
+    const isSelfDeclared = (SESSION_USER && SESSION_USER.role==='substitute' && SESSION_USER.substituteId===subId)
+      || (SESSION_USER && SESSION_USER.role==='admin' && ADMIN_VIEWING_AS==='substitute' && MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id===subId);
+    if(isSelfDeclared){
       const sub = (DATA.substitutePool||[]).find(s=>s.id===subId);
       notifyAdminsSubAvailable(sub && sub.name, open.date);
     }
