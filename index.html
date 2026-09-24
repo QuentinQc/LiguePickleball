@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924180027">
+<meta name="app-build" content="20260924181410">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -24,7 +24,7 @@
     var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
     var probeUrl = location.pathname + '?_probe=' + Date.now();
     fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
-      var m = html.match(/<meta name="app-build" content="20260924180027"]+)">/);
+      var m = html.match(/<meta name="app-build" content="20260924181410"]+)">/);
       if(m && m[1] && m[1] !== CURRENT_BUILD){
         var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
         location.replace(freshUrl);
@@ -6073,11 +6073,10 @@ function printableMatchSheetsHTML(session){
     const target = targetPointsFor(activeCount);
     const n = gd.matches.length;
     // Une seule colonne (un match par ligne) ; la taille des lignes se
-    // resserre automatiquement selon le nombre de matchs pour que tout
-    // tienne sur une seule page portrait par groupe.
-    let compact = '';
-    if(n>20) compact = ' ms-ultra';
-    else if(n>12) compact = ' ms-compact';
+    // resserre automatiquement selon le nombre de matchs (palier testé,
+    // voir matchSheetTierFor) pour que tout tienne sur une seule page
+    // portrait par groupe.
+    const rowStyleVars = matchSheetRowStyleVars(n);
     html += `<div class="ms-page">
       <div class="ms-header">
         <div>
@@ -6089,8 +6088,8 @@ function printableMatchSheetsHTML(session){
           <div>Matchs en <strong>${target} points</strong></div>
         </div>
       </div>
-      <div class="ms-grid" style="grid-template-columns:repeat(1,1fr);">
-        ${gd.matches.map((m,i)=>`<div class="ms-match${compact}">
+      <div class="ms-grid" style="grid-template-columns:repeat(1,1fr);${rowStyleVars}">
+        ${gd.matches.map((m,i)=>`<div class="ms-match">
           <div class="ms-match-num">${i+1}</div>
           <div class="ms-teams">
             <div class="ms-team-names">${m.teamA.map(id=>`<div class="ms-player-name">${escapeHTML(playerName(id))}</div>`).join('')}</div>
@@ -6106,10 +6105,11 @@ function printableMatchSheetsHTML(session){
   });
   return html || `<div class="ms-page"><p class="print-sub">Aucun match à imprimer pour cette session.</p></div>`;
 }
-// CSS dédié à printableMatchSheetsHTML — un match par ligne (colonne unique),
-// dont la hauteur se resserre automatiquement (.ms-compact / .ms-ultra)
-// selon le nombre de matchs, pensé pour rester lisible même imprimé en
-// N&B et tenir sur une seule page portrait par groupe.
+// CSS dédié à printableMatchSheetsHTML — un match par ligne (colonne unique).
+// La taille (police, espacements, cases de score) est pilotée par des
+// variables CSS injectées par match_ROW_STYLE_VARS ci-dessous, choisies
+// selon le nombre de matchs du groupe pour que tout tienne toujours sur
+// une seule page portrait par groupe (palier testé jusqu'à ~36 matchs).
 const MATCH_SHEET_CSS = `
   .ms-page{page-break-after:always;padding:6mm 4mm;display:flex;flex-direction:column;}
   .ms-page:last-child{page-break-after:auto;}
@@ -6117,30 +6117,44 @@ const MATCH_SHEET_CSS = `
   .ms-league{font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:#444;}
   .ms-group{font-size:24px;font-weight:800;}
   .ms-meta{text-align:right;font-size:12px;color:#333;line-height:1.5;}
-  .ms-grid{display:grid;gap:6px;}
-  .ms-match{border:1px solid #000;border-radius:6px;padding:8px 12px;page-break-inside:avoid;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;}
-  .ms-match-num{flex:0 0 auto;font-size:12px;font-weight:800;color:#555;width:20px;text-align:center;}
+  .ms-grid{display:grid;gap:var(--ms-row-gap,6px);}
+  .ms-match{border:1px solid #000;border-radius:6px;padding:var(--ms-pad-y,8px) var(--ms-pad-x,12px);page-break-inside:avoid;display:flex;flex-wrap:wrap;align-items:center;gap:var(--ms-match-gap,4px) 10px;}
+  .ms-match-num{flex:0 0 auto;font-size:var(--ms-num-font,12px);font-weight:800;color:#555;width:20px;text-align:center;}
   .ms-teams{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
-  .ms-team-names{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .ms-team-names{flex:1;display:flex;flex-direction:column;gap:var(--ms-name-gap,2px);min-width:0;}
   .ms-team-names-right{align-items:flex-end;}
-  .ms-player-name{font-size:14px;font-weight:600;overflow-wrap:break-word;}
+  .ms-player-name{font-size:var(--ms-font,14px);font-weight:600;overflow-wrap:break-word;}
   .ms-team-names-right .ms-player-name{text-align:right;}
   .ms-vs{font-size:12px;color:#888;flex:0 0 auto;}
-  .ms-score-box{flex:0 0 auto;display:inline-block;width:40px;height:32px;border:1.5px solid #000;border-radius:4px;}
-  .ms-sit{flex-basis:100%;font-size:10.5px;font-weight:400;color:#666;padding-left:30px;}
-  .ms-match.ms-compact{padding:6px 10px;gap:2px 8px;}
-  .ms-match.ms-compact .ms-match-num{font-size:11px;}
-  .ms-match.ms-compact .ms-player-name{font-size:12.5px;}
-  .ms-match.ms-compact .ms-team-names{gap:1px;}
-  .ms-match.ms-compact .ms-score-box{width:34px;height:26px;}
-  .ms-match.ms-compact .ms-sit{font-size:9.5px;padding-left:26px;}
-  .ms-match.ms-ultra{padding:4px 8px;gap:1px 6px;}
-  .ms-match.ms-ultra .ms-match-num{font-size:10px;width:16px;}
-  .ms-match.ms-ultra .ms-player-name{font-size:11px;}
-  .ms-match.ms-ultra .ms-team-names{gap:0;}
-  .ms-match.ms-ultra .ms-score-box{width:28px;height:22px;}
-  .ms-match.ms-ultra .ms-sit{font-size:9px;padding-left:22px;}
+  .ms-score-box{flex:0 0 auto;display:inline-block;width:var(--ms-score-w,40px);height:var(--ms-score-h,32px);border:1.5px solid #000;border-radius:4px;}
+  .ms-sit{flex-basis:100%;font-size:var(--ms-sit-font,10.5px);font-weight:400;color:#666;padding-left:30px;}
 `;
+// Paliers de compression pour la feuille de match (un match par ligne),
+// du plus grand (T0) au plus compact (T9). Chaque palier a été validé par
+// test réel (rendu + impression PDF portrait Lettre) pour tenir sur une
+// seule page jusqu'au nombre de matchs indiqué en commentaire.
+const MATCH_SHEET_TIERS = [
+  { font:14,  numFont:12,  sitFont:10.5, padY:8,   padX:12, scoreW:40, scoreH:32, nameGap:2,    matchGap:4,   rowGap:6 },    // ≤11
+  { font:12.5,numFont:11,  sitFont:9.5,  padY:6,   padX:10, scoreW:34, scoreH:26, nameGap:1,    matchGap:2,   rowGap:5 },    // ≤14
+  { font:11,  numFont:10,  sitFont:9,    padY:4,   padX:8,  scoreW:28, scoreH:22, nameGap:0.5,  matchGap:1,   rowGap:4 },    // ≤16
+  { font:10,  numFont:9,   sitFont:8.5,  padY:3,   padX:7,  scoreW:24, scoreH:19, nameGap:0,    matchGap:0.5, rowGap:3 },    // ≤18
+  { font:9,   numFont:8.5, sitFont:8,    padY:2,   padX:6,  scoreW:20, scoreH:16, nameGap:0,    matchGap:0.5, rowGap:2.5 },  // ≤22
+  { font:8,   numFont:7.5, sitFont:7,    padY:1,   padX:4,  scoreW:16, scoreH:13, nameGap:0,    matchGap:0,   rowGap:1.5 },  // ≤28
+  { font:7,   numFont:6.5, sitFont:6,    padY:0.5, padX:2.5,scoreW:12, scoreH:11, nameGap:0,    matchGap:0,   rowGap:0.75 }, // ≤36
+];
+function matchSheetTierFor(n){
+  if(n<=11) return MATCH_SHEET_TIERS[0];
+  if(n<=14) return MATCH_SHEET_TIERS[1];
+  if(n<=16) return MATCH_SHEET_TIERS[2];
+  if(n<=18) return MATCH_SHEET_TIERS[3];
+  if(n<=22) return MATCH_SHEET_TIERS[4];
+  if(n<=28) return MATCH_SHEET_TIERS[5];
+  return MATCH_SHEET_TIERS[6]; // meilleur effort au-delà de 36 matchs (rarissime)
+}
+function matchSheetRowStyleVars(n){
+  const t = matchSheetTierFor(n);
+  return `--ms-row-gap:${t.rowGap}px;--ms-pad-y:${t.padY}px;--ms-pad-x:${t.padX}px;--ms-font:${t.font}px;--ms-num-font:${t.numFont}px;--ms-sit-font:${t.sitFont}px;--ms-score-w:${t.scoreW}px;--ms-score-h:${t.scoreH}px;--ms-name-gap:${t.nameGap}px;--ms-match-gap:${t.matchGap}px;`;
+}
 function printMatchSheets(sessionId){
   const session = DATA.sessions.find(s=>s.id===sessionId) || currentOpenSession();
   if(!session){ showAlert("Aucune session trouvée à imprimer."); return; }
