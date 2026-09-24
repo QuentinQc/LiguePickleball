@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260923190115">
+<meta name="app-build" content="20260924125602">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -24,7 +24,7 @@
     var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
     var probeUrl = location.pathname + '?_probe=' + Date.now();
     fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
-      var m = html.match(/<meta name="app-build" content="20260923190115"]+)">/);
+      var m = html.match(/<meta name="app-build" content="20260924125602"]+)">/);
       if(m && m[1] && m[1] !== CURRENT_BUILD){
         var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
         location.replace(freshUrl);
@@ -669,6 +669,86 @@ async function saveOrgVideoData(){
   }
 }
 function saveOrgVideoDataAndRender(){ saveOrgVideoData(); render(); }
+// ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
+// un tournoi peut regrouper des participants de plusieurs ligues de
+// l'organisation, plutôt que d'être enfermé dans les données d'une seule. ----
+let ORG_TOURNAMENT_DATA = { tournaments: [] };
+function orgTournaments(){
+  if(!ORG_TOURNAMENT_DATA.tournaments) ORG_TOURNAMENT_DATA.tournaments = [];
+  return ORG_TOURNAMENT_DATA.tournaments;
+}
+async function loadOrgTournamentData(orgId){
+  if(!orgId){ ORG_TOURNAMENT_DATA = { tournaments: [] }; return; }
+  try{
+    const { data, error } = await sb.from('organization_tournaments').select('data').eq('organization_id', orgId).single();
+    if(error){
+      if(error.code === 'PGRST116'){
+        // Première utilisation : récupère les tournois qui existaient déjà
+        // dans les données de chaque ligue (ancienne architecture par ligue,
+        // avant que les tournois deviennent partagés au niveau organisation),
+        // pour ne rien perdre en migrant.
+        const migrated = await migrateLegacyLeagueTournaments();
+        const fresh = { tournaments: migrated };
+        await sb.from('organization_tournaments').insert({ organization_id: orgId, data: fresh });
+        ORG_TOURNAMENT_DATA = fresh;
+        return;
+      }
+      throw error;
+    }
+    ORG_TOURNAMENT_DATA = (data && data.data) ? data.data : { tournaments: [] };
+  }catch(e){
+    console.error('Erreur de chargement des tournois', e);
+    ORG_TOURNAMENT_DATA = { tournaments: [] };
+  }
+}
+async function migrateLegacyLeagueTournaments(){
+  try{
+    const leagues = myOrgLeagues();
+    const results = await Promise.all(leagues.map(async l=>{
+      if(l.id === CURRENT_LEAGUE_ID && DATA) return { id:l.id, tournaments: DATA.tournaments||[] };
+      const { data } = await sb.from('league_data').select('data').eq('league_id', l.id).single();
+      const d = (data && data.data) || {};
+      return { id:l.id, tournaments: d.tournaments||[] };
+    }));
+    const all = [];
+    results.forEach(r=>{
+      (r.tournaments||[]).forEach(t=>{
+        const participants = (t.participants||[]).map(p=>
+          (p.type==='player'||p.type==='substitute') ? Object.assign({}, p, { leagueId: p.leagueId || r.id }) : p
+        );
+        all.push(Object.assign({}, t, { participants }));
+      });
+    });
+    return all;
+  }catch(e){
+    console.error('Erreur de migration des tournois existants', e);
+    return [];
+  }
+}
+async function saveOrgTournamentData(){
+  const orgId = currentLeagueOrgId();
+  if(!orgId) return;
+  try{
+    const { error } = await sb.from('organization_tournaments').update({ data: ORG_TOURNAMENT_DATA, updated_at: new Date().toISOString() }).eq('organization_id', orgId);
+    if(error) throw error;
+  }catch(e){
+    console.error('Erreur de sauvegarde des tournois', e);
+    showAlert("La sauvegarde des tournois a échoué : " + (e && e.message ? e.message : 'erreur inconnue'));
+  }
+}
+function saveOrgTournamentDataAndRender(){ saveOrgTournamentData(); render(); }
+// Retrouve un joueur/remplaçant par sa ligue d'origine, peu importe la
+// ligue actuellement chargée — nécessaire puisqu'un tournoi peut mélanger
+// des participants de plusieurs ligues de l'organisation.
+function orgPersonByLeagueAndId(leagueId, refId){
+  const bucket = ORG_ROSTER_BY_LEAGUE[leagueId];
+  if(!bucket) return null;
+  return (bucket.players||[]).find(p=>p.id===refId) || (bucket.substitutePool||[]).find(s=>s.id===refId) || null;
+}
+function orgLeagueLabel(leagueId){
+  const l = LEAGUES.find(x=>x.id===leagueId);
+  return l ? (l.schedule_label || l.name) : '—';
+}
 async function loadMyOrganizations(profileId){
   const { data, error } = await sb.from('organization_admins').select('organization_id, organizations(id, name)').eq('profile_id', profileId);
   MY_ORGANIZATIONS = error ? [] : (data || []).map(r=>r.organizations).filter(Boolean);
@@ -2125,6 +2205,7 @@ async function logout(){
   OFFLINE_CACHED_AT = null;
   ALL_ORGANIZATIONS = [];
   ORG_VIDEO_DATA = { folders: [], videos: [] };
+  ORG_TOURNAMENT_DATA = { tournaments: [] };
   DATA = null;
   VIEW = {};
   render();
@@ -2153,7 +2234,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['tournois','Tournois','🏆'],['videos','Vidéos','🎬'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -2208,8 +2289,6 @@ function renderAdmin(){
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
-  else if(VIEW.tab==='tournois') c.innerHTML = adminTournamentsSectionHTML();
-  else if(VIEW.tab==='videos') c.innerHTML = adminVideosSectionHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
 }
@@ -2217,7 +2296,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['videos','Vidéos','🎬'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -2260,7 +2339,6 @@ function renderMlpAdmin(){
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
   else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
-  else if(VIEW.tab==='videos') c.innerHTML = adminVideosSectionHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
 }
@@ -2672,7 +2750,7 @@ function adminTournamentsSectionHTML(){
   return tournamentListHTML();
 }
 function tournamentListHTML(){
-  const tournaments = (DATA.tournaments||[]).slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const tournaments = orgTournaments().slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
@@ -2773,9 +2851,12 @@ function saveNewTournamentForm(){
     participants: [], // {id, type:'player'|'substitute'|'guest', refId, name, seed}
     createdAt: new Date().toISOString()
   };
-  DATA.tournaments = DATA.tournaments || [];
-  DATA.tournaments.push(t);
-  VIEW = { tab:'tournois', tournamentsSubTab:'detail', currentTournamentId: t.id };
+  orgTournaments().push(t);
+  // Les tournois vivent dans le stockage de l'organisation, pas dans celui
+  // de la ligue actuelle — la sauvegarde générique du pop-up (qui cible la
+  // ligue) ne suffit pas, on sauvegarde donc explicitement ici.
+  saveOrgTournamentData();
+  VIEW = { orgSubTab:'tournois', tournamentsSubTab:'detail', currentTournamentId: t.id };
 }
 function openTournamentDetail(id){
   VIEW.tournamentsSubTab = 'detail';
@@ -2788,7 +2869,7 @@ function backToTournamentList(){
   render();
 }
 function openEditTournamentModal(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   const html = `
     <div class="field"><label>Nom du tournoi</label><input id="editTournamentName" value="${escapeHTML(t.name)}"></div>
@@ -2863,19 +2944,20 @@ function openEditTournamentModal(tournamentId){
         winByTwo: document.getElementById('editTournamentWinByTwo').checked
       };
     }
+    saveOrgTournamentData();
   });
 }
 function onDeleteTournament(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   showConfirm(`Supprimer définitivement le tournoi « ${t.name} » ?`, ()=>{
-    DATA.tournaments = DATA.tournaments.filter(x=>x.id!==tournamentId);
-    VIEW = { tab:'tournois' };
-    saveAndRender();
+    ORG_TOURNAMENT_DATA.tournaments = orgTournaments().filter(x=>x.id!==tournamentId);
+    VIEW = { orgSubTab:'tournois' };
+    saveOrgTournamentDataAndRender();
   });
 }
 function tournamentDetailHTML(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return `<div class="card"><p class="empty">Tournoi introuvable.</p><button class="btn-ghost" onclick="backToTournamentList()">← Retour</button></div>`;
   return `
     <button class="btn-ghost" onclick="backToTournamentList()">← Tous les tournois</button>
@@ -2898,19 +2980,20 @@ function tournamentDetailHTML(tournamentId){
     </div>
     <div class="card">
       <h3>Participants <span class="small">(${t.participants.length})</span></h3>
-      <p class="small">Sélectionne les joueurs réguliers et remplaçants qui participent, et ajoute au besoin des invités externes (sans compte).</p>
+      <p class="small">Sélectionne les joueurs réguliers et remplaçants qui participent — de n'importe quelle ligue de l'organisation — et ajoute au besoin des invités externes (sans compte).</p>
       <div class="action-grid">
         <button class="action-btn" onclick="openSelectParticipantsModal('${t.id}')"><span class="icon">👥</span> Choisir les participants</button>
         <button class="action-btn" onclick="openAddGuestToTournamentModal('${t.id}')"><span class="icon">➕</span> Ajouter un invité externe</button>
       </div>
       <table>
-        <tr><th>Nom</th><th>Type</th><th></th></tr>
+        <tr><th>Nom</th><th>Ligue</th><th>Type</th><th></th></tr>
         ${t.participants.map(p=>`<tr>
           <td>${escapeHTML(p.name)}</td>
+          <td>${p.leagueId ? escapeHTML(orgLeagueLabel(p.leagueId)) : '<span class="small">—</span>'}</td>
           <td>${p.type==='player' ? '<span class="tag tag-green">Régulier</span>' : (p.type==='substitute' ? '<span class="tag tag-yellow">Remplaçant</span>' : '<span class="tag tag-stay">Invité externe</span>')}</td>
           <td><button class="btn-ghost-danger" onclick="removeTournamentParticipant('${t.id}','${p.id}')">retirer</button></td>
         </tr>`).join('')}
-        ${t.participants.length===0 ? `<tr><td colspan="3" class="empty">Aucun participant pour l'instant</td></tr>` : ''}
+        ${t.participants.length===0 ? `<tr><td colspan="4" class="empty">Aucun participant pour l'instant</td></tr>` : ''}
       </table>
     </div>
     <div class="card">
@@ -2931,80 +3014,103 @@ function tournamentDetailHTML(tournamentId){
 }
 let TOURNAMENT_SELECT_STATE = null;
 function openSelectParticipantsModal(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   TOURNAMENT_SELECT_STATE = {
     tournamentId,
-    selectedPlayerIds: new Set(t.participants.filter(p=>p.type==='player').map(p=>p.refId)),
-    selectedSubIds: new Set(t.participants.filter(p=>p.type==='substitute').map(p=>p.refId))
+    selectedPlayerKeys: new Set(t.participants.filter(p=>p.type==='player').map(p=>(p.leagueId||'')+'::'+p.refId)),
+    selectedSubKeys: new Set(t.participants.filter(p=>p.type==='substitute').map(p=>(p.leagueId||'')+'::'+p.refId))
   };
   showFormModal('Choisir les participants', selectParticipantsFormHTML, saveSelectParticipantsForm);
 }
+// Le bassin de sélection couvre TOUTES les ligues de l'organisation — un
+// tournoi peut regrouper des participants de plusieurs ligues — regroupé
+// par ligue pour rester lisible.
 function selectParticipantsFormHTML(){
   const st = TOURNAMENT_SELECT_STATE;
-  return `
-    <h3 style="margin-top:0;">Joueurs réguliers</h3>
-    ${DATA.players.map(p=>`
-      <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
-        <input type="checkbox" style="width:auto;" ${st.selectedPlayerIds.has(p.id)?'checked':''} onchange="toggleTournamentSelectPlayer('${p.id}')">
-        <span>${escapeHTML(p.name)}</span>
-      </label>`).join('')}
-    ${DATA.players.length===0 ? `<p class="small">Aucun joueur régulier.</p>` : ''}
-    ${(DATA.substitutePool||[]).length ? `<h3>Remplaçants</h3>
-    ${(DATA.substitutePool||[]).map(s=>`
-      <label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
-        <input type="checkbox" style="width:auto;" ${st.selectedSubIds.has(s.id)?'checked':''} onchange="toggleTournamentSelectSub('${s.id}')">
-        <span>${escapeHTML(s.name)}</span>
-      </label>`).join('')}` : ''}`;
+  const leagues = myOrgLeagues();
+  let html = '';
+  leagues.forEach(l=>{
+    const bucket = ORG_ROSTER_BY_LEAGUE[l.id] || { players: [], substitutePool: [] };
+    if(!(bucket.players||[]).length && !(bucket.substitutePool||[]).length) return;
+    const label = l.schedule_label || l.name;
+    html += `<h3 style="margin-top:14px;">🏆 ${escapeHTML(label)}</h3>`;
+    if((bucket.players||[]).length){
+      html += `<p class="small" style="margin:4px 0;">Joueurs réguliers</p>`;
+      html += bucket.players.map(p=>{
+        const key = l.id+'::'+p.id;
+        return `<label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
+          <input type="checkbox" style="width:auto;" ${st.selectedPlayerKeys.has(key)?'checked':''} onchange="toggleTournamentSelectPlayer('${key}')">
+          <span>${escapeHTML(p.name)}</span>
+        </label>`;
+      }).join('');
+    }
+    if((bucket.substitutePool||[]).length){
+      html += `<p class="small" style="margin:4px 0;">Remplaçants</p>`;
+      html += bucket.substitutePool.map(s=>{
+        const key = l.id+'::'+s.id;
+        return `<label class="row" style="align-items:center;gap:8px;cursor:pointer;margin-bottom:4px;">
+          <input type="checkbox" style="width:auto;" ${st.selectedSubKeys.has(key)?'checked':''} onchange="toggleTournamentSelectSub('${key}')">
+          <span>${escapeHTML(s.name)}</span>
+        </label>`;
+      }).join('');
+    }
+  });
+  return html || `<p class="small">Aucun joueur dans l'organisation pour l'instant.</p>`;
 }
-function toggleTournamentSelectPlayer(pid){
+function toggleTournamentSelectPlayer(key){
   const st = TOURNAMENT_SELECT_STATE;
-  if(st.selectedPlayerIds.has(pid)) st.selectedPlayerIds.delete(pid); else st.selectedPlayerIds.add(pid);
+  if(st.selectedPlayerKeys.has(key)) st.selectedPlayerKeys.delete(key); else st.selectedPlayerKeys.add(key);
 }
-function toggleTournamentSelectSub(sid){
+function toggleTournamentSelectSub(key){
   const st = TOURNAMENT_SELECT_STATE;
-  if(st.selectedSubIds.has(sid)) st.selectedSubIds.delete(sid); else st.selectedSubIds.add(sid);
+  if(st.selectedSubKeys.has(key)) st.selectedSubKeys.delete(key); else st.selectedSubKeys.add(key);
 }
 function saveSelectParticipantsForm(){
   const st = TOURNAMENT_SELECT_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   if(!t){ TOURNAMENT_SELECT_STATE = null; return; }
   // Retire les participants réguliers/remplaçants décochés, garde les invités externes intacts.
   t.participants = t.participants.filter(p=>p.type==='guest');
-  st.selectedPlayerIds.forEach(pid=>{
-    const p = DATA.players.find(x=>x.id===pid);
-    if(p) t.participants.push({ id: uid('tp'), type:'player', refId: pid, name: p.name, seed: ratingOf(pid) });
+  st.selectedPlayerKeys.forEach(key=>{
+    const sep = key.indexOf('::');
+    const leagueId = key.slice(0, sep), pid = key.slice(sep+2);
+    const p = orgPersonByLeagueAndId(leagueId, pid);
+    if(p) t.participants.push({ id: uid('tp'), type:'player', refId: pid, leagueId, name: p.name, seed: (typeof p.rating==='number'?p.rating:RATING_DEFAULT) });
   });
-  st.selectedSubIds.forEach(sid=>{
-    const s = (DATA.substitutePool||[]).find(x=>x.id===sid);
-    if(s) t.participants.push({ id: uid('tp'), type:'substitute', refId: sid, name: s.name, seed: null });
+  st.selectedSubKeys.forEach(key=>{
+    const sep = key.indexOf('::');
+    const leagueId = key.slice(0, sep), sid = key.slice(sep+2);
+    const s = orgPersonByLeagueAndId(leagueId, sid);
+    if(s) t.participants.push({ id: uid('tp'), type:'substitute', refId: sid, leagueId, name: s.name, seed: null });
   });
   TOURNAMENT_SELECT_STATE = null;
+  saveOrgTournamentData();
 }
 function openAddGuestToTournamentModal(tournamentId){
   showPrompt("Nom de l'invité externe :", '', (name)=>{
     if(!name || !name.trim()) return;
-    const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+    const t = orgTournaments().find(x=>x.id===tournamentId);
     if(!t) return;
     t.participants.push({ id: uid('tp'), type:'guest', refId:null, name:name.trim(), seed:null });
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function removeTournamentParticipant(tournamentId, participantId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   t.participants = t.participants.filter(p=>p.id!==participantId);
-  saveAndRender();
+  saveOrgTournamentDataAndRender();
 }
 // ==================== TOURNOIS (Phase 2 — équipes + bracket) ====================
 let TEAM_FORM_STATE = null;
 let MLP_TEAM_FORM_STATE = null;
 function openFormTeamsModal(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   if(t.teamFormat === 'singles'){
     t.teams = t.participants.map(p=>({ id: uid('team'), memberIds:[p.id], memberNames:[p.name], seed: p.seed }));
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
     return;
   }
   if(t.teamFormat === 'mlp'){
@@ -3017,7 +3123,7 @@ function openFormTeamsModal(tournamentId){
 }
 function formTeamsFormHTML(){
   const st = TEAM_FORM_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   const pairedIds = new Set(st.pairs.flat());
   const unpaired = t.participants.filter(p=>!pairedIds.has(p.id) && p.id !== st.pending);
   let html = (t && (t.pools || t.bracket)) ? `<p class="small" style="color:var(--danger);">⚠️ Des poules ou un bracket existent déjà pour ce tournoi — modifier les équipes ne les mettra pas à jour automatiquement ; tu devras les régénérer après.</p>` : '';
@@ -3047,7 +3153,7 @@ function removeTeamPair(i){
 }
 function saveFormTeamsForm(){
   const st = TEAM_FORM_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   if(!t){ TEAM_FORM_STATE=null; return; }
   t.teams = st.pairs.map(pair=>{
     const names = pair.map(id=>{ const p = t.participants.find(x=>x.id===id); return p?p.name:'?'; });
@@ -3055,12 +3161,14 @@ function saveFormTeamsForm(){
     return { id: uid('team'), memberIds: pair.slice(), memberNames: names, seed: (seeds[0]+seeds[1])/2 };
   });
   TEAM_FORM_STATE = null;
+  saveOrgTournamentData();
 }
 // ---- Formation d'équipes MLP (composition genrée : 2H+2F ou 2H+1F) ----
 function participantGender(t, participantId){
   const part = t.participants.find(p=>p.id===participantId);
   if(!part || part.type!=='player') return null;
-  const player = DATA.players.find(x=>x.id===part.refId);
+  if(part.gender) return part.gender;
+  const player = part.leagueId ? orgPersonByLeagueAndId(part.leagueId, part.refId) : DATA.players.find(x=>x.id===part.refId);
   return player ? (player.gender||null) : null;
 }
 function mlpGenderCounts(t, memberIds){
@@ -3079,7 +3187,7 @@ function mlpCompositionValid(counts, rosterSize){
 }
 function mlpFormTeamsFormHTML(){
   const st = MLP_TEAM_FORM_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   const assignedIds = new Set(st.teams.flatMap(tm=>tm.memberIds).concat(st.currentMembers));
   const available = t.participants.filter(p=>!assignedIds.has(p.id));
   const counts = mlpGenderCounts(t, st.currentMembers);
@@ -3124,13 +3232,14 @@ function toggleMlpMember(pid){
 }
 function setParticipantGenderInline(participantRefParticipantId, gender){
   const st = MLP_TEAM_FORM_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   const part = t.participants.find(p=>p.id===participantRefParticipantId);
   if(!part || part.type!=='player') return;
-  const player = DATA.players.find(x=>x.id===part.refId);
-  if(!player) return;
-  player.gender = gender || null;
-  saveAndRender();
+  // Le genre est mémorisé directement sur le participant (comme son nom et
+  // sa cote au moment de la sélection) plutôt que sur la fiche joueur
+  // d'origine, qui peut appartenir à une autre ligue que celle ouverte.
+  part.gender = gender || null;
+  saveOrgTournamentDataAndRender();
 }
 function commitMlpTeam(){
   const st = MLP_TEAM_FORM_STATE;
@@ -3147,7 +3256,7 @@ function removeMlpTeam(i){
 }
 function saveMlpFormTeamsForm(){
   const st = MLP_TEAM_FORM_STATE;
-  const t = (DATA.tournaments||[]).find(x=>x.id===st.tournamentId);
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
   if(!t){ MLP_TEAM_FORM_STATE=null; return; }
   if(st.teams.length < 2){ showAlert("Forme au moins 2 équipes avant d'enregistrer."); return false; }
   t.teams = st.teams.map(tm=>{
@@ -3156,6 +3265,7 @@ function saveMlpFormTeamsForm(){
     return { id: uid('team'), name: tm.name, memberIds: tm.memberIds.slice(), memberNames: names, seed: seeds.reduce((a,b)=>a+b,0)/seeds.length };
   });
   MLP_TEAM_FORM_STATE = null;
+  saveOrgTournamentData();
 }
 // Ordre standard de seeding (1 contre dernier, 2 contre avant-dernier, etc.)
 function standardBracketOrder(size){
@@ -3209,7 +3319,8 @@ function participantNameById(t, id){
 function mlpParticipantGender(t, participantId){
   const part = (t.participants||[]).find(p=>p.id===participantId);
   if(!part || part.type!=='player') return null;
-  const pl = DATA.players.find(x=>x.id===part.refId);
+  if(part.gender) return part.gender;
+  const pl = part.leagueId ? orgPersonByLeagueAndId(part.leagueId, part.refId) : DATA.players.find(x=>x.id===part.refId);
   return pl ? (pl.gender||null) : null;
 }
 function mlpTeamGenderSplit(t, team){
@@ -3740,7 +3851,7 @@ function buildSingleElimBracket(teams, defaultFormat, mlpRosterSize){
   return { format:'single_elim', rounds };
 }
 function generateBracket(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   if(!t.teams || t.teams.length < 2){ showAlert("Il faut au moins 2 équipes — forme d'abord les équipes ci-dessus."); return; }
   if(t.format === 'pools_then_elim'){ openGeneratePoolsModal(tournamentId); return; }
@@ -3752,11 +3863,11 @@ function generateBracket(tournamentId){
   showConfirm(msg, ()=>{
     t.bracket = buildSingleElimBracket(t.teams, t.matchFormat, t.teamFormat==='mlp' ? (t.mlpRosterSize||4) : null);
     t.status = 'in_progress';
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, which, value){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
   const m = t.bracket.rounds[roundIndex].matches[matchIndex];
   if(!m.games) m.games = t.teamFormat==='mlp' ? newMLPGames(t.mlpRosterSize||4) : newEmptyGames(1);
@@ -3782,10 +3893,10 @@ function setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, w
   }
   const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
   t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
-  saveData();
+  saveOrgTournamentData();
 }
 function openEditRoundFormatModal(tournamentId, roundIndex){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
   const round = t.bracket.rounds[roundIndex];
   const fmt = round.matchFormat || t.matchFormat || { pointsToWin:11, bestOf:1, winByTwo:true };
@@ -3833,6 +3944,7 @@ function openEditRoundFormatModal(tournamentId, roundIndex){
       propagateByeWinners(t.bracket.rounds);
       t.status = 'in_progress';
     }
+    saveOrgTournamentData();
   });
 }
 function bracketRoundLabel(r, lastIndex){
@@ -3957,16 +4069,16 @@ function mlpBracketMatchHTML(t, ri, mi, m, aName, bName, aWon, bWon, canScore){
   return html;
 }
 function setMlpDreambreakerPlayer(tournamentId, teamId, participantId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !participantId) return;
   const team = (t.teams||[]).find(x=>x.id===teamId);
   if(!team) return;
   team.dreambreakerParticipantId = participantId;
-  saveAndRender();
+  saveOrgTournamentDataAndRender();
 }
 // ---- Poules puis élimination ----
 function openGeneratePoolsModal(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   if(!t.teams || t.teams.length < 4){ showAlert("Il faut au moins 4 équipes pour des poules."); return; }
   const maxPools = Math.max(2, Math.floor(t.teams.length/2));
@@ -4006,7 +4118,7 @@ function openGeneratePoolsModal(tournamentId){
   });
 }
 function generatePools(tournamentId, numPools, advancePerPool){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   const seeded = t.teams.slice().sort((a,b)=>{
     const as = typeof a.seed==='number' ? a.seed : -Infinity;
@@ -4034,7 +4146,7 @@ function generatePools(tournamentId, numPools, advancePerPool){
   t.poolsConfig = { advancePerPool };
   t.bracket = null;
   t.status = 'in_progress';
-  saveAndRender();
+  saveOrgTournamentDataAndRender();
 }
 function computePoolStandings(pool){
   const stats = {};
@@ -4057,7 +4169,7 @@ function computePoolStandings(pool){
     .sort((a,b)=> b.wins-a.wins || b.diff-a.diff || b.pf-a.pf);
 }
 function setPoolMatchScore(tournamentId, poolId, matchIndex, gameIndex, which, value){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
   const pool = t.pools.find(p=>p.id===poolId);
   if(!pool) return;
@@ -4067,10 +4179,10 @@ function setPoolMatchScore(tournamentId, poolId, matchIndex, gameIndex, which, v
   if(!g) return;
   if(which==='A') g.scoreA = value===''?null:Number(value);
   else g.scoreB = value===''?null:Number(value);
-  saveData();
+  saveOrgTournamentData();
 }
 function finalizePoolsAndGenerateBracket(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
   const allComplete = t.pools.every(pool=> pool.matches.every(m=> computeGamesWinner(m.games, m.teamAId, m.teamBId).winnerTeamId));
   if(!allComplete){ showAlert("Tous les matchs de poules doivent être complétés avant de générer le bracket final."); return; }
@@ -4086,7 +4198,7 @@ function finalizePoolsAndGenerateBracket(tournamentId){
   showConfirm(msg, ()=>{
     t.bracket = buildSingleElimBracket(advancing, t.matchFormat);
     t.status = 'in_progress';
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function poolsDisplayHTML(t){
@@ -4180,14 +4292,14 @@ function simulateOnePool(t, pool){
   });
 }
 function simulateSinglePool(tournamentId, poolId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
   const pool = t.pools.find(p=>p.id===poolId);
   if(!pool) return;
   showConfirm(`Simuler seulement la « ${pool.name} » avec des scores aléatoires ?`, ()=>{
     pool.matches.forEach(m=>{ m.games = newEmptyGames(t.poolsMatchFormat?t.poolsMatchFormat.bestOf:1); });
     simulateOnePool(t, pool);
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function simulatePoolMatches(t){
@@ -4216,7 +4328,7 @@ function simulateBracketMatches(t){
 // Simule seulement une ronde précise du bracket (doit déjà avoir ses deux
 // équipes déterminées par la ronde précédente).
 function simulateSingleRound(tournamentId, roundIndex){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
   const round = t.bracket.rounds[roundIndex];
   const realMatches = round.matches.filter(m=>!m.isBye);
@@ -4233,7 +4345,7 @@ function simulateSingleRound(tournamentId, roundIndex){
     simulateOneRound(t, roundIndex);
     const lastRound = t.bracket.rounds[t.bracket.rounds.length-1];
     t.status = lastRound.matches[0].winnerTeamId ? 'completed' : 'in_progress';
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function resetBracketResultsKeepingStructure(bracket){
@@ -4248,7 +4360,7 @@ function resetBracketResultsKeepingStructure(bracket){
   propagateByeWinners(bracket.rounds);
 }
 function simulateTournament(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   if(t.format === 'double_elim'){ showAlert("La double élimination n'est pas encore disponible — impossible de la simuler pour l'instant."); return; }
   if(t.participants.length < 2){ showAlert("Ajoute au moins 2 participants avant de simuler."); return; }
@@ -4283,17 +4395,17 @@ function simulateTournament(tournamentId){
     }
     simulateBracketMatches(t);
     t.status = 'completed';
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 function resetTournamentResults(tournamentId){
-  const t = (DATA.tournaments||[]).find(x=>x.id===tournamentId);
+  const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t) return;
   showConfirm("Réinitialiser tous les résultats de ce tournoi (poules et bracket) ? Les participants et les équipes formées restent intacts.", ()=>{
     t.pools = null;
     t.bracket = null;
     t.status = 'draft';
-    saveAndRender();
+    saveOrgTournamentDataAndRender();
   });
 }
 // ==================== FIN TOURNOIS (Phase 2) ====================
@@ -6312,7 +6424,10 @@ function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
 // ça couvre TOUTES les ligues de l'organisation plutôt qu'une seule.
 function openOrganizationPage(){
   DRAWER_OPEN = false;
-  Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]).then(()=>{
+  Promise.all([
+    loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers(),
+    loadOrgTournamentData(CURRENT_ORGANIZATION_ID), loadOrgVideoData(currentLeagueOrgId())
+  ]).then(()=>{
     ADMIN_SHOWING_ORG = true;
     render();
   });
@@ -6349,7 +6464,7 @@ function organizationHeroHTML(){
 }
 function renderOrganizationManagement(){
   const sub = VIEW.orgSubTab || 'general';
-  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['comptes','🔑 Comptes']];
+  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['comptes','🔑 Comptes'],['videos','🎬 Vidéos'],['tournois','🏆 Tournois']];
   app.innerHTML = `
     ${topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null)}
     ${storageBannerHTML()}
@@ -6360,6 +6475,8 @@ function renderOrganizationManagement(){
   const c = document.getElementById('orgTabContent');
   if(sub==='membres') c.innerHTML = organizationMembersCardHTML();
   else if(sub==='comptes') c.innerHTML = organizationAccountsHTML();
+  else if(sub==='videos') c.innerHTML = adminVideosSectionHTML();
+  else if(sub==='tournois') c.innerHTML = adminTournamentsSectionHTML();
   else c.innerHTML = organizationGeneralHTML();
 }
 function organizationGeneralHTML(){
