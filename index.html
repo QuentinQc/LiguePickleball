@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924155904">
+<meta name="app-build" content="20260924170328">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -24,7 +24,7 @@
     var CURRENT_BUILD = document.querySelector('meta[name="app-build"]').content;
     var probeUrl = location.pathname + '?_probe=' + Date.now();
     fetch(probeUrl, {cache:'no-store'}).then(function(r){ return r.text(); }).then(function(html){
-      var m = html.match(/<meta name="app-build" content="20260924155904"]+)">/);
+      var m = html.match(/<meta name="app-build" content="20260924170328"]+)">/);
       if(m && m[1] && m[1] !== CURRENT_BUILD){
         var freshUrl = location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now();
         location.replace(freshUrl);
@@ -8160,6 +8160,17 @@ function previousGroupSessionInnerHTML(me){
   return html;
 }
 function playerGroupHTML(me){
+  // Blessé : plus aucun groupe/match/score à afficher — un seul message clair,
+  // le joueur reste hors de son groupe jusqu'à ce qu'il se déclare rétabli
+  // (ou qu'un admin le fasse pour lui).
+  if(me.injured){
+    return `<div class="card">
+      <h2>Mon groupe</h2>
+      <div class="modal-badges" style="margin-bottom:12px;"><span class="tag tag-down">🤕 Blessé(e)</span></div>
+      <p class="small">Tu es indiqué(e) comme blessé(e) — ton groupe, tes matchs et les scores de la session en cours ne sont pas affichés tant que tu ne te déclares pas rétabli(e) (section « Absence »).</p>
+      <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Gérer</button>
+    </div>`;
+  }
   const g = groupById(me.groupId);
   const groupMembers = playersInGroup(me.groupId).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
   const open = currentOpenSession();
@@ -8167,7 +8178,6 @@ function playerGroupHTML(me){
   if(open && isAbsent(open, me.id)) absenceBadges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
   const planned = plannedAbsencesForPlayer(me.id);
   if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
-  if(me.injured) absenceBadges.push('<span class="tag tag-down">🤕 Blessé(e)</span>');
   const absenceStatusRow = absenceBadges.length ? `
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
       <div class="modal-badges">${absenceBadges.join('')}</div>
@@ -8189,7 +8199,10 @@ function playerGroupHTML(me){
   </div>`;
   if(open){
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
-    if(!open.published){
+    const amAbsent = isAbsent(open, me.id);
+    if(amAbsent){
+      html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la session du ${open.date} — le groupe et les scores de cette session ne sont pas affichés. Contacte un administrateur si c'est une erreur.</p></div>`;
+    } else if(!open.published){
       html += `<div class="card"><p class="small">La session du ${open.date} est en préparation. Tes matchs seront visibles ici une fois qu'un administrateur l'aura publiée.</p></div>`;
     } else if(gd && gd.matches.length){
       html += `<div class="card"><h3>Matchs de la session en cours (${open.date})</h3>`;
