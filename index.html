@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924183958">
+<meta name="app-build" content="20260924194756">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -7448,10 +7448,52 @@ function matchupSettingsFormHTML(){
     <div class="row">
       <button class="btn-ghost" onclick="closeModal();openTemplateModal(4)">Modifier le modèle — groupes de 4</button>
       <button class="btn-ghost" onclick="closeModal();openTemplateModal(5)">Modifier le modèle — groupes de 5</button>
-    </div>` : `<p class="small">Enregistre pour appliquer ce choix, puis reviens ici pour configurer un modèle si tu passes en manuel.</p>`}`;
+    </div>` : `<p class="small">Enregistre pour appliquer ce choix, puis reviens ici pour configurer un modèle si tu passes en manuel.</p>`}
+    ${myOrgLeagues().filter(l=>l.id!==CURRENT_LEAGUE_ID).length>0 ? `<div class="row" style="margin-top:10px;">
+      <button class="btn-ghost" onclick="closeModal();openImportMatchupTemplateModal()">📥 Importer le modèle d'une autre ligue</button>
+    </div>` : ''}`;
 }
 function saveMatchupSettingsForm(){
   DATA.matchupMode = SETTINGS_MATCHUP_PREVIEW === 'manual' ? 'manual' : 'auto';
+}
+
+// ---- Importer le modèle de rotation manuel (groupes de 4 et 5) depuis une
+// autre ligue de la même organisation, vers la ligue active. On charge
+// seulement les données de la ligue source (lecture) pour en extraire les
+// 5 champs du modèle, puis on les applique à DATA et on sauvegarde
+// normalement — le reste des données de la ligue source n'est jamais
+// modifié, et la sauvegarde suit le chemin habituel (saveAndRender). ----
+function openImportMatchupTemplateModal(){
+  const sources = myOrgLeagues().filter(l=>l.id!==CURRENT_LEAGUE_ID);
+  if(sources.length===0){ showAlert("Il n'y a pas d'autre ligue dans cette organisation d'où importer."); return; }
+  const html = `
+    <p class="small">Va chercher le mode « Manuelle » et les modèles de rotation (groupes de 4 et de 5, basés sur les numéros de position) de la ligue choisie ci-dessous, et les applique à <strong>${escapeHTML(currentLeagueLabel())}</strong>. Ça remplace le réglage de génération des matchs de cette ligue-ci — le reste de ses données (joueurs, sessions, etc.) n'est pas touché.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+      ${sources.map(l=>{
+        const safeName = escapeHTML(l.name).replace(/'/g, "\\'");
+        return `<button class="btn-ghost" onclick="confirmImportMatchupTemplate('${l.id}','${safeName}')">${escapeHTML(l.schedule_label || l.name)}</button>`;
+      }).join('')}
+    </div>`;
+  showContentModal("Importer d'une autre ligue", html);
+}
+function confirmImportMatchupTemplate(sourceLeagueId, sourceName){
+  showConfirm(`Importer le modèle de rotation depuis « ${sourceName} » ? Ça remplacera le réglage actuel de génération des matchs de cette ligue-ci (mode + modèles groupes de 4 et de 5).`, ()=>importMatchupTemplateFromLeague(sourceLeagueId, sourceName));
+}
+async function importMatchupTemplateFromLeague(sourceLeagueId, sourceName){
+  try{
+    const sourceData = await loadData(sourceLeagueId);
+    if(!sourceData){ showAlert("Impossible de charger les données de « " + sourceName + " » — import annulé."); return; }
+    DATA.matchupMode = 'manual';
+    DATA.manualMatchupTemplate4 = (sourceData.manualMatchupTemplate4 || []).map(t=>({ teamA:(t.teamA||[]).slice(), teamB:(t.teamB||[]).slice() }));
+    DATA.manualMatchupTemplate5 = (sourceData.manualMatchupTemplate5 || []).map(t=>({ teamA:(t.teamA||[]).slice(), teamB:(t.teamB||[]).slice() }));
+    DATA.manualMatchCount4 = sourceData.manualMatchCount4 || 6;
+    DATA.manualMatchCount5 = sourceData.manualMatchCount5 || 10;
+    saveAndRender();
+    showAlert(`✅ Modèle importé depuis « ${sourceName} ». La prochaine session créée l'utilisera.`);
+  }catch(e){
+    console.error("Erreur d'import du modèle", e);
+    showAlert("L'import a échoué : " + (e && e.message ? e.message : 'erreur inconnue'));
+  }
 }
 
 // ---- Pop-up : modèle de rotation par position (un par taille de groupe) ----
