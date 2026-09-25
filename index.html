@@ -10,7 +10,10 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260924194756">
+<meta name="app-build" content="20260925171819">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -113,45 +116,49 @@
 </script>
 <style>
 :root{
-  --court: #0F3B3F;
-  --court-light: #15525A;
+  --court: #0C2622;
+  --court-light: #143C37;
+  --court-elevated-2: #184740;
   --line: #EDEDEA;
+  --line-soft: rgba(237,237,234,0.09);
+  --line-soft-strong: rgba(237,237,234,0.16);
   --ball: #CFEA5C;
   --ball-dark: #9FBF3A;
   --paddle: #E96A3C;
   --text: #F3F5EF;
   --muted: #8FB3AE;
   --danger: #E9556B;
-  --radius: 10px;
-  --font-display: 'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font-display: 'Oswald', 'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--court);color:var(--text);font-family:var(--font-body);min-height:100%;}
+html,body{margin:0;padding:0;background:radial-gradient(1200px 700px at 15% -10%, #123a34 0%, var(--court) 55%);background-attachment:fixed;color:var(--text);font-family:var(--font-body);min-height:100%;}
 body{padding:0;}
 /* En mode PWA plein écran (statut translucide), le contenu passe sous
    l'encoche/l'heure sans cette marge de sécurité — on la réserve en haut
    (et sur les côtés/en bas pour les téléphones à encoche latérale). */
 #app{width:100%;padding:calc(20px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));}
-h1,h2,h3{font-family:var(--font-display);font-weight:800;letter-spacing:0.02em;margin:0 0 4px;text-transform:uppercase;}
-h1{font-size:28px;color:var(--ball);}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;letter-spacing:0.02em;margin:0 0 4px;text-transform:uppercase;}
+h1{font-size:28px;color:var(--ball);font-weight:600;}
 h2{font-size:20px;color:var(--line);}
 h3{font-size:15px;color:var(--muted);}
 p{margin:4px 0;line-height:1.4;}
 .eyebrow{font-family:var(--font-display);font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
-.card{background:var(--court-light);border-radius:var(--radius);padding:16px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.03);}
-.card-divider{border-top:1px solid rgba(255,255,255,0.08);margin:16px 0;}
+.card{background:var(--court-light);border-radius:var(--radius);padding:16px;margin-bottom:16px;border:1px solid var(--line-soft);}
+.card-divider{border-top:1px solid var(--line-soft);margin:16px 0;}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-.btn{font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;font-size:13px;border:none;border-radius:999px;padding:10px 18px;cursor:pointer;transition:transform .1s ease, opacity .15s ease;}
+.btn{font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:600;font-size:14px;border:none;border-radius:999px;padding:11px 20px;cursor:pointer;transition:transform .1s ease, opacity .15s ease, background .15s ease;}
 .btn:active{transform:scale(0.97);}
-.btn-primary{background:var(--ball);color:#0F3B3F;}
+.btn-primary{background:var(--ball);color:#0C2622;}
 .btn-primary:hover{background:var(--ball-dark);}
-.btn-secondary{background:transparent;color:var(--line);border:1px solid rgba(255,255,255,0.25);}
+.btn-secondary{background:transparent;color:var(--line);border:1px solid var(--line-soft-strong);}
 .btn-secondary:hover{border-color:var(--ball);color:var(--ball);}
-.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(233,85,107,0.4);}
 .btn-danger:hover{background:rgba(233,85,107,0.12);}
-.btn-ghost{display:inline-block;background:rgba(255,255,255,0.08);color:var(--line);border:none;border-radius:999px;padding:7px 14px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:13px;text-decoration:none;cursor:pointer;transition:background .15s ease, color .15s ease, opacity .15s ease;margin:2px 4px 2px 0;}
-.btn-ghost:hover{background:rgba(255,255,255,0.16);color:var(--ball);}
+.btn-ghost{display:inline-block;background:rgba(255,255,255,0.06);color:var(--line);border:1px solid var(--line-soft);border-radius:999px;padding:7px 14px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:13px;text-decoration:none;cursor:pointer;transition:background .15s ease, color .15s ease, opacity .15s ease;margin:2px 4px 2px 0;}
+.btn-ghost:hover{background:rgba(255,255,255,0.13);color:var(--ball);}
 .btn-ghost:disabled{opacity:0.4;cursor:not-allowed;}
 .btn-ghost-danger{display:inline-block;background:rgba(233,85,107,0.12);color:var(--danger);border:none;border-radius:999px;padding:7px 14px;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:13px;text-decoration:none;cursor:pointer;transition:background .15s ease, opacity .15s ease;margin:2px 4px 2px 0;}
 .btn-ghost-danger:hover{background:rgba(233,85,107,0.22);}
@@ -170,7 +177,7 @@ th.sortable{cursor:pointer;user-select:none;}
 th.sortable:hover{color:var(--ball);}
 td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
 tr.me{background:rgba(207,234,92,0.1);}
-.tag{display:inline-block;font-family:var(--font-display);font-size:11px;padding:3px 9px;border-radius:999px;letter-spacing:0.05em;text-transform:uppercase;}
+.tag{display:inline-block;font-family:var(--font-body);font-weight:600;font-size:11px;padding:4px 10px;border-radius:999px;letter-spacing:0.03em;text-transform:uppercase;}
 .tag-up{background:rgba(207,234,92,0.18);color:var(--ball);}
 .tag-down{background:rgba(233,85,107,0.15);color:var(--danger);}
 .tag-stay{background:rgba(255,255,255,0.08);color:var(--muted);}
@@ -186,34 +193,36 @@ tr.me{background:rgba(207,234,92,0.1);}
 .champion-card .champion-label{font-family:var(--font-display);font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#FFD60A;margin-bottom:6px;}
 .champion-card .champion-name{font-size:26px;font-weight:800;color:var(--line);margin-bottom:4px;}
 .champion-card .runner-up{margin-top:14px;font-size:13px;color:var(--muted);}
-.stat-chip{display:flex;flex-direction:column;background:rgba(255,255,255,0.05);border-radius:12px;padding:9px 16px;min-width:84px;}
-.stat-chip .stat-label{font-family:var(--font-display);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:2px;}
-.stat-chip .stat-value{font-size:17px;font-weight:700;color:var(--line);}
+.stat-chip{display:flex;flex-direction:column;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:10px 16px;min-width:84px;}
+.stat-chip .stat-label{font-family:var(--font-body);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:2px;}
+.stat-chip .stat-value{font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--ball);font-variant-numeric:tabular-nums;}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;}
-.action-btn{display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.05);border:none;color:var(--line);font-family:var(--font-body);font-size:14px;cursor:pointer;text-align:left;transition:background .15s ease;}
-.action-btn:hover{background:rgba(255,255,255,0.11);}
+.action-btn{display:flex;align-items:center;gap:9px;padding:13px 14px;border-radius:var(--radius-sm);background:var(--court-elevated-2);border:1px solid var(--line-soft);color:var(--line);font-family:var(--font-body);font-size:14px;cursor:pointer;text-align:left;transition:background .15s ease;}
+.action-btn:hover{background:rgba(255,255,255,0.09);}
 .action-btn .icon{font-size:18px;flex-shrink:0;}
-.action-btn.danger{color:var(--danger);background:rgba(233,85,107,0.10);}
-.action-btn.danger:hover{background:rgba(233,85,107,0.18);}
-.modal-section{background:rgba(255,255,255,0.03);border-radius:14px;padding:14px;margin-top:14px;}
+.action-btn.danger{color:var(--danger);background:rgba(233,85,107,0.08);border-color:rgba(233,85,107,0.25);}
+.action-btn.danger:hover{background:rgba(233,85,107,0.16);}
+.modal-section{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:14px;margin-top:14px;}
 .modal-section h3{margin:0 0 10px;font-size:13px;}
 .org-hero{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;}
-.org-hero-avatar{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:21px;flex-shrink:0;box-shadow:0 10px 22px -10px rgba(0,0,0,0.55);}
+.org-hero-avatar{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:21px;flex-shrink:0;box-shadow:0 10px 22px -10px rgba(0,0,0,0.55);}
 .org-hero h2{margin:0 0 8px;font-size:22px;}
 .org-hero .stat-chips{margin:0;}
 .section-heading{display:flex;align-items:center;gap:10px;margin:0 0 4px;}
-.section-heading .icon-badge{width:36px;height:36px;border-radius:10px;background:rgba(207,234,92,0.12);color:var(--ball);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
-.icon-badge{width:36px;height:36px;border-radius:10px;background:rgba(207,234,92,0.12);color:var(--ball);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
-.drawer-org-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:rgba(207,234,92,0.08);border:1px solid rgba(207,234,92,0.25);border-radius:12px;padding:10px 12px;cursor:pointer;transition:background .15s ease;font-family:var(--font-body);}
+.section-heading .icon-badge{width:40px;height:40px;border-radius:var(--radius-sm);background:rgba(207,234,92,0.13);color:var(--ball);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.icon-badge{width:40px;height:40px;border-radius:var(--radius-sm);background:rgba(207,234,92,0.13);color:var(--ball);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.icon-badge.orange{background:rgba(233,106,60,0.14);color:var(--paddle);}
+.icon-badge.teal{background:rgba(159,191,58,0.10);color:#7FCFC4;}
+.drawer-org-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:rgba(207,234,92,0.08);border:1px solid rgba(207,234,92,0.25);border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer;transition:background .15s ease;font-family:var(--font-body);}
 .drawer-org-btn:hover{background:rgba(207,234,92,0.16);}
 .drawer-org-btn-text{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
-.drawer-org-btn-title{font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--ball);font-weight:700;}
+.drawer-org-btn-title{font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;color:var(--ball);font-weight:600;}
 .drawer-org-btn-sub{font-size:11px;color:var(--muted);white-space:normal;}
 .drawer-org-btn-arrow{color:var(--muted);font-size:17px;flex-shrink:0;}
 .member-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
-.member-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,0.03);flex-wrap:wrap;transition:background .15s ease;}
-.member-row:hover{background:rgba(255,255,255,0.06);}
-.member-avatar{width:38px;height:38px;border-radius:50%;background:rgba(207,234,92,0.14);color:var(--ball);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:13px;flex-shrink:0;}
+.member-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--radius-sm);background:var(--court-elevated-2);border:1px solid var(--line-soft);flex-wrap:wrap;transition:background .15s ease;}
+.member-row:hover{background:rgba(255,255,255,0.07);}
+.member-avatar{width:38px;height:38px;border-radius:50%;background:rgba(207,234,92,0.14);color:var(--ball);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:600;font-size:13px;flex-shrink:0;}
 .member-info{flex:1 1 160px;min-width:140px;}
 .member-name{font-weight:600;}
 .member-leagues{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
@@ -6817,14 +6826,13 @@ function groupAbove(gid){
 // Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
 // ============ Réglages : écran principal (liste de cartes -> pop-ups) ============
 function settingsRow(icon, title, summary, onClickFn){
-  return `<div class="card clickable-row" onclick="${onClickFn}">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-weight:600;">${icon} ${escapeHTML(title)}</div>
-        <div class="small">${escapeHTML(summary)}</div>
-      </div>
-      <span class="small">›</span>
+  return `<div class="card clickable-row" onclick="${onClickFn}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;">
+    <div class="icon-badge">${icon}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:600;font-size:15px;">${escapeHTML(title)}</div>
+      <div class="small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(summary)}</div>
     </div>
+    <span class="small" style="font-size:18px;opacity:.6;flex-shrink:0;">›</span>
   </div>`;
 }
 function adminSettingsSectionHTML(){
