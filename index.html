@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260925172443">
+<meta name="app-build" content="20260925174401">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -8031,12 +8031,14 @@ function renderPlayer(playerId){
     <div class="drawer-extra-block">
       <label style="display:block;margin-bottom:6px;">Réglages</label>
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
+      ${DATA.showRatingToPlayers ? `<button class="btn-ghost" style="width:100%;text-align:left;" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>` : ''}
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
       ${notificationDrawerButtonHTML()}
     </div>`;
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
-    ${tabsBarHTML(tabs, activeTab, 'setPlayerTab', [{key:'absence', icon:'🚫', label:'Absence', onclick:`openAbsenceHub('${me.id}')`}])}
+    ${tabsBarHTML(tabs, activeTab, 'setPlayerTab')}
     <div id="tabContent"></div>
     <div class="bottom-nav-spacer"></div>
   `;
@@ -8379,13 +8381,12 @@ function playerGroupHTML(me){
   if(open && isAbsent(open, me.id)) absenceBadges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
   const planned = plannedAbsencesForPlayer(me.id);
   if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
-  const absenceStatusRow = absenceBadges.length ? `
-    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div class="modal-badges">${absenceBadges.join('')}</div>
-      <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Gérer</button>
-    </div>` : '';
-  let html = `<div class="card"><h2>${escapeHTML(g ? g.name : '—')}</h2>
-    ${absenceStatusRow}
+  let html = `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
+      <h2 style="margin:0;">${escapeHTML(g ? g.name : '—')}</h2>
+      <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">🚫 Absence</button>
+    </div>
+    ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
     <table>
       <tr><th>Nom</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}</tr>
       ${groupMembers.map(p=>{
@@ -8394,8 +8395,6 @@ function playerGroupHTML(me){
       }).join('')}
       ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
     </table>
-    ${DATA.showRatingToPlayers ? `<button class="btn-ghost" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>` : ''}
-    <button class="btn-ghost" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
     ${previousGroupSessionInnerHTML(me)}
   </div>`;
   if(open){
