@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260925171819">
+<meta name="app-build" content="20260925172443">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -148,6 +148,10 @@ p{margin:4px 0;line-height:1.4;}
 .eyebrow{font-family:var(--font-display);font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
 .card{background:var(--court-light);border-radius:var(--radius);padding:16px;margin-bottom:16px;border:1px solid var(--line-soft);}
 .card-divider{border-top:1px solid var(--line-soft);margin:16px 0;}
+/* Grille de cartes — plusieurs cartes par ligne au lieu d'empiler en pleine
+   largeur ; se replie en 1 colonne sur petit écran via minmax(). */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:10px;margin-bottom:16px;align-items:stretch;}
+.card-grid > .card{margin-bottom:0;height:100%;}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
 .btn{font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:600;font-size:14px;border:none;border-radius:999px;padding:11px 20px;cursor:pointer;transition:transform .1s ease, opacity .15s ease, background .15s ease;}
 .btn:active{transform:scale(0.97);}
@@ -2664,9 +2668,10 @@ function mlpSettingsSectionHTML(){
 function mlpSettingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  let html = '';
+  let html = '<div class="card-grid">';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''}`, "openGeneralInfoModal()");
   html += settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()");
+  html += '</div>';
   html += `<div class="card">
     <h3>➕ Nouvelle ligue</h3>
     <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
@@ -6970,13 +6975,14 @@ function settingsLigueTabHTML(){
   const calSummary = DATA.autoStartSessions
     ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
     : 'Démarrage manuel (par défaut)';
-  let html = '';
+  let html = '<div class="card-grid">';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   if(DATA.leagueFormat === 'mlp'){
     html += settingsRow('⚧️', 'Composition des équipes MLP', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()");
   } else {
     html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
   }
+  html += '</div>';
   html += `<div class="card">
     <h3>➕ Nouvelle ligue</h3>
     <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
@@ -6993,7 +6999,7 @@ function settingsJeuTabHTML(){
   const matchupSummary = DATA.matchupMode==='manual'
     ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
     : 'Automatique — génération et rotation par l\'app';
-  let html = '';
+  let html = '<div class="card-grid">';
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
   html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
@@ -7004,11 +7010,13 @@ function settingsJeuTabHTML(){
   const totalPlayerTabs = playerTabDefs().length, hiddenPlayerTabs = (DATA.hiddenPlayerTabs||[]).length;
   const totalSubTabs = subTabDefs().length, hiddenSubTabsCount = (DATA.hiddenSubTabs||[]).length;
   html += settingsRow('🗂️', 'Onglets visibles', `Joueurs : ${hiddenPlayerTabs ? (totalPlayerTabs-hiddenPlayerTabs)+'/'+totalPlayerTabs+' onglets' : 'tous visibles'} · Remplaçants : ${hiddenSubTabsCount ? (totalSubTabs-hiddenSubTabsCount)+'/'+totalSubTabs+' onglets' : 'tous visibles'}`, "openTabVisibilityModal()");
+  html += '</div>';
   return html;
 }
 function settingsAvanceTabHTML(){
-  let html = '';
+  let html = '<div class="card-grid">';
   html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
+  html += '</div>';
   html += `<div class="card">
     <h3>💾 Sauvegarde</h3>
     <p class="small">Filet de sécurité manuel, en plus de la sauvegarde automatique en ligne.</p>
