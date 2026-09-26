@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260925174401">
+<meta name="app-build" content="20260925180512">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -5291,6 +5291,27 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
   if(err3){ showAlert("Erreur : " + err3.message); return null; }
   return newPlayer.id;
 }
+// Même chose que addPlayerToLeagueForProfile, mais pour un remplaçant : crée
+// un nouveau remplaçant dans la ligue visée et lie le compte à celui-ci via
+// profile_players.substitute_id (jamais player_id). Sans cette liaison, le
+// compte reste "en attente" ou pointe vers rien, d'où le message « Profil de
+// remplaçant introuvable » côté joueur.
+async function addSubstituteToLeagueForProfile(leagueId, profileId, name){
+  const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+  if(error){ showAlert("Erreur : " + error.message); return null; }
+  const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
+  leagueData.substitutePool = leagueData.substitutePool || [];
+  const finalName = uniquePlayerName(name, leagueData.substitutePool);
+  const newSub = { id: uid('sub'), name: finalName, rating: RATING_DEFAULT, ratingGames: 0 };
+  leagueData.substitutePool.push(newSub);
+  const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  if(err2){ showAlert("Erreur : " + err2.message); return null; }
+  const { error: err3 } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, substitute_id: newSub.id });
+  if(err3){ showAlert("Erreur : " + err3.message); return null; }
+  const pr = ALL_PROFILES.find(p=>p.id===profileId);
+  if(pr && pr.role !== 'admin') await sb.from('profiles').update({ role:'substitute' }).eq('id', profileId);
+  return newSub.id;
+}
 // Charge les joueurs/remplaçants de CHAQUE ligue de l'organisation (pas
 // seulement la ligue actuellement affichée), pour construire le bassin de
 // membres de l'organisation. La ligue déjà chargée (DATA) est réutilisée
@@ -5492,6 +5513,8 @@ function saveAssignMemberForm(entry){
     for(const leagueId of leagueIds){
       if(entry.profileId && type==='joueur'){
         await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name);
+      } else if(entry.profileId && type==='remplacant'){
+        await addSubstituteToLeagueForProfile(leagueId, entry.profileId, entry.name);
       } else {
         await addNamedEntryToLeague(leagueId, entry.name, type, entry.email, orgMemberId);
       }
@@ -5549,17 +5572,31 @@ function organizationAccountsHTML(){
     const linkedInLeague = new Set(orgLinks.filter(pp=>pp.league_id===leagueId).map(pp=>pp.player_id));
     return (bucket.players||[]).filter(pl=>!linkedInLeague.has(pl.id));
   };
+  const unlinkedSubstitutesByLeague = (leagueId)=>{
+    const bucket = ORG_ROSTER_BY_LEAGUE[leagueId] || { substitutePool: [] };
+    const linkedInLeague = new Set(orgLinks.filter(pp=>pp.league_id===leagueId).map(pp=>pp.substitute_id));
+    return (bucket.substitutePool||[]).filter(s=>!linkedInLeague.has(s.id));
+  };
   const optionsFor = (pr)=> orgLeagues.map(l=>{
     const label = l.schedule_label || l.name;
-    const unlinked = unlinkedPlayersByLeague(l.id);
+    const unlinkedP = unlinkedPlayersByLeague(l.id);
+    const unlinkedS = unlinkedSubstitutesByLeague(l.id);
     return `<optgroup label="${escapeHTML(label)}">
-      ${unlinked.map(pl=>`<option value="${l.id}::${pl.id}">${escapeHTML(pl.name)}</option>`).join('')}
-      <option value="${l.id}::__new__">+ Créer un nouveau joueur « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
+      ${unlinkedP.map(pl=>`<option value="${l.id}::j::${pl.id}">${escapeHTML(pl.name)} (joueur)</option>`).join('')}
+      ${unlinkedS.map(s=>`<option value="${l.id}::s::${s.id}">${escapeHTML(s.name)} (remplaçant)</option>`).join('')}
+      <option value="${l.id}::j::__new__">+ Créer un nouveau joueur « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
+      <option value="${l.id}::s::__new__">+ Créer un nouveau remplaçant « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
     </optgroup>`;
   }).join('');
   const orphaned = orgLinks
-    .map(link=>({ link, profile: ALL_PROFILES.find(p=>p.id===link.profile_id), league: orgLeagues.find(l=>l.id===link.league_id) }))
-    .filter(x=>x.profile && x.league && !((ORG_ROSTER_BY_LEAGUE[x.link.league_id]||{}).players||[]).some(p=>p.id===x.link.player_id));
+    .map(link=>({ link, profile: ALL_PROFILES.find(p=>p.id===link.profile_id), league: orgLeagues.find(l=>l.id===link.league_id), kind: link.substitute_id ? 's' : 'j' }))
+    .filter(x=>{
+      if(!x.profile || !x.league) return false;
+      const bucket = ORG_ROSTER_BY_LEAGUE[x.link.league_id] || {};
+      return x.kind==='s'
+        ? !((bucket.substitutePool||[]).some(s=>s.id===x.link.substitute_id))
+        : !((bucket.players||[]).some(p=>p.id===x.link.player_id));
+    });
   const adminCount = orgProfiles.filter(p=>p.role==='admin').length;
   const roleButton = (pr)=>{
     const isAdmin = pr.role === 'admin';
@@ -5600,21 +5637,21 @@ function organizationAccountsHTML(){
       <div class="section-heading"><span class="icon-badge" style="background:rgba(233,85,107,0.14);color:var(--danger);">⚠️</span><h3 style="margin:0;color:var(--danger);">Comptes orphelins <span class="small" style="color:var(--muted);">(${orphaned.length})</span></h3></div>
       <p class="small" style="margin:8px 0 4px;">Le joueur associé à ces comptes a été retiré. Reconnecte-les à un joueur existant de la même ligue, ou supprime le lien.</p>
       <div class="member-list">
-        ${orphaned.map(({profile, league})=>`<div class="account-row">
+        ${orphaned.map(({profile, league, kind})=>`<div class="account-row">
           <div class="member-avatar">${escapeHTML(initialsOf(profile.display_name||profile.email))}</div>
           <div class="member-info">
             <div class="member-name">${escapeHTML(profile.email)}</div>
-            <div class="small">${escapeHTML(league.schedule_label || league.name)} · ${profile.role==='admin' ? 'Admin' : 'Joueur'}</div>
+            <div class="small">${escapeHTML(league.schedule_label || league.name)} · ${profile.role==='admin' ? 'Admin' : (kind==='s'?'Remplaçant':'Joueur')}</div>
             <div style="margin-top:6px;">${roleButton(profile)}</div>
           </div>
           <div class="account-actions">
             <select id="relinkSelect_${profile.id}">
-              <option value="">— choisir un joueur —</option>
-              ${unlinkedPlayersByLeague(league.id).map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
-              <option value="__new__">+ Créer un nouveau joueur « ${escapeHTML(profile.display_name||profile.email)} »</option>
+              <option value="">— choisir ${kind==='s'?'un remplaçant':'un joueur'} —</option>
+              ${(kind==='s' ? unlinkedSubstitutesByLeague(league.id) : unlinkedPlayersByLeague(league.id)).map(pl2=>`<option value="${pl2.id}">${escapeHTML(pl2.name)}</option>`).join('')}
+              <option value="__new__">+ Créer un nouveau ${kind==='s'?'remplaçant':'joueur'} « ${escapeHTML(profile.display_name||profile.email)} »</option>
             </select>
             <div class="row">
-              <button class="btn btn-secondary" style="flex:1;" onclick="relinkAccount('${profile.id}','${league.id}')">Relier</button>
+              <button class="btn btn-secondary" style="flex:1;" onclick="relinkAccount('${profile.id}','${league.id}','${kind}')">Relier</button>
               <button class="btn-ghost-danger" onclick="unlinkAccount('${profile.id}','${league.id}')">Délier</button>
             </div>
           </div>
@@ -5673,22 +5710,31 @@ async function linkAccount(profileId){
   const select = document.getElementById('linkSelect_'+profileId);
   const raw = select.value;
   if(!raw) return;
-  const sep = raw.indexOf('::');
-  const leagueId = raw.slice(0, sep);
-  const val = raw.slice(sep+2);
+  const [leagueId, kind, val] = raw.split('::');
   const pr = ALL_PROFILES.find(p=>p.id===profileId);
   // « En attente » = aucun lien existant avant cette action (peu importe le
   // rôle global du compte) — c'est ce moment précis qu'on veut notifier,
   // pas chaque nouvelle ligue ajoutée à un compte déjà actif.
   const wasPending = !ALL_PROFILE_PLAYERS.some(pp=>pp.profile_id===profileId);
-  let playerId = val;
-  if(val === '__new__'){
-    playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
-    if(!playerId) return;
+  if(kind === 's'){
+    let subId = val;
+    if(val === '__new__'){
+      subId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null);
+      if(!subId) return;
+    }
+    const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, substitute_id: subId });
+    if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+    if(pr && pr.role !== 'admin') await sb.from('profiles').update({ role:'substitute' }).eq('id', profileId);
+  } else {
+    let playerId = val;
+    if(val === '__new__'){
+      playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+      if(!playerId) return;
+    }
+    const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: playerId });
+    if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
+    await migratePlayerNotesToProfile(leagueId, playerId, profileId);
   }
-  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: playerId });
-  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-  await migratePlayerNotesToProfile(leagueId, playerId, profileId);
   if(wasPending){
     const leagueMeta = LEAGUES.find(l=>l.id===leagueId);
     notifyAccountApproved(profileId, leagueMeta && (leagueMeta.schedule_label || leagueMeta.name));
@@ -5698,19 +5744,28 @@ async function linkAccount(profileId){
 // Reconnecte un compte dont le joueur associé a été retiré par erreur (le
 // lien existe déjà en base pour cette ligue précise, on met juste à jour
 // vers quel joueur il pointe, plutôt que de devoir délier puis relier).
-async function relinkAccount(profileId, leagueId){
+async function relinkAccount(profileId, leagueId, kind){
   const select = document.getElementById('relinkSelect_'+profileId);
   const value = select.value;
   if(!value) return;
-  let playerId = value;
-  if(value === '__new__'){
-    const pr = ALL_PROFILES.find(p=>p.id===profileId);
-    playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
-    if(!playerId) return;
+  const pr = ALL_PROFILES.find(p=>p.id===profileId);
+  let id = value;
+  if(kind === 's'){
+    if(value === '__new__'){
+      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null);
+      if(!id) return;
+    }
+    const { error } = await sb.from('profile_players').update({ substitute_id: id, player_id: null }).eq('profile_id', profileId).eq('league_id', leagueId);
+    if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
+  } else {
+    if(value === '__new__'){
+      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+      if(!id) return;
+    }
+    const { error } = await sb.from('profile_players').update({ player_id: id, substitute_id: null }).eq('profile_id', profileId).eq('league_id', leagueId);
+    if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
+    await migratePlayerNotesToProfile(leagueId, id, profileId);
   }
-  const { error } = await sb.from('profile_players').update({ player_id: playerId }).eq('profile_id', profileId).eq('league_id', leagueId);
-  if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
-  await migratePlayerNotesToProfile(leagueId, playerId, profileId);
   await refreshAfterAccountChange(profileId, leagueId);
 }
 async function unlinkAccount(profileId, leagueId){
