@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20260926200730">
+<meta name="app-build" content="20260926203300">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4785,8 +4785,16 @@ function substituteDetailModalHTML(subId){
       <p class="small" style="margin-bottom:10px;">${escapeHTML(profile.email)} — Remplaçant</p>
       <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>`;
   } else {
-    const linkedProfileIds = new Set((LEAGUE_PLAYER_LINKS||[]).map(l=>l.profile_id));
-    const pendingAccounts = ALL_PROFILES.filter(pr=>!linkedProfileIds.has(pr.id));
+    // « En attente » doit être org-wide, pas juste la ligue courante — sinon
+    // un compte déjà actif dans une AUTRE ligue de l'organisation apparaît à
+    // tort comme "en attente" ici. Les admins restent volontairement dans la
+    // liste (même choix que l'onglet Comptes) : un admin peut aussi être
+    // joueur/remplaçant dans une ligue — voir profileRoleLabel, qui ne
+    // dépend plus de profiles.role pour ça, donc les lier ici n'écrase plus
+    // jamais son accès admin.
+    const orgLeagueIds = new Set(myOrgLeagues().map(l=>l.id));
+    const orgLinkedProfileIds = new Set((ALL_PROFILE_PLAYERS||[]).filter(pp=>orgLeagueIds.has(pp.league_id)).map(pp=>pp.profile_id));
+    const pendingAccounts = ALL_PROFILES.filter(pr=> pr.organization_id===CURRENT_ORGANIZATION_ID && !orgLinkedProfileIds.has(pr.id));
     html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié — ce remplaçant n'a pas encore accès à sa propre vue.</p>`;
     if(pendingAccounts.length){
       html += `
@@ -4814,8 +4822,6 @@ async function linkSubstituteAccount(subId){
   if(!profileId) return;
   const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, substitute_id: subId });
   if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-  const { error: err2 } = await sb.from('profiles').update({ role: 'substitute' }).eq('id', profileId);
-  if(err2){ showAlert("Erreur lors de la mise à jour du rôle : " + err2.message); return; }
   await loadAllProfiles();
   if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
   openSubstituteDetailModal(subId);
@@ -4841,9 +4847,7 @@ function convertPlayerToSubstitute(pid){
     DATA.players = DATA.players.filter(x=>x.id!==pid);
     const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===pid);
     if(link){
-      const { error } = await sb.from('profile_players').update({ player_id: null, substitute_id: newSub.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
-      const linkedProfile = ALL_PROFILES.find(pr=>pr.id===link.profile_id);
-      if(!error && linkedProfile && linkedProfile.role !== 'admin') await sb.from('profiles').update({ role: 'substitute' }).eq('id', link.profile_id);
+      await sb.from('profile_players').update({ player_id: null, substitute_id: newSub.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
       await loadAllProfiles();
       if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
     }
@@ -4865,9 +4869,7 @@ function convertSubstituteToPlayer(subId){
     DATA.substitutePool = (DATA.substitutePool||[]).filter(x=>x.id!==subId);
     const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
     if(link){
-      const { error } = await sb.from('profile_players').update({ substitute_id: null, player_id: newPlayer.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
-      const linkedProfile = ALL_PROFILES.find(pr=>pr.id===link.profile_id);
-      if(!error && linkedProfile && linkedProfile.role !== 'admin') await sb.from('profiles').update({ role: 'player' }).eq('id', link.profile_id);
+      await sb.from('profile_players').update({ substitute_id: null, player_id: newPlayer.id }).eq('profile_id', link.profile_id).eq('league_id', CURRENT_LEAGUE_ID);
       await loadAllProfiles();
       if(CURRENT_PROFILE && CURRENT_PROFILE.id === link.profile_id){ ADMIN_VIEWING_AS = null; await refreshMyOwnLinks(); }
     }
@@ -5325,8 +5327,6 @@ async function addSubstituteToLeagueForProfile(leagueId, profileId, name){
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
   const { error: err3 } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, substitute_id: newSub.id });
   if(err3){ showAlert("Erreur : " + err3.message); return null; }
-  const pr = ALL_PROFILES.find(p=>p.id===profileId);
-  if(pr && pr.role !== 'admin') await sb.from('profiles').update({ role:'substitute' }).eq('id', profileId);
   return newSub.id;
 }
 // Charge les joueurs/remplaçants de CHAQUE ligue de l'organisation (pas
@@ -5539,38 +5539,24 @@ function saveAssignMemberForm(entry){
     await refreshAfterOrgRosterChange(leagueIds);
   })();
 }
-async function removePlayerFromLeagueForProfile(leagueId, profileId){
-  const { error } = await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', leagueId);
-  if(error){ showAlert("Erreur : " + error.message); }
-}
-// Ouvre un pop-up listant toutes les ligues, avec une case à cocher pour
-// ajouter/retirer ce joueur (via son compte lié) de chacune.
-function leaguesSummaryForProfile(profileId){
-  const ids = ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id);
-  const labels = ids.map(id=>{ const l = LEAGUES.find(x=>x.id===id); return l ? (l.schedule_label || l.name) : '?'; });
-  return labels.length ? labels.join(', ') : '—';
-}
-function openProfileLeaguesModal(profileId, displayName){
-  const memberLeagueIds = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.profile_id===profileId).map(pp=>pp.league_id));
-  const safeName = displayName.replace(/'/g, "\\'");
-  const body = LEAGUES.map(l=>`
-    <label class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
-      <input type="checkbox" style="width:auto;" ${memberLeagueIds.has(l.id)?'checked':''} onchange="toggleProfileLeague('${profileId}','${l.id}', this.checked, '${safeName}')">
-      <span>${l.schedule_label ? escapeHTML(l.schedule_label) : escapeHTML(l.name)}${l.schedule_label ? ' <span class="small">('+escapeHTML(l.name)+')</span>' : ''}${l.id===CURRENT_LEAGUE_ID ? ' <span class="small">— ligue actuelle</span>' : ''}</span>
-    </label>`).join('');
-  showContentModal(`Ligues de ${displayName}`, body || `<p class="small">Aucune ligue n'existe encore.</p>`);
-}
-async function toggleProfileLeague(profileId, leagueId, checked, displayName){
-  if(checked){
-    await addPlayerToLeagueForProfile(leagueId, profileId, displayName);
-  } else {
-    await removePlayerFromLeagueForProfile(leagueId, profileId);
-  }
-  await loadAllProfilePlayers();
-  if(leagueId === CURRENT_LEAGUE_ID){ await loadAllProfiles(); }
-  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
-  closeModal();
-  openProfileLeaguesModal(profileId, displayName);
+// Le rôle "Joueur"/"Remplaçant" affiché pour un compte est calculé à partir
+// de ses vrais liens (profile_players), jamais du champ profiles.role : un
+// même compte peut être joueur dans une ligue de l'organisation ET
+// remplaçant dans une autre, ce qu'un simple champ "role" global ne peut pas
+// représenter fidèlement (la dernière conversion écraserait la valeur pour
+// tout le compte). profiles.role ne sert donc plus qu'à distinguer
+// admin / non-admin (voir onAuthResolved, ligne ~2408) — on ne lui écrit
+// jamais 'player'/'substitute' ailleurs dans le code.
+function profileRoleLabel(profile){
+  if(!profile) return '?';
+  if(profile.role === 'admin') return 'Admin';
+  const links = (ALL_PROFILE_PLAYERS||[]).filter(pp=>pp.profile_id===profile.id);
+  const hasPlayer = links.some(l=>l.player_id);
+  const hasSub = links.some(l=>l.substitute_id);
+  if(hasPlayer && hasSub) return 'Joueur + Remplaçant';
+  if(hasSub) return 'Remplaçant';
+  if(hasPlayer) return 'Joueur';
+  return 'En attente';
 }
 // Comptes gérés au niveau de l'organisation (pas d'une ligue précise) : un
 // compte en attente peut être lié à un joueur dans N'IMPORTE LAQUELLE des
@@ -5635,7 +5621,7 @@ function organizationAccountsHTML(){
         <div class="member-avatar">${escapeHTML(initialsOf(pr.display_name||pr.email))}</div>
         <div class="member-info">
           <div class="member-name">${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</div>
-          <div class="small">${escapeHTML(pr.email)} · ${pr.role==='admin'?'Admin':(pr.role==='substitute'?'Remplaçant':'Joueur')}</div>
+          <div class="small">${escapeHTML(pr.email)} · ${profileRoleLabel(pr)}</div>
           <div style="margin-top:6px;">${roleButton(pr)}</div>
         </div>
         <div class="account-actions">
@@ -5697,7 +5683,13 @@ function setAccountRole(profileId, newRole){
           const loaded = await loadData(CURRENT_LEAGUE_ID);
           DATA = loaded || defaultData();
           migrateData();
-          SESSION_USER = { role:'player', playerId: link.player_id };
+          // Le premier lien du compte peut être un joueur régulier OU un
+          // remplaçant — ne jamais supposer "joueur" par défaut (un admin
+          // rétrogradé qui n'était en fait lié que comme remplaçant se
+          // retrouvait routé vers une vue joueur inexistante).
+          SESSION_USER = link.substitute_id
+            ? { role:'substitute', substituteId: link.substitute_id }
+            : { role:'player', playerId: link.player_id };
           VIEW = { tab:'classement' };
         } else {
           SESSION_USER = { role:'pending', email: CURRENT_PROFILE.email, displayName: CURRENT_PROFILE.display_name };
@@ -5741,7 +5733,6 @@ async function linkAccount(profileId){
     }
     const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, substitute_id: subId });
     if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-    if(pr && pr.role !== 'admin') await sb.from('profiles').update({ role:'substitute' }).eq('id', profileId);
   } else {
     let playerId = val;
     if(val === '__new__'){
