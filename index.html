@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001140500">
+<meta name="app-build" content="20261001141500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1954,9 +1954,13 @@ function findRatablePerson(pid){
   // Un remplaçant du bassin est référencé dans les équipes sous la forme
   // "sub::<id>" (voir groupAbsenceManagementHTML) — il faut retirer ce
   // préfixe avant de chercher dans substitutePool, sinon la recherche
-  // échoue toujours et sa cote ne se met jamais à jour.
-  if(isSubPoolId(pid)) return (DATA.substitutePool||[]).find(x=>x.id===pid.slice(5));
-  return DATA.players.find(x=>x.id===pid);
+  // échoue toujours et sa cote ne se met jamais à jour. Mais un remplaçant
+  // peut aussi être référencé directement par son id réel (sans préfixe),
+  // par exemple depuis son propre popup (bouton "Modifier la cote") — dans
+  // ce cas il faut chercher dans substitutePool aussi, pas seulement players,
+  // sinon le bouton ne fait rien silencieusement.
+  if(isSubPoolId(pid)) pid = pid.slice(5);
+  return DATA.players.find(x=>x.id===pid) || (DATA.substitutePool||[]).find(x=>x.id===pid);
 }
 function ratingOf(pid){
   const p = findRatablePerson(pid);
