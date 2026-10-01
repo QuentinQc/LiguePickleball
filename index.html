@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001103000">
+<meta name="app-build" content="20261001110000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -7117,7 +7117,7 @@ function organizationHeroHTML(){
 }
 function renderOrganizationManagement(){
   const sub = VIEW.orgSubTab || 'general';
-  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['comptes','🔑 Comptes'],['videos','🎬 Vidéos'],['tournois','🏆 Tournois']];
+  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['rapport','📊 Rapport'],['comptes','🔑 Comptes'],['videos','🎬 Vidéos'],['tournois','🏆 Tournois']];
   app.innerHTML = `
     ${topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null)}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
@@ -7127,6 +7127,7 @@ function renderOrganizationManagement(){
   `;
   const c = document.getElementById('orgTabContent');
   if(sub==='membres') c.innerHTML = organizationMembersCardHTML();
+  else if(sub==='rapport') c.innerHTML = organizationReportHTML();
   else if(sub==='comptes') c.innerHTML = organizationAccountsHTML();
   else if(sub==='videos') c.innerHTML = adminVideosSectionHTML();
   else if(sub==='tournois') c.innerHTML = adminTournamentsSectionHTML();
@@ -7184,6 +7185,35 @@ function organizationMembersCardHTML(){
       ${entries.length===0 ? `<p class="empty">Aucun membre pour l'instant</p>` : ''}
     </div>
   </div>`;
+}
+// Rapport : vue d'ensemble en tableau de tous les joueurs de l'organisation,
+// une colonne par ligue, pour voir en un coup d'œil qui joue où et avec
+// quel statut — plutôt que de devoir ouvrir chaque fiche séparément.
+function organizationReportHTML(){
+  const leagues = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
+  const entries = organizationRosterEntries();
+  ORG_ROSTER_ENTRIES_CACHE = entries;
+  const cellFor = (entry, leagueId)=>{
+    const row = entry.rows.find(r=>r.leagueId===leagueId);
+    if(!row) return '<span class="small" style="opacity:.35;">—</span>';
+    return `<span class="tag ${row.type==='remplaçant'?'tag-yellow':'tag-up'}">${row.type==='remplaçant'?'🔄 Rempl.':'Joueur'}</span>`;
+  };
+  let html = `<div class="card">
+    <div class="section-heading"><span class="icon-badge">📊</span><h3 style="margin:0;">Rapport des joueurs <span class="small">(${entries.length})</span></h3></div>
+    <p class="small" style="margin:8px 0 4px;">Vue d'ensemble de tous les joueurs de l'organisation et de leur statut dans chaque ligue. Clique sur un nom pour voir sa fiche et la modifier.</p>`;
+  if(!entries.length || !leagues.length){
+    html += `<p class="empty">Aucun joueur pour l'instant.</p>`;
+  } else {
+    html += `<table>
+      <tr><th>Nom</th>${leagues.map(l=>`<th>${escapeHTML(l.schedule_label || l.name)}</th>`).join('')}</tr>
+      ${entries.map((e,i)=>`<tr>
+        <td class="clickable-row" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}</td>
+        ${leagues.map(l=>`<td>${cellFor(e, l.id)}</td>`).join('')}
+      </tr>`).join('')}
+    </table>`;
+  }
+  html += `</div>`;
+  return html;
 }
 function settingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
