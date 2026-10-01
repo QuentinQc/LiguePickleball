@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001173500">
+<meta name="app-build" content="20261001190000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -231,6 +231,32 @@ tr.me{background:rgba(207,234,92,0.1);}
 .member-name{font-weight:600;}
 .wall-msg{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:8px 10px;font-size:14px;}
 .wall-msg-mine{background:rgba(207,234,92,0.10);border-color:rgba(207,234,92,0.25);}
+/* Mur de discussion — bulles de clavardage groupées par auteur */
+.wall-date-sep{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 8px;text-transform:uppercase;letter-spacing:0.04em;}
+.wall-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;}
+.wall-row.mine{flex-direction:row-reverse;}
+.wall-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:11px;}
+.wall-group{display:flex;flex-direction:column;gap:4px;max-width:78%;min-width:0;}
+.wall-row.mine .wall-group{align-items:flex-end;}
+.wall-author{font-size:11px;font-weight:600;color:var(--muted);margin-left:2px;}
+.wall-bubble{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:16px;border-bottom-left-radius:4px;padding:8px 12px;font-size:14px;white-space:pre-wrap;word-break:break-word;}
+.wall-row.mine .wall-bubble{background:var(--ball);color:var(--court);border-color:transparent;border-bottom-left-radius:16px;border-bottom-right-radius:4px;}
+.wall-time{font-size:10px;opacity:0.6;margin-top:3px;white-space:nowrap;}
+.wall-time a{text-decoration:underline;}
+/* Trouver un partenaire — carte façon billet */
+.partner-card{display:flex;border:1px solid var(--line-soft);border-radius:var(--radius-sm);overflow:hidden;background:var(--court-elevated-2);}
+.partner-card.closed{opacity:0.55;}
+.partner-date-block{background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 16px;min-width:60px;flex-shrink:0;}
+.partner-date-day{font-family:var(--font-display);font-weight:800;font-size:22px;line-height:1;}
+.partner-date-month{font-size:10px;letter-spacing:0.08em;margin-top:2px;}
+.partner-body{padding:10px 14px;flex:1;min-width:0;}
+.pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;}
+.pill-green{background:rgba(143,191,63,0.18);color:#8FBF3F;}
+.pill-gray{background:rgba(255,255,255,0.08);color:var(--muted);}
+.avatar-stack{display:flex;}
+.avatar-stack-item{width:24px;height:24px;border-radius:50%;border:2px solid var(--court-elevated-2);margin-left:-8px;font-size:9px;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;}
+.avatar-stack-item:first-child{margin-left:0;}
+.avatar-stack-more{background:rgba(255,255,255,0.12);color:var(--muted);}
 .member-name-link{cursor:pointer;}
 .member-name-link:hover{color:var(--ball);text-decoration:underline;text-decoration-color:rgba(255,255,255,0.3);text-underline-offset:3px;}
 .member-leagues{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
@@ -596,6 +622,8 @@ let SOCIAL_EVENT_RSVPS = {};    // { event_id: [{profile_id,name,status}, ...] }
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
 let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation de la ligue affichée (partagées entre ses ligues)
+let WALL_REALTIME_CHANNEL = null;   // canal Supabase Realtime abonné à org_messages pour l'organisation courante
+let PARTNER_REALTIME_CHANNEL = null; // canal Supabase Realtime abonné à partner_posts pour la ligue courante
 let DRAWER_OPEN = false; // tiroir de navigation latéral (remplace les onglets horizontaux)
 let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
 
@@ -1000,23 +1028,8 @@ function wallChannels(){
     .filter(lg=>lg && lg.organization_id === orgId);
 }
 function leagueWallHTML(){
-  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
   const channels = wallChannels();
   const activeChannel = VIEW.wallChannel || 'general';
-  const msgs = LEAGUE_WALL_MESSAGES || [];
-  const dayLabel = (iso)=>{ const d = new Date(iso); return d.toLocaleDateString('fr-CA', { day:'numeric', month:'short' }) + ' · ' + d.toLocaleTimeString('fr-CA', { hour:'2-digit', minute:'2-digit' }); };
-  const rows = msgs.map(m=>{
-    const mine = CURRENT_PROFILE && m.profile_id === CURRENT_PROFILE.id;
-    const canDelete = mine || isAdmin;
-    return `<div class="wall-msg${mine?' wall-msg-mine':''}">
-      <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;">
-        <strong style="font-size:13px;">${escapeHTML(m.author_name)}</strong>
-        <span class="small" style="opacity:0.65;white-space:nowrap;">${dayLabel(m.created_at)}</span>
-      </div>
-      <div style="white-space:pre-wrap;word-break:break-word;margin-top:2px;">${escapeHTML(m.content)}</div>
-      ${canDelete ? `<button class="btn-ghost-danger" style="padding:2px 6px;margin-top:4px;font-size:12px;" onclick="deleteLeagueMessage('${m.id}')">🗑️ Supprimer</button>` : ''}
-    </div>`;
-  }).join('');
   const channelTabsHTML = `<div class="subtabs" style="margin-bottom:10px;flex-wrap:wrap;">
     <div class="tab ${activeChannel==='general'?'active':''}" onclick="switchWallChannel('general')">🌐 Général</div>
     ${channels.map(l=>`<div class="tab ${activeChannel===l.id?'active':''}" onclick="switchWallChannel('${l.id}')">${escapeHTML(l.name)}</div>`).join('')}
@@ -1029,14 +1042,64 @@ function leagueWallHTML(){
       </div>
       <p class="small" style="margin:6px 0 10px;color:var(--muted);">${activeChannel==='general' ? "Visible par tous les membres de l'organisation." : 'Visible par les membres de cette ligue.'}</p>
       ${channelTabsHTML}
-      <div id="wallMessages" style="display:flex;flex-direction:column;gap:10px;max-height:50vh;overflow-y:auto;padding:4px 2px;">
-        ${rows || '<p class="empty">Aucun message pour l\'instant — sois le premier à écrire !</p>'}
+      <div id="wallMessages" style="display:flex;flex-direction:column;max-height:55vh;overflow-y:auto;padding:4px 2px;">
+        ${wallMessagesListHTML()}
       </div>
       <div class="row" style="gap:8px;margin-top:12px;align-items:flex-end;">
         <textarea id="wallMessageInput" rows="2" maxlength="500" placeholder="Écrire un message..." style="flex:1;"></textarea>
         <button class="btn btn-primary" style="width:auto;" onclick="postLeagueMessage()">Envoyer</button>
       </div>
     </div>`;
+}
+// Regroupe les messages consécutifs du même auteur (fenêtre de 5 minutes)
+// pour n'afficher son avatar/nom qu'une fois, comme une vraie appli de
+// clavardage, avec un séparateur quand la journée change. Isolée dans sa
+// propre fonction pour pouvoir rafraîchir SEULEMENT #wallMessages (via le
+// temps réel) sans toucher au reste de la carte, notamment le textarea en
+// cours de rédaction.
+function wallMessagesListHTML(){
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const msgs = LEAGUE_WALL_MESSAGES || [];
+  if(!msgs.length) return '<p class="empty">Aucun message pour l\'instant — sois le premier à écrire !</p>';
+  const dateSepLabel = (iso)=>{
+    const d = new Date(iso); const today = new Date(); const yest = new Date(today); yest.setDate(yest.getDate()-1);
+    const sameDay = (a,b)=> a.toDateString()===b.toDateString();
+    if(sameDay(d,today)) return "Aujourd'hui";
+    if(sameDay(d,yest)) return 'Hier';
+    return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' });
+  };
+  const timeLabel = (iso)=> new Date(iso).toLocaleTimeString('fr-CA', { hour:'2-digit', minute:'2-digit' });
+  const groups = [];
+  msgs.forEach(m=>{
+    const day = new Date(m.created_at).toDateString();
+    const last = groups[groups.length-1];
+    const withinWindow = last && last.profile_id===m.profile_id && last.day===day
+      && (new Date(m.created_at) - new Date(last.items[last.items.length-1].created_at)) < 5*60*1000;
+    if(withinWindow) last.items.push(m);
+    else groups.push({ profile_id:m.profile_id, author_name:m.author_name, avatar_url:m.avatar_url, day, items:[m] });
+  });
+  let html = '';
+  let shownDay = null;
+  groups.forEach(g=>{
+    if(g.day !== shownDay){
+      html += `<div class="wall-date-sep">${escapeHTML(dateSepLabel(g.items[0].created_at))}</div>`;
+      shownDay = g.day;
+    }
+    const mine = CURRENT_PROFILE && g.profile_id === CURRENT_PROFILE.id;
+    const initials = (g.author_name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+    const canDelete = mine || isAdmin;
+    html += `<div class="wall-row${mine?' mine':''}">
+      ${avatarHTML('wall-avatar', initials, g.avatar_url)}
+      <div class="wall-group">
+        ${!mine ? `<div class="wall-author">${escapeHTML(g.author_name)}</div>` : ''}
+        ${g.items.map(m=>`<div class="wall-bubble">
+          ${escapeHTML(m.content)}
+          <div class="wall-time">${timeLabel(m.created_at)}${canDelete ? ` · <a href="javascript:void(0)" onclick="deleteLeagueMessage('${m.id}')">supprimer</a>` : ''}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  return html;
 }
 function scrollWallToBottom(){
   const el = document.getElementById('wallMessages');
@@ -1060,7 +1123,9 @@ async function postLeagueMessage(){
   const { error } = await sb.from('org_messages').insert({
     organization_id: orgId,
     league_id: activeChannel==='general' ? null : activeChannel,
-    profile_id: CURRENT_PROFILE.id, author_name, content
+    profile_id: CURRENT_PROFILE.id, author_name,
+    avatar_url: CURRENT_PROFILE.avatar_url || null,
+    content
   });
   if(error){ showAlert("Le message n'a pas pu être envoyé."); return; }
   await loadWallChannel(activeChannel);
@@ -1073,6 +1138,25 @@ function deleteLeagueMessage(id){
     await loadWallChannel(VIEW.wallChannel || 'general');
     render();
   });
+}
+// ---- Temps réel : un message posté/supprimé par quelqu'un d'autre apparaît
+// sans recharger la page. On ne patche QUE #wallMessages (pas toute la carte,
+// donc le textarea en cours de rédaction n'est jamais perturbé), et seulement
+// si le message concerne le canal actuellement affiché.
+function onWallRealtimeInsert(msg){
+  const activeChannel = VIEW.wallChannel || 'general';
+  const belongs = activeChannel==='general' ? msg.league_id===null : msg.league_id===activeChannel;
+  if(!belongs || LEAGUE_WALL_MESSAGES.some(m=>m.id===msg.id)) return;
+  LEAGUE_WALL_MESSAGES.push(msg);
+  const container = document.getElementById('wallMessages');
+  if(container){ container.innerHTML = wallMessagesListHTML(); scrollWallToBottom(); }
+}
+function onWallRealtimeDelete(old){
+  const idx = LEAGUE_WALL_MESSAGES.findIndex(m=>m.id===old.id);
+  if(idx===-1) return;
+  LEAGUE_WALL_MESSAGES.splice(idx,1);
+  const container = document.getElementById('wallMessages');
+  if(container) container.innerHTML = wallMessagesListHTML();
 }
 // ---- Trouver un partenaire / match amical : petit babillard par ligue —
 // table dédiée `partner_posts`. "interested" est une liste jsonb de
@@ -1090,7 +1174,7 @@ async function createPartnerPost(){
   if(!message || !CURRENT_PROFILE || !CURRENT_LEAGUE_ID) return;
   const author_name = myDisplayName();
   const play_date = (dateEl && dateEl.value) ? dateEl.value : null;
-  const { error } = await sb.from('partner_posts').insert({ league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, message, play_date });
+  const { error } = await sb.from('partner_posts').insert({ league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date });
   if(error){ showAlert("L'annonce n'a pas pu être publiée."); return; }
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   render();
@@ -1105,7 +1189,7 @@ async function togglePartnerInterest(id){
   if(!post) return;
   const list = Array.isArray(post.interested) ? post.interested.slice() : [];
   const already = list.some(x=>x.profile_id===CURRENT_PROFILE.id);
-  const next = already ? list.filter(x=>x.profile_id!==CURRENT_PROFILE.id) : [...list, { profile_id: CURRENT_PROFILE.id, name: myDisplayName() }];
+  const next = already ? list.filter(x=>x.profile_id!==CURRENT_PROFILE.id) : [...list, { profile_id: CURRENT_PROFILE.id, name: myDisplayName(), avatar_url: CURRENT_PROFILE.avatar_url || null }];
   await sb.from('partner_posts').update({ interested: next }).eq('id', id);
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   render();
@@ -1126,34 +1210,6 @@ function deletePartnerPost(id){
   });
 }
 function partnerBoardHTML(){
-  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
-  const posts = (PARTNER_POSTS||[]).slice().sort((a,b)=>{
-    if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
-    return new Date(b.created_at) - new Date(a.created_at);
-  });
-  const dayLabel = (iso)=>{ const d = new Date(iso); return d.toLocaleDateString('fr-CA', { day:'numeric', month:'short' }) + ' · ' + d.toLocaleTimeString('fr-CA', { hour:'2-digit', minute:'2-digit' }); };
-  const playDateLabel = (s)=>{ if(!s) return ''; const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
-  const rows = posts.map(p=>{
-    const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
-    const canManage = mine || isAdmin;
-    const interested = Array.isArray(p.interested) ? p.interested : [];
-    const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
-    const closed = p.status !== 'open';
-    return `<div class="wall-msg${mine?' wall-msg-mine':''}" style="${closed?'opacity:0.6;':''}">
-      <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;">
-        <strong style="font-size:13px;">${escapeHTML(p.author_name)}</strong>
-        <span class="small" style="opacity:0.65;white-space:nowrap;">${dayLabel(p.created_at)}</span>
-      </div>
-      ${p.play_date ? `<div class="small" style="margin-top:2px;"><span class="tag">📅 ${escapeHTML(playDateLabel(p.play_date))}</span>${closed?' <span class="tag">Comblée</span>':''}</div>` : (closed ? `<div class="small" style="margin-top:2px;"><span class="tag">Comblée</span></div>` : '')}
-      <div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(p.message)}</div>
-      ${interested.length ? `<p class="small" style="margin-top:6px;color:var(--muted);">Partant(e)s : ${interested.map(x=>escapeHTML(x.name)).join(', ')}</p>` : ''}
-      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
-        ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
-        ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
-        ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
   return `
     <div class="card">
       <h3 style="margin:0 0 4px;">🤝 Trouver un partenaire</h3>
@@ -1166,10 +1222,101 @@ function partnerBoardHTML(){
           <button class="btn btn-primary" style="width:auto;margin-left:auto;" onclick="createPartnerPost()">Publier</button>
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-        ${rows || '<p class="empty">Aucune annonce pour l\'instant.</p>'}
+      <div id="partnerPostsList" style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">
+        ${partnerPostsListHTML()}
       </div>
     </div>`;
+}
+// Isolée pour pouvoir rafraîchir SEULEMENT #partnerPostsList (via le temps
+// réel) sans toucher au formulaire de nouvelle annonce en cours de saisie.
+function partnerPostsListHTML(){
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const posts = (PARTNER_POSTS||[]).slice().sort((a,b)=>{
+    if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  if(!posts.length) return '<p class="empty">Aucune annonce pour l\'instant.</p>';
+  const initials = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  const dayNum = (s)=>{ const d = new Date(s+'T00:00:00'); return d.getDate(); };
+  const monthAbbr = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { month:'short' }).toUpperCase().replace('.',''); };
+  const playDateLabel = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
+  const relTime = (iso)=>{
+    const mins = Math.round((Date.now() - new Date(iso).getTime())/60000);
+    if(mins<1) return "à l'instant";
+    if(mins<60) return `il y a ${mins} min`;
+    const hrs = Math.round(mins/60);
+    if(hrs<24) return `il y a ${hrs} h`;
+    return `il y a ${Math.round(hrs/24)} j`;
+  };
+  return posts.map(p=>{
+    const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
+    const canManage = mine || isAdmin;
+    const interested = Array.isArray(p.interested) ? p.interested : [];
+    const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+    const closed = p.status !== 'open';
+    const shown = interested.slice(0,5);
+    const extra = interested.length - shown.length;
+    return `<div class="partner-card${closed?' closed':''}">
+      <div class="partner-date-block">
+        ${p.play_date ? `<div class="partner-date-day">${dayNum(p.play_date)}</div><div class="partner-date-month">${escapeHTML(monthAbbr(p.play_date))}</div>` : `<div style="font-size:22px;">🏓</div>`}
+      </div>
+      <div class="partner-body">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div class="row" style="align-items:center;gap:6px;min-width:0;">
+            ${avatarHTML('wall-avatar', initials(p.author_name), p.avatar_url, 'width:24px;height:24px;font-size:10px;')}
+            <span class="small" style="font-weight:600;">${escapeHTML(p.author_name)}</span>
+            <span class="small" style="opacity:0.6;white-space:nowrap;">${relTime(p.created_at)}</span>
+          </div>
+          <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
+        </div>
+        ${p.play_date ? `<div class="small" style="margin-top:4px;color:var(--muted);">📅 ${escapeHTML(playDateLabel(p.play_date))}</div>` : ''}
+        <div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(p.message)}</div>
+        ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:10px;">
+          <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', initials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
+          <span class="small" style="color:var(--muted);">${interested.length} partant(e)${interested.length>1?'s':''}</span>
+        </div>` : ''}
+        <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap;">
+          ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
+          ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
+          ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+// ---- Temps réel : toute création/modification/suppression d'annonce par
+// quelqu'un d'autre rafraîchit SEULEMENT #partnerPostsList, pas le formulaire
+// de nouvelle annonce au-dessus (évite d'effacer ce que la personne tape).
+function onPartnerRealtimeChange(){
+  const container = document.getElementById('partnerPostsList');
+  if(!container) return;
+  loadPartnerPosts(CURRENT_LEAGUE_ID).then(()=>{
+    const c = document.getElementById('partnerPostsList');
+    if(c) c.innerHTML = partnerPostsListHTML();
+  });
+}
+// ---- Mise en place / démontage des abonnements temps réel (mur + partenaire).
+// Appelé à chaque changement de ligue/organisation : on retire l'ancien
+// abonnement (s'il existe) avant d'en ouvrir un nouveau, pour ne jamais
+// accumuler des canaux qui pointent vers une ligue/organisation périmée.
+function teardownRealtimeChannels(){
+  if(WALL_REALTIME_CHANNEL){ sb.removeChannel(WALL_REALTIME_CHANNEL); WALL_REALTIME_CHANNEL = null; }
+  if(PARTNER_REALTIME_CHANNEL){ sb.removeChannel(PARTNER_REALTIME_CHANNEL); PARTNER_REALTIME_CHANNEL = null; }
+}
+function setupRealtimeChannels(){
+  teardownRealtimeChannels();
+  const orgId = currentLeagueOrgId();
+  if(orgId){
+    WALL_REALTIME_CHANNEL = sb.channel(`org_messages_${orgId}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'org_messages', filter:`organization_id=eq.${orgId}` }, payload => onWallRealtimeInsert(payload.new))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'org_messages', filter:`organization_id=eq.${orgId}` }, payload => onWallRealtimeDelete(payload.old))
+      .subscribe();
+  }
+  if(CURRENT_LEAGUE_ID){
+    PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${CURRENT_LEAGUE_ID}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`league_id=eq.${CURRENT_LEAGUE_ID}` }, () => onPartnerRealtimeChange())
+      .subscribe();
+  }
 }
 // ---- Événements sociaux : calendrier à l'échelle de l'ORGANISATION (comme
 // le canal Général du mur) — un BBQ de fin de saison ou un tournoi social
@@ -1543,6 +1690,7 @@ async function switchToLeague(leagueId){
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
+  setupRealtimeChannels();
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
@@ -1582,6 +1730,7 @@ async function switchMyLeague(leagueId){
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
+  setupRealtimeChannels();
   const isSub = !!link.substitute_id;
   if(SESSION_USER.role === 'admin'){
     // Un admin qui consulte sa propre vue joueur/remplaçant : on ne touche
@@ -2807,6 +2956,7 @@ async function onAuthResolved(user){
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
+  setupRealtimeChannels();
   if(link.substitute_id){
     SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
     VIEW = { tab:'dispo' };
