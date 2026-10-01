@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001152344">
+<meta name="app-build" content="20261001153005">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -6278,23 +6278,35 @@ async function saveOrgMemberDetailAdd(idx){
 // ligue séparément. Le genre reste techniquement stocké sur chaque fiche
 // (c'est ce que lit la formation d'équipes MLP), mais ne se configure plus
 // que depuis ici.
-async function setMemberGender(idx){
+// Ouvre un choix (plutôt que de faire défiler les valeurs au clic) pour fixer
+// le genre de ce membre. Même pop-up que pickMyGender côté joueur, pour une
+// expérience cohérente partout où le genre se règle dans l'appli.
+function setMemberGender(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
   if(!entry || !entry.rows.length) return;
-  const nextGender = entry.gender==='F' ? 'M' : (entry.gender==='M' ? null : 'F');
+  showChoice('Choisir le genre :', ['Femme', 'Homme', 'Non défini'], (choiceIdx)=>{
+    applyMemberGender(idx, choiceIdx===0 ? 'F' : (choiceIdx===1 ? 'M' : null));
+  });
+}
+async function applyMemberGender(idx, nextGender){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry || !entry.rows.length) return;
   const byLeague = {};
   entry.rows.forEach(r=>{ (byLeague[r.leagueId] = byLeague[r.leagueId] || []).push(r); });
+  let hadError = false;
   for(const leagueId of Object.keys(byLeague)){
     const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
-    if(error) continue;
+    if(error){ hadError = true; continue; }
     const leagueData = (data && data.data) || {};
     byLeague[leagueId].forEach(r=>{
       const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
       const rec = list.find(x=>x.id===r.refId);
       if(rec) rec.gender = nextGender;
     });
-    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+    const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+    if(err2) hadError = true;
   }
+  if(hadError) showAlert("Le genre n'a pas pu être mis à jour dans toutes les ligues. Réessaie plus tard.");
   await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
 }
 // Renomme cette personne d'un coup dans TOUTES ses ligues (sa fiche joueur
@@ -9146,12 +9158,12 @@ function myProfileModalHTML(){
     <div class="modal-section">
       <h3>Genre</h3>
       <p class="small" style="margin-bottom:8px;color:var(--muted);">Utilisé seulement pour former des équipes de tournoi MLP (double féminin/masculin/mixte). S'applique à toutes tes ligues.</p>
-      <button class="action-btn" style="width:auto;" onclick="cycleMyGender()"><span class="icon">⚧️</span> Genre : ${curGender==='F'?'Femme':curGender==='M'?'Homme':'Non défini'}</button>
+      <button class="action-btn" style="width:auto;" onclick="pickMyGender()"><span class="icon">⚧️</span> Genre : ${curGender==='F'?'Femme':curGender==='M'?'Homme':'Non défini'}</button>
     </div>` : ''}
     <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="saveMyProfile()">Enregistrer</button>`;
 }
 function openMyProfileModal(){
-  showContentModal('Mon profil', myProfileModalHTML());
+  showContentModal('Mon profil', myProfileModalHTML);
 }
 async function saveMyProfile(){
   if(!CURRENT_PROFILE) return;
@@ -9220,25 +9232,34 @@ async function removeMyProfilePhoto(){
   if(mine) mine.avatar_url = null;
   openMyProfileModal();
 }
+// Ouvre un choix (Femme / Homme / Non défini) plutôt que de faire défiler les
+// valeurs au clic — même pop-up que setMemberGender côté admin, pour que ce
+// soit cohérent partout dans l'appli où le genre se règle.
+function pickMyGender(){
+  showChoice('Choisis ton genre (utilisé seulement pour former des équipes de tournoi MLP) :', ['Femme', 'Homme', 'Non défini'], (choiceIdx)=>{
+    applyMyGender(choiceIdx===0 ? 'F' : (choiceIdx===1 ? 'M' : null));
+  });
+}
 // Change le genre de la personne connectée dans TOUTES ses ligues d'un coup
 // (même logique que setMemberGender côté admin, mais à partir de ses propres
 // liens profile_players plutôt que de la fiche membre d'une organisation).
-async function cycleMyGender(){
+async function applyMyGender(nextGender){
   if(!CURRENT_PROFILE) return;
-  const cur = myCurrentGender();
-  const nextGender = cur==='F' ? 'M' : (cur==='M' ? null : 'F');
+  let hadError = false;
   for(const link of (MY_LEAGUE_LINKS||[])){
     const { data, error } = await sb.from('league_data').select('data').eq('league_id', link.league_id).single();
-    if(error) continue;
+    if(error){ hadError = true; continue; }
     const leagueData = (data && data.data) || {};
     const list = link.substitute_id ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
     const refId = link.substitute_id || link.player_id;
     const rec = list.find(x=>x.id===refId);
     if(rec) rec.gender = nextGender;
-    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', link.league_id);
+    const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', link.league_id);
+    if(err2) hadError = true;
   }
   const loaded = await loadData(CURRENT_LEAGUE_ID);
   if(loaded){ DATA = loaded; migrateData(); }
+  if(hadError) showAlert("Le genre n'a pas pu être mis à jour dans toutes tes ligues. Réessaie plus tard.");
   openMyProfileModal();
 }
 // Affichage lecture seule de la bio d'un compte lié, réutilisé dans les
