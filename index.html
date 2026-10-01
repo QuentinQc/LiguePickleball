@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001153000">
+<meta name="app-build" content="20261001154500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -8556,12 +8556,42 @@ async function saveMyProfile(){
 // Envoie la photo choisie vers le bucket Supabase Storage "avatars" (un
 // fichier par compte, toujours au même chemin avec upsert) puis enregistre
 // son URL publique sur le compte.
+// Redimensionne et compresse une image côté appareil avant envoi (canvas →
+// JPEG) pour qu'une photo de cellulaire de plusieurs Mo devienne quelques
+// dizaines de Ko — important une fois multiplié par tous les joueurs d'une
+// ligue. Retourne le fichier original si la compression échoue pour une
+// raison quelconque (format non décodable, etc.) plutôt que de bloquer l'envoi.
+function compressImageFile(file, maxDim, quality){
+  return new Promise((resolve)=>{
+    try{
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = ()=>{
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(w>maxDim || h>maxDim){
+          if(w>=h){ h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob=>resolve(blob || file), 'image/jpeg', quality);
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    }catch(e){ resolve(file); }
+  });
+}
 async function onMyProfilePhotoChosen(inputEl){
   const file = inputEl.files && inputEl.files[0];
   if(!file || !CURRENT_PROFILE) return;
-  const ext = ((file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')) || 'jpg';
-  const path = CURRENT_PROFILE.id + '/avatar.' + ext;
-  const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
+  const compressed = await compressImageFile(file, 480, 0.82);
+  // Toujours en .jpg après compression, chemin fixe — une seule photo par
+  // compte, remplacée à chaque envoi (voir commentaire sur le bucket).
+  const path = CURRENT_PROFILE.id + '/avatar.jpg';
+  const { error: upErr } = await sb.storage.from('avatars').upload(path, compressed, { upsert: true, cacheControl: '3600', contentType: 'image/jpeg' });
   if(upErr){ showContentModal('Erreur', `<p class="small">Impossible d'envoyer la photo. Vérifie que le bucket "avatars" existe bien dans Supabase (menu ☰ → voir l'administrateur technique).</p>`); return; }
   const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
   const url = (pub && pub.publicUrl) ? (pub.publicUrl + '?t=' + Date.now()) : null;
