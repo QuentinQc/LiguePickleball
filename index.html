@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001190000">
+<meta name="app-build" content="20261001145525">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -250,6 +250,18 @@ tr.me{background:rgba(207,234,92,0.1);}
 .partner-date-day{font-family:var(--font-display);font-weight:800;font-size:22px;line-height:1;}
 .partner-date-month{font-size:10px;letter-spacing:0.08em;margin-top:2px;}
 .partner-body{padding:10px 14px;flex:1;min-width:0;}
+/* Trouver un partenaire — liste de pastilles cliquables (ouvre le détail en modale) */
+.partner-pill-list{display:flex;flex-wrap:wrap;gap:8px;}
+.partner-pill{display:flex;align-items:center;gap:7px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;padding:5px 12px 5px 5px;cursor:pointer;max-width:100%;transition:border-color .15s ease,transform .1s ease;}
+.partner-pill:hover{border-color:var(--ball);}
+.partner-pill:active{transform:scale(0.97);}
+.partner-pill.closed{opacity:0.5;}
+.partner-pill.mine{border-color:rgba(207,234,92,0.45);}
+.partner-pill-date{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:11px;flex-shrink:0;}
+.partner-pill-text{display:flex;flex-direction:column;min-width:0;line-height:1.25;}
+.partner-pill-author{font-size:12px;font-weight:600;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+.partner-pill-msg{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+.partner-pill-count{font-size:10px;font-weight:700;background:rgba(207,234,92,0.18);color:#8FBF3F;border-radius:999px;padding:2px 7px;flex-shrink:0;}
 .pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;}
 .pill-green{background:rgba(143,191,63,0.18);color:#8FBF3F;}
 .pill-gray{background:rgba(255,255,255,0.08);color:var(--muted);}
@@ -1229,60 +1241,84 @@ function partnerBoardHTML(){
 }
 // Isolée pour pouvoir rafraîchir SEULEMENT #partnerPostsList (via le temps
 // réel) sans toucher au formulaire de nouvelle annonce en cours de saisie.
-function partnerPostsListHTML(){
-  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
-  const posts = (PARTNER_POSTS||[]).slice().sort((a,b)=>{
+// Petits formatteurs partagés entre la liste de pastilles et le détail en modale.
+function partnerInitials(name){ return (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?'; }
+function partnerDayNum(s){ const d = new Date(s+'T00:00:00'); return d.getDate(); }
+function partnerMonthAbbr(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { month:'short' }).toUpperCase().replace('.',''); }
+function partnerDateLabel(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); }
+function partnerRelTime(iso){
+  const mins = Math.round((Date.now() - new Date(iso).getTime())/60000);
+  if(mins<1) return "à l'instant";
+  if(mins<60) return `il y a ${mins} min`;
+  const hrs = Math.round(mins/60);
+  if(hrs<24) return `il y a ${hrs} h`;
+  return `il y a ${Math.round(hrs/24)} j`;
+}
+function sortedPartnerPosts(){
+  return (PARTNER_POSTS||[]).slice().sort((a,b)=>{
     if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
     return new Date(b.created_at) - new Date(a.created_at);
   });
+}
+// Liste compacte : une pastille par annonce, cliquer dessus ouvre le détail
+// (et ses actions : partant(e), marquer comblée, supprimer) dans une modale.
+function partnerPostsListHTML(){
+  const posts = sortedPartnerPosts();
   if(!posts.length) return '<p class="empty">Aucune annonce pour l\'instant.</p>';
-  const initials = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
-  const dayNum = (s)=>{ const d = new Date(s+'T00:00:00'); return d.getDate(); };
-  const monthAbbr = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { month:'short' }).toUpperCase().replace('.',''); };
-  const playDateLabel = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
-  const relTime = (iso)=>{
-    const mins = Math.round((Date.now() - new Date(iso).getTime())/60000);
-    if(mins<1) return "à l'instant";
-    if(mins<60) return `il y a ${mins} min`;
-    const hrs = Math.round(mins/60);
-    if(hrs<24) return `il y a ${hrs} h`;
-    return `il y a ${Math.round(hrs/24)} j`;
-  };
-  return posts.map(p=>{
+  return `<div class="partner-pill-list">${posts.map(p=>{
     const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
-    const canManage = mine || isAdmin;
-    const interested = Array.isArray(p.interested) ? p.interested : [];
-    const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
     const closed = p.status !== 'open';
-    const shown = interested.slice(0,5);
-    const extra = interested.length - shown.length;
-    return `<div class="partner-card${closed?' closed':''}">
-      <div class="partner-date-block">
-        ${p.play_date ? `<div class="partner-date-day">${dayNum(p.play_date)}</div><div class="partner-date-month">${escapeHTML(monthAbbr(p.play_date))}</div>` : `<div style="font-size:22px;">🏓</div>`}
+    const interested = Array.isArray(p.interested) ? p.interested : [];
+    const shortMsg = (p.message||'').length > 26 ? p.message.slice(0,26)+'…' : p.message;
+    return `<div class="partner-pill${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
+      <div class="partner-pill-date">${p.play_date ? partnerDayNum(p.play_date) : '🏓'}</div>
+      <div class="partner-pill-text">
+        <span class="partner-pill-author">${escapeHTML(p.author_name)}</span>
+        <span class="partner-pill-msg">${escapeHTML(shortMsg)}</span>
       </div>
-      <div class="partner-body">
-        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div class="row" style="align-items:center;gap:6px;min-width:0;">
-            ${avatarHTML('wall-avatar', initials(p.author_name), p.avatar_url, 'width:24px;height:24px;font-size:10px;')}
-            <span class="small" style="font-weight:600;">${escapeHTML(p.author_name)}</span>
-            <span class="small" style="opacity:0.6;white-space:nowrap;">${relTime(p.created_at)}</span>
-          </div>
-          <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
-        </div>
-        ${p.play_date ? `<div class="small" style="margin-top:4px;color:var(--muted);">📅 ${escapeHTML(playDateLabel(p.play_date))}</div>` : ''}
-        <div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(p.message)}</div>
-        ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:10px;">
-          <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', initials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
-          <span class="small" style="color:var(--muted);">${interested.length} partant(e)${interested.length>1?'s':''}</span>
-        </div>` : ''}
-        <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap;">
-          ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
-          ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
-          ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
-        </div>
-      </div>
+      ${interested.length ? `<span class="partner-pill-count">${interested.length}</span>` : ''}
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
+}
+// Contenu détaillé d'une annonce (ouvert depuis une pastille), rendu dans une
+// modale générique. Isolé de sa div d'habillage pour pouvoir être repatché
+// tel quel par le temps réel pendant que la modale reste ouverte.
+let PARTNER_DETAIL_MODAL_ID = null;
+function openPartnerPostDetail(id){
+  PARTNER_DETAIL_MODAL_ID = id;
+  showContentModal('Annonce', ()=>`<div id="partnerDetailBody">${partnerPostDetailInnerHTML(id)}</div>`);
+}
+function partnerPostDetailInnerHTML(id){
+  const p = (PARTNER_POSTS||[]).find(x=>x.id===id);
+  if(!p) return '<p class="empty">Cette annonce a été supprimée.</p>';
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
+  const canManage = mine || isAdmin;
+  const interested = Array.isArray(p.interested) ? p.interested : [];
+  const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+  const closed = p.status !== 'open';
+  const shown = interested.slice(0,8);
+  const extra = interested.length - shown.length;
+  return `
+    <div class="row" style="align-items:center;gap:10px;">
+      ${avatarHTML('wall-avatar', partnerInitials(p.author_name), p.avatar_url, 'width:34px;height:34px;font-size:13px;')}
+      <div style="min-width:0;flex:1;">
+        <div style="font-weight:600;">${escapeHTML(p.author_name)}</div>
+        <div class="small" style="opacity:0.6;">${partnerRelTime(p.created_at)}</div>
+      </div>
+      <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
+    </div>
+    ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}</div>` : ''}
+    <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
+    ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', partnerInitials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
+      <span class="small" style="color:var(--muted);">${interested.length} partant(e)${interested.length>1?'s':''}</span>
+    </div>` : ''}
+    <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+      ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
+      ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
+      ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
+    </div>`;
 }
 // ---- Temps réel : toute création/modification/suppression d'annonce par
 // quelqu'un d'autre rafraîchit SEULEMENT #partnerPostsList, pas le formulaire
@@ -1293,6 +1329,12 @@ function onPartnerRealtimeChange(){
   loadPartnerPosts(CURRENT_LEAGUE_ID).then(()=>{
     const c = document.getElementById('partnerPostsList');
     if(c) c.innerHTML = partnerPostsListHTML();
+    // Si le détail d'une annonce est ouvert en modale, on le repatche aussi
+    // (interessé(e)s, statut) sans fermer la modale sous le nez de la personne.
+    if(PARTNER_DETAIL_MODAL_ID){
+      const d = document.getElementById('partnerDetailBody');
+      if(d) d.innerHTML = partnerPostDetailInnerHTML(PARTNER_DETAIL_MODAL_ID);
+    }
   });
 }
 // ---- Mise en place / démontage des abonnements temps réel (mur + partenaire).
