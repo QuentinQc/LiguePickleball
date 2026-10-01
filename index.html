@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001153005">
+<meta name="app-build" content="20261001153452">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -6294,20 +6294,25 @@ async function applyMemberGender(idx, nextGender){
   const byLeague = {};
   entry.rows.forEach(r=>{ (byLeague[r.leagueId] = byLeague[r.leagueId] || []).push(r); });
   let hadError = false;
-  for(const leagueId of Object.keys(byLeague)){
-    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
-    if(error){ hadError = true; continue; }
-    const leagueData = (data && data.data) || {};
-    byLeague[leagueId].forEach(r=>{
-      const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
-      const rec = list.find(x=>x.id===r.refId);
-      if(rec) rec.gender = nextGender;
-    });
-    const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
-    if(err2) hadError = true;
+  try{
+    for(const leagueId of Object.keys(byLeague)){
+      const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+      if(error){ hadError = true; continue; }
+      const leagueData = (data && data.data) || {};
+      byLeague[leagueId].forEach(r=>{
+        const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+        const rec = list.find(x=>x.id===r.refId);
+        if(rec) rec.gender = nextGender;
+      });
+      const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+      if(err2) hadError = true;
+    }
+  }catch(e){
+    console.error('Erreur de mise à jour du genre', e);
+    hadError = true;
   }
-  if(hadError) showAlert("Le genre n'a pas pu être mis à jour dans toutes les ligues. Réessaie plus tard.");
   await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
+  if(hadError) showAlert("Le genre n'a pas pu être mis à jour dans toutes les ligues. Réessaie plus tard.");
 }
 // Renomme cette personne d'un coup dans TOUTES ses ligues (sa fiche joueur
 // ou remplaçant dans chacune) ainsi que sa fiche membre — un nom n'est pas
@@ -9246,21 +9251,33 @@ function pickMyGender(){
 async function applyMyGender(nextGender){
   if(!CURRENT_PROFILE) return;
   let hadError = false;
-  for(const link of (MY_LEAGUE_LINKS||[])){
-    const { data, error } = await sb.from('league_data').select('data').eq('league_id', link.league_id).single();
-    if(error){ hadError = true; continue; }
-    const leagueData = (data && data.data) || {};
-    const list = link.substitute_id ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
-    const refId = link.substitute_id || link.player_id;
-    const rec = list.find(x=>x.id===refId);
-    if(rec) rec.gender = nextGender;
-    const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', link.league_id);
-    if(err2) hadError = true;
+  // Protégé par un try/catch : la fenêtre de choix se ferme dès qu'on clique
+  // une option (comportement normal), donc si une requête plantait ici sans
+  // être rattrapée, "Mon profil" ne se rouvrait jamais et ça semblait n'avoir
+  // rien fait. Avec le try/catch, la fenêtre se rouvre dans tous les cas.
+  try{
+    for(const link of (MY_LEAGUE_LINKS||[])){
+      const { data, error } = await sb.from('league_data').select('data').eq('league_id', link.league_id).single();
+      if(error){ hadError = true; continue; }
+      const leagueData = (data && data.data) || {};
+      const list = link.substitute_id ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+      const refId = link.substitute_id || link.player_id;
+      const rec = list.find(x=>x.id===refId);
+      if(rec) rec.gender = nextGender;
+      const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', link.league_id);
+      if(err2) hadError = true;
+    }
+    const loaded = await loadData(CURRENT_LEAGUE_ID);
+    if(loaded){ DATA = loaded; migrateData(); }
+  }catch(e){
+    console.error('Erreur de mise à jour du genre', e);
+    hadError = true;
   }
-  const loaded = await loadData(CURRENT_LEAGUE_ID);
-  if(loaded){ DATA = loaded; migrateData(); }
-  if(hadError) showAlert("Le genre n'a pas pu être mis à jour dans toutes tes ligues. Réessaie plus tard.");
+  // On rouvre "Mon profil" D'ABORD, puis on affiche l'alerte s'il y a lieu —
+  // dans l'autre ordre, la réouverture écrasait l'alerte avant que la
+  // personne ait le temps de la voir.
   openMyProfileModal();
+  if(hadError) showAlert("Le genre n'a pas pu être mis à jour. Vérifie ta connexion et réessaie — si ça persiste, ça peut être un réglage de permissions à revoir côté administrateur.");
 }
 // Affichage lecture seule de la bio d'un compte lié, réutilisé dans les
 // fiches joueur/remplaçant/membre. Vide si rien n'est rempli.
