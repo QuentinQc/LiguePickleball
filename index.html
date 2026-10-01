@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001150357">
+<meta name="app-build" content="20261001152344">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -265,6 +265,19 @@ tr.me{background:rgba(207,234,92,0.1);}
 .partner-pill-author{font-size:14px;font-weight:700;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
 .partner-pill-msg{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
 .partner-pill-count{font-size:12px;font-weight:700;background:rgba(207,234,92,0.18);color:#8FBF3F;border-radius:999px;padding:4px 10px;flex-shrink:0;}
+/* Événements sociaux — même langage visuel que les pastilles de partenaire */
+.event-pill-list{display:flex;flex-wrap:wrap;gap:10px;}
+.event-pill{display:flex;align-items:center;gap:11px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;padding:8px 20px 8px 8px;cursor:pointer;max-width:100%;transition:background .15s ease,border-color .15s ease,transform .1s ease;}
+.event-pill:hover{border-color:var(--ball);background:rgba(207,234,92,0.06);}
+.event-pill:active{transform:scale(0.97);}
+.event-pill.past{opacity:0.5;}
+.event-pill-date{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg, var(--ball), #8FBF3F);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;flex-shrink:0;line-height:1.1;}
+.event-pill-date .d{font-size:15px;}
+.event-pill-date .m{font-size:8px;letter-spacing:0.05em;}
+.event-pill-text{display:flex;flex-direction:column;min-width:0;line-height:1.3;gap:1px;}
+.event-pill-title{font-size:14px;font-weight:700;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+.event-pill-sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+.event-pill-count{font-size:12px;font-weight:700;background:rgba(207,234,92,0.18);color:#8FBF3F;border-radius:999px;padding:4px 10px;flex-shrink:0;}
 .pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;}
 .pill-green{background:rgba(143,191,63,0.18);color:#8FBF3F;}
 .pill-gray{background:rgba(255,255,255,0.08);color:var(--muted);}
@@ -1179,8 +1192,20 @@ function onWallRealtimeDelete(old){
 // et pour garder la lecture/écriture en une seule requête. ----
 async function loadPartnerPosts(leagueId){
   if(!leagueId){ PARTNER_POSTS = []; return; }
+  await cleanupExpiredPartnerPosts(leagueId);
   const { data, error } = await sb.from('partner_posts').select('*').eq('league_id', leagueId).order('created_at', { ascending:false }).limit(100);
   PARTNER_POSTS = error ? [] : (data || []);
+}
+// Supprime automatiquement les annonces "comblées" depuis plus de 24h. L'appli
+// n'a pas de tâche planifiée côté serveur, donc ce nettoyage est opportuniste :
+// il tourne à chaque chargement du babillard (changement de ligue, nouvelle
+// annonce, etc.), ce qui suffit en pratique puisque quelqu'un consulte
+// généralement le babillard bien avant/après l'échéance des 24h — et le
+// temps réel propage la suppression aux autres personnes déjà sur l'écran.
+async function cleanupExpiredPartnerPosts(leagueId){
+  if(!leagueId) return;
+  const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString();
+  await sb.from('partner_posts').delete().eq('league_id', leagueId).eq('status', 'closed').lt('closed_at', cutoff);
 }
 async function createPartnerPost(){
   const msgEl = document.getElementById('partnerMessageInput');
@@ -1212,7 +1237,10 @@ async function togglePartnerInterest(id){
 async function togglePartnerStatus(id){
   const post = PARTNER_POSTS.find(p=>p.id===id);
   if(!post) return;
-  await sb.from('partner_posts').update({ status: post.status==='open' ? 'closed' : 'open' }).eq('id', id);
+  const closing = post.status === 'open';
+  // closed_at marque le début du délai de 24h avant suppression automatique ;
+  // on l'efface en rouvrant, pour repartir sur un délai complet si reclôturée plus tard.
+  await sb.from('partner_posts').update({ status: closing ? 'closed' : 'open', closed_at: closing ? new Date().toISOString() : null }).eq('id', id);
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   render();
 }
@@ -1454,43 +1482,67 @@ async function setMyRsvp(eventId, status){
   await loadSocialEvents();
   render();
 }
+// Petits formatteurs partagés entre la liste de pastilles et le détail en modale.
+function eventDayNum(s){ const d = new Date(s+'T00:00:00'); return d.getDate(); }
+function eventMonthAbbr(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { month:'short' }).toUpperCase().replace('.',''); }
+function eventDateLabel(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); }
 function socialEventsHTML(){
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
-  const todayStr = new Date().toISOString().slice(0,10);
-  const events = (SOCIAL_EVENTS||[]).slice().sort((a,b)=> (a.event_date||'').localeCompare(b.event_date||''));
-  const dateLabel = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
-  const rows = events.map(e=>{
-    const past = e.event_date < todayStr;
-    const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
-    const going = rsvps.filter(r=>r.status==='going');
-    const maybe = rsvps.filter(r=>r.status==='maybe');
-    const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
-    const myStatus = mine ? mine.status : null;
-    return `<div class="wall-msg" style="${past?'opacity:0.55;':''}">
-      <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;">
-        <strong style="font-size:14px;">${escapeHTML(e.title)}</strong>
-        ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="padding:2px 6px;font-size:12px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="padding:2px 6px;font-size:12px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
-      </div>
-      <div class="small" style="margin-top:2px;"><span class="tag">📅 ${escapeHTML(dateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${past?' <span class="tag">Terminé</span>':''}</div>
-      ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(e.description)}</div>` : ''}
-      ${(going.length||maybe.length) ? `<p class="small" style="margin-top:6px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
-      ${!past ? `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
-        <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
-        <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
-        <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
-      </div>` : ''}
-    </div>`;
-  }).join('');
   return `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">📅 Événements sociaux</h3>
       ${isAdmin ? `<button class="btn btn-secondary" onclick="openNewSocialEventModal()">+ Nouvel événement</button>` : ''}
     </div>
     <p class="small" style="margin:6px 0 10px;color:var(--muted);">Visible par tous les membres de l'organisation.</p>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      ${rows || '<p class="empty">Aucun événement prévu pour l\'instant.</p>'}
-    </div>
+    <div id="socialEventsList">${socialEventsListHTML()}</div>
   </div>`;
+}
+// Liste compacte : une pastille par événement, cliquer dessus ouvre le détail
+// (description, confirmations, boutons de présence) dans une modale.
+function socialEventsListHTML(){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const events = (SOCIAL_EVENTS||[]).slice().sort((a,b)=> (a.event_date||'').localeCompare(b.event_date||''));
+  if(!events.length) return '<p class="empty">Aucun événement prévu pour l\'instant.</p>';
+  return `<div class="event-pill-list">${events.map(e=>{
+    const past = e.event_date < todayStr;
+    const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
+    const going = rsvps.filter(r=>r.status==='going');
+    const sub = e.location || (e.event_time ? `à ${e.event_time}` : '');
+    return `<div class="event-pill${past?' past':''}" onclick="openEventDetail('${e.id}')">
+      <div class="event-pill-date"><span class="d">${eventDayNum(e.event_date)}</span><span class="m">${escapeHTML(eventMonthAbbr(e.event_date))}</span></div>
+      <div class="event-pill-text">
+        <span class="event-pill-title">${escapeHTML(e.title)}</span>
+        ${sub ? `<span class="event-pill-sub">${escapeHTML(sub)}</span>` : ''}
+      </div>
+      ${going.length ? `<span class="event-pill-count">✅ ${going.length}</span>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+function openEventDetail(id){ showContentModal('Événement', ()=>eventDetailInnerHTML(id)); }
+function eventDetailInnerHTML(id){
+  const e = (SOCIAL_EVENTS||[]).find(x=>x.id===id);
+  if(!e) return '<p class="empty">Cet événement a été supprimé.</p>';
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const todayStr = new Date().toISOString().slice(0,10);
+  const past = e.event_date < todayStr;
+  const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
+  const going = rsvps.filter(r=>r.status==='going');
+  const maybe = rsvps.filter(r=>r.status==='maybe');
+  const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
+  const myStatus = mine ? mine.status : null;
+  return `
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
+      <strong style="font-size:16px;">${escapeHTML(e.title)}</strong>
+      ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="padding:4px 8px;font-size:12px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="padding:4px 8px;font-size:12px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
+    </div>
+    <div class="small" style="margin-top:6px;"><span class="tag">📅 ${escapeHTML(eventDateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${past?' <span class="tag">Terminé</span>':''}</div>
+    ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:10px;">${escapeHTML(e.description)}</div>` : ''}
+    ${(going.length||maybe.length) ? `<p class="small" style="margin-top:10px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
+    ${!past ? `<div class="row" style="gap:6px;margin-top:14px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+      <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
+      <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
+      <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
+    </div>` : ''}`;
 }
 // ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
 // un tournoi peut regrouper des participants de plusieurs ligues de
