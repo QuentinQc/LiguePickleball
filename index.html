@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001111500">
+<meta name="app-build" content="20261001113000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -5551,9 +5551,7 @@ function orgMemberDetailModalHTML(idx){
         <button class="btn btn-secondary" style="margin-top:6px;width:100%;" onclick="saveOrgMemberDetailAdd(${idx})">+ Ajouter</button>
       </div>`;
   }
-  if(entry.orgMemberId && !entry.rows.length){
-    html += `<button class="action-btn danger" style="width:100%;margin-top:14px;" onclick="closeModal();confirmDeleteOrgMember(${idx})"><span class="icon">🗑️</span> Supprimer ce membre</button>`;
-  }
+  html += `<button class="action-btn danger" style="width:100%;margin-top:14px;" onclick="confirmFullyDeleteOrgMember(${idx})"><span class="icon">🗑️</span> Supprimer ${escapeHTML(entry.name)} de l'organisation</button>`;
   return html;
 }
 function openOrgMemberDetailModal(idx){
@@ -5601,6 +5599,33 @@ function confirmRemovePersonFromLeague(idx, rowIdx){
     const ok = await removePersonFromLeague(row.leagueId, row.refId, row.type, entry.profileId);
     if(ok) await refreshOrgMemberDetailModal(idx, [row.leagueId]);
   });
+}
+// Supprime complètement une personne de l'organisation : retirée de TOUTES
+// ses ligues (une par une, avec déliaison du compte pour chacune) puis sa
+// fiche « membre » elle-même effacée — pas besoin de d'abord vider ses
+// ligues une à une avant de pouvoir la supprimer. Son compte (s'il y en a
+// un) n'est pas touché, seulement ses liens vers des joueurs/remplaçants.
+async function fullyDeleteOrgMember(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  for(const row of entry.rows){
+    await removePersonFromLeague(row.leagueId, row.refId, row.type, entry.profileId);
+  }
+  if(entry.orgMemberId){
+    await sb.from('org_members').delete().eq('id', entry.orgMemberId);
+  }
+  closeModal();
+  await Promise.all([loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
+  render();
+}
+function confirmFullyDeleteOrgMember(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const n = entry.rows.length;
+  const msg = n
+    ? `Supprimer complètement ${entry.name} de l'organisation ? Il/elle sera retiré(e) de ${n===1?'sa ligue':'ses '+n+' ligues'} (${entry.rows.map(r=>r.leagueLabel).join(', ')}) et sa fiche membre sera effacée. Son compte, s'il y en a un, n'est pas supprimé — seulement ses liens.`
+    : `Supprimer la fiche membre de ${entry.name} ?`;
+  showConfirm(msg, ()=>fullyDeleteOrgMember(idx));
 }
 // Fait passer une personne de joueur à remplaçant (ou l'inverse) dans UNE
 // ligue donnée, directement dans le JSONB de cette ligue — même logique que
