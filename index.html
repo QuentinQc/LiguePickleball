@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001170500">
+<meta name="app-build" content="20261001173500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2908,7 +2908,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -2967,6 +2967,7 @@ function renderAdmin(){
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
+  else if(VIEW.tab==='gamification') c.innerHTML = gamificationHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
@@ -2976,7 +2977,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -3023,6 +3024,7 @@ function renderMlpAdmin(){
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
+  else if(VIEW.tab==='gamification') c.innerHTML = gamificationHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
@@ -8341,11 +8343,11 @@ function switchRowHTML(id, checked, label){
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
   return DATA.leagueFormat === 'mlp'
-    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique'],['videos','Vidéos']];
+    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
+    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
-  return [['dispo','Disponibilité'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique']];
+  return [['dispo','Disponibilité'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
@@ -8532,7 +8534,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8567,7 +8569,7 @@ function renderSubstitute(subId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : substituteAvailabilityHTML(sub))));
+  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : substituteAvailabilityHTML(sub)))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
@@ -8676,7 +8678,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8715,11 +8717,11 @@ function renderPlayer(playerId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : playerGroupHTML(me))))));
+  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : playerGroupHTML(me)))))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function renderMlpPlayer(me){
-  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8756,7 +8758,7 @@ function renderMlpPlayer(me){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : mlpPlayerTeamHTML(me))))));
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : mlpPlayerTeamHTML(me)))))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function mlpPlayerTeamHTML(me){
@@ -9143,6 +9145,135 @@ function playerFunStatsHTML(me){
 
   if(facts.length===0) return '';
   return `<div class="card"><h3>Tes stats</h3>${facts.map(f=>`<p>${f}</p>`).join('')}</div>`;
+}
+// ---- Gamification : badges, séries et joueur du mois — entièrement calculés
+// à partir de l'historique des sessions déjà en mémoire (aucune nouvelle
+// table). Un remplaçant référencé dans un match ("sub::<id>") est ramené à
+// son id réel pour que ses stats comptent comme n'importe quel joueur,
+// exactement comme findRatablePerson le fait déjà pour la cote. ----
+function normalizeStatId(id){
+  if(isGuestId(id)) return null;
+  if(isSubPoolId(id)) return id.slice(5);
+  return id;
+}
+function statPersonName(id){
+  const p = DATA.players.find(x=>x.id===id);
+  if(p) return p.name;
+  const s = (DATA.substitutePool||[]).find(x=>x.id===id);
+  return s ? s.name : '?';
+}
+// monthKey optionnel au format "YYYY-MM" pour ne compter que les sessions de
+// ce mois (utilisé pour le joueur du mois) ; sans paramètre, tout l'historique.
+function computeLeagueGameStats(monthKey){
+  const closed = DATA.sessions.filter(s=>s.status==='closed' && (!monthKey || (s.date && s.date.slice(0,7)===monthKey)));
+  const stats = {};
+  closed.forEach(s=>{
+    (s.groupsData||[]).forEach(gd=>{
+      (gd.matches||[]).forEach(m=>{
+        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB==='') return;
+        const sa=Number(m.scoreA), sb=Number(m.scoreB);
+        if(sa===sb) return;
+        const teamAWon = sa>sb;
+        [[m.teamA, teamAWon],[m.teamB, !teamAWon]].forEach(([team, won])=>{
+          (team||[]).forEach(rawId=>{
+            const id = normalizeStatId(rawId);
+            if(!id) return;
+            if(!stats[id]) stats[id] = { wins:0, losses:0, timeline:[] };
+            if(won) stats[id].wins++; else stats[id].losses++;
+            stats[id].timeline.push(won ? 'W' : 'L');
+          });
+        });
+      });
+    });
+  });
+  return stats;
+}
+function currentStreak(timeline){
+  if(!timeline || !timeline.length) return { type:null, length:0 };
+  const last = timeline[timeline.length-1];
+  let length = 0;
+  for(let i=timeline.length-1; i>=0 && timeline[i]===last; i--) length++;
+  return { type:last, length };
+}
+function bestStreak(timeline, type){
+  let best=0, cur=0;
+  (timeline||[]).forEach(r=>{ if(r===type){ cur++; best=Math.max(best,cur); } else cur=0; });
+  return best;
+}
+function computeBadgesForId(id, stats){
+  const s = stats[id] || { wins:0, losses:0, timeline:[] };
+  const total = s.wins + s.losses;
+  const winRate = total ? s.wins/total : 0;
+  const streak = currentStreak(s.timeline);
+  const best = bestStreak(s.timeline, 'W');
+  const badges = [];
+  if(total>=1) badges.push({ icon:'🥉', label:'Débutant', detail:'A joué son premier match comptabilisé.' });
+  if(total>=25) badges.push({ icon:'🥈', label:'Habitué', detail:'25 matchs joués ou plus.' });
+  if(total>=100) badges.push({ icon:'🥇', label:'Vétéran', detail:'100 matchs joués ou plus.' });
+  if(streak.type==='W' && streak.length>=3) badges.push({ icon:'🔥', label:`Série de ${streak.length} victoires`, detail:'Série de victoires en cours.' });
+  if(best>=5) badges.push({ icon:'💪', label:`Meilleure série : ${best}`, detail:'Plus longue série de victoires jamais réalisée.' });
+  if(total>=10 && winRate>=0.65) badges.push({ icon:'🎯', label:"Taux de victoire d'élite", detail:`${Math.round(winRate*100)}% de victoires sur ${total} matchs.` });
+  return badges;
+}
+function gamificationHTML(){
+  const overall = computeLeagueGameStats(null);
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0,7);
+  const monthStats = computeLeagueGameStats(monthKey);
+  const monthLabel = now.toLocaleDateString('fr-CA', { month:'long', year:'numeric' });
+
+  const monthCandidates = Object.keys(monthStats)
+    .map(id=>{ const s=monthStats[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total?s.wins/total:0 }; })
+    .filter(c=>c.total>=3)
+    .sort((a,b)=> b.rate-a.rate || b.wins-a.wins);
+  const playerOfMonth = monthCandidates[0];
+
+  const streakLeaders = Object.keys(overall)
+    .map(id=>({ id, streak: currentStreak(overall[id].timeline) }))
+    .filter(x=>x.streak.type==='W' && x.streak.length>=2)
+    .sort((a,b)=> b.streak.length - a.streak.length)
+    .slice(0,8);
+
+  let myId = null;
+  if(SESSION_USER){
+    if(SESSION_USER.role==='player') myId = SESSION_USER.playerId;
+    else if(SESSION_USER.role==='substitute') myId = SESSION_USER.substituteId;
+  }
+
+  let html = `<div class="card">
+    <h3>🏅 Joueur du mois — ${escapeHTML(monthLabel)}</h3>
+    ${playerOfMonth
+      ? `<p>🏆 <strong>${escapeHTML(statPersonName(playerOfMonth.id))}</strong> — ${playerOfMonth.wins} victoire${playerOfMonth.wins>1?'s':''} sur ${playerOfMonth.total} (${Math.round(playerOfMonth.rate*100)}%) ce mois-ci.</p>`
+      : `<p class="small">Pas encore assez de matchs joués ce mois-ci (minimum 3) pour désigner un joueur du mois.</p>`}
+  </div>
+  <div class="card">
+    <h3>🔥 Séries en cours</h3>
+    ${streakLeaders.length
+      ? `<table><tr><th>Joueur</th><th>Série</th></tr>${streakLeaders.map(x=>`<tr><td>${escapeHTML(statPersonName(x.id))}</td><td>${x.streak.length} victoires 🔥</td></tr>`).join('')}</table>`
+      : `<p class="small">Personne n'a de série de victoires en cours pour l'instant.</p>`}
+  </div>`;
+
+  if(myId){
+    const myBadges = computeBadgesForId(myId, overall);
+    html += `<div class="card">
+      <h3>🎖️ Tes badges</h3>
+      ${myBadges.length
+        ? `<div style="display:flex;flex-direction:column;gap:8px;">${myBadges.map(b=>`<div class="wall-msg"><strong>${b.icon} ${escapeHTML(b.label)}</strong><div class="small" style="margin-top:2px;color:var(--muted);">${escapeHTML(b.detail)}</div></div>`).join('')}</div>`
+        : `<p class="small">Continue à jouer pour débloquer tes premiers badges !</p>`}
+    </div>`;
+  } else {
+    const allIds = Object.keys(overall).sort((a,b)=> statPersonName(a).localeCompare(statPersonName(b)));
+    const badgeRows = allIds.map(id=>{
+      const badges = computeBadgesForId(id, overall);
+      if(!badges.length) return '';
+      return `<div><strong>${escapeHTML(statPersonName(id))}</strong><div class="row" style="flex-wrap:wrap;gap:4px;margin-top:4px;">${badges.map(b=>`<span class="tag" title="${escapeHTML(b.detail)}">${b.icon} ${escapeHTML(b.label)}</span>`).join('')}</div></div>`;
+    }).filter(Boolean).join('');
+    html += `<div class="card">
+      <h3>🎖️ Badges de la ligue</h3>
+      ${badgeRows ? `<div style="display:flex;flex-direction:column;gap:10px;">${badgeRows}</div>` : `<p class="empty">Pas encore de badges décernés.</p>`}
+    </div>`;
+  }
+  return html;
 }
 // Résultats de la dernière session jouée par le groupe actuel du joueur.
 function previousGroupSessionInnerHTML(me){
