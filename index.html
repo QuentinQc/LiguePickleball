@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001165500">
+<meta name="app-build" content="20261001170500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -591,6 +591,8 @@ let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let LEAGUE_WALL_MESSAGES = [];  // messages du mur de discussion de CURRENT_LEAGUE_ID, rechargés à chaque changement de ligue
 let PARTNER_POSTS = [];         // annonces "trouver un partenaire" de CURRENT_LEAGUE_ID, rechargées à chaque changement de ligue
+let SOCIAL_EVENTS = [];         // événements sociaux de l'organisation courante (pas propres à une ligue)
+let SOCIAL_EVENT_RSVPS = {};    // { event_id: [{profile_id,name,status}, ...] }
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
 let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation de la ligue affichée (partagées entre ses ligues)
@@ -1169,6 +1171,132 @@ function partnerBoardHTML(){
       </div>
     </div>`;
 }
+// ---- Événements sociaux : calendrier à l'échelle de l'ORGANISATION (comme
+// le canal Général du mur) — un BBQ de fin de saison ou un tournoi social
+// concerne généralement tout le club, pas une seule ligue. Deux tables :
+// social_events (créés/modifiés par un admin) et social_event_rsvps (un rang
+// par personne et par événement, que n'importe quel membre peut poser). ----
+async function loadSocialEvents(){
+  const orgId = currentLeagueOrgId();
+  if(!orgId){ SOCIAL_EVENTS = []; SOCIAL_EVENT_RSVPS = {}; return; }
+  const { data: events, error } = await sb.from('social_events').select('*').eq('organization_id', orgId).order('event_date', { ascending:true });
+  SOCIAL_EVENTS = error ? [] : (events || []);
+  const ids = SOCIAL_EVENTS.map(e=>e.id);
+  if(ids.length){
+    const { data: rsvps, error: err2 } = await sb.from('social_event_rsvps').select('*').in('event_id', ids);
+    SOCIAL_EVENT_RSVPS = {};
+    if(!err2) (rsvps||[]).forEach(r=>{ (SOCIAL_EVENT_RSVPS[r.event_id] = SOCIAL_EVENT_RSVPS[r.event_id] || []).push(r); });
+  } else {
+    SOCIAL_EVENT_RSVPS = {};
+  }
+}
+function socialEventFormHTML(e){
+  e = e || {};
+  return `
+    <div class="modal-section" style="margin-top:0;">
+      <label class="small">Titre</label>
+      <input type="text" id="eventTitleInput" value="${escapeHTML(e.title||'')}" style="width:100%;" placeholder="Ex : BBQ de fin de saison">
+    </div>
+    <div class="modal-section">
+      <label class="small">Description (optionnel)</label>
+      <textarea id="eventDescInput" rows="3" style="width:100%;">${escapeHTML(e.description||'')}</textarea>
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;">
+      <div class="modal-section" style="flex:1;min-width:140px;">
+        <label class="small">Date</label>
+        <input type="date" id="eventDateInput" value="${e.event_date||''}" style="width:100%;">
+      </div>
+      <div class="modal-section" style="flex:1;min-width:120px;">
+        <label class="small">Heure (optionnel)</label>
+        <input type="time" id="eventTimeInput" value="${e.event_time||''}" style="width:100%;">
+      </div>
+    </div>
+    <div class="modal-section">
+      <label class="small">Lieu (optionnel)</label>
+      <input type="text" id="eventLocationInput" value="${escapeHTML(e.location||'')}" style="width:100%;">
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:6px;" onclick="saveSocialEvent(${e.id?`'${e.id}'`:'null'})">Enregistrer</button>`;
+}
+function openNewSocialEventModal(){ showContentModal('Nouvel événement', socialEventFormHTML()); }
+function openEditSocialEventModal(id){
+  const e = SOCIAL_EVENTS.find(x=>x.id===id);
+  if(!e) return;
+  showContentModal("Modifier l'événement", socialEventFormHTML(e));
+}
+async function saveSocialEvent(id){
+  const title = (document.getElementById('eventTitleInput')||{}).value;
+  const description = (document.getElementById('eventDescInput')||{}).value;
+  const date = (document.getElementById('eventDateInput')||{}).value;
+  const time = (document.getElementById('eventTimeInput')||{}).value;
+  const location = (document.getElementById('eventLocationInput')||{}).value;
+  const orgId = currentLeagueOrgId();
+  if(!title || !title.trim() || !date || !CURRENT_PROFILE || !orgId) return;
+  const payload = { organization_id: orgId, title: title.trim(), description: (description||'').trim() || null, event_date: date, event_time: time || null, location: (location||'').trim() || null };
+  let error;
+  if(id){
+    ({ error } = await sb.from('social_events').update(payload).eq('id', id));
+  } else {
+    payload.created_by = CURRENT_PROFILE.id;
+    ({ error } = await sb.from('social_events').insert(payload));
+  }
+  if(error){ showAlert("L'événement n'a pas pu être enregistré."); return; }
+  closeModal();
+  await loadSocialEvents();
+  render();
+}
+function deleteSocialEvent(id){
+  showConfirm('Supprimer cet événement ?', async ()=>{
+    closeModal();
+    await sb.from('social_events').delete().eq('id', id);
+    await loadSocialEvents();
+    render();
+  });
+}
+async function setMyRsvp(eventId, status){
+  if(!CURRENT_PROFILE) return;
+  const name = myDisplayName();
+  await sb.from('social_event_rsvps').upsert({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }, { onConflict: 'event_id,profile_id' });
+  await loadSocialEvents();
+  render();
+}
+function socialEventsHTML(){
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const todayStr = new Date().toISOString().slice(0,10);
+  const events = (SOCIAL_EVENTS||[]).slice().sort((a,b)=> (a.event_date||'').localeCompare(b.event_date||''));
+  const dateLabel = (s)=>{ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
+  const rows = events.map(e=>{
+    const past = e.event_date < todayStr;
+    const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
+    const going = rsvps.filter(r=>r.status==='going');
+    const maybe = rsvps.filter(r=>r.status==='maybe');
+    const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
+    const myStatus = mine ? mine.status : null;
+    return `<div class="wall-msg" style="${past?'opacity:0.55;':''}">
+      <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;">
+        <strong style="font-size:14px;">${escapeHTML(e.title)}</strong>
+        ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="padding:2px 6px;font-size:12px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="padding:2px 6px;font-size:12px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
+      </div>
+      <div class="small" style="margin-top:2px;"><span class="tag">📅 ${escapeHTML(dateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${past?' <span class="tag">Terminé</span>':''}</div>
+      ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(e.description)}</div>` : ''}
+      ${(going.length||maybe.length) ? `<p class="small" style="margin-top:6px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
+      ${!past ? `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
+        <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
+        <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">📅 Événements sociaux</h3>
+      ${isAdmin ? `<button class="btn btn-secondary" onclick="openNewSocialEventModal()">+ Nouvel événement</button>` : ''}
+    </div>
+    <p class="small" style="margin:6px 0 10px;color:var(--muted);">Visible par tous les membres de l'organisation.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${rows || '<p class="empty">Aucun événement prévu pour l\'instant.</p>'}
+    </div>
+  </div>`;
+}
 // ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
 // un tournoi peut regrouper des participants de plusieurs ligues de
 // l'organisation, plutôt que d'être enfermé dans les données d'une seule. ----
@@ -1414,6 +1542,7 @@ async function switchToLeague(leagueId){
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  await loadSocialEvents();
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
@@ -1452,6 +1581,7 @@ async function switchMyLeague(leagueId){
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  await loadSocialEvents();
   const isSub = !!link.substitute_id;
   if(SESSION_USER.role === 'admin'){
     // Un admin qui consulte sa propre vue joueur/remplaçant : on ne touche
@@ -2676,6 +2806,7 @@ async function onAuthResolved(user){
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  await loadSocialEvents();
   if(link.substitute_id){
     SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
     VIEW = { tab:'dispo' };
@@ -2777,7 +2908,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -2835,6 +2966,7 @@ function renderAdmin(){
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
+  else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
@@ -2844,7 +2976,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -2890,6 +3022,7 @@ function renderMlpAdmin(){
   else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
+  else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
@@ -8208,11 +8341,11 @@ function switchRowHTML(id, checked, label){
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
   return DATA.leagueFormat === 'mlp'
-    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique'],['videos','Vidéos']];
+    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique'],['videos','Vidéos']]
+    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
-  return [['dispo','Disponibilité'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique']];
+  return [['dispo','Disponibilité'],['mur','Mur'],['partenaire','Partenaire'],['evenements','Événements'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
@@ -8399,7 +8532,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8434,7 +8567,7 @@ function renderSubstitute(subId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : substituteAvailabilityHTML(sub)));
+  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : substituteAvailabilityHTML(sub))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
@@ -8543,7 +8676,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8582,11 +8715,11 @@ function renderPlayer(playerId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : playerGroupHTML(me)))));
+  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : playerGroupHTML(me))))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function renderMlpPlayer(me){
-  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8623,7 +8756,7 @@ function renderMlpPlayer(me){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : mlpPlayerTeamHTML(me)))));
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : mlpPlayerTeamHTML(me))))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function mlpPlayerTeamHTML(me){
