@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001133000">
+<meta name="app-build" content="20261001140500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4762,44 +4762,29 @@ function substituteDetailModalHTML(subId){
         <div class="modal-badges"><span class="tag tag-yellow">Remplaçant</span></div>
       </div>
     </div>
-    <p class="small" style="margin:10px 0;">${escapeHTML(s.email||'Aucun courriel')} ${s.notes ? '· '+escapeHTML(s.notes) : ''}</p>
+    <p class="small" style="margin:10px 0;">${s.notes ? escapeHTML(s.notes) : ''}</p>
     <div class="stat-chips">
       <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</span></div>
       <div class="stat-chip"><span class="stat-label">Matchs comptés</span><span class="stat-value">${typeof s.ratingGames==='number'?s.ratingGames:0}</span></div>
     </div>
     <div class="action-grid">
-      <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">✏️</span> Modifier</button>
+      <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">📝</span> Notes</button>
       <button class="action-btn" onclick="closeModal();editPlayerRating('${subId}')"><span class="icon">📊</span> Modifier la cote</button>
       <button class="action-btn" onclick="convertSubstituteToPlayer('${subId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
       <button class="action-btn danger" onclick="closeModal();removeSubstituteFromPool('${subId}')"><span class="icon">🗑️</span> Retirer</button>
     </div>
     <div class="modal-section"><h3>Compte lié</h3>`;
+  // Lecture seule ici — comme pour un joueur régulier, le nom, le courriel,
+  // le genre et la liaison/déliaison d'un compte se gèrent uniquement depuis
+  // la fiche du membre (menu ☰ → Organisation → Membres), jamais depuis une
+  // ligue précise : une même personne peut être dans plusieurs ligues à la
+  // fois, donc ça ne peut pas être une info propre à une seule d'entre elles.
   if(profile){
-    html += `
-      <p class="small" style="margin-bottom:10px;">${escapeHTML(profile.email)} — Remplaçant</p>
-      <button class="action-btn danger" onclick="closeModal();unlinkAccount('${profile.id}')"><span class="icon">🔓</span> Délier le compte</button>`;
+    html += `<p class="small">${escapeHTML(profile.email)} — Remplaçant</p>
+      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
   } else {
-    // « En attente » doit être org-wide, pas juste la ligue courante — sinon
-    // un compte déjà actif dans une AUTRE ligue de l'organisation apparaît à
-    // tort comme "en attente" ici. Les admins restent volontairement dans la
-    // liste (même choix que l'onglet Comptes) : un admin peut aussi être
-    // joueur/remplaçant dans une ligue — voir profileRoleLabel, qui ne
-    // dépend plus de profiles.role pour ça, donc les lier ici n'écrase plus
-    // jamais son accès admin.
-    const orgLeagueIds = new Set(myOrgLeagues().map(l=>l.id));
-    const orgLinkedProfileIds = new Set((ALL_PROFILE_PLAYERS||[]).filter(pp=>orgLeagueIds.has(pp.league_id)).map(pp=>pp.profile_id));
-    const pendingAccounts = ALL_PROFILES.filter(pr=> pr.organization_id===CURRENT_ORGANIZATION_ID && !orgLinkedProfileIds.has(pr.id));
-    html += `<p class="small" style="margin-bottom:10px;">Aucun compte lié — ce remplaçant n'a pas encore accès à sa propre vue.</p>`;
-    if(pendingAccounts.length){
-      html += `
-        <select id="subLinkSelect_${subId}">
-          <option value="">— choisir un compte en attente —</option>
-          ${pendingAccounts.map(pr=>`<option value="${pr.id}">${escapeHTML(pr.display_name||pr.email)} (${escapeHTML(pr.email)})</option>`).join('')}
-        </select>
-        <button class="btn btn-secondary" style="margin-top:8px;" onclick="linkSubstituteAccount('${subId}')">Lier ce compte</button>`;
-    } else {
-      html += `<p class="small">Aucun compte en attente à lier pour l'instant.</p>`;
-    }
+    html += `<p class="small">Aucun compte lié.</p>
+      <p class="small" style="color:var(--muted);">Pour lier un compte en attente à ce remplaçant : menu ☰ → Organisation.</p>`;
   }
   html += `</div>`;
   return html;
@@ -4808,17 +4793,6 @@ function openSubstituteDetailModal(subId){
   const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
   if(!s) return;
   showContentModal(escapeHTML(s.name), substituteDetailModalHTML(subId));
-}
-async function linkSubstituteAccount(subId){
-  const select = document.getElementById('subLinkSelect_'+subId);
-  if(!select) return;
-  const profileId = select.value;
-  if(!profileId) return;
-  const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: CURRENT_LEAGUE_ID, substitute_id: subId });
-  if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
-  await loadAllProfiles();
-  if(CURRENT_PROFILE && CURRENT_PROFILE.id === profileId){ await refreshMyOwnLinks(); }
-  openSubstituteDetailModal(subId);
 }
 // Convertit un joueur régulier en remplaçant : il quitte son groupe et la
 // liste des Réguliers, rejoint le bassin de Remplaçants. Son compte lié (s'il
@@ -4871,18 +4845,16 @@ function convertSubstituteToPlayer(subId){
     openPlayerDetailModal(newPlayer.id);
   });
 }
+// Le nom et le courriel ont été retirés d'ici — ce sont des infos propres à
+// la personne, pas à cette ligue (une même personne peut être remplaçante
+// ici et joueuse ailleurs) ; ils se gèrent depuis la fiche du membre
+// (Organisation → Membres). Seules les notes, propres à ce bassin de
+// remplaçants précis, restent modifiables ici.
 function editSubstituteInPool(id){
   const s = (DATA.substitutePool||[]).find(x=>x.id===id);
   if(!s) return;
-  const html = `
-    <div class="field"><label>Nom</label><input id="editSubName" value="${escapeHTML(s.name)}"></div>
-    <div class="field"><label>Courriel</label><input id="editSubEmail" type="email" value="${escapeHTML(s.email||'')}"></div>
-    <div class="field"><label>Notes</label><input id="editSubNotes" value="${escapeHTML(s.notes||'')}"></div>`;
-  showFormModal('Modifier ' + s.name, html, ()=>{
-    const name = document.getElementById('editSubName').value.trim();
-    if(!name){ showAlert("Le nom est requis."); return false; }
-    s.name = name;
-    s.email = document.getElementById('editSubEmail').value.trim();
+  const html = `<div class="field"><label>Notes</label><input id="editSubNotes" value="${escapeHTML(s.notes||'')}"></div>`;
+  showFormModal('Notes — ' + s.name, html, ()=>{
     s.notes = document.getElementById('editSubNotes').value.trim();
   });
 }
@@ -5000,7 +4972,6 @@ function playerDetailModalHTML(pid){
       <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${rating.toFixed(2)}</span></div>
     </div>
     <div class="action-grid">
-      <button class="action-btn" onclick="closeModal();renamePlayer('${pid}')"><span class="icon">✏️</span> Renommer</button>
       <button class="action-btn" onclick="closeModal();editPlayerRating('${pid}')"><span class="icon">📊</span> Modifier la cote</button>
       <button class="action-btn" onclick="togglePlayerStatus('${pid}')"><span class="icon">${p.status==='new'?'✅':'🆕'}</span> ${p.status==='new' ? 'Marquer confirmé(e)' : 'Marquer nouveau/nouvelle'}</button>
       <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
@@ -5192,13 +5163,10 @@ function addPlayerFromList(){
   DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
   saveAndRender();
 }
-function renamePlayer(pid){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  showPrompt('Nouveau nom du joueur :', p.name, (name)=>{
-    if(name && name.trim()){ p.name = uniquePlayerName(name.trim(), DATA.players, pid); saveAndRender(); }
-  });
-}
+// L'ancien bouton "Renommer" du popup joueur a été retiré : un nom n'est
+// pas propre à une ligue (la même personne peut être dans plusieurs), donc
+// renommer ne se fait plus que depuis la fiche du membre, où ça se répercute
+// partout d'un coup (voir renameOrgMember).
 // Modification manuelle de la cote d'un joueur, avec bornes raisonnables
 // (2.0-8.0) et une confirmation renforcée si le joueur a déjà des matchs
 // comptabilisés (pour éviter d'écraser une cote gagnée par erreur).
@@ -5508,11 +5476,13 @@ function orgMemberDetailModalHTML(idx){
         <div class="modal-badges">${entry.profileId ? '<span class="tag tag-up">Compte lié</span>' : '<span class="tag">Aucun compte lié</span>'}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
       </div>
     </div>`;
-  if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}</p>`;
-  html += `<div class="row" style="align-items:center;gap:8px;margin:10px 0;">
+  if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}${!entry.profileId?` <button class="btn-ghost" style="padding:2px 8px;" onclick="editOrgMemberEmail(${idx})" title="Modifier le courriel">✏️</button>`:''}</p>`;
+  else if(!entry.profileId) html += `<p class="small" style="margin:10px 0;">Aucun courriel <button class="btn-ghost" style="padding:2px 8px;" onclick="editOrgMemberEmail(${idx})">✏️ Ajouter</button></p>`;
+  html += `<div class="row" style="align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap;">
+    <button class="action-btn" style="width:auto;" onclick="renameOrgMember(${idx})"><span class="icon">✏️</span> Renommer</button>
     <button class="action-btn" style="width:auto;" ${entry.rows.length?`onclick="setMemberGender(${idx})"`:'disabled title="Ajoute d\'abord à une ligue pour pouvoir définir le genre"'}><span class="icon">⚧️</span> Genre : ${entry.gender==='F'?'Femme':entry.gender==='M'?'Homme':'Non défini'}</button>
   </div>
-  <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Utilisé seulement pour former des équipes de tournoi MLP (double féminin/masculin/mixte).</p>
+  <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Ces infos s'appliquent à la fois dans toutes ses ligues — le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte). Le courriel d'un compte lié est celui du compte, non modifiable ici.</p>
   <div class="modal-section"><h3>Ligues</h3>`;
   if(entry.rows.length){
     html += entry.rows.map((r,ri)=>`
@@ -5708,6 +5678,69 @@ async function setMemberGender(idx){
       if(rec) rec.gender = nextGender;
     });
     await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  }
+  await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
+}
+// Renomme cette personne d'un coup dans TOUTES ses ligues (sa fiche joueur
+// ou remplaçant dans chacune) ainsi que sa fiche membre — un nom n'est pas
+// propre à une ligue, donc plus besoin de le refaire une à une.
+function renameOrgMember(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  showPrompt('Nouveau nom :', entry.name, (name)=>{
+    const trimmed = (name||'').trim();
+    if(trimmed) applyOrgMemberRename(idx, trimmed);
+  });
+}
+async function applyOrgMemberRename(idx, newName){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const byLeague = {};
+  entry.rows.forEach(r=>{ (byLeague[r.leagueId] = byLeague[r.leagueId] || []).push(r); });
+  for(const leagueId of Object.keys(byLeague)){
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+    if(error) continue;
+    const leagueData = (data && data.data) || {};
+    byLeague[leagueId].forEach(r=>{
+      const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+      const rec = list.find(x=>x.id===r.refId);
+      if(rec) rec.name = uniquePlayerName(newName, list, r.refId);
+    });
+    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  }
+  if(entry.orgMemberId){
+    await sb.from('org_members').update({ name: newName }).eq('id', entry.orgMemberId);
+  }
+  await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
+}
+// Modifie le courriel de contact de cette personne (pas lié à un compte —
+// dans ce cas c'est le courriel du compte, non modifiable ici) dans toutes
+// ses ligues et sa fiche membre, même logique que renommer/genre.
+function editOrgMemberEmail(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry || entry.profileId) return;
+  showPrompt('Courriel :', entry.email || '', (email)=>{
+    applyOrgMemberEmail(idx, (email||'').trim());
+  });
+}
+async function applyOrgMemberEmail(idx, newEmail){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const byLeague = {};
+  entry.rows.forEach(r=>{ (byLeague[r.leagueId] = byLeague[r.leagueId] || []).push(r); });
+  for(const leagueId of Object.keys(byLeague)){
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+    if(error) continue;
+    const leagueData = (data && data.data) || {};
+    byLeague[leagueId].forEach(r=>{
+      const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+      const rec = list.find(x=>x.id===r.refId);
+      if(rec) rec.email = newEmail || null;
+    });
+    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  }
+  if(entry.orgMemberId){
+    await sb.from('org_members').update({ email: newEmail || null }).eq('id', entry.orgMemberId);
   }
   await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
 }
