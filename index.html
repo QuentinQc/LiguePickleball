@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001101500">
+<meta name="app-build" content="20261001103000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -5502,50 +5502,10 @@ function saveAddOrgMemberForm(){
     await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
   })();
 }
-function openAssignMemberModal(idx){
-  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
-  if(!entry) return;
-  const alreadyIn = new Set(entry.rows.map(r=>r.leagueId));
-  const remaining = myOrgLeagues().filter(l=>!alreadyIn.has(l.id));
-  if(!remaining.length){ showAlert(`${entry.name} est déjà dans toutes les ligues de ton organisation.`); return; }
-  // Simple pré-réglage par défaut pour chaque ligne (le rôle déjà dominant
-  // ailleurs pour cette personne) — modifiable indépendamment ligue par
-  // ligue juste en dessous, puisqu'elle peut très bien être régulière dans
-  // l'une et remplaçante dans une autre.
-  const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
-  const html = `
-    <p class="small">Ajoute ${escapeHTML(entry.name)} dans d'autres ligues de ton organisation — choisis joueur ou remplaçant pour chacune.</p>
-    <div class="field">
-      <div class="card" style="max-height:260px;overflow-y:auto;padding:10px 12px;">
-        ${remaining.map(l=>leagueTypeRowHTML(l, 'assignMemberLeague', roleGuess)).join('')}
-      </div>
-    </div>`;
-  showFormModal(`Assigner ${entry.name}`, html, ()=>saveAssignMemberForm(entry));
-}
-function saveAssignMemberForm(entry){
-  const picks = readPerLeagueTypes('assignMemberLeague');
-  if(!picks.length){ showAlert("Choisis au moins une ligue."); return false; }
-  (async ()=>{
-    // Si cette personne n'a pas encore de ligne org_members (détectée par nom
-    // ou par compte, avant cette fonctionnalité), on lui en crée une
-    // maintenant plutôt que de continuer à deviner par nom.
-    let orgMemberId = entry.orgMemberId;
-    if(!orgMemberId){
-      const member = await createOrgMember(entry.name, entry.email, null, entry.profileId || null);
-      orgMemberId = member ? member.id : null;
-    }
-    for(const { leagueId, type } of picks){
-      if(entry.profileId && type==='joueur'){
-        await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name);
-      } else if(entry.profileId && type==='remplacant'){
-        await addSubstituteToLeagueForProfile(leagueId, entry.profileId, entry.name);
-      } else {
-        await addNamedEntryToLeague(leagueId, entry.name, type, entry.email, orgMemberId);
-      }
-    }
-    await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
-  })();
-}
+// L'ancien bouton "+ Assigner" de la liste (et sa modale dédiée) a été
+// retiré : l'ajout à une ligue se fait maintenant directement dans la fiche
+// du membre (voir orgMemberDetailModalHTML / saveOrgMemberDetailAdd), pour
+// tout gérer au même endroit plutôt que d'ouvrir une modale séparée.
 // Fiche détaillée d'un membre : ses ligues (avec son statut dans chacune),
 // avec possibilité de le retirer d'une ligue ou de l'ajouter à une autre,
 // le tout sans quitter la fiche (on la reconstruit après chaque action).
@@ -5570,7 +5530,7 @@ function orgMemberDetailModalHTML(idx){
       <div class="row" style="align-items:center;justify-content:space-between;gap:8px;padding:8px 0;${ri>0?'border-top:1px solid var(--line-soft);':''}">
         <div class="row" style="align-items:center;gap:8px;min-width:0;flex:1;">
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.leagueLabel)}</span>
-          <span class="tag ${r.type==='remplaçant'?'tag-yellow':'tag-up'}">${r.type==='remplaçant'?'🔄 Remplaçant':'Joueur'}</span>
+          <span class="tag ${r.type==='remplaçant'?'tag-yellow':'tag-up'}" style="cursor:pointer;" onclick="confirmToggleMemberLeagueType(${idx},${ri})" title="Cliquer pour changer le statut">${r.type==='remplaçant'?'🔄 Remplaçant':'Joueur'} ✏️</span>
         </div>
         <button class="btn-ghost-danger" onclick="confirmRemovePersonFromLeague(${idx},${ri})" title="Retirer de cette ligue">🗑️</button>
       </div>`).join('');
@@ -5635,6 +5595,59 @@ function confirmRemovePersonFromLeague(idx, rowIdx){
   if(!row) return;
   showConfirm(`Retirer ${entry.name} de ${row.leagueLabel} ?`, async ()=>{
     const ok = await removePersonFromLeague(row.leagueId, row.refId, row.type, entry.profileId);
+    if(ok) await refreshOrgMemberDetailModal(idx, [row.leagueId]);
+  });
+}
+// Fait passer une personne de joueur à remplaçant (ou l'inverse) dans UNE
+// ligue donnée, directement dans le JSONB de cette ligue — même logique que
+// convertPlayerToSubstitute/convertSubstituteToPlayer, mais généralisée à
+// n'importe quelle ligue de l'organisation (pas seulement la ligue affichée),
+// cote et compte lié conservés.
+async function changePersonTypeInLeague(leagueId, refId, fromType, profileId){
+  const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+  if(error){ showAlert("Erreur : " + error.message); return false; }
+  const leagueData = (data && data.data) || {};
+  leagueData.players = leagueData.players || [];
+  leagueData.substitutePool = leagueData.substitutePool || [];
+  let newId;
+  if(fromType==='remplaçant'){
+    const s = leagueData.substitutePool.find(x=>x.id===refId);
+    if(!s) return false;
+    leagueData.substitutePool = leagueData.substitutePool.filter(x=>x.id!==refId);
+    const newPlayer = { id: uid('p'), name: s.name, groupId: null, rating: typeof s.rating==='number'?s.rating:RATING_DEFAULT, ratingGames: typeof s.ratingGames==='number'?s.ratingGames:0, order: 0, status:'new' };
+    if(s.email) newPlayer.email = s.email;
+    if(s.orgMemberId) newPlayer.orgMemberId = s.orgMemberId;
+    leagueData.players.push(newPlayer);
+    newId = newPlayer.id;
+  } else {
+    const p = leagueData.players.find(x=>x.id===refId);
+    if(!p) return false;
+    leagueData.players = leagueData.players.filter(x=>x.id!==refId);
+    const newSub = { id: uid('sub'), name: p.name, rating: typeof p.rating==='number'?p.rating:RATING_DEFAULT, ratingGames: typeof p.ratingGames==='number'?p.ratingGames:0 };
+    if(p.email) newSub.email = p.email;
+    if(p.orgMemberId) newSub.orgMemberId = p.orgMemberId;
+    leagueData.substitutePool.push(newSub);
+    newId = newSub.id;
+  }
+  const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  if(err2){ showAlert("Erreur : " + err2.message); return false; }
+  if(profileId){
+    if(fromType==='remplaçant'){
+      await sb.from('profile_players').update({ substitute_id: null, player_id: newId }).eq('profile_id', profileId).eq('league_id', leagueId);
+    } else {
+      await sb.from('profile_players').update({ player_id: null, substitute_id: newId }).eq('profile_id', profileId).eq('league_id', leagueId);
+    }
+  }
+  return true;
+}
+function confirmToggleMemberLeagueType(idx, rowIdx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const row = entry.rows[rowIdx];
+  if(!row) return;
+  const newLabel = row.type==='remplaçant' ? 'joueur régulier' : 'remplaçant';
+  showConfirm(`Changer le statut de ${entry.name} dans ${row.leagueLabel} vers « ${newLabel} » ?`, async ()=>{
+    const ok = await changePersonTypeInLeague(row.leagueId, row.refId, row.type, entry.profileId);
     if(ok) await refreshOrgMemberDetailModal(idx, [row.leagueId]);
   });
 }
@@ -7165,7 +7178,6 @@ function organizationMembersCardHTML(){
           <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
         </div>
         <div class="member-actions">
-          <button class="btn-ghost" onclick="openAssignMemberModal(${i})">+ Assigner</button>
           ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
         </div>
       </div>`).join('')}
