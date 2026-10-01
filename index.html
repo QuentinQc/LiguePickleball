@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001084900">
+<meta name="app-build" content="20261001101500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -229,6 +229,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .member-avatar{width:38px;height:38px;border-radius:50%;background:rgba(207,234,92,0.14);color:var(--ball);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:600;font-size:13px;flex-shrink:0;}
 .member-info{flex:1 1 160px;min-width:140px;}
 .member-name{font-weight:600;}
+.member-name-link{cursor:pointer;}
+.member-name-link:hover{color:var(--ball);text-decoration:underline;text-decoration-color:rgba(255,255,255,0.3);text-underline-offset:3px;}
 .member-leagues{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
 .member-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .account-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);flex-wrap:wrap;margin-bottom:8px;}
@@ -5544,6 +5546,119 @@ function saveAssignMemberForm(entry){
     await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
   })();
 }
+// Fiche détaillée d'un membre : ses ligues (avec son statut dans chacune),
+// avec possibilité de le retirer d'une ligue ou de l'ajouter à une autre,
+// le tout sans quitter la fiche (on la reconstruit après chaque action).
+function orgMemberDetailModalHTML(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return `<p class="small">Membre introuvable.</p>`;
+  const initials = (entry.name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  const alreadyIn = new Set(entry.rows.map(r=>r.leagueId));
+  const remaining = myOrgLeagues().filter(l=>!alreadyIn.has(l.id));
+  let html = `
+    <div class="modal-header-row">
+      <div class="avatar-circle">${escapeHTML(initials)}</div>
+      <div>
+        <div style="font-size:19px;font-weight:700;">${escapeHTML(entry.name)}</div>
+        <div class="modal-badges">${entry.profileId ? '<span class="tag tag-up">Compte lié</span>' : '<span class="tag">Aucun compte lié</span>'}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
+      </div>
+    </div>`;
+  if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}</p>`;
+  html += `<div class="modal-section"><h3>Ligues</h3>`;
+  if(entry.rows.length){
+    html += entry.rows.map((r,ri)=>`
+      <div class="row" style="align-items:center;justify-content:space-between;gap:8px;padding:8px 0;${ri>0?'border-top:1px solid var(--line-soft);':''}">
+        <div class="row" style="align-items:center;gap:8px;min-width:0;flex:1;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.leagueLabel)}</span>
+          <span class="tag ${r.type==='remplaçant'?'tag-yellow':'tag-up'}">${r.type==='remplaçant'?'🔄 Remplaçant':'Joueur'}</span>
+        </div>
+        <button class="btn-ghost-danger" onclick="confirmRemovePersonFromLeague(${idx},${ri})" title="Retirer de cette ligue">🗑️</button>
+      </div>`).join('');
+  } else {
+    html += `<p class="small">Aucune ligue pour l'instant.</p>`;
+  }
+  html += `</div>`;
+  if(remaining.length){
+    const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
+    html += `
+      <div class="modal-section">
+        <h3>Ajouter à une ligue</h3>
+        ${remaining.map(l=>leagueTypeRowHTML(l, 'orgDetailLeague', roleGuess)).join('')}
+        <button class="btn btn-secondary" style="margin-top:6px;width:100%;" onclick="saveOrgMemberDetailAdd(${idx})">+ Ajouter</button>
+      </div>`;
+  }
+  if(entry.orgMemberId && !entry.rows.length){
+    html += `<button class="action-btn danger" style="width:100%;margin-top:14px;" onclick="closeModal();confirmDeleteOrgMember(${idx})"><span class="icon">🗑️</span> Supprimer ce membre</button>`;
+  }
+  return html;
+}
+function openOrgMemberDetailModal(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  showContentModal(escapeHTML(entry.name), orgMemberDetailModalHTML(idx));
+}
+// Recharge les données affectées puis reconstruit la fiche à jour, pour que
+// retirer/ajouter une ligue se reflète immédiatement sans fermer la fiche.
+async function refreshOrgMemberDetailModal(idx, affectedLeagueIds){
+  await Promise.all([loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
+  if(CURRENT_LEAGUE_ID && affectedLeagueIds.includes(CURRENT_LEAGUE_ID)){
+    const loaded = await loadData(CURRENT_LEAGUE_ID);
+    if(loaded){ DATA = loaded; migrateData(); }
+  }
+  ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries();
+  render();
+  if(ORG_ROSTER_ENTRIES_CACHE[idx]) openOrgMemberDetailModal(idx);
+}
+// Retire une personne d'une ligue donnée (joueur ou remplaçant) directement
+// dans le JSONB de cette ligue, puis délie le compte de cette ligue-là s'il
+// y en avait un — sans toucher aux autres ligues où elle reste active.
+async function removePersonFromLeague(leagueId, refId, type, profileId){
+  const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+  if(error){ showAlert("Erreur : " + error.message); return false; }
+  const leagueData = (data && data.data) || {};
+  if(type==='remplaçant'){
+    leagueData.substitutePool = (leagueData.substitutePool||[]).filter(x=>x.id!==refId);
+  } else {
+    leagueData.players = (leagueData.players||[]).filter(x=>x.id!==refId);
+  }
+  const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  if(err2){ showAlert("Erreur : " + err2.message); return false; }
+  if(profileId){
+    await sb.from('profile_players').delete().eq('profile_id', profileId).eq('league_id', leagueId);
+  }
+  return true;
+}
+function confirmRemovePersonFromLeague(idx, rowIdx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const row = entry.rows[rowIdx];
+  if(!row) return;
+  showConfirm(`Retirer ${entry.name} de ${row.leagueLabel} ?`, async ()=>{
+    const ok = await removePersonFromLeague(row.leagueId, row.refId, row.type, entry.profileId);
+    if(ok) await refreshOrgMemberDetailModal(idx, [row.leagueId]);
+  });
+}
+async function saveOrgMemberDetailAdd(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
+  const picks = readPerLeagueTypes('orgDetailLeague');
+  if(!picks.length){ showAlert("Choisis au moins une ligue."); return; }
+  let orgMemberId = entry.orgMemberId;
+  if(!orgMemberId){
+    const member = await createOrgMember(entry.name, entry.email, null, entry.profileId || null);
+    orgMemberId = member ? member.id : null;
+  }
+  for(const { leagueId, type } of picks){
+    if(entry.profileId && type==='joueur'){
+      await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name);
+    } else if(entry.profileId && type==='remplacant'){
+      await addSubstituteToLeagueForProfile(leagueId, entry.profileId, entry.name);
+    } else {
+      await addNamedEntryToLeague(leagueId, entry.name, type, entry.email, orgMemberId);
+    }
+  }
+  await refreshOrgMemberDetailModal(idx, picks.map(p=>p.leagueId));
+}
 // Le rôle "Joueur"/"Remplaçant" affiché pour un compte est calculé à partir
 // de ses vrais liens (profile_players), jamais du champ profiles.role : un
 // même compte peut être joueur dans une ligue de l'organisation ET
@@ -7045,7 +7160,7 @@ function organizationMembersCardHTML(){
       ${entries.map((e,i)=>`<div class="member-row">
         <div class="member-avatar">${escapeHTML(initialsOf(e.name))}</div>
         <div class="member-info">
-          <div class="member-name">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+          <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
           ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
           <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
         </div>
