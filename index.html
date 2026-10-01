@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001141500">
+<meta name="app-build" content="20261001153000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4760,7 +4760,7 @@ function substituteDetailModalHTML(subId){
   const initials = s.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   let html = `
     <div class="modal-header-row">
-      <div class="avatar-circle" style="background:linear-gradient(135deg, #FFD60A, #FF9F0A);">${escapeHTML(initials||'?')}</div>
+      ${avatarHTML('avatar-circle', initials, profile && profile.avatar_url, profile && profile.avatar_url ? '' : 'background:linear-gradient(135deg, #FFD60A, #FF9F0A);')}
       <div>
         <div style="font-size:19px;font-weight:700;">${escapeHTML(s.name)}</div>
         <div class="modal-badges"><span class="tag tag-yellow">Remplaçant</span></div>
@@ -4785,7 +4785,8 @@ function substituteDetailModalHTML(subId){
   // fois, donc ça ne peut pas être une info propre à une seule d'entre elles.
   if(profile){
     html += `<p class="small">${escapeHTML(profile.email)} — Remplaçant</p>
-      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
+      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>
+      ${profileBioStyleHTML(profile)}`;
   } else {
     html += `<p class="small">Aucun compte lié.</p>
       <p class="small" style="color:var(--muted);">Pour lier un compte en attente à ce remplaçant : menu ☰ → Organisation.</p>`;
@@ -4965,7 +4966,7 @@ function playerDetailModalHTML(pid){
 
   let html = `
     <div class="modal-header-row">
-      <div class="avatar-circle">${escapeHTML(initials||'?')}</div>
+      ${avatarHTML('avatar-circle', initials, profile && profile.avatar_url)}
       <div>
         <div style="font-size:19px;font-weight:700;">${escapeHTML(p.name)}</div>
         <div class="modal-badges">${badges.join('')}</div>
@@ -5007,7 +5008,8 @@ function playerDetailModalHTML(pid){
   if(profile){
     const isAdmin = profile.role === 'admin';
     html += `<p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
-      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
+      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>
+      ${profileBioStyleHTML(profile)}`;
   } else {
     html += `<p class="small">Aucun compte lié.</p>
       <p class="small" style="color:var(--muted);">Pour lier un compte en attente à ce joueur : menu ☰ → Organisation.</p>`;
@@ -5470,11 +5472,12 @@ function orgMemberDetailModalHTML(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
   if(!entry) return `<p class="small">Membre introuvable.</p>`;
   const initials = (entry.name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  const linkedProfile = entry.profileId ? ALL_PROFILES.find(x=>x.id===entry.profileId) : null;
   const alreadyIn = new Set(entry.rows.map(r=>r.leagueId));
   const remaining = myOrgLeagues().filter(l=>!alreadyIn.has(l.id));
   let html = `
     <div class="modal-header-row">
-      <div class="avatar-circle">${escapeHTML(initials)}</div>
+      ${avatarHTML('avatar-circle', initials, linkedProfile && linkedProfile.avatar_url)}
       <div>
         <div style="font-size:19px;font-weight:700;">${escapeHTML(entry.name)}</div>
         <div class="modal-badges">${entry.profileId ? '<span class="tag tag-up">Compte lié</span>' : '<span class="tag">Aucun compte lié</span>'}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
@@ -5487,6 +5490,7 @@ function orgMemberDetailModalHTML(idx){
     <button class="action-btn" style="width:auto;" ${entry.rows.length?`onclick="setMemberGender(${idx})"`:'disabled title="Ajoute d\'abord à une ligue pour pouvoir définir le genre"'}><span class="icon">⚧️</span> Genre : ${entry.gender==='F'?'Femme':entry.gender==='M'?'Homme':'Non défini'}</button>
   </div>
   <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Ces infos s'appliquent à la fois dans toutes ses ligues — le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte). Le courriel d'un compte lié est celui du compte, non modifiable ici.</p>
+  ${(()=>{ const bioHtml = linkedProfile ? profileBioStyleHTML(linkedProfile) : ''; return bioHtml ? `<div class="modal-section"><h3>Profil</h3>${bioHtml}</div>` : ''; })()}
   <div class="modal-section"><h3>Ligues</h3>`;
   if(entry.rows.length){
     html += entry.rows.map((r,ri)=>`
@@ -7232,7 +7236,7 @@ function organizationMembersCardHTML(){
     <p class="small" style="margin:8px 0 4px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
     <div class="member-list">
       ${entries.map((e,i)=>`<div class="member-row">
-        <div class="member-avatar">${escapeHTML(initialsOf(e.name))}</div>
+        ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
         <div class="member-info">
           <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
           ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
@@ -8195,7 +8199,10 @@ function renderSubstitute(subId){
         }).join('')}
       </div>
     </div>` : '';
-  const drawerSettings = (PUSH_SUPPORTED || isIOSDevice()) ? `<div class="drawer-extra-block">${notificationDrawerButtonHTML()}</div>` : '';
+  const drawerSettings = `<div class="drawer-extra-block">
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openMyProfileModal()">✏️ Mon profil</button>
+      ${(PUSH_SUPPORTED || isIOSDevice()) ? notificationDrawerButtonHTML() : ''}
+    </div>`;
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
@@ -8337,6 +8344,7 @@ function renderPlayer(playerId){
   const drawerSettings = `
     <div class="drawer-extra-block">
       <label style="display:block;margin-bottom:6px;">Réglages</label>
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openMyProfileModal()">✏️ Mon profil</button>
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
       ${DATA.showRatingToPlayers ? `<button class="btn-ghost" style="width:100%;text-align:left;" onclick="showRatingExplanationModal()">ℹ️ Comment fonctionne la cote ?</button>` : ''}
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
@@ -8378,6 +8386,7 @@ function renderMlpPlayer(me){
   const drawerSettings = `
     <div class="drawer-extra-block">
       <label style="display:block;margin-bottom:6px;">Réglages</label>
+      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openMyProfileModal()">✏️ Mon profil</button>
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showPlayerGuideModal()">📖 Guide</button>
       ${notificationDrawerButtonHTML()}
     </div>`;
@@ -8485,6 +8494,117 @@ function leagueRulesHTML(){
     ${enabledCriteria.length ? `<ol style="margin:0;padding-left:20px;">${enabledCriteria.map(c=>`<li class="small">${c}</li>`).join('')}</ol>` : `<p class="small">Aucun critère activé — les égalités ne sont pas départagées.</p>`}
     ${DATA.autoStartSessions ? `<h3 style="margin-top:14px;">Calendrier</h3><p class="small">Les sessions démarrent automatiquement chaque semaine${DATA.seasonEndDate ? ', jusqu\'au '+DATA.seasonEndDate : ''}.</p>` : ''}
     <p class="small" style="margin-top:14px;">Ce résumé reflète toujours les réglages actuels de la ligue.</p>`;
+}
+// ---------- Profil joueur enrichi (photo + bio + genre) ----------
+// Photo et bio sont stockées directement sur le compte (profiles.avatar_url
+// / profiles.bio) — donc partagées entre toutes les ligues de la personne.
+// Le genre, lui, reste physiquement une info par ligue (voir setMemberGender
+// côté admin) mais le joueur peut aussi le régler lui-même ici : on le change
+// alors dans toutes ses ligues d'un coup, via ses liens (MY_LEAGUE_LINKS).
+function avatarHTML(cssClass, initials, avatarUrl, extraStyle){
+  extraStyle = extraStyle || '';
+  if(avatarUrl) return `<div class="${cssClass}" style="overflow:hidden;padding:0;${extraStyle}"><img src="${escapeHTML(avatarUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;"></div>`;
+  return `<div class="${cssClass}" style="${extraStyle}">${escapeHTML(initials||'?')}</div>`;
+}
+function myCurrentGender(){
+  if(SESSION_USER && SESSION_USER.role==='player'){ const p = DATA.players.find(x=>x.id===SESSION_USER.playerId); return p ? p.gender : null; }
+  if(SESSION_USER && SESSION_USER.role==='substitute'){ const s=(DATA.substitutePool||[]).find(x=>x.id===SESSION_USER.substituteId); return s ? s.gender : null; }
+  return null;
+}
+function myProfileModalHTML(){
+  const p = CURRENT_PROFILE;
+  if(!p) return `<p class="small">Connecte-toi pour modifier ton profil.</p>`;
+  const bio = p.bio || '';
+  const initials = (p.display_name||p.email||'').split(/[ @]/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  const curGender = myCurrentGender();
+  return `
+    <p class="small" style="color:var(--muted);">Visible par les autres membres de tes ligues sur ta fiche joueur.</p>
+    <div class="row" style="align-items:center;gap:14px;margin:10px 0;">
+      ${avatarHTML('avatar-circle', initials, p.avatar_url, 'width:64px;height:64px;font-size:22px;')}
+      <div>
+        <input type="file" id="myProfilePhotoInput" accept="image/*" style="display:none;" onchange="onMyProfilePhotoChosen(this)">
+        <button class="btn btn-secondary" style="width:auto;" onclick="document.getElementById('myProfilePhotoInput').click()">📷 Changer la photo</button>
+        ${p.avatar_url ? `<button class="btn-ghost-danger" style="width:auto;margin-left:6px;" onclick="removeMyProfilePhoto()">Retirer</button>` : ''}
+      </div>
+    </div>
+    <div class="modal-section">
+      <h3>À propos de toi</h3>
+      <textarea id="myProfileBio" rows="3" maxlength="280" placeholder="Quelques mots sur toi, ton parcours, ce que tu aimes dans le pickleball..." style="width:100%;">${escapeHTML(bio)}</textarea>
+    </div>
+    ${(MY_LEAGUE_LINKS && MY_LEAGUE_LINKS.length) ? `
+    <div class="modal-section">
+      <h3>Genre</h3>
+      <p class="small" style="margin-bottom:8px;color:var(--muted);">Utilisé seulement pour former des équipes de tournoi MLP (double féminin/masculin/mixte). S'applique à toutes tes ligues.</p>
+      <button class="action-btn" style="width:auto;" onclick="cycleMyGender()"><span class="icon">⚧️</span> Genre : ${curGender==='F'?'Femme':curGender==='M'?'Homme':'Non défini'}</button>
+    </div>` : ''}
+    <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="saveMyProfile()">Enregistrer</button>`;
+}
+function openMyProfileModal(){
+  showContentModal('Mon profil', myProfileModalHTML());
+}
+async function saveMyProfile(){
+  if(!CURRENT_PROFILE) return;
+  const bio = (document.getElementById('myProfileBio')||{}).value || '';
+  const { error } = await sb.from('profiles').update({ bio: bio.trim() || null }).eq('id', CURRENT_PROFILE.id);
+  if(error){ return; }
+  CURRENT_PROFILE.bio = bio.trim() || null;
+  const mine = ALL_PROFILES.find(pr=>pr.id===CURRENT_PROFILE.id);
+  if(mine){ mine.bio = CURRENT_PROFILE.bio; }
+  closeModal();
+  render();
+}
+// Envoie la photo choisie vers le bucket Supabase Storage "avatars" (un
+// fichier par compte, toujours au même chemin avec upsert) puis enregistre
+// son URL publique sur le compte.
+async function onMyProfilePhotoChosen(inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file || !CURRENT_PROFILE) return;
+  const ext = ((file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')) || 'jpg';
+  const path = CURRENT_PROFILE.id + '/avatar.' + ext;
+  const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
+  if(upErr){ showContentModal('Erreur', `<p class="small">Impossible d'envoyer la photo. Vérifie que le bucket "avatars" existe bien dans Supabase (menu ☰ → voir l'administrateur technique).</p>`); return; }
+  const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+  const url = (pub && pub.publicUrl) ? (pub.publicUrl + '?t=' + Date.now()) : null;
+  await sb.from('profiles').update({ avatar_url: url }).eq('id', CURRENT_PROFILE.id);
+  CURRENT_PROFILE.avatar_url = url;
+  const mine = ALL_PROFILES.find(pr=>pr.id===CURRENT_PROFILE.id);
+  if(mine) mine.avatar_url = url;
+  openMyProfileModal();
+}
+async function removeMyProfilePhoto(){
+  if(!CURRENT_PROFILE) return;
+  await sb.from('profiles').update({ avatar_url: null }).eq('id', CURRENT_PROFILE.id);
+  CURRENT_PROFILE.avatar_url = null;
+  const mine = ALL_PROFILES.find(pr=>pr.id===CURRENT_PROFILE.id);
+  if(mine) mine.avatar_url = null;
+  openMyProfileModal();
+}
+// Change le genre de la personne connectée dans TOUTES ses ligues d'un coup
+// (même logique que setMemberGender côté admin, mais à partir de ses propres
+// liens profile_players plutôt que de la fiche membre d'une organisation).
+async function cycleMyGender(){
+  if(!CURRENT_PROFILE) return;
+  const cur = myCurrentGender();
+  const nextGender = cur==='F' ? 'M' : (cur==='M' ? null : 'F');
+  for(const link of (MY_LEAGUE_LINKS||[])){
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', link.league_id).single();
+    if(error) continue;
+    const leagueData = (data && data.data) || {};
+    const list = link.substitute_id ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+    const refId = link.substitute_id || link.player_id;
+    const rec = list.find(x=>x.id===refId);
+    if(rec) rec.gender = nextGender;
+    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', link.league_id);
+  }
+  const loaded = await loadData(CURRENT_LEAGUE_ID);
+  if(loaded){ DATA = loaded; migrateData(); }
+  openMyProfileModal();
+}
+// Affichage lecture seule de la bio d'un compte lié, réutilisé dans les
+// fiches joueur/remplaçant/membre. Vide si rien n'est rempli.
+function profileBioStyleHTML(profile){
+  if(!profile || !profile.bio) return '';
+  return `<p class="small" style="margin-top:6px;">${escapeHTML(profile.bio)}</p>`;
 }
 // ---------- Statistiques amusantes/encourageantes pour un joueur ----------
 // Reconstitue une estimation de l'historique de cote (à partir des
