@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001113000">
+<meta name="app-build" content="20261001133000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2832,13 +2832,6 @@ function openAddPersonModal(){
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
       </div>` : ''}
-      <div class="field"><label>Genre (optionnel)</label>
-        <select id="addPersonGender">
-          <option value="">Non défini</option>
-          <option value="F">Femme</option>
-          <option value="M">Homme</option>
-        </select>
-      </div>
       <div class="field"><label>Cote (optionnel)</label><input id="addPersonRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="${RATING_DEFAULT.toFixed(1)} par défaut"></div>
     </div>
     <div id="addPersonSubFields" style="display:none;">
@@ -2859,11 +2852,10 @@ function openAddPersonModal(){
       const groupEl = document.getElementById('addPersonGroup');
       const desiredGroupId = groupEl ? groupEl.value : '';
       const groupId = desiredGroupId || null;
-      const genderEl = document.getElementById('addPersonGender');
       const ratingEl = document.getElementById('addPersonRating');
       const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
       const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-      DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new', gender: genderEl.value || null });
+      DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
       if(groupId){
         const count = DATA.players.filter(p=>p.groupId===groupId).length;
         if(count > GROUP_MAX_PLAYERS()){
@@ -4940,15 +4932,10 @@ function adminPlayersHTML(){
           <option value="">— En attente (à placer plus tard) —</option>
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
-        <select id="newPlayerGender" title="Utilisé pour former des équipes MLP (double féminin/masculin/mixte)">
-          <option value="">Genre (optionnel)</option>
-          <option value="F">Femme</option>
-          <option value="M">Homme</option>
-        </select>
         <input id="newPlayerRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="Cote (${RATING_DEFAULT.toFixed(1)} par défaut)" style="width:170px;">
         <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
       </div>
-      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes. Le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte).</p>
+      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes. Le genre (pour les équipes de tournoi MLP) se configure maintenant depuis la fiche du membre, dans Organisation → Membres.</p>
       ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
     </div>
     <div class="card">
@@ -5015,8 +5002,6 @@ function playerDetailModalHTML(pid){
     <div class="action-grid">
       <button class="action-btn" onclick="closeModal();renamePlayer('${pid}')"><span class="icon">✏️</span> Renommer</button>
       <button class="action-btn" onclick="closeModal();editPlayerRating('${pid}')"><span class="icon">📊</span> Modifier la cote</button>
-      <button class="action-btn" onclick="closeModal();movePlayer('${pid}')"><span class="icon">🔀</span> Déplacer de groupe</button>
-      <button class="action-btn" onclick="cyclePlayerGender('${pid}')"><span class="icon">⚧️</span> Genre : ${p.gender==='F'?'Femme':p.gender==='M'?'Homme':'Non défini'}</button>
       <button class="action-btn" onclick="togglePlayerStatus('${pid}')"><span class="icon">${p.status==='new'?'✅':'🆕'}</span> ${p.status==='new' ? 'Marquer confirmé(e)' : 'Marquer nouveau/nouvelle'}</button>
       <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
       <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
@@ -5048,7 +5033,6 @@ function playerDetailModalHTML(pid){
     const isAdmin = profile.role === 'admin';
     html += `<p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
       <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
-    html += playerNotesSectionHTML();
   } else {
     html += `<p class="small">Aucun compte lié.</p>
       <p class="small" style="color:var(--muted);">Pour lier un compte en attente à ce joueur : menu ☰ → Organisation.</p>`;
@@ -5193,7 +5177,6 @@ function setRegularsSort(col){
 function addPlayerFromList(){
   const nameEl = document.getElementById('newPlayerName');
   const groupEl = document.getElementById('newPlayerGroup');
-  const genderEl = document.getElementById('newPlayerGender');
   const ratingEl = document.getElementById('newPlayerRating');
   const rawName = nameEl.value.trim();
   const desiredGroupId = groupEl.value;
@@ -5206,17 +5189,8 @@ function addPlayerFromList(){
   }
   const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
   const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new', gender: genderEl.value || null });
+  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
   saveAndRender();
-}
-// Utilisé pour former des équipes de tournoi MLP (double féminin/masculin/
-// mixte) — n'affecte rien d'autre dans l'application.
-function cyclePlayerGender(pid){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  p.gender = p.gender==='F' ? 'M' : (p.gender==='M' ? null : 'F');
-  saveAndRender();
-  openPlayerDetailModal(pid);
 }
 function renamePlayer(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -5400,6 +5374,13 @@ function organizationRosterEntries(){
         }
       }
       entry.rows.push({ leagueId:l.id, leagueLabel, type, refId: person.id });
+      // Le genre (utilisé pour la composition des équipes de tournoi MLP)
+      // vit encore sur la fiche joueur/remplaçant de chaque ligue, mais se
+      // configure maintenant uniquement depuis cette fiche-ci (voir
+      // setMemberGender) — on prend la première valeur trouvée parmi ses
+      // ligues comme valeur affichée, les écritures la gardent synchronisée
+      // partout.
+      if(!entry.gender && person.gender) entry.gender = person.gender;
     };
     (bucket.players||[]).forEach(p=>addRow(p, 'joueur'));
     (bucket.substitutePool||[]).forEach(s=>addRow(s, 'remplaçant'));
@@ -5528,7 +5509,11 @@ function orgMemberDetailModalHTML(idx){
       </div>
     </div>`;
   if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}</p>`;
-  html += `<div class="modal-section"><h3>Ligues</h3>`;
+  html += `<div class="row" style="align-items:center;gap:8px;margin:10px 0;">
+    <button class="action-btn" style="width:auto;" ${entry.rows.length?`onclick="setMemberGender(${idx})"`:'disabled title="Ajoute d\'abord à une ligue pour pouvoir définir le genre"'}><span class="icon">⚧️</span> Genre : ${entry.gender==='F'?'Femme':entry.gender==='M'?'Homme':'Non défini'}</button>
+  </div>
+  <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Utilisé seulement pour former des équipes de tournoi MLP (double féminin/masculin/mixte).</p>
+  <div class="modal-section"><h3>Ligues</h3>`;
   if(entry.rows.length){
     html += entry.rows.map((r,ri)=>`
       <div class="row" style="align-items:center;justify-content:space-between;gap:8px;padding:8px 0;${ri>0?'border-top:1px solid var(--line-soft);':''}">
@@ -5700,6 +5685,31 @@ async function saveOrgMemberDetailAdd(idx){
     }
   }
   await refreshOrgMemberDetailModal(idx, picks.map(p=>p.leagueId));
+}
+// Fait tourner le genre de cette personne (Non défini → Femme → Homme →
+// Non défini) et l'applique à SA fiche joueur/remplaçant dans CHACUNE de ses
+// ligues — une seule action ici plutôt que de devoir le refaire dans chaque
+// ligue séparément. Le genre reste techniquement stocké sur chaque fiche
+// (c'est ce que lit la formation d'équipes MLP), mais ne se configure plus
+// que depuis ici.
+async function setMemberGender(idx){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry || !entry.rows.length) return;
+  const nextGender = entry.gender==='F' ? 'M' : (entry.gender==='M' ? null : 'F');
+  const byLeague = {};
+  entry.rows.forEach(r=>{ (byLeague[r.leagueId] = byLeague[r.leagueId] || []).push(r); });
+  for(const leagueId of Object.keys(byLeague)){
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+    if(error) continue;
+    const leagueData = (data && data.data) || {};
+    byLeague[leagueId].forEach(r=>{
+      const list = r.type==='remplaçant' ? (leagueData.substitutePool||[]) : (leagueData.players||[]);
+      const rec = list.find(x=>x.id===r.refId);
+      if(rec) rec.gender = nextGender;
+    });
+    await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+  }
+  await refreshOrgMemberDetailModal(idx, Object.keys(byLeague));
 }
 // Le rôle "Joueur"/"Remplaçant" affiché pour un compte est calculé à partir
 // de ses vrais liens (profile_players), jamais du champ profiles.role : un
@@ -6177,28 +6187,8 @@ function removePlayer(pid){
     saveAndRender();
   });
 }
-function movePlayer(pid){
-  const p = DATA.players.find(x=>x.id===pid);
-  if(!p) return;
-  const currentGroup = groupById(p.groupId);
-  const sorted = groupsSorted();
-  const choices = sorted.map(g=>g.name).concat(['— Mettre en attente (aucun groupe) —']);
-  showChoice(`Déplacer ${p.name} (actuellement dans ${currentGroup ? currentGroup.name : 'en attente'}) vers quel groupe ?`, choices, (idx)=>{
-    if(idx === sorted.length){
-      p.groupId = null;
-      p.order = 0;
-      saveAndRender();
-      return;
-    }
-    if(!sorted[idx]) return;
-    const otherPlayers = DATA.players.filter(x=>x.id!==pid); // le joueur qu'on déplace ne compte pas contre lui-même
-    const groupId = resolveGroupAssignment(sorted[idx].id, DATA.groups, otherPlayers);
-    if(!groupId) return;
-    p.groupId = groupId;
-    p.order = nextOrderInGroup(groupId);
-    saveAndRender();
-  });
-}
+// L'ancien bouton "Déplacer de groupe" du popup joueur a été retiré : le
+// glisser-déposer dans l'onglet Groupes fait déjà ça, de façon plus directe.
 
 // Vue centralisée de toutes les absences/remplaçants de la session, tous
 // groupes confondus, pour éviter d'avoir à fouiller dans chaque groupe.
