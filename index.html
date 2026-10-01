@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001163000">
+<meta name="app-build" content="20261001165500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -590,6 +590,7 @@ let CURRENT_LEAGUE_ID = null;  // ligue actuellement affichée
 let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let LEAGUE_WALL_MESSAGES = [];  // messages du mur de discussion de CURRENT_LEAGUE_ID, rechargés à chaque changement de ligue
+let PARTNER_POSTS = [];         // annonces "trouver un partenaire" de CURRENT_LEAGUE_ID, rechargées à chaque changement de ligue
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
 let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation de la ligue affichée (partagées entre ses ligues)
@@ -1071,6 +1072,103 @@ function deleteLeagueMessage(id){
     render();
   });
 }
+// ---- Trouver un partenaire / match amical : petit babillard par ligue —
+// table dédiée `partner_posts`. "interested" est une liste jsonb de
+// {profile_id, name} plutôt qu'une table séparée, vu le petit volume attendu
+// et pour garder la lecture/écriture en une seule requête. ----
+async function loadPartnerPosts(leagueId){
+  if(!leagueId){ PARTNER_POSTS = []; return; }
+  const { data, error } = await sb.from('partner_posts').select('*').eq('league_id', leagueId).order('created_at', { ascending:false }).limit(100);
+  PARTNER_POSTS = error ? [] : (data || []);
+}
+async function createPartnerPost(){
+  const msgEl = document.getElementById('partnerMessageInput');
+  const dateEl = document.getElementById('partnerDateInput');
+  const message = msgEl ? msgEl.value.trim() : '';
+  if(!message || !CURRENT_PROFILE || !CURRENT_LEAGUE_ID) return;
+  const author_name = myDisplayName();
+  const play_date = (dateEl && dateEl.value) ? dateEl.value : null;
+  const { error } = await sb.from('partner_posts').insert({ league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, message, play_date });
+  if(error){ showAlert("L'annonce n'a pas pu être publiée."); return; }
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  render();
+}
+// Ajoute/retire la personne connectée de la liste des intéressés d'une
+// annonce. Lecture-modification-écriture simple (pas de fonction serveur) —
+// comme le reste de l'appli, le dernier qui écrit gagne en cas de double-clic
+// simultané, risque négligeable vu le volume attendu sur ce babillard.
+async function togglePartnerInterest(id){
+  if(!CURRENT_PROFILE) return;
+  const post = PARTNER_POSTS.find(p=>p.id===id);
+  if(!post) return;
+  const list = Array.isArray(post.interested) ? post.interested.slice() : [];
+  const already = list.some(x=>x.profile_id===CURRENT_PROFILE.id);
+  const next = already ? list.filter(x=>x.profile_id!==CURRENT_PROFILE.id) : [...list, { profile_id: CURRENT_PROFILE.id, name: myDisplayName() }];
+  await sb.from('partner_posts').update({ interested: next }).eq('id', id);
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  render();
+}
+async function togglePartnerStatus(id){
+  const post = PARTNER_POSTS.find(p=>p.id===id);
+  if(!post) return;
+  await sb.from('partner_posts').update({ status: post.status==='open' ? 'closed' : 'open' }).eq('id', id);
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  render();
+}
+function deletePartnerPost(id){
+  showConfirm('Supprimer cette annonce ?', async ()=>{
+    closeModal();
+    await sb.from('partner_posts').delete().eq('id', id);
+    await loadPartnerPosts(CURRENT_LEAGUE_ID);
+    render();
+  });
+}
+function partnerBoardHTML(){
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const posts = (PARTNER_POSTS||[]).slice().sort((a,b)=>{
+    if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  const dayLabel = (iso)=>{ const d = new Date(iso); return d.toLocaleDateString('fr-CA', { day:'numeric', month:'short' }) + ' · ' + d.toLocaleTimeString('fr-CA', { hour:'2-digit', minute:'2-digit' }); };
+  const playDateLabel = (s)=>{ if(!s) return ''; const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); };
+  const rows = posts.map(p=>{
+    const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
+    const canManage = mine || isAdmin;
+    const interested = Array.isArray(p.interested) ? p.interested : [];
+    const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+    const closed = p.status !== 'open';
+    return `<div class="wall-msg${mine?' wall-msg-mine':''}" style="${closed?'opacity:0.6;':''}">
+      <div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;">
+        <strong style="font-size:13px;">${escapeHTML(p.author_name)}</strong>
+        <span class="small" style="opacity:0.65;white-space:nowrap;">${dayLabel(p.created_at)}</span>
+      </div>
+      ${p.play_date ? `<div class="small" style="margin-top:2px;"><span class="tag">📅 ${escapeHTML(playDateLabel(p.play_date))}</span>${closed?' <span class="tag">Comblée</span>':''}</div>` : (closed ? `<div class="small" style="margin-top:2px;"><span class="tag">Comblée</span></div>` : '')}
+      <div style="white-space:pre-wrap;word-break:break-word;margin-top:6px;">${escapeHTML(p.message)}</div>
+      ${interested.length ? `<p class="small" style="margin-top:6px;color:var(--muted);">Partant(e)s : ${interested.map(x=>escapeHTML(x.name)).join(', ')}</p>` : ''}
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
+        ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
+        ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
+        ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="card">
+      <h3 style="margin:0 0 4px;">🤝 Trouver un partenaire</h3>
+      <p class="small" style="margin:0 0 10px;color:var(--muted);">Besoin d'un ou une partenaire pour un match amical ? Publie une annonce visible par toute la ligue.</p>
+      <div class="modal-section" style="margin-top:0;">
+        <h3>Nouvelle annonce</h3>
+        <textarea id="partnerMessageInput" rows="2" maxlength="300" placeholder="Ex : Cherche un ou une partenaire pour jouer samedi matin, niveau intermédiaire." style="width:100%;"></textarea>
+        <div class="row" style="gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+          <label class="small" style="display:flex;align-items:center;gap:6px;">Date (optionnel) <input type="date" id="partnerDateInput"></label>
+          <button class="btn btn-primary" style="width:auto;margin-left:auto;" onclick="createPartnerPost()">Publier</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+        ${rows || '<p class="empty">Aucune annonce pour l\'instant.</p>'}
+      </div>
+    </div>`;
+}
 // ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
 // un tournoi peut regrouper des participants de plusieurs ligues de
 // l'organisation, plutôt que d'être enfermé dans les données d'une seule. ----
@@ -1315,6 +1413,7 @@ async function switchToLeague(leagueId){
   migrateData();
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
@@ -1352,6 +1451,7 @@ async function switchMyLeague(leagueId){
   migrateData();
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
   const isSub = !!link.substitute_id;
   if(SESSION_USER.role === 'admin'){
     // Un admin qui consulte sa propre vue joueur/remplaçant : on ne touche
@@ -2575,6 +2675,7 @@ async function onAuthResolved(user){
   migrateData();
   await loadOrgVideoData(currentLeagueOrgId());
   await loadWallChannel('general');
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
   if(link.substitute_id){
     SESSION_USER = { role:'substitute', substituteId: link.substitute_id };
     VIEW = { tab:'dispo' };
@@ -2676,7 +2777,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -2733,6 +2834,7 @@ function renderAdmin(){
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
+  else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
@@ -2742,7 +2844,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -2787,6 +2889,7 @@ function renderMlpAdmin(){
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
   else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
+  else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
@@ -8105,11 +8208,11 @@ function switchRowHTML(id, checked, label){
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
   return DATA.leagueFormat === 'mlp'
-    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['historique','Historique'],['videos','Vidéos']];
+    ? [['equipe','Mon équipe'],['classement','Classement'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique'],['videos','Vidéos']]
+    : [['classement','Mon groupe'],['stats','Statistiques'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
-  return [['dispo','Disponibilité'],['mur','Mur'],['historique','Historique']];
+  return [['dispo','Disponibilité'],['mur','Mur'],['partenaire','Partenaire'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
@@ -8296,7 +8399,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8331,7 +8434,7 @@ function renderSubstitute(subId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : substituteAvailabilityHTML(sub));
+  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : substituteAvailabilityHTML(sub)));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
@@ -8440,7 +8543,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8479,11 +8582,11 @@ function renderPlayer(playerId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : playerGroupHTML(me))));
+  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : playerGroupHTML(me)))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function renderMlpPlayer(me){
-  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['mur','Mur','💬'],['partenaire','Partenaire','🤝'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -8520,7 +8623,7 @@ function renderMlpPlayer(me){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : mlpPlayerTeamHTML(me))));
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : mlpPlayerTeamHTML(me)))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function mlpPlayerTeamHTML(me){
