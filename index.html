@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261001155228">
+<meta name="app-build" content="20261005183312">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -252,6 +252,14 @@ tr.me{background:rgba(207,234,92,0.1);}
 .partner-body{padding:10px 14px;flex:1;min-width:0;}
 /* Trouver un partenaire — liste de pastilles cliquables (ouvre le détail en modale) */
 .partner-pill-list{display:flex;flex-wrap:wrap;gap:10px;}
+.orgpick-search{margin-bottom:8px;}
+.orgpick-list{max-height:45vh;overflow-y:auto;border:1px solid var(--line-soft);border-radius:12px;}
+.orgpick-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line-soft);}
+.orgpick-row:last-child{border-bottom:none;}
+.orgpick-row input[type=checkbox]{width:auto;flex:0 0 auto;margin:0;}
+.orgpick-all{padding:6px 12px;border-bottom:none;}
+.orgpick-name{display:block;font-weight:600;}
+.orgpick-meta{display:block;}
 .partner-pill{display:flex;align-items:center;gap:11px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;padding:8px 20px 8px 8px;cursor:pointer;max-width:100%;transition:background .15s ease,border-color .15s ease,transform .1s ease;}
 .partner-pill:hover{border-color:var(--ball);background:rgba(207,234,92,0.06);}
 .partner-pill:active{transform:scale(0.97);}
@@ -3399,7 +3407,10 @@ function adminAllPeopleHTML(){
   return `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="margin:0;">Tous <span class="small">(${all.length})</span></h2>
-      <button class="btn btn-primary" onclick="openAddPersonModal()">➕ Ajouter une personne</button>
+      <div class="row" style="gap:8px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="openAddFromOrgModal()">👥 Depuis l'organisation</button>
+        <button class="btn btn-primary" onclick="openAddPersonModal()">➕ Ajouter une personne</button>
+      </div>
     </div>
     <p class="small">Réguliers et remplaçants ensemble — clique sur une ligne pour ouvrir la gestion de cette personne.</p>
     <table>
@@ -3412,7 +3423,7 @@ function adminAllPeopleHTML(){
         <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
         <td>${x.linked ? '✅' : '—'}</td>
       </tr>`).join('')}
-      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant</td></tr>` : ''}
+      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddFromOrgModal()">👥 Ajouter des gens de l'organisation</button></td></tr>` : ''}
     </table>
   </div>`;
 }
@@ -3493,6 +3504,161 @@ function openAddPersonModal(){
       DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
     }
   });
+}
+// ---- Ajouter à la ligue des gens déjà connus de l'organisation (avec ou sans
+// compte), en lot — pensé pour remplir vite une nouvelle ligue. ----
+let ORG_PICK_CANDIDATES = [];
+function uniqueNameQuiet(name, list){
+  const taken = new Set((list||[]).map(x=>(x.name||'').trim().toLowerCase()));
+  if(!taken.has(name.trim().toLowerCase())) return name.trim();
+  let i = 2;
+  while(taken.has((name.trim()+' ('+i+')').toLowerCase())) i++;
+  return name.trim()+' ('+i+')';
+}
+async function openAddFromOrgModal(){
+  if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation active."); return; }
+  try{
+    await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
+  }catch(e){ showAlert("Impossible de charger l'organisation : " + (e && e.message || e)); return; }
+  const entries = organizationRosterEntries();
+  const cands = [];
+  const seenProfiles = new Set();
+  const inLeagueNames = new Set((DATA.players||[]).concat(DATA.substitutePool||[]).map(x=>(x.name||'').trim().toLowerCase()));
+  const linkedHere = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.profile_id));
+  entries.forEach(e=>{
+    if(e.profileId) seenProfiles.add(e.profileId);
+    const here = e.rows.some(r=>r.leagueId===CURRENT_LEAGUE_ID) || (e.profileId && linkedHere.has(e.profileId));
+    if(here) return;
+    if(!e.orgMemberId && inLeagueNames.has(e.name.trim().toLowerCase())) return;
+    const other = e.rows.find(r=>r.type==='joueur');
+    let rating = null;
+    if(other){
+      const bucket = ORG_ROSTER_BY_LEAGUE[other.leagueId];
+      const pl = bucket && (bucket.players||[]).find(p=>p.id===other.refId);
+      if(pl && typeof pl.rating==='number') rating = pl.rating;
+    }
+    cands.push({ name:e.name, orgMemberId:e.orgMemberId||null, profileId:e.profileId||null, email:e.email||null, gender:e.gender||null, rating,
+      meta: e.profileId ? '✅ Compte' : 'Sans compte', leagues: e.rows.map(r=>r.leagueLabel).filter((v,i,a)=>a.indexOf(v)===i).join(', ') });
+  });
+  const orgLeagueIds = new Set(myOrgLeagues().map(l=>l.id));
+  const linkedAnywhere = new Set(ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id)).map(pp=>pp.profile_id));
+  ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID && !linkedAnywhere.has(p.id) && !seenProfiles.has(p.id)).forEach(p=>{
+    cands.push({ name: p.display_name || p.email || 'Sans nom', orgMemberId:null, profileId:p.id, email:p.email||null, gender:null, rating:null, meta:'✅ Compte en attente', leagues:'' });
+  });
+  cands.sort((a,b)=>a.name.localeCompare(b.name));
+  ORG_PICK_CANDIDATES = cands;
+  const groups = DATA.groups || [];
+  const html = `
+    <p class="small" style="margin-top:0;">Coche les personnes de l'organisation à ajouter à cette ligue. Leur cote (si connue) et leur compte sont repris automatiquement.</p>
+    ${cands.length ? `
+    <input class="orgpick-search" placeholder="🔍 Rechercher…" oninput="filterOrgPick(this.value)">
+    <label class="orgpick-row orgpick-all"><input type="checkbox" onchange="toggleOrgPickAll(this.checked)"><span><strong>Tout sélectionner</strong> <span class="small">(les résultats affichés)</span></span></label>
+    <div class="orgpick-list">
+      ${cands.map((c,i)=>`<label class="orgpick-row" data-name="${escapeHTML(c.name.toLowerCase())}">
+        <input type="checkbox" class="orgpick-cb" value="${i}" onchange="updateOrgPickCount()">
+        <span style="min-width:0;flex:1;"><span class="orgpick-name">${escapeHTML(c.name)}</span><span class="small orgpick-meta">${c.meta}${c.leagues ? ' · '+escapeHTML(c.leagues) : ''}${c.rating!==null ? ' · cote '+c.rating.toFixed(2) : ''}</span></span>
+      </label>`).join('')}
+    </div>` : `<p class="small"><em>Tout le monde de l'organisation est déjà dans cette ligue.</em></p>`}
+    <div class="field" style="margin-top:12px;">
+      <label>Nouveaux noms, sans compte (un par ligne, optionnel)</label>
+      <textarea id="orgPickNewNames" rows="3" placeholder="Marie Tremblay&#10;Jean Roy" oninput="updateOrgPickCount()"></textarea>
+    </div>
+    <div class="row" style="gap:8px;">
+      <div class="field" style="flex:1;margin:0;"><label>Ajouter comme</label>
+        <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Joueurs</option><option value="remplacant">🔄 Remplaçants</option></select></div>
+      <div class="field" style="flex:1;margin:0;" id="orgPickPlaceWrap"><label>Placement</label>
+        <select id="orgPickPlace"><option value="wait">⏳ En attente</option>${groups.length ? '<option value="fill">Remplir les groupes dans l\'ordre</option>' : ''}</select></div>
+    </div>
+    <button class="btn btn-primary" id="orgPickBtn" style="width:100%;margin-top:14px;" onclick="confirmAddFromOrg()" disabled>Ajouter</button>`;
+  showContentModal('Ajouter depuis l\'organisation', html);
+}
+function filterOrgPick(q){
+  q = (q||'').trim().toLowerCase();
+  document.querySelectorAll('.orgpick-list .orgpick-row').forEach(r=>{ r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
+}
+function toggleOrgPickAll(checked){
+  document.querySelectorAll('.orgpick-list .orgpick-row').forEach(r=>{
+    if(r.style.display==='none') return;
+    const cb = r.querySelector('.orgpick-cb'); if(cb) cb.checked = checked;
+  });
+  updateOrgPickCount();
+}
+function parseOrgPickNewNames(){
+  const el = document.getElementById('orgPickNewNames');
+  if(!el) return [];
+  return el.value.split('\n').map(s=>s.trim()).filter(Boolean);
+}
+function updateOrgPickCount(){
+  const n = document.querySelectorAll('.orgpick-cb:checked').length + parseOrgPickNewNames().length;
+  const btn = document.getElementById('orgPickBtn');
+  if(!btn) return;
+  btn.disabled = n===0;
+  btn.textContent = n ? `Ajouter ${n} personne${n>1?'s':''}` : 'Ajouter';
+}
+function onOrgPickTypeChange(){
+  const t = document.getElementById('orgPickType').value;
+  const w = document.getElementById('orgPickPlaceWrap');
+  if(w) w.style.display = t==='joueur' ? '' : 'none';
+}
+async function confirmAddFromOrg(){
+  const picked = Array.from(document.querySelectorAll('.orgpick-cb:checked')).map(el=>ORG_PICK_CANDIDATES[parseInt(el.value,10)]).filter(Boolean);
+  const newNames = parseOrgPickNewNames();
+  if(!picked.length && !newNames.length) return;
+  const type = document.getElementById('orgPickType').value;
+  const placeEl = document.getElementById('orgPickPlace');
+  const fill = type==='joueur' && placeEl && placeEl.value==='fill';
+  const btn = document.getElementById('orgPickBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Ajout en cours…'; }
+  const sortedGroups = (DATA.groups||[]).slice().sort((a,b)=>a.order-b.order);
+  const groupForNext = ()=>{
+    if(!fill) return null;
+    for(const g of sortedGroups){
+      if(DATA.players.filter(p=>p.groupId===g.id).length < GROUP_MAX_PLAYERS()) return g.id;
+    }
+    return null;
+  };
+  const errors = [];
+  // Nouveaux noms sans compte : on crée d'abord leur fiche « membre » de l'organisation.
+  const all = picked.slice();
+  for(const nm of newNames){
+    const m = await createOrgMember(nm, null, null, null);
+    if(m) all.push({ name:nm, orgMemberId:m.id, profileId:null, email:null, gender:null, rating:null });
+  }
+  // Comptes en attente sans fiche membre : on leur en crée une pour garder l'identité canonique.
+  for(const c of all){
+    if(!c.orgMemberId && c.profileId){
+      const m = await createOrgMember(c.name, c.email, null, c.profileId);
+      if(m) c.orgMemberId = m.id;
+    }
+  }
+  const links = [];
+  all.forEach(c=>{
+    let obj;
+    if(type==='remplacant'){
+      DATA.substitutePool = DATA.substitutePool || [];
+      obj = { id: uid('sub'), name: uniqueNameQuiet(c.name, DATA.substitutePool), rating: typeof c.rating==='number' ? c.rating : RATING_DEFAULT, ratingGames: 0 };
+      DATA.substitutePool.push(obj);
+    } else {
+      const groupId = groupForNext();
+      obj = { id: uid('p'), name: uniqueNameQuiet(c.name, DATA.players), groupId, rating: typeof c.rating==='number' ? c.rating : RATING_DEFAULT, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' };
+      DATA.players.push(obj);
+    }
+    if(c.orgMemberId) obj.orgMemberId = c.orgMemberId;
+    if(c.email) obj.email = c.email;
+    if(c.gender) obj.gender = c.gender;
+    if(c.profileId) links.push(type==='remplacant' ? { profile_id:c.profileId, league_id:CURRENT_LEAGUE_ID, substitute_id:obj.id } : { profile_id:c.profileId, league_id:CURRENT_LEAGUE_ID, player_id:obj.id });
+  });
+  await saveData();
+  if(SAVE_ERROR) errors.push(SAVE_ERROR);
+  if(links.length){
+    const { error } = await sb.from('profile_players').insert(links);
+    if(error) errors.push("Liaison des comptes : " + error.message);
+  }
+  try{ await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]); }catch(e){}
+  MODAL = null;
+  render();
+  if(errors.length) showAlert("Ajout terminé avec des erreurs : " + errors.join(' / '));
+  else showAlert(`✅ ${all.length} personne${all.length>1?'s ajoutées':' ajoutée'} à la ligue.`);
 }
 function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
 function setAdminTab(t){
