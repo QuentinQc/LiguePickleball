@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006103411">
+<meta name="app-build" content="20261006105300">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -304,6 +304,14 @@ tr.me{background:rgba(207,234,92,0.1);}
 .dm-list{gap:6px;}
 .dm-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--court-elevated-2);color:var(--text);border:1px solid var(--line-soft);border-radius:999px;padding:8px 14px 8px 8px;cursor:pointer;font-family:inherit;flex:0 0 auto;}
 .chat-head-ico.chat-head-ico{overflow:hidden;font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--court);}
+.wall-bubble[data-mid]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:pointer;}
+.msg-actions-overlay{position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;padding:12px calc(12px + env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px));}
+.msg-actions-sheet{width:100%;max-width:420px;display:flex;flex-direction:column;gap:8px;animation:chatPop .15s ease-out;}
+.msg-actions-preview{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:16px;padding:12px 16px;font-size:14px;color:var(--muted);text-align:center;}
+.msg-actions-btn{background:var(--court-light);border:1px solid var(--line-soft-strong);color:var(--text);border-radius:16px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;}
+.msg-actions-btn.danger{color:#fff;background:var(--paddle);border-color:var(--paddle);}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;}
+.sheet-body > .card:last-child{margin-bottom:0;}
 .chat-fab:active{transform:scale(.94);}
 .chat-fab-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--paddle);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .addtab-bar{display:flex;gap:4px;padding:4px;background:var(--court-elevated-2);border-radius:999px;margin-bottom:14px;}
@@ -1208,7 +1216,7 @@ function wallMessagesListHTML(){
       ${avatarHTML('wall-avatar', initials, g.avatar_url)}
       <div class="wall-group">
         ${!mine ? `<div class="wall-author">${escapeHTML(g.author_name)}</div>` : ''}
-        ${g.items.map(m=>`<div class="wall-bubble">${escapeHTML(m.content)}<div class="wall-time">${timeLabel(m.created_at)}${canDelete ? ` · <a href="javascript:void(0)" onclick="deleteLeagueMessage('${m.id}')">supprimer</a>` : ''}</div></div>`).join('')}
+        ${g.items.map(m=>`<div class="wall-bubble" data-mid="${m.id}" data-kind="wall" data-can="${canDelete?1:0}">${escapeHTML(m.content)}<div class="wall-time">${timeLabel(m.created_at)}</div></div>`).join('')}
       </div>
     </div>`;
   });
@@ -1262,7 +1270,7 @@ function dmThreadListHTML(otherId){
     const day = new Date(m.created_at).toDateString();
     if(day!==shown){ html += `<div class="wall-date-sep">${escapeHTML(dayLabel(m.created_at))}</div>`; shown = day; }
     const mine = m.sender_id===me;
-    html += `<div class="wall-row${mine?' mine':''}">${mine ? '' : avatarHTML('wall-avatar', partnerInitials(other.display_name), other.avatar_url)}<div class="wall-group"><div class="wall-bubble">${escapeHTML(m.content)}<div class="wall-time">${new Date(m.created_at).toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'})}</div></div></div></div>`;
+    html += `<div class="wall-row${mine?' mine':''}">${mine ? '' : avatarHTML('wall-avatar', partnerInitials(other.display_name), other.avatar_url)}<div class="wall-group"><div class="wall-bubble" data-mid="${m.id}" data-kind="dm" data-can="${mine?1:0}">${escapeHTML(m.content)}<div class="wall-time">${new Date(m.created_at).toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'})}</div></div></div></div>`;
   });
   return html;
 }
@@ -1371,6 +1379,23 @@ function updateChatFab(){
     + convos.map(x=>`<button type="button" class="chat-menu-item" onclick="openDmThread('${x.c.id}')">${avatarHTML('chat-menu-av', partnerInitials(x.c.display_name), x.c.avatar_url)}${escapeHTML(x.c.display_name||'Joueur')}${x.unread ? `<span class="chat-menu-badge">${x.unread}</span>` : ''}</button>`).join('')
     + (DM_AVAILABLE ? `<button type="button" class="chat-menu-item chat-menu-more" onclick="openDmList()" aria-label="Toutes les conversations">⋯${dmCount ? `<span class="chat-menu-badge">${dmCount}</span>` : ''}</button>` : '');
 }
+function sheetModalHTML(){
+  const k = MODAL.sheet;
+  const ico = k==='partenaire' ? '🤝' : '🎉';
+  const title = k==='partenaire' ? 'Partenaire' : 'Événements';
+  const sub = k==='partenaire' ? 'Trouver un partenaire ou un match amical' : "Calendrier de l'organisation";
+  const body = k==='partenaire' ? partnerBoardHTML() : socialEventsHTML();
+  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="chat-sheet">
+      <div class="chat-head">
+        <div class="chat-head-ico">${ico}</div>
+        <div class="chat-head-txt"><div class="chat-head-title">${title}</div><div class="chat-head-sub">${sub}</div></div>
+        <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
+      </div>
+      <div class="sheet-body">${body}</div>
+    </div>
+  </div>`;
+}
 function chatModalHTML(){
   const mode = (MODAL && MODAL.chatMode) || 'channel';
   const channels = wallChannels();
@@ -1407,6 +1432,80 @@ function chatModalHTML(){
     </div>
   </div>`;
 }
+// ---- Appui long sur un message : copier / supprimer ----
+function closeMessageActions(){ const el = document.getElementById('msgActions'); if(el) el.remove(); }
+function openMessageActions(bubble){
+  closeMessageActions();
+  const id = bubble.dataset.mid, kind = bubble.dataset.kind, can = bubble.dataset.can==='1';
+  const textNode = Array.from(bubble.childNodes).find(n=>n.nodeType===3);
+  const text = textNode ? textNode.textContent : '';
+  window.__msgActionText = text;
+  const el = document.createElement('div');
+  el.id = 'msgActions';
+  el.className = 'msg-actions-overlay';
+  el.onclick = (e)=>{ if(e.target===el) closeMessageActions(); };
+  el.innerHTML = `<div class="msg-actions-sheet">
+    <div class="msg-actions-preview">${escapeHTML(text.length>90 ? text.slice(0,89)+'…' : text)}</div>
+    <button type="button" class="msg-actions-btn" onclick="copyMessageText()">📋 Copier</button>
+    ${can ? `<button type="button" class="msg-actions-btn danger" id="msgDelBtn" onclick="confirmDeleteMessage('${kind}','${id}')">🗑️ Supprimer</button>` : ''}
+    <button type="button" class="msg-actions-btn" onclick="closeMessageActions()">Annuler</button>
+  </div>`;
+  document.body.appendChild(el);
+}
+function copyMessageText(){
+  const t = window.__msgActionText || '';
+  try{ navigator.clipboard.writeText(t); }catch(e){}
+  closeMessageActions();
+}
+async function confirmDeleteMessage(kind, id){
+  const btn = document.getElementById('msgDelBtn');
+  if(btn && !btn.dataset.armed){ btn.dataset.armed = '1'; btn.textContent = '⚠️ Confirmer la suppression'; return; }
+  closeMessageActions();
+  if(kind==='wall'){
+    await sb.from('org_messages').delete().eq('id', id);
+    const i = LEAGUE_WALL_MESSAGES.findIndex(m=>m.id===id);
+    if(i>-1) LEAGUE_WALL_MESSAGES.splice(i,1);
+    const c = document.getElementById('wallMessages');
+    if(c) c.innerHTML = wallMessagesListHTML();
+  } else {
+    await sb.from('direct_messages').delete().eq('id', id);
+    const i = DM_MESSAGES.findIndex(m=>m.id===id);
+    if(i>-1) DM_MESSAGES.splice(i,1);
+    const c = document.getElementById('wallMessages');
+    if(c && MODAL && MODAL.dmWith) c.innerHTML = dmThreadListHTML(MODAL.dmWith);
+  }
+}
+function onDmRealtimeDelete(old){
+  const i = DM_MESSAGES.findIndex(m=>m.id===old.id);
+  if(i===-1) return;
+  DM_MESSAGES.splice(i,1);
+  const c = document.getElementById('wallMessages');
+  if(c && MODAL && MODAL.chat && MODAL.chatMode==='dm-thread') c.innerHTML = dmThreadListHTML(MODAL.dmWith);
+  updateChatFab();
+}
+(function(){
+  let timer = null, sx = 0, sy = 0, fired = false;
+  const find = t => t && t.closest ? t.closest('.wall-bubble[data-mid]') : null;
+  const start = e => {
+    const b = find(e.target); if(!b) return;
+    const pt = e.touches ? e.touches[0] : e;
+    sx = pt.clientX; sy = pt.clientY; fired = false;
+    clearTimeout(timer);
+    timer = setTimeout(()=>{ fired = true; try{ if(navigator.vibrate) navigator.vibrate(15); }catch(_){} openMessageActions(b); }, 450);
+  };
+  const cancel = () => clearTimeout(timer);
+  const move = e => { const pt = e.touches ? e.touches[0] : e; if(Math.abs(pt.clientX-sx) > 10 || Math.abs(pt.clientY-sy) > 10) cancel(); };
+  document.addEventListener('touchstart', start, { passive:true });
+  document.addEventListener('touchmove', move, { passive:true });
+  document.addEventListener('touchend', cancel);
+  document.addEventListener('touchcancel', cancel);
+  document.addEventListener('contextmenu', e => {
+    const b = find(e.target); if(!b) return;
+    e.preventDefault(); clearTimeout(timer);
+    if(!fired) openMessageActions(b);
+    fired = false;
+  });
+})();
 function scrollWallToBottom(){
   const el = document.getElementById('wallMessages');
   if(el) el.scrollTop = el.scrollHeight;
@@ -1680,6 +1779,7 @@ function setupRealtimeChannels(){
   if(CURRENT_PROFILE && orgId){
     DM_REALTIME_CHANNEL = sb.channel(`dm_${CURRENT_PROFILE.id}`)
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'direct_messages', filter:`recipient_id=eq.${CURRENT_PROFILE.id}` }, payload => onDmRealtimeInsert(payload.new))
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'direct_messages' }, payload => onDmRealtimeDelete(payload.old))
       .subscribe();
     loadDirectMessages();
   }
@@ -3130,7 +3230,7 @@ function applyPendingGo(){
   const go = PENDING_GO;
   if(go.startsWith('dm:') && !DM_AVAILABLE) return; // réessayé quand les messages privés sont chargés
   PENDING_GO = null;
-  if(go==='partenaire' || go==='evenements'){ QUICK_VIEW = go; markQuickSeen(go); render(); }
+  if(go==='partenaire' || go==='evenements') openQuickView(go);
   else if(go.startsWith('chat:')) openChat(go.slice(5));
   else if(go.startsWith('dm:')) openDmThread(go.slice(3));
 }
@@ -3157,7 +3257,7 @@ function quickIconsHTML(){
   </div>`;
 }
 function toggleQuickMenu(force){ QUICK_MENU_OPEN = typeof force==='boolean' ? force : !QUICK_MENU_OPEN; render(); }
-function openQuickView(k){ QUICK_MENU_OPEN = false; QUICK_VIEW = k; markQuickSeen(k); render(); window.scrollTo(0,0); }
+function openQuickView(k){ QUICK_MENU_OPEN = false; markQuickSeen(k); MODAL_UNDER = null; MODAL = { kind:'content', sheet:k, title:k }; render(); }
 function closeQuickView(){ if(QUICK_VIEW) markQuickSeen(QUICK_VIEW); QUICK_VIEW = null; render(); }
 function applyQuickView(){
   if(!QUICK_VIEW) return;
@@ -10346,37 +10446,49 @@ function saveAndRender(){ saveData(); render(); }
 // ---------- modale interne (confirm/prompt/alert natifs sont bloqués dans cet environnement) ----------
 let MODAL = null; // { kind:'confirm'|'prompt'|'alert'|'choice', message, defaultValue, choices, onConfirm }
 
-function showConfirm(message, onConfirm){ MODAL = { kind:'confirm', message, onConfirm }; render(); }
-function showAlert(message){ MODAL = { kind:'alert', message }; render(); }
-function showPrompt(message, defaultValue, onConfirm){ MODAL = { kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }; render(); }
-function showChoice(message, choices, onConfirm){ MODAL = { kind:'choice', message, choices, onConfirm }; render(); }
-function showContentModal(title, htmlContent){ MODAL = { kind:'content', title, htmlContent }; render(); }
+// Pile de fenêtres : une fenêtre ouverte PAR-DESSUS une « feuille » (Partenaire / Événements)
+// la met de côté, et la fermer ramène la feuille.
+let MODAL_UNDER = null;
+function setModal(m){
+  if(MODAL && MODAL.sheet && !m.sheet){ MODAL_UNDER = MODAL; m.under = true; }
+  MODAL = m;
+}
+function dropModal(){
+  const u = (MODAL && MODAL.under) ? MODAL_UNDER : null;
+  MODAL_UNDER = null;
+  MODAL = u;
+}
+function showConfirm(message, onConfirm){ setModal({ kind:'confirm', message, onConfirm }); render(); }
+function showAlert(message){ setModal({ kind:'alert', message }); render(); }
+function showPrompt(message, defaultValue, onConfirm){ setModal({ kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }); render(); }
+function showChoice(message, choices, onConfirm){ setModal({ kind:'choice', message, choices, onConfirm }); render(); }
+function showContentModal(title, htmlContent){ setModal({ kind:'content', title, htmlContent }); render(); }
 // Pop-up formulaire réutilisable : affiche du HTML (avec des champs), un
 // bouton Enregistrer qui appelle onSave() (qui lit les champs elle-même,
 // pendant que le pop-up est encore ouvert), puis referme et rafraîchit.
-function showFormModal(title, htmlContent, onSave){ MODAL = { kind:'form', title, htmlContent, onSave }; render(); }
+function showFormModal(title, htmlContent, onSave){ setModal({ kind:'form', title, htmlContent, onSave }); render(); }
 function modalFormSaveClick(){
   if(!MODAL || !MODAL.onSave) return;
   const cb = MODAL.onSave;
   const result = cb();
   if(result === false){ render(); return; } // validation a échoué : le pop-up reste ouvert (ex: showAlert affiché)
-  MODAL = null;
+  dropModal();
   saveAndRender();
 }
-function closeModal(){ MODAL = null; render(); }
+function closeModal(){ if(MODAL && MODAL.sheet) markQuickSeen(MODAL.sheet); dropModal(); render(); }
 function modalConfirmClick(){
   if(!MODAL) return;
   const cb = MODAL.onConfirm;
   let value = true;
   if(MODAL.kind === 'prompt'){ value = document.getElementById('modalPromptInput').value; }
-  MODAL = null;
+  dropModal();
   if(cb) cb(value);
   render();
 }
 function modalChoiceClick(idx){
   if(!MODAL) return;
   const cb = MODAL.onConfirm;
-  MODAL = null;
+  dropModal();
   if(cb) cb(idx);
   render();
 }
@@ -10384,6 +10496,7 @@ function modalHTML(){
   if(!MODAL) return '';
   const overlay = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
   if(MODAL.kind === 'content' && MODAL.chat) return chatModalHTML();
+  if(MODAL.kind === 'content' && MODAL.sheet) return sheetModalHTML();
   if(MODAL.kind === 'content' || MODAL.kind === 'form'){
     const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.15);';
     const bodyHtml = typeof MODAL.htmlContent === 'function' ? MODAL.htmlContent() : MODAL.htmlContent;
