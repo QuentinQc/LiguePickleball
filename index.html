@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006100035">
+<meta name="app-build" content="20261006101109">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -277,6 +277,19 @@ tr.me{background:rgba(207,234,92,0.1);}
 .chat-messages .wall-time a{color:inherit;}
 .chat-send{width:44px;height:44px;border-radius:50%;border:none;background:var(--ball);color:#0C2622;font-size:18px;cursor:pointer;flex:0 0 auto;}
 .chat-send:active{transform:scale(.92);}
+.chat-menu-backdrop{position:fixed;inset:0;z-index:890;background:rgba(0,0,0,.35);}
+.chat-menu{position:fixed;right:14px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:901;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+@media (max-width:640px){.chat-menu{bottom:calc(172px + env(safe-area-inset-bottom,0px));}}
+.chat-menu-item{display:flex;align-items:center;gap:8px;background:var(--court-elevated-2);color:var(--text);border:1px solid var(--line-soft-strong);border-radius:999px;padding:11px 18px;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.4);animation:chatPop .16s ease-out;}
+.chat-menu{max-height:calc(100vh - 230px);overflow-y:auto;scrollbar-width:none;}
+.chat-menu-av{width:26px;height:26px;border-radius:50%;flex:0 0 auto;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-left:-8px;}
+.chat-menu-more{font-size:20px;line-height:1;padding:8px 16px;letter-spacing:2px;}
+.chat-menu-item:active{transform:scale(.96);}
+.chat-menu-badge,.dm-dot{background:var(--paddle);color:#fff;border-radius:11px;min-width:22px;height:22px;padding:0 6px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}
+@keyframes chatPop{from{opacity:0;transform:translateY(8px) scale(.96);}to{opacity:1;transform:none;}}
+.dm-list{gap:6px;}
+.dm-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--court-elevated-2);color:var(--text);border:1px solid var(--line-soft);border-radius:999px;padding:8px 14px 8px 8px;cursor:pointer;font-family:inherit;flex:0 0 auto;}
+.chat-head-ico.chat-head-ico{overflow:hidden;font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--court);}
 .chat-fab:active{transform:scale(.94);}
 .chat-fab-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--paddle);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .addtab-bar{display:flex;gap:4px;padding:4px;background:var(--court-elevated-2);border-radius:999px;margin-bottom:14px;}
@@ -1186,51 +1199,195 @@ function wallMessagesListHTML(){
   });
   return html;
 }
-// ---- Bulle de chat flottante (style Messenger) : ouvre le mur dans une fenêtre. ----
+// ---- Bulle de chat flottante (style Messenger) : un clic ouvre un petit menu de
+// canaux à droite de la bulle ; choisir un canal ouvre la discussion. ----
 let CHAT_UNREAD = 0;
-async function openChat(){
-  CHAT_UNREAD = 0;
+let CHAT_MENU_OPEN = false;
+// Messages privés (1 à 1) — table direct_messages + fonction chat_contacts (SQL à exécuter une fois).
+let DM_AVAILABLE = false, DM_CONTACTS = [], DM_MESSAGES = [], DM_REALTIME_CHANNEL = null;
+async function loadDirectMessages(){
+  const orgId = currentLeagueOrgId();
+  if(!orgId || !CURRENT_PROFILE){ DM_AVAILABLE = false; DM_MESSAGES = []; DM_CONTACTS = []; updateChatFab(); return; }
+  const me = CURRENT_PROFILE.id;
+  try{
+    const { data, error } = await sb.from('direct_messages').select('*').eq('organization_id', orgId).or(`sender_id.eq.${me},recipient_id.eq.${me}`).order('created_at', { ascending:true }).limit(500);
+    if(error) throw error;
+    const { data: c, error: e2 } = await sb.rpc('chat_contacts', { p_org: orgId });
+    if(e2) throw e2;
+    DM_MESSAGES = data || []; DM_CONTACTS = c || []; DM_AVAILABLE = true;
+  }catch(e){ DM_AVAILABLE = false; DM_MESSAGES = []; DM_CONTACTS = []; }
+  updateChatFab();
+}
+function dmContact(id){ return DM_CONTACTS.find(c=>c.id===id) || { id, display_name:'Joueur', avatar_url:null }; }
+function dmUnreadCount(){ const me = CURRENT_PROFILE && CURRENT_PROFILE.id; return DM_MESSAGES.filter(m=>m.recipient_id===me && !m.read_at).length; }
+function dmUnreadFrom(id){ const me = CURRENT_PROFILE && CURRENT_PROFILE.id; return DM_MESSAGES.filter(m=>m.sender_id===id && m.recipient_id===me && !m.read_at).length; }
+function dmPair(otherId){
+  const me = CURRENT_PROFILE.id;
+  return DM_MESSAGES.filter(m=>(m.sender_id===me && m.recipient_id===otherId) || (m.sender_id===otherId && m.recipient_id===me));
+}
+async function markDmRead(otherId){
+  const me = CURRENT_PROFILE.id;
+  const unread = DM_MESSAGES.filter(m=>m.sender_id===otherId && m.recipient_id===me && !m.read_at);
+  if(!unread.length) return;
+  const now = new Date().toISOString();
+  unread.forEach(m=>{ m.read_at = now; });
+  try{ await sb.from('direct_messages').update({ read_at: now }).eq('sender_id', otherId).eq('recipient_id', me).is('read_at', null); }catch(e){}
+  updateChatFab();
+}
+function dmThreadListHTML(otherId){
+  const msgs = dmPair(otherId);
+  if(!msgs.length) return '<div class="chat-empty"><div style="font-size:42px;">✉️</div><div>Aucun message pour l\'instant</div><div class="small">Écris le premier !</div></div>';
+  const me = CURRENT_PROFILE.id;
+  const other = dmContact(otherId);
+  const sameDay = (a,b)=> a.toDateString()===b.toDateString();
+  const dayLabel = (iso)=>{ const d=new Date(iso), t=new Date(), y=new Date(t); y.setDate(y.getDate()-1); return sameDay(d,t) ? "Aujourd'hui" : sameDay(d,y) ? 'Hier' : d.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'}); };
+  let html = '', shown = null;
+  msgs.forEach(m=>{
+    const day = new Date(m.created_at).toDateString();
+    if(day!==shown){ html += `<div class="wall-date-sep">${escapeHTML(dayLabel(m.created_at))}</div>`; shown = day; }
+    const mine = m.sender_id===me;
+    html += `<div class="wall-row${mine?' mine':''}">${mine ? '' : avatarHTML('wall-avatar', partnerInitials(other.display_name), other.avatar_url)}<div class="wall-group"><div class="wall-bubble">${escapeHTML(m.content)}<div class="wall-time">${new Date(m.created_at).toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'})}</div></div></div></div>`;
+  });
+  return html;
+}
+function dmListRowsHTML(){
+  const rows = DM_CONTACTS.map(c=>{
+    const pair = dmPair(c.id);
+    return { c, last: pair[pair.length-1] || null, unread: dmUnreadFrom(c.id) };
+  }).sort((a,b)=>{
+    if(a.last && b.last) return new Date(b.last.created_at) - new Date(a.last.created_at);
+    if(a.last) return -1; if(b.last) return 1;
+    return (a.c.display_name||'').localeCompare(b.c.display_name||'');
+  });
+  if(!rows.length) return '<div class="chat-empty"><div style="font-size:42px;">👥</div><div>Personne à qui écrire pour l\'instant</div></div>';
+  return rows.map(r=>`<button type="button" class="dm-row" data-name="${escapeHTML(normSearch(r.c.display_name))}" onclick="openDmThread('${r.c.id}')">
+    ${avatarHTML('orgpick-avatar', partnerInitials(r.c.display_name), r.c.avatar_url)}
+    <span class="orgpick-main"><span class="orgpick-name">${escapeHTML(r.c.display_name||'Joueur')}</span><span class="orgpick-meta">${r.last ? (r.last.sender_id===CURRENT_PROFILE.id ? 'Toi : ' : '') + escapeHTML(r.last.content) : 'Nouvelle conversation'}</span></span>
+    ${r.unread ? `<span class="dm-dot">${r.unread}</span>` : ''}
+  </button>`).join('');
+}
+function filterDmList(q){
+  q = normSearch(q);
+  document.querySelectorAll('#dmList .dm-row').forEach(r=>{ r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
+}
+async function openChat(key){
+  CHAT_MENU_OPEN = false; CHAT_UNREAD = 0;
+  if(key) VIEW.wallChannel = key;
   try{ await loadWallChannel(VIEW.wallChannel || 'general'); }catch(e){}
-  MODAL = { kind:'content', title:'💬 Discussion', htmlContent: ()=>leagueWallHTML(true), chat:true };
+  MODAL = { kind:'content', title:'💬 Discussion', htmlContent: ()=>'', chat:true, chatMode:'channel' };
   render();
   scrollWallToBottom();
+}
+function openDmList(){
+  CHAT_MENU_OPEN = false;
+  MODAL = { kind:'content', title:'✉️ Messages privés', htmlContent: ()=>'', chat:true, chatMode:'dm-list' };
+  render();
+}
+async function openDmThread(otherId){
+  CHAT_MENU_OPEN = false;
+  MODAL = { kind:'content', title:'✉️ Message privé', htmlContent: ()=>'', chat:true, chatMode:'dm-thread', dmWith: otherId };
+  await markDmRead(otherId);
+  render();
+  scrollWallToBottom();
+}
+function chatBack(){ openDmList(); }
+function chatSend(){
+  if(MODAL && MODAL.chatMode==='dm-thread') return postDirectMessage();
+  return postLeagueMessage();
+}
+async function postDirectMessage(){
+  const el = document.getElementById('wallMessageInput');
+  const content = el ? el.value.trim() : '';
+  const orgId = currentLeagueOrgId();
+  if(!content || !CURRENT_PROFILE || !orgId || !MODAL || !MODAL.dmWith) return;
+  const { data, error } = await sb.from('direct_messages').insert({ organization_id: orgId, sender_id: CURRENT_PROFILE.id, recipient_id: MODAL.dmWith, content }).select().single();
+  if(error){ showAlert("Le message n'a pas pu être envoyé."); return; }
+  DM_MESSAGES.push(data);
+  render();
+  scrollWallToBottom();
+  const ni = document.getElementById('wallMessageInput');
+  if(ni && !('ontouchstart' in window)) ni.focus();
+}
+function onDmRealtimeInsert(msg){
+  if(!CURRENT_PROFILE || msg.recipient_id!==CURRENT_PROFILE.id || DM_MESSAGES.some(m=>m.id===msg.id)) return;
+  DM_MESSAGES.push(msg);
+  if(!DM_CONTACTS.some(c=>c.id===msg.sender_id)) loadDirectMessages();
+  if(MODAL && MODAL.chat && MODAL.chatMode==='dm-thread' && MODAL.dmWith===msg.sender_id){
+    markDmRead(msg.sender_id);
+    const el = document.getElementById('wallMessages');
+    if(el){ el.innerHTML = dmThreadListHTML(msg.sender_id); scrollWallToBottom(); }
+  } else if(MODAL && MODAL.chat && MODAL.chatMode==='dm-list'){
+    const l = document.getElementById('dmList');
+    if(l) l.innerHTML = dmListRowsHTML();
+  }
+  updateChatFab();
+}
+function toggleChatMenu(force){
+  CHAT_MENU_OPEN = typeof force==='boolean' ? force : !CHAT_MENU_OPEN;
+  updateChatFab();
 }
 function chatFabVisible(){
   return !!(SESSION_USER && CURRENT_PROFILE && CURRENT_LEAGUE_ID && DATA && currentLeagueOrgId());
 }
 function updateChatFab(){
   let fab = document.getElementById('chatFab');
+  let menu = document.getElementById('chatMenu');
+  let bd = document.getElementById('chatMenuBackdrop');
   const show = chatFabVisible() && !MODAL;
-  if(!show){ if(fab) fab.remove(); return; }
+  if(!show){ [fab,menu,bd].forEach(x=>x && x.remove()); return; }
   if(!fab){
     fab = document.createElement('button');
     fab.id = 'chatFab'; fab.className = 'chat-fab'; fab.setAttribute('aria-label','Discussion');
-    fab.onclick = openChat;
+    fab.onclick = ()=>toggleChatMenu();
     document.body.appendChild(fab);
   }
-  fab.innerHTML = '💬' + (CHAT_UNREAD>0 ? `<span class="chat-fab-badge">${CHAT_UNREAD>9?'9+':CHAT_UNREAD}</span>` : '');
+  const total = CHAT_UNREAD + (DM_AVAILABLE ? dmUnreadCount() : 0);
+  fab.innerHTML = (CHAT_MENU_OPEN ? '✕' : '💬') + ((!CHAT_MENU_OPEN && total>0) ? `<span class="chat-fab-badge">${total>9?'9+':total}</span>` : '');
+  if(!CHAT_MENU_OPEN){ [menu,bd].forEach(x=>x && x.remove()); return; }
+  if(!bd){ bd = document.createElement('div'); bd.id = 'chatMenuBackdrop'; bd.className = 'chat-menu-backdrop'; bd.onclick = ()=>toggleChatMenu(false); document.body.appendChild(bd); }
+  if(!menu){ menu = document.createElement('div'); menu.id = 'chatMenu'; menu.className = 'chat-menu'; document.body.appendChild(menu); }
+  const dmCount = DM_AVAILABLE ? dmUnreadCount() : 0;
+  const active = VIEW.wallChannel || 'general';
+  const convos = DM_AVAILABLE ? DM_CONTACTS.map(c=>{ const p = dmPair(c.id); return { c, last: p[p.length-1]||null, unread: dmUnreadFrom(c.id) }; })
+    .filter(x=>x.last).sort((x,y)=>new Date(y.last.created_at)-new Date(x.last.created_at)).slice(0,5) : [];
+  menu.innerHTML = `<button type="button" class="chat-menu-item" onclick="openChat('general')">🌐 Général</button>`
+    + wallChannels().map(l=>`<button type="button" class="chat-menu-item" onclick="openChat('${l.id}')">🏓 ${escapeHTML(l.name)}</button>`).join('')
+    + convos.map(x=>`<button type="button" class="chat-menu-item" onclick="openDmThread('${x.c.id}')">${avatarHTML('chat-menu-av', partnerInitials(x.c.display_name), x.c.avatar_url)}${escapeHTML(x.c.display_name||'Joueur')}${x.unread ? `<span class="chat-menu-badge">${x.unread}</span>` : ''}</button>`).join('')
+    + (DM_AVAILABLE ? `<button type="button" class="chat-menu-item chat-menu-more" onclick="openDmList()" aria-label="Toutes les conversations">⋯${dmCount ? `<span class="chat-menu-badge">${dmCount}</span>` : ''}</button>` : '');
 }
 function chatModalHTML(){
+  const mode = (MODAL && MODAL.chatMode) || 'channel';
   const channels = wallChannels();
   const active = VIEW.wallChannel || 'general';
   const pill = (key,label)=>`<button type="button" class="chat-chan ${active===key?'active':''}" onclick="switchWallChannel('${key}')">${label}</button>`;
+  let head, body;
+  if(mode==='channel'){
+    head = `<div class="chat-head-ico">💬</div>
+        <div class="chat-head-txt"><div class="chat-head-title">Discussion</div><div class="chat-head-sub">${active==='general' ? "Toute l'organisation" : 'Membres de cette ligue'}</div></div>
+        <button type="button" class="chat-head-btn" onclick="refreshLeagueWall()" aria-label="Rafraîchir">↻</button>`;
+    body = `<div class="chat-chans">${pill('general','🌐 Général')}${channels.map(l=>pill(l.id, escapeHTML(l.name))).join('')}</div>
+      <div id="wallMessages" class="chat-messages">${wallMessagesListHTML()}</div>`;
+  } else if(mode==='dm-list'){
+    head = `<div class="chat-head-ico">✉️</div>
+        <div class="chat-head-txt"><div class="chat-head-title">Messages privés</div><div class="chat-head-sub">Conversations 1 à 1</div></div>`;
+    body = `<div class="chat-chans" style="padding:10px 14px;"><input class="orgpick-search" style="width:100%;" placeholder="🔍 Rechercher une personne…" oninput="filterDmList(this.value)"></div>
+      <div id="dmList" class="chat-messages dm-list">${dmListRowsHTML()}</div>`;
+  } else {
+    const o = dmContact(MODAL.dmWith);
+    head = `<button type="button" class="chat-head-btn" onclick="chatBack()" aria-label="Retour">←</button>
+        ${avatarHTML('chat-head-ico', partnerInitials(o.display_name), o.avatar_url)}
+        <div class="chat-head-txt"><div class="chat-head-title">${escapeHTML(o.display_name||'Joueur')}</div><div class="chat-head-sub">Message privé</div></div>`;
+    body = `<div id="wallMessages" class="chat-messages">${dmThreadListHTML(MODAL.dmWith)}</div>`;
+  }
+  const composer = mode==='dm-list' ? '' : `<div class="chat-composer">
+        <textarea id="wallMessageInput" rows="1" maxlength="500" placeholder="Écrire un message…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();chatSend();}"></textarea>
+        <button type="button" class="chat-send" onclick="chatSend()" aria-label="Envoyer">➤</button>
+      </div>`;
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet">
-      <div class="chat-head">
-        <div class="chat-head-ico">💬</div>
-        <div class="chat-head-txt">
-          <div class="chat-head-title">Discussion</div>
-          <div class="chat-head-sub">${active==='general' ? "Toute l'organisation" : 'Membres de cette ligue'}</div>
-        </div>
-        <button type="button" class="chat-head-btn" onclick="refreshLeagueWall()" aria-label="Rafraîchir">↻</button>
-        <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
-      </div>
-      <div class="chat-chans">${pill('general','🌐 Général')}${channels.map(l=>pill(l.id, escapeHTML(l.name))).join('')}</div>
-      <div id="wallMessages" class="chat-messages">${wallMessagesListHTML()}</div>
-      <div class="chat-composer">
-        <textarea id="wallMessageInput" rows="1" maxlength="500" placeholder="Écrire un message…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();postLeagueMessage();}"></textarea>
-        <button type="button" class="chat-send" onclick="postLeagueMessage()" aria-label="Envoyer">➤</button>
-      </div>
+      <div class="chat-head">${head}<button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button></div>
+      ${body}
+      ${composer}
     </div>
   </div>`;
 }
@@ -1488,6 +1645,7 @@ function onPartnerRealtimeChange(){
 function teardownRealtimeChannels(){
   if(WALL_REALTIME_CHANNEL){ sb.removeChannel(WALL_REALTIME_CHANNEL); WALL_REALTIME_CHANNEL = null; }
   if(PARTNER_REALTIME_CHANNEL){ sb.removeChannel(PARTNER_REALTIME_CHANNEL); PARTNER_REALTIME_CHANNEL = null; }
+  if(DM_REALTIME_CHANNEL){ sb.removeChannel(DM_REALTIME_CHANNEL); DM_REALTIME_CHANNEL = null; }
 }
 function setupRealtimeChannels(){
   teardownRealtimeChannels();
@@ -1502,6 +1660,12 @@ function setupRealtimeChannels(){
     PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${CURRENT_LEAGUE_ID}`)
       .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`league_id=eq.${CURRENT_LEAGUE_ID}` }, () => onPartnerRealtimeChange())
       .subscribe();
+  }
+  if(CURRENT_PROFILE && orgId){
+    DM_REALTIME_CHANNEL = sb.channel(`dm_${CURRENT_PROFILE.id}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'direct_messages', filter:`recipient_id=eq.${CURRENT_PROFILE.id}` }, payload => onDmRealtimeInsert(payload.new))
+      .subscribe();
+    loadDirectMessages();
   }
 }
 // ---- Événements sociaux : calendrier à l'échelle de l'ORGANISATION (comme
