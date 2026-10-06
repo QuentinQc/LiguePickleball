@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006090324">
+<meta name="app-build" content="20261006092827">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -3534,6 +3534,8 @@ function submitAddPerson(){
 // ---- Ajouter à la ligue des gens déjà connus de l'organisation (avec ou sans
 // compte), en lot — pensé pour remplir vite une nouvelle ligue. ----
 let ORG_PICK_CANDIDATES = [];
+// Normalise pour la recherche : sans casse ni accents (« heloise » trouve « Héloïse »).
+function normSearch(t){ return (t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
 function uniqueNameQuiet(name, list){
   const taken = new Set((list||[]).map(x=>(x.name||'').trim().toLowerCase()));
   if(!taken.has(name.trim().toLowerCase())) return name.trim();
@@ -3591,7 +3593,7 @@ async function openAddToLeagueModal(tab){
     <div class="orgpick-list">
       ${cands.map((c,i)=>{
         const pr = c.profileId ? ALL_PROFILES.find(x=>x.id===c.profileId) : null;
-        return `<label class="orgpick-row" data-name="${escapeHTML(c.name.toLowerCase())}" data-acc="${c.profileId?'acc':'no'}">
+        return `<label class="orgpick-row" data-name="${escapeHTML(normSearch(c.name))}" data-acc="${c.profileId?'acc':'no'}">
         <input type="checkbox" class="orgpick-cb" value="${i}" onchange="updateOrgPickCount()">
         ${avatarHTML('orgpick-avatar', partnerInitials(c.name), pr && pr.avatar_url)}
         <span class="orgpick-main"><span class="orgpick-name">${escapeHTML(c.name)}</span><span class="orgpick-meta">${c.profileId ? '✅ Compte' : 'Sans compte'}${c.leagues ? ' · '+escapeHTML(c.leagues) : ''}</span></span>
@@ -3600,10 +3602,6 @@ async function openAddToLeagueModal(tab){
       </label>`;}).join('')}
       <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
     </div>` : `<div class="orgpick-empty">🎉 Tout le monde de l'organisation est déjà dans cette ligue.</div>`}
-    <details class="orgpick-new">
-      <summary>➕ Ajouter de nouveaux noms (sans compte)</summary>
-      <textarea id="orgPickNewNames" rows="3" placeholder="Un nom par ligne&#10;Marie Tremblay&#10;Jean Roy" oninput="updateOrgPickCount()"></textarea>
-    </details>
     <div class="orgpick-footer">
       <div class="orgpick-opts">
         <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Comme joueurs</option><option value="remplacant">🔄 Comme remplaçants</option></select>
@@ -3642,7 +3640,7 @@ function setAddTab(t){
   if(o) o.style.display = t==='org' ? '' : 'none';
   if(n) n.style.display = t==='new' ? '' : 'none';
 }
-function filterOrgPick(q){ ORG_PICK_QUERY = (q||'').trim().toLowerCase(); applyOrgPickFilter(); }
+function filterOrgPick(q){ ORG_PICK_QUERY = normSearch(q); applyOrgPickFilter(); }
 function setOrgPickFilter(f){
   ORG_PICK_FILTER = f;
   document.querySelectorAll('.orgpick-chip[data-f]').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
