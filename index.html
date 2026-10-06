@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 133">
+<meta name="app-build" content="Version 134">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -770,6 +770,44 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .g-seg button{width:30px;height:30px;font-size:14px;padding:0;}
 .g-pick{display:flex;gap:8px;margin-bottom:12px;}
 .g-pick button{flex:1;padding:10px;font-weight:600;}
+
+.fm-hint{padding:10px 12px;border-radius:12px;background:rgba(214,255,60,.08);border:1px solid rgba(214,255,60,.25);font-size:13px;}
+.fm-members{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.fm-members .tm-pill{max-width:none;font-weight:500;}
+.fm-draft{border-style:dashed;}
+.fm-needs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.fm-need{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:999px;background:rgba(255,255,255,.07);font-size:12.5px;font-weight:600;}
+.fm-need.ok{background:rgba(214,255,60,.18);}
+.fm-need.bad{background:rgba(233,85,107,.18);}
+.fm-chip{user-select:none;}
+.fm-chip.dim{opacity:.55;}
+.ss-hero{text-align:center;}
+.ss-emoji{font-size:38px;}
+.ss-strip{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
+.ss-gen .ss-strip{justify-content:flex-start;margin-bottom:12px;}
+.ss-tile{width:50px;height:54px;border-radius:14px;background:var(--ball);color:#0C2622;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;line-height:1;}
+.ss-tile small{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.ss-tile b{font-family:var(--font-display);font-size:22px;margin-top:3px;}
+.ss-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:12px;overflow:hidden;}
+.ss-bar i{display:block;height:100%;background:var(--ball);border-radius:99px;transition:width .3s;}
+.ss-stepper{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.ss-step{display:inline-flex;align-items:center;gap:6px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;padding:4px;}
+.ss-step b{min-width:26px;text-align:center;font-size:17px;}
+.ss-step button{width:34px;height:34px;border-radius:50%;border:none;background:var(--ball);color:#0C2622;font-size:18px;font-weight:700;cursor:pointer;}
+.ss-step button:disabled{opacity:.35;}
+.ss-add{width:100%;padding:13px;border-radius:16px;border:1.5px dashed rgba(255,255,255,.3);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;margin-bottom:12px;}
+.ss-tie{border-left:4px solid var(--tc);}
+.ss-tiehead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;}
+.ss-side{display:flex;align-items:center;gap:8px;min-width:0;opacity:.85;}
+.ss-side.r{flex-direction:row-reverse;text-align:right;}
+.ss-side.won{opacity:1;}
+.ss-side.won .ss-sname{color:var(--ball);}
+.ss-sname{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.ss-mid{text-align:center;}
+.ss-tiebar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.ss-vsrow{display:flex;align-items:center;justify-content:space-around;gap:8px;padding:12px;border-radius:16px;background:var(--court-elevated-2);}
+.ss-vsteam{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;text-align:center;min-width:0;}
+.ss-empty{background:transparent;border:1.5px dashed rgba(255,255,255,.3);color:var(--muted);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -5216,6 +5254,29 @@ function mlpCompositionLabel(rosterSize){
 function mlpCompositionValid(counts, rosterSize){
   return rosterSize===3 ? (counts.m===2 && counts.f===1 && counts.other===0) : (counts.m===2 && counts.f===2 && counts.other===0);
 }
+function mlpFormSlotsHTML(t, st){
+  const slots = [];
+  for(let i=0;i<st.rosterSize;i++){
+    const id = st.currentMembers[i];
+    if(id){
+      const part = t.participants.find(x=>x.id===id);
+      const g = participantGender(t,id);
+      slots.push(`<div class="tm-slot" onclick="toggleMlpMember('${id}')">${mlpGenderDot(g)}<span class="nm">${escapeHTML(part?part.name:'?')}</span></div>`);
+    } else slots.push(`<div class="tm-slot empty">＋ Place ${i+1}</div>`);
+  }
+  return `<div class="tm-slots">${slots.join('')}</div>`;
+}
+function mlpFormNeedHTML(counts, rosterSize){
+  const needM = 2, needF = rosterSize===3 ? 1 : 2;
+  const chip = (sym, cls, n, need)=>`<span class="fm-need ${n===need?'ok':(n>need?'bad':'')}"><span class="g-dot g-${cls}">${sym}</span>${n}/${need}</span>`;
+  return `<div class="fm-needs">${chip('♂','M',counts.m,needM)}${chip('♀','F',counts.f,needF)}${counts.other?`<span class="fm-need bad"><span class="g-dot g-U">?</span>${counts.other} à définir</span>`:''}</div>`;
+}
+function cycleParticipantGender(pid){
+  const st = MLP_TEAM_FORM_STATE;
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
+  const g = participantGender(t, pid);
+  setParticipantGenderInline(pid, g==='M' ? 'F' : g==='F' ? '' : 'M');
+}
 function mlpFormTeamsFormHTML(){
   const st = MLP_TEAM_FORM_STATE;
   const t = orgTournaments().find(x=>x.id===st.tournamentId);
@@ -5223,36 +5284,45 @@ function mlpFormTeamsFormHTML(){
   const available = t.participants.filter(p=>!assignedIds.has(p.id));
   const counts = mlpGenderCounts(t, st.currentMembers);
   const valid = mlpCompositionValid(counts, st.rosterSize);
+  const nextColor = MLP_TEAM_PALETTE[st.teams.length % MLP_TEAM_PALETTE.length];
   let html = (t && (t.pools || t.bracket)) ? `<p class="small" style="color:var(--danger);">⚠️ Un bracket existe déjà pour ce tournoi — modifier les équipes ne le mettra pas à jour automatiquement ; tu devras le régénérer après.</p>` : '';
-  html += `<p class="small">Composition requise par équipe : <strong>${mlpCompositionLabel(st.rosterSize)}</strong>. Clique sur le genre d'un participant pour le définir si besoin.</p>`;
-  html += `<h3 style="margin-top:12px;">Équipes formées</h3>`;
-  html += st.teams.length ? st.teams.map((tm,i)=>`
-    <div class="row" style="align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:8px 12px;margin-bottom:6px;">
-      <span><strong>${escapeHTML(tm.name)}</strong> — ${tm.memberIds.map(id=>escapeHTML((t.participants.find(p=>p.id===id)||{}).name||'?')).join(', ')}</span>
-      <button class="btn-ghost-danger" onclick="removeMlpTeam(${i})">défaire</button>
-    </div>`).join('') : `<p class="small">Aucune équipe formée pour l'instant.</p>`;
-  html += `<h3 style="margin-top:12px;">Nouvelle équipe</h3>
-    <input id="mlpNewTeamName" placeholder="Nom de l'équipe" value="${escapeHTML(st.currentName)}" oninput="MLP_TEAM_FORM_STATE.currentName=this.value" style="margin-bottom:8px;">
-    <p class="small">Sélectionnés : ${counts.m} homme(s), ${counts.f} femme(s)${counts.other?', '+counts.other+' genre non défini':''} — ${valid ? '✅ composition valide' : 'composition requise : '+mlpCompositionLabel(st.rosterSize)}</p>`;
-  html += st.currentMembers.length ? `<div class="row" style="gap:6px;margin-bottom:10px;">${st.currentMembers.map(id=>{
-    const p = t.participants.find(x=>x.id===id);
-    const g = participantGender(t,id);
-    return `<button class="btn-ghost" style="background:var(--ball);color:var(--court);" onclick="toggleMlpMember('${id}')">${escapeHTML(p?p.name:'?')} (${g==='F'?'F':g==='M'?'H':'?'})</button>`;
-  }).join('')}</div>` : '';
-  html += `<button class="btn btn-secondary" ${(!valid || !st.currentName.trim())?'disabled':''} onclick="commitMlpTeam()">+ Ajouter cette équipe</button>`;
-  html += `<h3 style="margin-top:14px;">Participants disponibles</h3>`;
-  html += available.length ? available.map(p=>{
+  html += `<div class="fm-hint">🎯 Chaque équipe : <strong>${mlpCompositionLabel(st.rosterSize)}</strong></div>`;
+  // Équipes déjà formées
+  html += `<h3 style="margin:14px 0 8px;">Équipes formées <span class="tm-count" style="--tc:var(--ball);">${st.teams.length}</span></h3>`;
+  html += st.teams.length ? st.teams.map((tm,i)=>{
+    const col = MLP_TEAM_PALETTE[i % MLP_TEAM_PALETTE.length];
+    const fake = { name: tm.name, color: col };
+    return `<div class="card tm-card" style="--tc:${col};padding:12px;margin-bottom:8px;">
+      <div class="tm-head">${mlpTeamBadgeHTML(fake, 38)}
+        <div class="tm-title"><div class="tm-name">${escapeHTML(tm.name)}</div>
+        <div class="fm-members">${tm.memberIds.map(id=>`<span class="tm-pill" style="--tc:${col};">${mlpGenderDot(participantGender(t,id))}${escapeHTML((t.participants.find(p=>p.id===id)||{}).name||'?')}</span>`).join('')}</div></div>
+        <button type="button" class="pl-x" onclick="removeMlpTeam(${i})" aria-label="Défaire l'équipe">✕</button>
+      </div></div>`;
+  }).join('') : `<p class="small" style="color:var(--muted);">Aucune équipe formée pour l'instant.</p>`;
+  // Équipe en cours de composition
+  html += `<div class="card tm-card fm-draft" style="--tc:${nextColor};margin-top:14px;">
+    <div class="tm-head">${mlpTeamBadgeHTML({name: st.currentName||'?', color: nextColor}, 42)}
+      <input id="mlpNewTeamName" placeholder="Nom de la nouvelle équipe" value="${escapeHTML(st.currentName)}" oninput="MLP_TEAM_FORM_STATE.currentName=this.value;mlpFormRefreshBtn()" style="margin:0;flex:1;min-width:0;"></div>
+    ${mlpFormSlotsHTML(t, st)}
+    ${mlpFormNeedHTML(counts, st.rosterSize)}
+    <button class="btn btn-primary" id="mlpCommitBtn" style="width:100%;margin-top:10px;" ${(!valid || !st.currentName.trim())?'disabled':''} onclick="commitMlpTeam()">＋ Ajouter cette équipe</button>
+  </div>`;
+  // Réserve de participants
+  html += `<h3 style="margin:16px 0 4px;">Participants disponibles <span class="tm-count" style="--tc:var(--ball);">${available.length}</span></h3>
+    <p class="small" style="margin:0 0 8px;color:var(--muted);">Touche un nom pour l'ajouter · touche la pastille ♂ ♀ pour changer le genre.</p>`;
+  html += available.length ? `<div class="tm-pool">${available.map(p=>{
     const g = participantGender(t, p.id);
-    return `<div class="row" style="align-items:center;gap:6px;display:inline-flex;margin:2px;">
-      <button class="btn-ghost" onclick="toggleMlpMember('${p.id}')">${escapeHTML(p.name)}</button>
-      <select style="width:80px;" onchange="setParticipantGenderInline('${p.id}', this.value)">
-        <option value="" ${!g?'selected':''}>?</option>
-        <option value="F" ${g==='F'?'selected':''}>F</option>
-        <option value="M" ${g==='M'?'selected':''}>H</option>
-      </select>
-    </div>`;
-  }).join('') : `<p class="small">Tous les participants sont assignés à une équipe.</p>`;
+    const full = st.currentMembers.length >= st.rosterSize;
+    return `<span class="tm-chip fm-chip ${full?'dim':''}" onclick="toggleMlpMember('${p.id}')"><span class="g-dot g-${g==='F'?'F':g==='M'?'M':'U'}" onclick="event.stopPropagation();cycleParticipantGender('${p.id}')" title="Changer le genre">${g==='F'?'♀':g==='M'?'♂':'?'}</span>${escapeHTML(p.name)}</span>`;
+  }).join('')}</div>` : `<p class="small">Tous les participants sont assignés à une équipe. 🎉</p>`;
   return html;
+}
+function mlpFormRefreshBtn(){
+  const b = document.getElementById('mlpCommitBtn'); if(!b) return;
+  const st = MLP_TEAM_FORM_STATE;
+  const t = orgTournaments().find(x=>x.id===st.tournamentId);
+  const valid = mlpCompositionValid(mlpGenderCounts(t, st.currentMembers), st.rosterSize);
+  b.disabled = !(valid && st.currentName.trim());
 }
 function toggleMlpMember(pid){
   const st = MLP_TEAM_FORM_STATE;
@@ -5645,16 +5715,38 @@ function removeMlpLeagueTeam(teamId){
     saveAndRender();
   });
 }
-// ---- Sessions (affrontements planifiés manuellement) ----
+let MLP_PER_TEAM = 2;
+let MLP_TIE_PICK = { a:null, b:null };
+function mlpDateTileHTML(dateStr){
+  const d = new Date((dateStr||'')+'T12:00:00');
+  if(isNaN(d)) return `<div class="ss-tile"><b>?</b></div>`;
+  const mois = d.toLocaleDateString('fr-CA',{month:'short'}).replace('.','');
+  const jour = d.toLocaleDateString('fr-CA',{weekday:'long'});
+  return `<div class="ss-tile"><small>${escapeHTML(mois)}</small><b>${d.getDate()}</b></div>`;
+}
+function mlpSessionTitle(dateStr){
+  const d = new Date((dateStr||'')+'T12:00:00');
+  if(isNaN(d)) return 'Session';
+  const t = d.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+  return 'Session du ' + t;
+}
+function mlpTeamStripHTML(){
+  const teams = DATA.mlpTeams || [];
+  return teams.length ? `<div class="ss-strip">${teams.map(t=>mlpTeamBadgeHTML(t,34)).join('')}</div>` : '';
+}
 function mlpSessionsSectionHTML(){
   const open = (DATA.mlpSessions||[]).find(s=>s.status==='open');
+  const teams = DATA.mlpTeams || [];
   let html = '';
   if(!open){
-    html += `<div class="card">
-      <h3>Nouvelle session</h3>
-      <p class="small">Planifie manuellement les affrontements pour une nouvelle date de jeu.</p>
-      <input id="newMlpSessionDate" type="date" value="${fmtDate(new Date())}">
-      <button class="btn btn-secondary" onclick="startNewMlpSession()">Créer la session</button>
+    html += `<div class="card ss-hero">
+      <div class="ss-emoji">🏓</div>
+      <h3 style="margin:6px 0 4px;">Nouvelle session</h3>
+      <p class="small" style="margin:0 0 12px;">Choisis la date de jeu, puis génère ou compose les affrontements entre les équipes.</p>
+      ${mlpTeamStripHTML()}
+      <input id="newMlpSessionDate" type="date" value="${fmtDate(new Date())}" style="margin:12px 0 10px;">
+      <button class="btn btn-primary" style="width:100%;" ${teams.length<2?'disabled':''} onclick="startNewMlpSession()">🚀 Lancer la session</button>
+      ${teams.length<2?`<p class="small" style="color:var(--paddle);margin-top:8px;">Crée au moins 2 équipes (onglet Équipes).</p>`:''}
     </div>`;
   } else {
     html += mlpOpenSessionHTML(open);
@@ -5673,44 +5765,71 @@ function startNewMlpSession(){
   DATA.mlpSessions.push({ id: uid('mlps'), date, status:'open', ties: [] });
   saveAndRender();
 }
+function mlpStepPerTeam(d){
+  const max = Math.max(1, (DATA.mlpTeams||[]).length-1);
+  MLP_PER_TEAM = Math.min(max, Math.max(1, MLP_PER_TEAM + d));
+  render();
+}
 function mlpOpenSessionHTML(session){
   const teams = DATA.mlpTeams || [];
-  const hasTies = (session.ties||[]).length > 0;
-  let html = `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3>Session du ${session.date}</h3>
-      <button class="btn-ghost-danger" onclick="deleteMlpSession('${session.id}')">Supprimer la session</button>
+  const ties = session.ties || [];
+  const hasTies = ties.length > 0;
+  const done = ties.filter(t=>t.winnerTeamId).length;
+  const pct = hasTies ? Math.round(done*100/ties.length) : 0;
+  const maxPer = Math.max(1, teams.length-1);
+  MLP_PER_TEAM = Math.min(maxPer, Math.max(1, MLP_PER_TEAM));
+  let html = `<div class="card ss-head">
+    <div class="tm-head">
+      ${mlpDateTileHTML(session.date)}
+      <div class="tm-title"><div class="tm-name">${escapeHTML(mlpSessionTitle(session.date))}</div>
+        <div class="tm-sub"><span class="tag tag-green" style="font-size:11px;">● En cours</span> · ${hasTies ? done+'/'+ties.length+' affrontement'+(ties.length>1?'s':'')+' terminé'+(done>1?'s':'') : 'aucun affrontement'}</div></div>
+      <button type="button" class="tm-more" onclick="openMlpSessionMenu('${session.id}')" aria-label="Options">⋯</button>
     </div>
+    ${hasTies ? `<div class="ss-bar"><i style="width:${pct}%;"></i></div>` : ''}
   </div>`;
   if(!hasTies){
-    html += `<div class="card">
-      <h3>Générer les affrontements automatiquement</h3>
-      <p class="small">Pour une soirée d'environ 2h, prévois généralement 2 affrontements par équipe. Les adversaires sont différents à chaque ronde — aucune répétition dans la même session.</p>
-      <div class="row" style="gap:8px;align-items:center;">
-        <label class="small">Affrontements par équipe</label>
-        <input id="mlpMatchupsPerTeam" type="number" min="1" max="${Math.max(1, teams.length-1)}" value="2" style="width:70px;">
-        <button class="btn btn-primary" ${teams.length<2?'disabled':''} onclick="generateMlpMatchupsForSession('${session.id}')">🔄 Générer les affrontements</button>
+    html += `<div class="card ss-gen">
+      <h3 style="margin:0 0 4px;">⚡ Générer les affrontements</h3>
+      <p class="small" style="margin:0 0 12px;">Pour ~2 h de jeu : 2 affrontements par équipe. Adversaires différents à chaque ronde.</p>
+      ${mlpTeamStripHTML()}
+      <div class="ss-stepper">
+        <span class="small">Affrontements par équipe</span>
+        <div class="ss-step"><button type="button" onclick="mlpStepPerTeam(-1)" ${MLP_PER_TEAM<=1?'disabled':''}>−</button><b>${MLP_PER_TEAM}</b><button type="button" onclick="mlpStepPerTeam(1)" ${MLP_PER_TEAM>=maxPer?'disabled':''}>＋</button></div>
       </div>
-      ${teams.length % 2 !== 0 && teams.length>0 ? `<p class="small" style="color:var(--paddle);margin-top:8px;">⚠️ Nombre impair d'équipes — à chaque ronde, une équipe différente est au repos, donc certaines auront moins d'affrontements cette session.</p>` : ''}
+      <button class="btn btn-primary" style="width:100%;" ${teams.length<2?'disabled':''} onclick="generateMlpMatchupsForSession('${session.id}')">🔄 Générer</button>
+      ${teams.length % 2 !== 0 && teams.length>0 ? `<p class="small" style="color:var(--paddle);margin-top:8px;">⚠️ Nombre impair d'équipes — une équipe différente est au repos à chaque ronde.</p>` : ''}
     </div>`;
   }
-  html += `<div class="card">
-    <h3>Ajouter un affrontement manuellement</h3>
-    <div class="row" style="gap:6px;align-items:center;">
-      <select id="mlpTieTeamA"><option value="">— Équipe A —</option>${teams.map(t=>`<option value="${t.id}">${escapeHTML(t.name)}</option>`).join('')}</select>
-      <span class="small">contre</span>
-      <select id="mlpTieTeamB"><option value="">— Équipe B —</option>${teams.map(t=>`<option value="${t.id}">${escapeHTML(t.name)}</option>`).join('')}</select>
-      <button class="btn btn-secondary" onclick="addMlpTie('${session.id}')">+ Ajouter cet affrontement</button>
-    </div>
-  </div>`;
-  html += (session.ties||[]).map(tie=>mlpTieCardHTML(session, tie)).join('');
-  const allDecided = (session.ties||[]).length>0 && session.ties.every(tie=>tie.winnerTeamId);
-  html += `<div class="card">
-    <p class="small">${(session.ties||[]).length===0 ? "Ajoute au moins un affrontement." : (allDecided ? "Tous les affrontements sont terminés." : "Entre les scores de chaque affrontement, puis clique sur « 🔄 Valider ce résultat » sur chacun pour confirmer.")}</p>
-    <button class="btn btn-primary" ${!allDecided?'disabled':''} onclick="closeMlpSession('${session.id}')">Clore la session</button>
+  html += `<button type="button" class="ss-add" onclick="openMlpAddTiePopup('${session.id}')">＋ Ajouter un affrontement</button>`;
+  html += ties.map(tie=>mlpTieCardHTML(session, tie)).join('');
+  const allDecided = hasTies && ties.every(tie=>tie.winnerTeamId);
+  html += `<div class="card" style="text-align:center;">
+    <p class="small" style="margin:0 0 10px;">${!hasTies ? "Ajoute au moins un affrontement." : (allDecided ? "🎉 Tous les affrontements sont terminés." : "Entre les scores puis touche « Valider ce résultat » sur chaque affrontement.")}</p>
+    <button class="btn btn-primary" style="width:100%;" ${!allDecided?'disabled':''} onclick="closeMlpSession('${session.id}')">🏁 Clore la session</button>
   </div>`;
   return html;
 }
+function openMlpSessionMenu(sessionId){
+  showContentModal('Session', `<button class="btn btn-secondary" style="width:100%;" onclick="dropModal();deleteMlpSession('${sessionId}')">🗑️ Supprimer la session</button>`);
+}
+function openMlpAddTiePopup(sessionId){
+  MLP_TIE_PICK = { a:null, b:null };
+  const body = ()=>{
+    const teams = DATA.mlpTeams || [];
+    const row = (key, label)=>`<h3 style="margin:12px 0 8px;">${label}</h3><div class="tm-pool">${teams.map(t=>{
+      const other = MLP_TIE_PICK[key==='a'?'b':'a'];
+      return `<button type="button" class="tm-chip tm-chip-team ${MLP_TIE_PICK[key]===t.id?'on':''}" style="--tc:${mlpTeamColor(t)};" ${other===t.id?'disabled':''} onclick="pickMlpTieTeam('${key}','${t.id}')"><i></i>${escapeHTML(t.name)}</button>`;
+    }).join('')}</div>`;
+    const A = teams.find(t=>t.id===MLP_TIE_PICK.a), B = teams.find(t=>t.id===MLP_TIE_PICK.b);
+    const slot = t=> t ? `<div class="ss-vsteam">${mlpTeamBadgeHTML(t,44)}<span>${escapeHTML(t.name)}</span></div>` : `<div class="ss-vsteam"><div class="tm-badge ss-empty" style="width:44px;height:44px;">?</div><span style="color:var(--muted)">à choisir</span></div>`;
+    return `<div class="ss-vsrow">${slot(A)}<span class="vs">VS</span>${slot(B)}</div>${row('a','Équipe A')}${row('b','Équipe B')}`;
+  };
+  showFormModal('Nouvel affrontement', body, ()=>{
+    if(!MLP_TIE_PICK.a || !MLP_TIE_PICK.b){ showAlert("Choisis deux équipes."); return false; }
+    addMlpTie(sessionId, MLP_TIE_PICK.a, MLP_TIE_PICK.b);
+  });
+}
+function pickMlpTieTeam(key, id){ MLP_TIE_PICK[key] = (MLP_TIE_PICK[key]===id ? null : id); render(); }
 // Génère des affrontements pour une session via la méthode de rotation
 // (round-robin classique) : une équipe reste fixe, les autres tournent
 // autour à chaque ronde — garantit qu'aucune paire ne se répète dans les
@@ -5741,23 +5860,19 @@ function generateMlpMatchupsForSession(sessionId){
   if((session.ties||[]).length){ showAlert("Cette session a déjà des affrontements — retire-les d'abord si tu veux régénérer."); return; }
   const teams = DATA.mlpTeams || [];
   if(teams.length < 2){ showAlert("Il faut au moins 2 équipes."); return; }
-  const perTeamEl = document.getElementById('mlpMatchupsPerTeam');
-  const perTeam = Math.max(1, parseInt(perTeamEl.value,10) || 2);
+  const perTeam = Math.max(1, MLP_PER_TEAM || 2);
   const rounds = generateRoundRobinRounds(teams.map(t=>t.id), perTeam);
   const pairs = rounds.flat();
   if(!pairs.length){ showAlert("Impossible de générer des affrontements avec ces réglages."); return; }
   session.ties = pairs.map(([teamAId,teamBId])=>({ id: uid('tie'), teamAId, teamBId, games: newMLPGames(DATA.mlpRosterSize||4), winnerTeamId:null, pointsA:null, pointsB:null }));
   saveAndRender();
 }
-function addMlpTie(sessionId){
+function addMlpTie(sessionId, teamAId, teamBId){
   const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
   if(!session) return;
-  const teamAId = document.getElementById('mlpTieTeamA').value;
-  const teamBId = document.getElementById('mlpTieTeamB').value;
   if(!teamAId || !teamBId || teamAId===teamBId){ showAlert("Choisis deux équipes différentes."); return; }
   session.ties = session.ties || [];
   session.ties.push({ id: uid('tie'), teamAId, teamBId, games: newMLPGames(DATA.mlpRosterSize||4), winnerTeamId:null, pointsA:null, pointsB:null });
-  saveAndRender();
 }
 function removeMlpTie(sessionId, tieId){
   const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
@@ -5783,16 +5898,15 @@ function mlpTieCardHTML(session, tie){
   const games = tie.games && tie.games.length ? tie.games : newMLPGames(DATA.mlpRosterSize||4);
   const aWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamAId;
   const bWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamBId;
-  const nameA = `<span style="${aWon?'color:var(--ball);':''}">${escapeHTML(teamA?teamA.name:'?')}</span>`;
-  const nameB = `<span style="${bWon?'color:var(--ball);':''}">${escapeHTML(teamB?teamB.name:'?')}</span>`;
-  let html = `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">${nameA} <span class="vs">VS</span> ${nameB}</h3>
-      <div class="row" style="gap:8px;align-items:center;">
-        ${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB} pts</span>` : '<span class="tag tag-stay">à jouer</span>'}
-        <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')" aria-label="Retirer l'affrontement">🗑️</button>
-      </div>
-    </div>`;
+  const side = (t, won, right)=> `<div class="ss-side ${won?'won':''} ${right?'r':''}" style="--tc:${mlpTeamColor(t)};">${t?mlpTeamBadgeHTML(t,40):''}<span class="ss-sname">${escapeHTML(t?t.name:'?')}</span></div>`;
+  let html = `<div class="card ss-tie" style="--tc:${tie.winnerTeamId?'var(--ball)':'var(--line-soft)'};">
+    <div class="ss-tiehead">
+      ${side(teamA,aWon,false)}
+      <div class="ss-mid">${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB}</span>` : '<span class="vs">VS</span>'}</div>
+      ${side(teamB,bWon,true)}
+    </div>
+    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?'tag-green':'tag-stay'}">${tie.winnerTeamId?'✅ Terminé':'⏳ à jouer'}</span>
+      <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')" aria-label="Retirer l'affrontement">🗑️</button></div>`;
   if(!teamA || !teamB){ html += `</div>`; return html; }
   games.forEach((g,gi)=>{
     if(g.type==='dreambreaker'){
