@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 132">
+<meta name="app-build" content="Version 133">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -728,6 +728,48 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .topbar-main-3col .view-slide button{padding:7px 4px;font-size:9px;}
   .topbar-ico{width:32px;height:32px;font-size:16px;}
 }
+
+.tm-badge{border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:#0C2622;flex:none;letter-spacing:.02em;}
+.tm-card{border-left:4px solid var(--tc);}
+.tm-head{display:flex;align-items:center;gap:12px;}
+.tm-title{flex:1;min-width:0;}
+.tm-name{font-weight:700;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tm-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.tm-count{color:var(--tc);font-weight:700;}
+.tm-more{width:34px;height:34px;border-radius:50%;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:inherit;font-size:20px;line-height:1;cursor:pointer;flex:none;}
+.tm-slots{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+.tm-slot{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:12px;background:var(--court-elevated-2);border:1px solid var(--line-soft);font-size:13.5px;min-width:0;cursor:pointer;}
+.tm-slot .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tm-slot.empty{border:1.5px dashed rgba(255,255,255,.28);background:transparent;color:var(--muted);justify-content:center;font-size:12.5px;}
+.g-dot{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;flex:none;background:rgba(255,255,255,.14);}
+.g-dot.g-F,.g-seg .g-F.on,.g-pick .g-F.on{background:#F49AC1;color:#3b0d22;}
+.g-dot.g-M,.g-seg .g-M.on,.g-pick .g-M.on{background:#7FB4FF;color:#0b2447;}
+.tm-pool{display:flex;flex-wrap:wrap;gap:8px;}
+.tm-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px 7px 8px;border-radius:999px;background:var(--court-elevated-2);border:1px solid var(--line-soft);color:inherit;font:inherit;font-size:13.5px;cursor:pointer;}
+.tm-chip:disabled{opacity:.4;cursor:not-allowed;}
+.tm-chip-team{padding-left:10px;}
+.tm-chip-team i,.tm-pill i{width:10px;height:10px;border-radius:50%;background:var(--tc);display:inline-block;flex:none;}
+.tm-chip-team.on{border-color:var(--tc);background:rgba(255,255,255,.1);}
+.tm-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--tc);font-size:12px;font-weight:600;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+.tm-pill-none{border:1px dashed rgba(255,255,255,.28);color:var(--muted);font-weight:500;}
+.tm-swatches{display:flex;flex-wrap:wrap;gap:10px;}
+.tm-sw{width:36px;height:36px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0;}
+.tm-sw.on{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35);}
+.pl-list{display:flex;flex-direction:column;gap:6px;}
+.pl-row{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 8px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;cursor:pointer;}
+.pl-av{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);color:#0C2622;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;flex:none;}
+.pl-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.pl-name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pl-sub{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+.pl-x,.pl-add{width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;flex:none;font-size:15px;}
+.pl-x{background:rgba(233,85,107,.15);color:var(--danger);}
+.pl-add{background:var(--ball);color:#0C2622;font-weight:700;}
+.pl-add:disabled{opacity:.4;}
+.g-seg{display:inline-flex;gap:4px;flex:none;}
+.g-seg button,.g-pick button{border:1px solid var(--line-soft);background:rgba(255,255,255,.06);color:inherit;border-radius:999px;cursor:pointer;font:inherit;}
+.g-seg button{width:30px;height:30px;font-size:14px;padding:0;}
+.g-pick{display:flex;gap:8px;margin-bottom:12px;}
+.g-pick button{flex:1;padding:10px;font-weight:600;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -4150,11 +4192,64 @@ function adminSessionSectionHTML(){
 function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 // Onglet « Joueurs » unifié : sous-onglets Tous les joueurs et Remplaçants.
 function adminPlayersSectionHTML(){
-  const sub = VIEW.playersSubTab || 'tous';
-  const subTabs = [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
+  const isMlp = DATA.leagueFormat === 'mlp';
+  const sub = (isMlp && VIEW.playersSubTab==='reguliers') ? 'tous' : (VIEW.playersSubTab || 'tous');
+  const subTabs = isMlp ? [['tous','Joueurs'],['remplacants','Remplaçants'],['prospects','Prospects']] : [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
   let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
-  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : adminAllPeopleHTML()));
+  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
   return html;
+}
+
+// Liste des joueurs propre au format MLP : équipe (pastille de couleur), genre,
+// compte — sans les notions d'échelle (groupe, cote, « en attente »).
+let MLP_PL_FILTER = 'all';
+function mlpPlayersHTML(){
+  const teams = DATA.mlpTeams||[];
+  const linkedIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.player_id).map(l=>l.player_id));
+  const list = DATA.players.slice().sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr'));
+  const withTeam = list.filter(p=>mlpTeamOf(p.id)).length;
+  const f = MLP_PL_FILTER;
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Joueurs <span class="small">(${list.length})</span></h2>
+      <button class="btn btn-primary" onclick="openAddToLeagueModal()">➕ Ajouter</button>
+    </div>
+    <p class="small">Touche un joueur pour gérer sa fiche : équipe, genre, compte.</p>
+    ${list.length ? `
+    <input class="orgpick-search" placeholder="🔍 Rechercher un joueur…" oninput="filterMlpPlayers()" id="mlpPlSearch" style="margin-bottom:8px;width:100%;">
+    <div class="orgpick-chips" style="margin-bottom:10px;">
+      <button type="button" class="orgpick-chip ${f==='all'?'active':''}" data-pf="all" onclick="setMlpPlFilter('all')">Tous <b>${list.length}</b></button>
+      <button type="button" class="orgpick-chip ${f==='team'?'active':''}" data-pf="team" onclick="setMlpPlFilter('team')">Avec équipe <b>${withTeam}</b></button>
+      <button type="button" class="orgpick-chip ${f==='none'?'active':''}" data-pf="none" onclick="setMlpPlFilter('none')">Sans équipe <b>${list.length-withTeam}</b></button>
+    </div>
+    <div class="pl-list" id="mlpPlList">${list.map(p=>{
+      const tm = mlpTeamOf(p.id);
+      const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===p.id);
+      const pr = link ? (ALL_PROFILES||[]).find(x=>x.id===link.profile_id) : null;
+      const isAdm = pr && pr.role==='admin';
+      return `<div class="pl-row" style="--tc:${mlpTeamColor(tm)};" data-name="${escapeHTML(normSearch(p.name))}" data-t="${tm?'team':'none'}" onclick="openPlayerDetailModal('${p.id}')">
+        ${avatarHTML('pl-av', partnerInitials(p.name), pr && pr.avatar_url, tm?`background:${mlpTeamColor(tm)};`:'')}
+        <span class="pl-main"><span class="pl-name">${escapeHTML(p.name)}${isAdm?' <span class="tag tag-up">👑</span>':''}${p.injured?' <span class="tag tag-down">🤕</span>':''}</span>
+          <span class="pl-sub">${mlpGenderDot(p.gender)} ${p.gender==='F'?'Femme':p.gender==='M'?'Homme':'Genre ?'}${linkedIds.has(p.id)?' · ✅ Compte':''}</span></span>
+        ${mlpTeamPillHTML(tm)}
+      </div>`;}).join('')}
+      <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
+    </div>` : `<p class="empty">Aucun joueur pour l'instant.<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddToLeagueModal()">➕ Ajouter des joueurs</button></p>`}
+  </div>`;
+}
+function setMlpPlFilter(f){
+  MLP_PL_FILTER = f;
+  document.querySelectorAll('[data-pf]').forEach(b=>b.classList.toggle('active', b.dataset.pf===f));
+  filterMlpPlayers();
+}
+function filterMlpPlayers(){
+  const q = normSearch((document.getElementById('mlpPlSearch')||{}).value||'');
+  let vis = 0;
+  document.querySelectorAll('#mlpPlList .pl-row').forEach(r=>{
+    const ok = (!q || (r.dataset.name||'').includes(q)) && (MLP_PL_FILTER==='all' || r.dataset.t===MLP_PL_FILTER);
+    r.style.display = ok ? '' : 'none'; if(ok) vis++;
+  });
+  const nr = document.querySelector('#mlpPlList .orgpick-noresult'); if(nr) nr.style.display = vis ? 'none' : '';
 }
 // Vue combinée en lecture seule : réguliers et remplaçants ensemble, avec
 // leur type, pour un coup d'œil rapide sur tout le monde.
@@ -5356,59 +5451,134 @@ function computeMLPTiePoints(tie, teamAId, teamBId){
 }
 // ---- Gestion des équipes ----
 let MLP_LEAGUE_TEAM_STATE = null;
+const MLP_TEAM_PALETTE = ['#CFEA5C','#4C8DF6','#F2994A','#E5535D','#9B6BF2','#3FB5A6','#F2C94C','#E58AC4'];
+function mlpTeamColor(team){
+  if(!team) return '#7A8CA5';
+  if(team.color) return team.color;
+  const idx = (DATA.mlpTeams||[]).findIndex(t=>t.id===team.id);
+  return MLP_TEAM_PALETTE[(idx<0?0:idx) % MLP_TEAM_PALETTE.length];
+}
+function mlpTeamOf(playerId){ return (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(playerId)) || null; }
+function mlpTeamBadgeHTML(team, size){
+  const words = (team.name||'?').trim().split(/\s+/).filter(Boolean);
+  const ini = (words.length>1 ? words[0][0]+words[1][0] : (team.name||'?').slice(0,2)).toUpperCase();
+  const sz = size || 46;
+  return `<div class="tm-badge" style="width:${sz}px;height:${sz}px;background:${mlpTeamColor(team)};font-size:${Math.round(sz*0.38)}px;">${escapeHTML(ini)}</div>`;
+}
+function mlpGenderDot(g){
+  return `<span class="g-dot g-${g==='F'?'F':g==='M'?'M':'U'}" title="${g==='F'?'Femme':g==='M'?'Homme':'Genre non défini'}">${g==='F'?'♀':g==='M'?'♂':'?'}</span>`;
+}
+function mlpTeamPillHTML(team){
+  return team ? `<span class="tm-pill" style="--tc:${mlpTeamColor(team)};"><i></i>${escapeHTML(team.name)}</span>` : `<span class="tm-pill tm-pill-none">Sans équipe</span>`;
+}
 function mlpTeamsSectionHTML(){
   const rosterSize = DATA.mlpRosterSize || 4;
   const teams = DATA.mlpTeams || [];
   const assignedIds = new Set(teams.flatMap(tm=>tm.memberIds));
   const unassigned = DATA.players.filter(p=>!assignedIds.has(p.id));
+  const need = mlpCompositionLabel(rosterSize);
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">Équipes MLP</h3>
-      <button class="btn btn-secondary" onclick="openCreateMlpLeagueTeamModal()">➕ Créer une équipe</button>
+      <h2 style="margin:0;">Équipes <span class="small">(${teams.length})</span></h2>
+      <button class="btn btn-primary" onclick="openMlpTeamFormModal()">➕ Nouvelle équipe</button>
     </div>
-    <p class="small">Composition requise : <strong>${mlpCompositionLabel(rosterSize)}</strong>. Modifiable à tout moment — les affrontements déjà joués gardent leurs résultats.</p>
+    <p class="small">Composition requise : <strong>${need}</strong>. Touche une place pour y ajouter quelqu'un, ou un joueur pour voir sa fiche.</p>
   </div>`;
   html += teams.length ? teams.map(tm=>{
-    const valid = mlpCompositionValid(mlpGenderCountsForIds(tm.memberIds), rosterSize);
-    return `<div class="card">
-      <div class="row" style="justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:700;font-size:16px;">${escapeHTML(tm.name)}</div>
-          <div class="small">${tm.memberIds.length ? tm.memberIds.map(id=>escapeHTML(playerName(id))).join(', ') : 'Aucun joueur — clique sur « Joueurs » pour en ajouter.'}</div>
+    const counts = mlpGenderCountsForIds(tm.memberIds);
+    const valid = mlpCompositionValid(counts, rosterSize);
+    const full = tm.memberIds.length>=rosterSize;
+    const col = mlpTeamColor(tm);
+    const slots = [];
+    tm.memberIds.forEach(id=>{
+      const pl = DATA.players.find(x=>x.id===id);
+      slots.push(`<div class="tm-slot" onclick="openPlayerDetailModal('${id}')">${mlpGenderDot(mlpPlayerGender(id))}<span class="nm">${escapeHTML(pl?pl.name:'?')}</span></div>`);
+    });
+    for(let i=tm.memberIds.length;i<rosterSize;i++) slots.push(`<div class="tm-slot empty" onclick="openMlpTeamRosterModal('${tm.id}')">＋ Place libre</div>`);
+    return `<div class="card tm-card" style="--tc:${col};">
+      <div class="tm-head">
+        ${mlpTeamBadgeHTML(tm)}
+        <div class="tm-title">
+          <div class="tm-name">${escapeHTML(tm.name)}</div>
+          <div class="tm-sub"><span class="tm-count">${tm.memberIds.length}/${rosterSize}</span> · ${counts.f} ♀ · ${counts.m} ♂${counts.other?` · ${counts.other} ?`:''}</div>
         </div>
-        <span class="tag ${valid?'tag-green':'tag-down'}">${valid?'✅ Complète':'⚠️ Invalide'}</span>
+        <span class="tag ${valid?'tag-green':(full?'tag-down':'tag-stay')}">${valid?'✅ Complète':(full?'⚠️ À corriger':'⏳ En formation')}</span>
+        <button type="button" class="tm-more" onclick="openMlpTeamMenu('${tm.id}')" aria-label="Actions">⋯</button>
       </div>
-      <div class="row" style="gap:6px;margin-top:10px;">
-        <button class="btn-ghost" onclick="openMlpTeamRosterModal('${tm.id}')">👥 Joueurs</button>
-        <button class="btn-ghost" onclick="openRenameMlpTeamModal('${tm.id}')">✏️ Renommer</button>
-        <button class="btn-ghost-danger" onclick="removeMlpLeagueTeam('${tm.id}')">🗑️ Retirer</button>
-      </div>
+      <div class="tm-slots">${slots.join('')}</div>
+      <button class="btn btn-secondary" style="margin-top:12px;width:100%;" onclick="openMlpTeamRosterModal('${tm.id}')">👥 Gérer l'équipe</button>
     </div>`;
-  }).join('') : `<div class="card"><p class="empty">Aucune équipe pour l'instant.</p></div>`;
+  }).join('') : `<div class="card"><p class="empty">Aucune équipe pour l'instant.<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openMlpTeamFormModal()">➕ Créer la première équipe</button></p></div>`;
   html += `<div class="card">
-    <h3>Joueurs non assignés</h3>
-    ${unassigned.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;">${unassigned.map(p=>`<span class="tag tag-stay">${escapeHTML(p.name)}${p.gender?' ('+(p.gender==='F'?'F':'H')+')':' (genre ?)'}</span>`).join('')}</div>` : `<p class="small">Tous les joueurs sont assignés à une équipe.</p>`}
+    <h3 style="margin:0 0 4px;">Sans équipe <span class="small">(${unassigned.length})</span></h3>
+    ${unassigned.length ? `<p class="small" style="margin:0 0 10px;">Touche un joueur pour le placer dans une équipe.</p>
+    <div class="tm-pool">${unassigned.map(pl=>`<button type="button" class="tm-chip" onclick="openMlpAssignPopup('${pl.id}')">${mlpGenderDot(pl.gender)}${escapeHTML(pl.name)}</button>`).join('')}</div>` : `<p class="small">Tous les joueurs sont dans une équipe. 🎉</p>`}
   </div>`;
   return html;
 }
-function openCreateMlpLeagueTeamModal(){
-  const html = `<input id="mlpTeamNameInput" placeholder="Nom de l'équipe">`;
-  showFormModal('Créer une équipe', html, ()=>{
+// Menu d'actions d'une équipe (pastille ⋯).
+function openMlpTeamMenu(teamId){
+  const tm = (DATA.mlpTeams||[]).find(t=>t.id===teamId); if(!tm) return;
+  showContentModal(escapeHTML(tm.name), `
+    <div class="action-grid">
+      <button class="action-btn" onclick="openMlpTeamRosterModal('${teamId}')"><span class="icon">👥</span> Gérer les joueurs</button>
+      <button class="action-btn" onclick="openMlpTeamFormModal('${teamId}')"><span class="icon">🎨</span> Nom et couleur</button>
+      <button class="action-btn danger" onclick="closeModal();removeMlpLeagueTeam('${teamId}')"><span class="icon">🗑️</span> Retirer l'équipe</button>
+    </div>`);
+}
+// Créer / modifier une équipe : nom + couleur (pastilles à toucher).
+let MLP_FORM_COLOR = null;
+function openMlpTeamFormModal(teamId){
+  const tm = teamId ? (DATA.mlpTeams||[]).find(t=>t.id===teamId) : null;
+  const used = new Set((DATA.mlpTeams||[]).filter(t=>!tm||t.id!==tm.id).map(t=>mlpTeamColor(t)));
+  MLP_FORM_COLOR = tm ? mlpTeamColor(tm) : (MLP_TEAM_PALETTE.find(c=>!used.has(c)) || MLP_TEAM_PALETTE[0]);
+  const html = `
+    <label class="f-label">Nom de l'équipe</label>
+    <input id="mlpTeamNameInput" placeholder="ex : Les Smashers" value="${tm?escapeHTML(tm.name):''}">
+    <label class="f-label" style="margin-top:12px;">Couleur</label>
+    <div class="tm-swatches">${MLP_TEAM_PALETTE.map(c=>`<button type="button" class="tm-sw ${c===MLP_FORM_COLOR?'on':''}" data-c="${c}" style="background:${c};" onclick="pickMlpFormColor('${c}')" aria-label="Couleur"></button>`).join('')}</div>`;
+  showFormModal(tm ? "Modifier l'équipe" : 'Nouvelle équipe', html, ()=>{
     const name = document.getElementById('mlpTeamNameInput').value.trim();
     if(!name){ showAlert("Le nom de l'équipe est requis."); return false; }
-    DATA.mlpTeams = DATA.mlpTeams || [];
-    DATA.mlpTeams.push({ id: uid('mlpteam'), name, memberIds: [], dreambreakerPlayerId: null });
+    if(tm){ tm.name = name; tm.color = MLP_FORM_COLOR; }
+    else { DATA.mlpTeams = DATA.mlpTeams || []; DATA.mlpTeams.push({ id: uid('mlpteam'), name, color: MLP_FORM_COLOR, memberIds: [], dreambreakerPlayerId: null }); }
   });
 }
-function openRenameMlpTeamModal(teamId){
-  const team = (DATA.mlpTeams||[]).find(t=>t.id===teamId);
-  if(!team) return;
-  const html = `<input id="mlpTeamNameInput" placeholder="Nom de l'équipe" value="${escapeHTML(team.name)}">`;
-  showFormModal("Renommer l'équipe", html, ()=>{
-    const name = document.getElementById('mlpTeamNameInput').value.trim();
-    if(!name){ showAlert("Le nom de l'équipe est requis."); return false; }
-    team.name = name;
-  });
+function pickMlpFormColor(c){
+  MLP_FORM_COLOR = c;
+  document.querySelectorAll('.tm-sw').forEach(b=>b.classList.toggle('on', b.dataset.c===c));
+}
+function openCreateMlpLeagueTeamModal(){ openMlpTeamFormModal(); }
+function openRenameMlpTeamModal(teamId){ openMlpTeamFormModal(teamId); }
+// Placer un joueur dans une équipe (ou le retirer de la sienne) via une fenêtre à pastilles.
+function openMlpAssignPopup(playerId){
+  const pl = DATA.players.find(x=>x.id===playerId); if(!pl) return;
+  const rosterSize = DATA.mlpRosterSize || 4;
+  const cur = mlpTeamOf(playerId);
+  const teams = DATA.mlpTeams || [];
+  showContentModal(escapeHTML(pl.name), `
+    <div class="modal-header-row">${avatarHTML('avatar-circle', partnerInitials(pl.name), null, cur?`background:${mlpTeamColor(cur)};`:'')}
+      <div><div style="font-size:18px;font-weight:700;">${escapeHTML(pl.name)}</div><div class="modal-badges">${mlpGenderDot(pl.gender)}${mlpTeamPillHTML(cur)}</div></div></div>
+    <h3 style="margin:14px 0 8px;">Placer dans une équipe</h3>
+    ${teams.length ? `<div class="tm-pool">${teams.map(t=>{
+      const isCur = cur && cur.id===t.id; const full = t.memberIds.length>=rosterSize && !isCur;
+      return `<button type="button" class="tm-chip tm-chip-team ${isCur?'on':''}" style="--tc:${mlpTeamColor(t)};" ${full?'disabled':''} onclick="assignMlpPlayerToTeam('${playerId}','${t.id}')"><i></i>${escapeHTML(t.name)} <span class="small">${t.memberIds.length}/${rosterSize}</span></button>`;
+    }).join('')}</div>` : `<p class="small">Crée d'abord une équipe.</p>`}
+    ${cur ? `<button class="btn-ghost-danger" style="margin-top:12px;" onclick="assignMlpPlayerToTeam('${playerId}',null)">Retirer de « ${escapeHTML(cur.name)} »</button>` : ''}`);
+}
+function assignMlpPlayerToTeam(playerId, teamId){
+  (DATA.mlpTeams||[]).forEach(t=>{ t.memberIds = t.memberIds.filter(id=>id!==playerId); });
+  if(teamId){
+    const t = (DATA.mlpTeams||[]).find(x=>x.id===teamId);
+    if(t && t.memberIds.length < (DATA.mlpRosterSize||4)) t.memberIds.push(playerId);
+  }
+  dropModal();
+  saveAndRender();
+}
+function setPlayerGender(pid, g){
+  const pl = DATA.players.find(x=>x.id===pid); if(!pl) return;
+  pl.gender = g || null;
+  saveData();
 }
 function openMlpTeamRosterModal(teamId){
   showContentModal('Joueurs de l\'équipe', ()=>mlpTeamRosterModalHTML(teamId));
@@ -5421,31 +5591,36 @@ function mlpTeamRosterModalHTML(teamId){
   const available = DATA.players.filter(p=>!assignedElsewhere.has(p.id) && !team.memberIds.includes(p.id));
   const counts = mlpGenderCountsForIds(team.memberIds);
   const valid = mlpCompositionValid(counts, rosterSize);
-  let html = `<p class="small">Requis : <strong>${mlpCompositionLabel(rosterSize)}</strong> — ${counts.m} homme(s), ${counts.f} femme(s)${counts.other?', '+counts.other+' genre non défini':''} ${valid?'✅ composition complète':''}</p>`;
-  html += `<h3 style="margin-top:10px;">Membres actuels</h3>`;
-  html += team.memberIds.length ? team.memberIds.map(id=>{
-    const p = DATA.players.find(x=>x.id===id);
-    const g = mlpPlayerGender(id);
-    return `<div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-      <span>${escapeHTML(p?p.name:'?')} <span class="small" style="color:var(--muted);">(${g==='F'?'F':g==='M'?'H':'genre ?'})</span></span>
-      <button class="btn-ghost-danger" onclick="removeMlpTeamMember('${teamId}','${id}')">Retirer</button>
+  const full = team.memberIds.length>=rosterSize;
+  const genderSeg = (p)=>`<span class="g-seg">
+      <button type="button" class="${p.gender==='F'?'on g-F':''}" onclick="event.stopPropagation();setPlayerGender('${p.id}','F');openMlpTeamRosterModal('${teamId}')">♀</button>
+      <button type="button" class="${p.gender==='M'?'on g-M':''}" onclick="event.stopPropagation();setPlayerGender('${p.id}','M');openMlpTeamRosterModal('${teamId}')">♂</button>
+    </span>`;
+  let html = `<div class="tm-head" style="--tc:${mlpTeamColor(team)};">
+      ${mlpTeamBadgeHTML(team, 42)}
+      <div class="tm-title"><div class="tm-name">${escapeHTML(team.name)}</div>
+      <div class="tm-sub"><span class="tm-count">${team.memberIds.length}/${rosterSize}</span> · ${counts.f} ♀ · ${counts.m} ♂${counts.other?' · '+counts.other+' ?':''}</div></div>
+      <span class="tag ${valid?'tag-green':'tag-stay'}">${valid?'✅ Complète':'⏳ '+mlpCompositionLabel(rosterSize)}</span>
     </div>`;
-  }).join('') : `<p class="small">Aucun membre pour l'instant.</p>`;
-  html += `<h3 style="margin-top:16px;">Ajouter un joueur</h3>`;
-  html += `<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;" ${team.memberIds.length>=rosterSize?'disabled':''} onclick="openAddToLeagueModal('org','${teamId}')">👥 Choisir dans l'organisation</button>`;
-  html += `<p class="small" style="margin:0 0 6px;color:var(--muted);">Ou parmi les joueurs de la ligue :</p>`;
-  html += available.length ? available.map(p=>`
-    <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-      <span>${escapeHTML(p.name)}</span>
-      <div class="row" style="gap:6px;align-items:center;">
-        <select style="width:100px;" onchange="setPlayerGenderFromTeamForm('${p.id}',this.value)">
-          <option value="" ${!p.gender?'selected':''}>Genre ?</option>
-          <option value="F" ${p.gender==='F'?'selected':''}>Femme</option>
-          <option value="M" ${p.gender==='M'?'selected':''}>Homme</option>
-        </select>
-        <button class="btn-ghost" ${team.memberIds.length>=rosterSize?'disabled':''} onclick="addMlpTeamMember('${teamId}','${p.id}')">+ Ajouter</button>
-      </div>
-    </div>`).join('') : `<p class="small">Aucun joueur disponible.</p>`;
+  html += `<h3 style="margin:14px 0 8px;">Dans l'équipe</h3>`;
+  html += team.memberIds.length ? `<div class="pl-list">${team.memberIds.map(id=>{
+    const p = DATA.players.find(x=>x.id===id);
+    return `<div class="pl-row" style="--tc:${mlpTeamColor(team)};">
+      ${avatarHTML('pl-av', partnerInitials(p?p.name:'?'), null, `background:${mlpTeamColor(team)};`)}
+      <span class="pl-main"><span class="pl-name">${escapeHTML(p?p.name:'?')}</span></span>
+      ${p ? genderSeg(p) : ''}
+      <button type="button" class="pl-x" onclick="removeMlpTeamMember('${teamId}','${id}')" aria-label="Retirer">✕</button>
+    </div>`;
+  }).join('')}</div>` : `<p class="small">Aucun membre pour l'instant.</p>`;
+  html += `<h3 style="margin:16px 0 8px;">Ajouter</h3>`;
+  html += `<button class="btn btn-primary" style="width:100%;margin-bottom:10px;" ${full?'disabled':''} onclick="openAddToLeagueModal('org','${teamId}')">👥 Choisir dans l'organisation</button>`;
+  html += available.length ? `<p class="small" style="margin:0 0 6px;color:var(--muted);">Ou parmi les joueurs de la ligue sans équipe :</p><div class="pl-list">${available.map(p=>`
+    <div class="pl-row">
+      ${avatarHTML('pl-av', partnerInitials(p.name), null)}
+      <span class="pl-main"><span class="pl-name">${escapeHTML(p.name)}</span></span>
+      ${genderSeg(p)}
+      <button type="button" class="pl-add" ${full?'disabled':''} onclick="addMlpTeamMember('${teamId}','${p.id}')">＋</button>
+    </div>`).join('')}</div>` : `<p class="small" style="color:var(--muted);">Aucun autre joueur disponible dans la ligue.</p>`;
   return html;
 }
 function addMlpTeamMember(teamId, playerId){
@@ -5455,12 +5630,14 @@ function addMlpTeamMember(teamId, playerId){
   if(team.memberIds.length >= rosterSize) return;
   if(!team.memberIds.includes(playerId)) team.memberIds.push(playerId);
   saveAndRender();
+  openMlpTeamRosterModal(teamId);
 }
 function removeMlpTeamMember(teamId, playerId){
   const team = (DATA.mlpTeams||[]).find(t=>t.id===teamId);
   if(!team) return;
   team.memberIds = team.memberIds.filter(id=>id!==playerId);
   saveAndRender();
+  openMlpTeamRosterModal(teamId);
 }
 function removeMlpLeagueTeam(teamId){
   showConfirm("Retirer cette équipe ? Les affrontements déjà joués gardent leurs résultats, mais elle n'apparaîtra plus pour les prochaines sessions.", ()=>{
@@ -6586,7 +6763,10 @@ function playerDetailModalHTML(pid){
   if(p.injured) badges.push('<span class="tag tag-down">🤕 Blessé</span>');
   if(absent) badges.push('<span class="tag tag-orange">🚫 Absent cette session</span>');
   if(isAdminAccount) badges.push('<span class="tag tag-up">👑 Admin</span>');
-  if(!p.injured) badges.push(g ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-stay">⏳ En attente</span>');
+  const isMlp = DATA.leagueFormat==='mlp';
+  const mlpTm = isMlp ? mlpTeamOf(pid) : null;
+  if(isMlp) badges.push(mlpTeamPillHTML(mlpTm));
+  else if(!p.injured) badges.push(g ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-stay">⏳ En attente</span>');
 
   let html = `
     <div class="modal-header-row">
@@ -6596,6 +6776,21 @@ function playerDetailModalHTML(pid){
         <div class="modal-badges">${badges.join('')}</div>
       </div>
     </div>
+    ${isMlp ? `
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Équipe</span><span class="stat-value" style="font-size:16px;">${escapeHTML(mlpTm?mlpTm.name:'—')}</span></div>
+    </div>
+    <h3 style="margin:6px 0 8px;">Genre</h3>
+    <div class="g-pick">
+      <button type="button" class="${p.gender==='F'?'on g-F':''}" onclick="setPlayerGender('${pid}','F');openPlayerDetailModal('${pid}')">♀ Femme</button>
+      <button type="button" class="${p.gender==='M'?'on g-M':''}" onclick="setPlayerGender('${pid}','M');openPlayerDetailModal('${pid}')">♂ Homme</button>
+    </div>
+    <div class="action-grid">
+      <button class="action-btn" onclick="openMlpAssignPopup('${pid}')"><span class="icon">👥</span> ${mlpTm?"Changer d'équipe":'Placer dans une équipe'}</button>
+      <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
+      <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
+      <button class="action-btn danger" onclick="closeModal();removePlayer('${pid}')"><span class="icon">🗑️</span> Retirer de la ligue</button>
+    </div>` : `
     <div class="stat-chips">
       <div class="stat-chip"><span class="stat-label">Groupe</span><span class="stat-value">${escapeHTML(g ? g.name : '—')}</span></div>
       <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${rating.toFixed(2)}</span></div>
@@ -6607,7 +6802,8 @@ function playerDetailModalHTML(pid){
       <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
       <button class="action-btn danger" onclick="closeModal();removePlayer('${pid}')"><span class="icon">🗑️</span> Retirer de la ligue</button>
     </div>
-    ${p.injured ? `<p class="small" style="color:var(--danger);">Basculé en attente d'assignation (Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}`;
+`}
+    ${p.injured && !isMlp ? `<p class="small" style="color:var(--danger);">Basculé en attente d'assignation (Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}`;
   if(openSession){
     html += `
     <div class="modal-section">
@@ -7864,6 +8060,7 @@ function deleteGroup(gid){
 function removePlayer(pid){
   showConfirm('Retirer ce joueur de la ligue ?', async ()=>{
     DATA.players = DATA.players.filter(p=>p.id!==pid);
+    (DATA.mlpTeams||[]).forEach(t=>{ t.memberIds = t.memberIds.filter(id=>id!==pid); });
     // Délie aussi le compte éventuellement associé — sinon il reste pointé
     // vers un joueur qui n'existe plus (« compte orphelin », visible dans
     // Organisation > Comptes).
