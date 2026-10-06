@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 134">
+<meta name="app-build" content="Version 135">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -808,6 +808,13 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .ss-vsrow{display:flex;align-items:center;justify-content:space-around;gap:8px;padding:12px;border-radius:16px;background:var(--court-elevated-2);}
 .ss-vsteam{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;text-align:center;min-width:0;}
 .ss-empty{background:transparent;border:1.5px dashed rgba(255,255,255,.3);color:var(--muted);}
+.ss-side,.ss-grip,.ss-ghost{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.ss-grip{touch-action:none;cursor:grab;display:inline-flex;border-radius:14px;flex:none;}
+.ss-side.ss-sel .ss-grip{outline:3px solid var(--ball);outline-offset:2px;}
+.ss-side.ss-lift{opacity:.35;}
+.ss-side.ss-over{background:rgba(214,255,60,.14);border-radius:14px;outline:2px dashed var(--ball);}
+.ss-ghost{position:fixed;z-index:3000;pointer-events:none;transform:translate(-50%,-60%) scale(1.08);display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:16px;background:var(--court-elevated-2,#173a35);border:1px solid var(--ball);box-shadow:0 10px 28px rgba(0,0,0,.5);font-weight:700;font-size:14px;}
+.ss-hint{margin:0 0 10px;color:var(--muted);text-align:center;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -5801,6 +5808,7 @@ function mlpOpenSessionHTML(session){
     </div>`;
   }
   html += `<button type="button" class="ss-add" onclick="openMlpAddTiePopup('${session.id}')">＋ Ajouter un affrontement</button>`;
+  if(hasTies) html += `<p class="small ss-hint">↔ Pour changer un affrontement : glisse un badge d'équipe sur un autre (ou touche deux badges) pour les échanger.</p>`;
   html += ties.map(tie=>mlpTieCardHTML(session, tie)).join('');
   const allDecided = hasTies && ties.every(tie=>tie.winnerTeamId);
   html += `<div class="card" style="text-align:center;">
@@ -5809,6 +5817,91 @@ function mlpOpenSessionHTML(session){
   </div>`;
   return html;
 }
+
+// ---- Échange d'équipes entre affrontements (glisser-déposer ou toucher deux badges) ----
+let MLP_SWAP_SEL = null;
+function mlpTieHasScores(tie){
+  return !!tie.winnerTeamId || (tie.games||[]).some(g=>(g.scoreA!=null && g.scoreA!=='') || (g.scoreB!=null && g.scoreB!==''));
+}
+function mlpSwapTeams(sessionId, tieIdA, keyA, tieIdB, keyB){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId); if(!session) return;
+  const tA = session.ties.find(x=>x.id===tieIdA), tB = session.ties.find(x=>x.id===tieIdB);
+  if(!tA || !tB || (tieIdA===tieIdB && keyA===keyB)) return;
+  const fa = keyA==='A'?'teamAId':'teamBId', fb = keyB==='A'?'teamAId':'teamBId';
+  const na = {a:tA.teamAId,b:tA.teamBId}, nb = {a:tB.teamAId,b:tB.teamBId};
+  const same = tieIdA===tieIdB;
+  const nextA = {teamAId:tA.teamAId, teamBId:tA.teamBId};
+  const nextB = same ? nextA : {teamAId:tB.teamAId, teamBId:tB.teamBId};
+  const va = tA[fa], vb = tB[fb];
+  nextA[fa] = vb; nextB[fb] = va;
+  if(nextA.teamAId===nextA.teamBId || nextB.teamAId===nextB.teamBId){ showAlert("Cet échange mettrait une équipe contre elle-même."); return; }
+  const apply = ()=>{
+    const reset = (t,n)=>{
+      const changed = n.teamAId!==t.teamAId || n.teamBId!==t.teamBId;
+      t.teamAId = n.teamAId; t.teamBId = n.teamBId;
+      if(changed){ t.games = newMLPGames(DATA.mlpRosterSize||4); t.winnerTeamId=null; t.pointsA=null; t.pointsB=null; }
+    };
+    reset(tA,nextA); if(!same) reset(tB,nextB);
+    MLP_SWAP_SEL = null;
+    saveAndRender();
+  };
+  if(mlpTieHasScores(tA) || mlpTieHasScores(tB)) showConfirm("Un des affrontements a déjà des scores : ils seront effacés par l'échange. Continuer ?", apply);
+  else apply();
+}
+(function(){
+  let drag = null, ghost = null;
+  const sideOf = el => el && el.closest ? el.closest('.ss-side[data-tie]') : null;
+  const clearOver = ()=>document.querySelectorAll('.ss-over').forEach(e=>e.classList.remove('ss-over'));
+  function paintSel(){
+    document.querySelectorAll('.ss-side.ss-sel').forEach(e=>e.classList.remove('ss-sel'));
+    if(MLP_SWAP_SEL){ const e = document.querySelector(`.ss-side[data-tie="${MLP_SWAP_SEL.tie}"][data-side="${MLP_SWAP_SEL.side}"]`); if(e) e.classList.add('ss-sel'); }
+  }
+  document.addEventListener('pointerdown', e=>{
+    const grip = e.target.closest && e.target.closest('.ss-grip'); if(!grip) return;
+    const side = sideOf(grip); if(!side) return;
+    drag = { side, x:e.clientX, y:e.clientY, moving:false, id:e.pointerId };
+    try{ grip.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    if(!drag.moving){
+      if(Math.hypot(e.clientX-drag.x, e.clientY-drag.y) < 8) return;
+      drag.moving = true;
+      ghost = document.createElement('div'); ghost.className = 'ss-ghost';
+      ghost.innerHTML = drag.side.querySelector('.ss-grip').innerHTML + '<span>'+drag.side.querySelector('.ss-sname').textContent.replace(/</g,'&lt;')+'</span>';
+      document.body.appendChild(ghost);
+      drag.side.classList.add('ss-lift');
+    }
+    e.preventDefault();
+    ghost.style.left = e.clientX+'px'; ghost.style.top = e.clientY+'px';
+    if(e.clientY > innerHeight-110) window.scrollBy(0,14); else if(e.clientY < 90) window.scrollBy(0,-14);
+    clearOver();
+    const t = sideOf(document.elementFromPoint(e.clientX, e.clientY));
+    if(t && t!==drag.side) t.classList.add('ss-over');
+  }, {passive:false});
+  function end(e, cancel){
+    if(!drag) return;
+    const d = drag; drag = null;
+    if(ghost){ ghost.remove(); ghost = null; }
+    clearOver(); d.side.classList.remove('ss-lift');
+    const q = d.side.dataset;
+    if(d.moving){
+      if(cancel) return;
+      const t = sideOf(document.elementFromPoint(e.clientX, e.clientY));
+      if(t && t!==d.side) mlpSwapTeams(q.sess, q.tie, q.side, t.dataset.tie, t.dataset.side);
+      return;
+    }
+    if(cancel) return;
+    // simple toucher : sélection puis échange
+    if(!MLP_SWAP_SEL){ MLP_SWAP_SEL = { sess:q.sess, tie:q.tie, side:q.side }; paintSel(); return; }
+    const sel = MLP_SWAP_SEL;
+    if(sel.tie===q.tie && sel.side===q.side){ MLP_SWAP_SEL = null; paintSel(); return; }
+    mlpSwapTeams(q.sess, sel.tie, sel.side, q.tie, q.side);
+    MLP_SWAP_SEL = null; paintSel();
+  }
+  document.addEventListener('pointerup', e=>end(e,false));
+  document.addEventListener('pointercancel', e=>end(e,true));
+})();
 function openMlpSessionMenu(sessionId){
   showContentModal('Session', `<button class="btn btn-secondary" style="width:100%;" onclick="dropModal();deleteMlpSession('${sessionId}')">🗑️ Supprimer la session</button>`);
 }
@@ -5898,12 +5991,12 @@ function mlpTieCardHTML(session, tie){
   const games = tie.games && tie.games.length ? tie.games : newMLPGames(DATA.mlpRosterSize||4);
   const aWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamAId;
   const bWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamBId;
-  const side = (t, won, right)=> `<div class="ss-side ${won?'won':''} ${right?'r':''}" style="--tc:${mlpTeamColor(t)};">${t?mlpTeamBadgeHTML(t,40):''}<span class="ss-sname">${escapeHTML(t?t.name:'?')}</span></div>`;
+  const side = (t, won, right, key)=> `<div class="ss-side ${won?'won':''} ${right?'r':''}" data-sess="${session.id}" data-tie="${tie.id}" data-side="${key}" style="--tc:${mlpTeamColor(t)};"><span class="ss-grip">${t?mlpTeamBadgeHTML(t,40):''}</span><span class="ss-sname">${escapeHTML(t?t.name:'?')}</span></div>`;
   let html = `<div class="card ss-tie" style="--tc:${tie.winnerTeamId?'var(--ball)':'var(--line-soft)'};">
     <div class="ss-tiehead">
-      ${side(teamA,aWon,false)}
+      ${side(teamA,aWon,false,'A')}
       <div class="ss-mid">${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB}</span>` : '<span class="vs">VS</span>'}</div>
-      ${side(teamB,bWon,true)}
+      ${side(teamB,bWon,true,'B')}
     </div>
     <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?'tag-green':'tag-stay'}">${tie.winnerTeamId?'✅ Terminé':'⏳ à jouer'}</span>
       <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')" aria-label="Retirer l'affrontement">🗑️</button></div>`;
