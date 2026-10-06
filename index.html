@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 135">
+<meta name="app-build" content="Version 139">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -815,6 +815,14 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .ss-side.ss-over{background:rgba(214,255,60,.14);border-radius:14px;outline:2px dashed var(--ball);}
 .ss-ghost{position:fixed;z-index:3000;pointer-events:none;transform:translate(-50%,-60%) scale(1.08);display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:16px;background:var(--court-elevated-2,#173a35);border:1px solid var(--ball);box-shadow:0 10px 28px rgba(0,0,0,.5);font-weight:700;font-size:14px;}
 .ss-hint{margin:0 0 10px;color:var(--muted);text-align:center;}
+.ss-pls{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0;}
+.ss-pls.r{align-items:flex-end;}
+.ss-pl{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:999px;background:var(--court-elevated-2);border:1px solid var(--line-soft);font-size:12.5px;max-width:100%;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.ss-pl .g-dot{width:18px;height:18px;font-size:11px;}
+.ss-pl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ss-pl.ss-sel{outline:2px solid var(--ball);}
+.ss-pl.ss-lift{opacity:.35;}
+.ss-pl.ss-over{outline:2px dashed var(--ball);background:rgba(214,255,60,.14);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -2959,6 +2967,9 @@ function groupBelow(gid){
 }
 
 function finalizeSession(session){
+  // Photo de l'état des groupes AVANT la clôture : permet de rouvrir la session
+  // et de tout remettre exactement comme avant (groupes + ordre).
+  session.preSnapshot = (DATA.players||[]).map(p=>({ id:p.id, groupId:p.groupId, order:p.order }));
   const movements = []; // {playerId, fromGroupId, toGroupId, reason?}
   const sorted = groupsSorted();
   const standingsByGroup = {};
@@ -5511,6 +5522,13 @@ function mlpLeagueGamePlayers(team, gameType){
   if(gameType==='dreambreaker') return team.dreambreakerPlayerId ? [team.dreambreakerPlayerId] : null;
   return null;
 }
+// Composition d'une joute pour un affrontement : l'ajustement manuel de l'admin
+// (tie.lineup) s'il existe et reste valide, sinon la composition automatique.
+function mlpTieLineup(tie, side, team, type){
+  const ov = tie && tie.lineup && tie.lineup[side] && tie.lineup[side][type];
+  if(ov && team && ov.length && ov.every(id=>team.memberIds.includes(id))) return ov;
+  return mlpLeagueGamePlayers(team, type);
+}
 // Points de classement façon MLP réel : 3 pts victoire en règle, 2 pts
 // victoire au DreamBreaker, 1 pt défaite au DreamBreaker, 0 pt défaite en règle.
 function computeMLPTiePoints(tie, teamAId, teamBId){
@@ -5808,7 +5826,7 @@ function mlpOpenSessionHTML(session){
     </div>`;
   }
   html += `<button type="button" class="ss-add" onclick="openMlpAddTiePopup('${session.id}')">＋ Ajouter un affrontement</button>`;
-  if(hasTies) html += `<p class="small ss-hint">↔ Pour changer un affrontement : glisse un badge d'équipe sur un autre (ou touche deux badges) pour les échanger.</p>`;
+  if(hasTies) html += `<p class="small ss-hint">↔ Glisse (ou touche deux fois) : un badge d'équipe pour changer l'affrontement, un joueur sur un autre de même genre pour changer les parties ♂ / ♀ / mixtes.</p>`;
   html += ties.map(tie=>mlpTieCardHTML(session, tie)).join('');
   const allDecided = hasTies && ties.every(tie=>tie.winnerTeamId);
   html += `<div class="card" style="text-align:center;">
@@ -5824,7 +5842,7 @@ function mlpTieHasScores(tie){
   return !!tie.winnerTeamId || (tie.games||[]).some(g=>(g.scoreA!=null && g.scoreA!=='') || (g.scoreB!=null && g.scoreB!==''));
 }
 function mlpSwapTeams(sessionId, tieIdA, keyA, tieIdB, keyB){
-  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId); if(!session) return;
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId); if(!session || session.status!=='open') return;
   const tA = session.ties.find(x=>x.id===tieIdA), tB = session.ties.find(x=>x.id===tieIdB);
   if(!tA || !tB || (tieIdA===tieIdB && keyA===keyB)) return;
   const fa = keyA==='A'?'teamAId':'teamBId', fb = keyB==='A'?'teamAId':'teamBId';
@@ -5839,7 +5857,7 @@ function mlpSwapTeams(sessionId, tieIdA, keyA, tieIdB, keyB){
     const reset = (t,n)=>{
       const changed = n.teamAId!==t.teamAId || n.teamBId!==t.teamBId;
       t.teamAId = n.teamAId; t.teamBId = n.teamBId;
-      if(changed){ t.games = newMLPGames(DATA.mlpRosterSize||4); t.winnerTeamId=null; t.pointsA=null; t.pointsB=null; }
+      if(changed){ t.games = newMLPGames(DATA.mlpRosterSize||4); t.winnerTeamId=null; t.pointsA=null; t.pointsB=null; delete t.lineup; }
     };
     reset(tA,nextA); if(!same) reset(tB,nextB);
     MLP_SWAP_SEL = null;
@@ -5848,19 +5866,49 @@ function mlpSwapTeams(sessionId, tieIdA, keyA, tieIdB, keyB){
   if(mlpTieHasScores(tA) || mlpTieHasScores(tB)) showConfirm("Un des affrontements a déjà des scores : ils seront effacés par l'échange. Continuer ?", apply);
   else apply();
 }
+function mlpSwapPlayers(sessionId, tieId, side, g1, p1, g2, p2){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId); if(!session || session.status!=='open') return;
+  const tie = (session.ties||[]).find(x=>x.id===tieId); if(!tie) return;
+  const team = (DATA.mlpTeams||[]).find(t=>t.id===(side==='A'?tie.teamAId:tie.teamBId)); if(!team) return;
+  if(g1===g2 && p1===p2) return;
+  if(mlpPlayerGender(p1)!==mlpPlayerGender(p2)){ showAlert("Tu peux échanger seulement deux joueurs du même genre (♂ avec ♂, ♀ avec ♀)."); return; }
+  const types = (tie.games||[]).map(g=>g.type);
+  const cur = {};
+  types.forEach(tp=>{ if(tp==='dreambreaker') return; const l = mlpTieLineup(tie, side, team, tp); if(l) cur[tp] = l.slice(); });
+  const t1 = types[g1], t2 = types[g2];
+  if(!cur[t1] || !cur[t2]) return;
+  const i1 = cur[t1].indexOf(p1), i2 = cur[t2].indexOf(p2);
+  if(i1<0 || i2<0) return;
+  cur[t1][i1] = p2; cur[t2][i2] = p1;
+  const dup = a=>new Set(a).size!==a.length;
+  if(dup(cur[t1]) || dup(cur[t2])){ showAlert("Cet échange mettrait le même joueur deux fois dans une partie. Essaie avec un joueur d'une autre partie (ex. Mixte 1 ↔ Mixte 2)."); return; }
+  tie.lineup = tie.lineup || {};
+  tie.lineup[side] = cur;
+  MLP_SWAP_SEL = null;
+  saveAndRender();
+}
 (function(){
   let drag = null, ghost = null;
-  const sideOf = el => el && el.closest ? el.closest('.ss-side[data-tie]') : null;
+  const SEL = { team:'.ss-side[data-tie]', pl:'.ss-pl[data-tie]' };
+  const find = (el,kind)=> el && el.closest ? el.closest(SEL[kind]) : null;
   const clearOver = ()=>document.querySelectorAll('.ss-over').forEach(e=>e.classList.remove('ss-over'));
+  const sameScope = (a,b,kind)=> kind==='team' || (a.dataset.tie===b.dataset.tie && a.dataset.side===b.dataset.side);
+  const isSame = (a,b)=> a===b;
   function paintSel(){
-    document.querySelectorAll('.ss-side.ss-sel').forEach(e=>e.classList.remove('ss-sel'));
-    if(MLP_SWAP_SEL){ const e = document.querySelector(`.ss-side[data-tie="${MLP_SWAP_SEL.tie}"][data-side="${MLP_SWAP_SEL.side}"]`); if(e) e.classList.add('ss-sel'); }
+    document.querySelectorAll('.ss-sel').forEach(e=>e.classList.remove('ss-sel'));
+    const sel = MLP_SWAP_SEL; if(!sel) return;
+    let q = sel.kind==='team' ? `.ss-side[data-tie="${sel.tie}"][data-side="${sel.side}"]` : `.ss-pl[data-tie="${sel.tie}"][data-side="${sel.side}"][data-game="${sel.game}"][data-pid="${sel.pid}"]`;
+    const e = document.querySelector(q); if(e) e.classList.add('ss-sel');
   }
   document.addEventListener('pointerdown', e=>{
-    const grip = e.target.closest && e.target.closest('.ss-grip'); if(!grip) return;
-    const side = sideOf(grip); if(!side) return;
-    drag = { side, x:e.clientX, y:e.clientY, moving:false, id:e.pointerId };
-    try{ grip.setPointerCapture(e.pointerId); }catch(_){}
+    let kind = null, el = null;
+    if(e.target.closest){
+      const pl = e.target.closest('.ss-pl[data-tie]'); const gr = e.target.closest('.ss-grip');
+      if(pl){ kind='pl'; el=pl; } else if(gr){ kind='team'; el=find(gr,'team'); }
+    }
+    if(!el) return;
+    drag = { el, kind, x:e.clientX, y:e.clientY, moving:false };
+    try{ (kind==='team' ? el.querySelector('.ss-grip') : el).setPointerCapture(e.pointerId); }catch(_){}
   });
   document.addEventListener('pointermove', e=>{
     if(!drag) return;
@@ -5868,36 +5916,44 @@ function mlpSwapTeams(sessionId, tieIdA, keyA, tieIdB, keyB){
       if(Math.hypot(e.clientX-drag.x, e.clientY-drag.y) < 8) return;
       drag.moving = true;
       ghost = document.createElement('div'); ghost.className = 'ss-ghost';
-      ghost.innerHTML = drag.side.querySelector('.ss-grip').innerHTML + '<span>'+drag.side.querySelector('.ss-sname').textContent.replace(/</g,'&lt;')+'</span>';
+      const nm = (drag.kind==='team' ? drag.el.querySelector('.ss-sname') : drag.el.querySelector('.nm')).textContent.replace(/</g,'&lt;');
+      ghost.innerHTML = (drag.kind==='team' ? drag.el.querySelector('.ss-grip').innerHTML : drag.el.querySelector('.g-dot').outerHTML) + '<span>'+nm+'</span>';
       document.body.appendChild(ghost);
-      drag.side.classList.add('ss-lift');
+      drag.el.classList.add('ss-lift');
     }
     e.preventDefault();
     ghost.style.left = e.clientX+'px'; ghost.style.top = e.clientY+'px';
     if(e.clientY > innerHeight-110) window.scrollBy(0,14); else if(e.clientY < 90) window.scrollBy(0,-14);
     clearOver();
-    const t = sideOf(document.elementFromPoint(e.clientX, e.clientY));
-    if(t && t!==drag.side) t.classList.add('ss-over');
+    const t = find(document.elementFromPoint(e.clientX, e.clientY), drag.kind);
+    if(t && t!==drag.el && sameScope(drag.el,t,drag.kind)) t.classList.add('ss-over');
   }, {passive:false});
+  function doSwap(kind, a, b){
+    const x = a.dataset, y = b.dataset;
+    if(kind==='team') mlpSwapTeams(x.sess, x.tie, x.side, y.tie, y.side);
+    else mlpSwapPlayers(x.sess, x.tie, x.side, +x.game, x.pid, +y.game, y.pid);
+  }
   function end(e, cancel){
     if(!drag) return;
     const d = drag; drag = null;
     if(ghost){ ghost.remove(); ghost = null; }
-    clearOver(); d.side.classList.remove('ss-lift');
-    const q = d.side.dataset;
+    clearOver(); d.el.classList.remove('ss-lift');
+    if(cancel) return;
     if(d.moving){
-      if(cancel) return;
-      const t = sideOf(document.elementFromPoint(e.clientX, e.clientY));
-      if(t && t!==d.side) mlpSwapTeams(q.sess, q.tie, q.side, t.dataset.tie, t.dataset.side);
+      const t = find(document.elementFromPoint(e.clientX, e.clientY), d.kind);
+      if(t && t!==d.el && sameScope(d.el,t,d.kind)) doSwap(d.kind, d.el, t);
       return;
     }
-    if(cancel) return;
-    // simple toucher : sélection puis échange
-    if(!MLP_SWAP_SEL){ MLP_SWAP_SEL = { sess:q.sess, tie:q.tie, side:q.side }; paintSel(); return; }
+    const q = d.el.dataset;
     const sel = MLP_SWAP_SEL;
-    if(sel.tie===q.tie && sel.side===q.side){ MLP_SWAP_SEL = null; paintSel(); return; }
-    mlpSwapTeams(q.sess, sel.tie, sel.side, q.tie, q.side);
+    const same = sel && sel.kind===d.kind && sel.tie===q.tie && sel.side===q.side && (d.kind==='team' || (sel.game===q.game && sel.pid===q.pid));
+    if(!sel || sel.kind!==d.kind || (d.kind==='pl' && (sel.tie!==q.tie || sel.side!==q.side))){
+      MLP_SWAP_SEL = { kind:d.kind, sess:q.sess, tie:q.tie, side:q.side, game:q.game, pid:q.pid }; paintSel(); return;
+    }
+    if(same){ MLP_SWAP_SEL = null; paintSel(); return; }
+    const other = document.querySelector(d.kind==='team' ? `.ss-side[data-tie="${sel.tie}"][data-side="${sel.side}"]` : `.ss-pl[data-tie="${sel.tie}"][data-side="${sel.side}"][data-game="${sel.game}"][data-pid="${sel.pid}"]`);
     MLP_SWAP_SEL = null; paintSel();
+    if(other) doSwap(d.kind, other, d.el);
   }
   document.addEventListener('pointerup', e=>end(e,false));
   document.addEventListener('pointercancel', e=>end(e,true));
@@ -5969,13 +6025,23 @@ function addMlpTie(sessionId, teamAId, teamBId){
 }
 function removeMlpTie(sessionId, tieId){
   const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
-  if(!session) return;
+  if(!session || session.status!=='open') return;
   session.ties = session.ties.filter(t=>t.id!==tieId);
   saveAndRender();
 }
 function deleteMlpSession(sessionId){
   showConfirm("Supprimer cette session et tous ses résultats ?", ()=>{
     DATA.mlpSessions = (DATA.mlpSessions||[]).filter(s=>s.id!==sessionId);
+    saveAndRender();
+  });
+}
+function reopenMlpSession(sessionId){
+  const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
+  if(!session) return;
+  if((DATA.mlpSessions||[]).some(s=>s.status==='open')){ showAlert("Une session est déjà en cours : clos-la avant d'en rouvrir une autre."); return; }
+  showConfirm("Rouvrir la session du "+session.date+" pour corriger des scores ? Le classement sera recalculé quand tu la cloreras de nouveau.", ()=>{
+    session.status = 'open';
+    session.reopenedAt = new Date().toISOString();
     saveAndRender();
   });
 }
@@ -6011,17 +6077,17 @@ function mlpTieCardHTML(session, tie){
         return;
       }
     }
-    const pairA = mlpLeagueGamePlayers(teamA, g.type);
-    const pairB = mlpLeagueGamePlayers(teamB, g.type);
-    const labelA = pairA ? pairA.map(playerName).join(' & ') : '?';
-    const labelB = pairB ? pairB.map(playerName).join(' & ') : '?';
+    const pairA = mlpTieLineup(tie, 'A', teamA, g.type);
+    const pairB = mlpTieLineup(tie, 'B', teamB, g.type);
+    const chips = (pair, side)=> pair ? `<div class="ss-pls ${side==='B'?'r':''}">${pair.map(id=>`<span class="ss-pl" data-sess="${session.id}" data-tie="${tie.id}" data-side="${side}" data-game="${gi}" data-pid="${id}">${mlpGenderDot(mlpPlayerGender(id))}<span class="nm">${escapeHTML(playerName(id))}</span></span>`).join('')}</div>` : '?';
+    const labelA = chips(pairA,'A'), labelB = chips(pairB,'B');
     html += `<div class="small" style="margin-top:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">${escapeHTML(mlpGameTypeLabel(g.type))}</div>
       <div class="match-row">
-        <div class="team">${escapeHTML(labelA)}</div>
+        <div class="team">${labelA}</div>
         <input class="pill-input" type="number" min="0" inputmode="numeric" value="${g.scoreA===null?'':g.scoreA}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'A',this.value)">
         <div class="vs">VS</div>
         <input class="pill-input" type="number" min="0" inputmode="numeric" value="${g.scoreB===null?'':g.scoreB}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'B',this.value)">
-        <div class="team" style="text-align:right;">${escapeHTML(labelB)}</div>
+        <div class="team" style="text-align:right;">${labelB}</div>
       </div>`;
   });
   html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>`;
@@ -6039,6 +6105,7 @@ function setMlpTieScore(sessionId, tieId, gameIndex, which, value){
   try{
     const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
     if(!session){ showAlert("Session introuvable (id: "+sessionId+")."); return; }
+    if(session.status!=='open'){ showAlert("Cette session est close : les scores sont verrouillés. Rouvre-la d'abord (Sessions passées → Rouvrir)."); render(); return; }
     session.ties = session.ties || [];
     const tie = session.ties.find(x=>x.id===tieId);
     if(!tie){ showAlert("Affrontement introuvable (id: "+tieId+")."); return; }
@@ -6056,10 +6123,95 @@ function setMlpTieScore(sessionId, tieId, gameIndex, which, value){
     showAlert("Erreur pendant la saisie du score : " + (e && e.message ? e.message : e));
   }
 }
+// Calcule gagnant / points / DreamBreaker d'un affrontement (modifie `tie`). Retourne true si décidé.
+function mlpApplyTieResult(tie){
+  const cfg = { mlpRosterSize: DATA.mlpRosterSize||4 };
+  const result = computeMLPTieWinner(cfg, tie.games, tie.teamAId, tie.teamBId);
+  if(result.needsDreambreaker && !tie.games.some(x=>x.type==='dreambreaker')){
+    tie.games.push({ type:'dreambreaker', scoreA:null, scoreB:null });
+  } else if(!result.needsDreambreaker){
+    tie.games = tie.games.filter(x=>x.type!=='dreambreaker');
+  }
+  tie.winnerTeamId = result.winnerTeamId;
+  if(tie.winnerTeamId){
+    const pts = computeMLPTiePoints(tie, tie.teamAId, tie.teamBId);
+    tie.pointsA = pts.pointsA; tie.pointsB = pts.pointsB;
+  } else { tie.pointsA = null; tie.pointsB = null; }
+  return !!tie.winnerTeamId;
+}
+// Saisie des scores par un joueur des deux équipes : on relit la ligue à jour
+// (pour ne pas écraser d'autres changements), on applique, puis on sauvegarde.
+async function playerSaveMlpTie(sessionId, tieId, meId){
+  try{
+    const inputs = Array.from(document.querySelectorAll(`input[data-ptie="${tieId}"]`));
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', CURRENT_LEAGUE_ID).single();
+    if(error){ showAlert("Erreur : " + error.message); return; }
+    const fresh = data && data.data;
+    const session = fresh && (fresh.mlpSessions||[]).find(x=>x.id===sessionId);
+    if(!session || session.status!=='open'){ showAlert("Cette session est déjà close — contacte un administrateur."); return; }
+    const tie = (session.ties||[]).find(x=>x.id===tieId);
+    if(!tie){ showAlert("Affrontement introuvable (il a peut-être été modifié)."); return; }
+    const mine = (fresh.mlpTeams||[]).some(t=>(t.id===tie.teamAId||t.id===tie.teamBId) && t.memberIds.includes(meId));
+    if(!mine){ showAlert("Tu ne fais pas partie de cet affrontement."); return; }
+    tie.games = (tie.games && tie.games.length) ? tie.games : newMLPGames(fresh.mlpRosterSize||4);
+    let bad = false;
+    inputs.forEach(inp=>{
+      const g = tie.games[+inp.dataset.g]; if(!g) return;
+      const v = inp.value==='' ? null : Number(inp.value);
+      if(v!==null && (!isFinite(v) || v<0)) bad = true;
+      if(inp.dataset.s==='A') g.scoreA = v; else g.scoreB = v;
+    });
+    if(bad){ showAlert("Les scores doivent être des nombres positifs."); return; }
+    const prev = DATA; DATA = fresh;
+    let decided;
+    try{ decided = mlpApplyTieResult(tie); } finally { /* DATA reste = fresh */ }
+    const { error: e2 } = await sb.rpc('mlp_submit_tie', {
+      p_league_id: CURRENT_LEAGUE_ID, p_session_id: sessionId, p_tie_id: tieId,
+      p_games: tie.games, p_winner: tie.winnerTeamId || null,
+      p_points_a: tie.pointsA==null ? null : tie.pointsA, p_points_b: tie.pointsB==null ? null : tie.pointsB
+    });
+    if(e2){ DATA = prev; showAlert("La sauvegarde a échoué : " + e2.message + " (le SQL « mlp-score-entry.sql » est-il exécuté dans Supabase ?)"); return; }
+    render();
+    showAlert(decided ? "✅ Résultat enregistré." : "Scores enregistrés. Le résultat sera déterminé quand toutes les parties auront un score.");
+  }catch(e){
+    showAlert("Erreur : " + (e && e.message ? e.message : e));
+  }
+}
+// Carte de saisie des scores côté joueur
+function mlpPlayerTieEntryHTML(tie, myTeam, me, sessionId){
+  const teamA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId);
+  const teamB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
+  if(!teamA || !teamB) return '';
+  const games = tie.games && tie.games.length ? tie.games : newMLPGames(DATA.mlpRosterSize||4);
+  const head = (t, right)=>`<div class="ss-side ${right?'r':''}" style="--tc:${mlpTeamColor(t)};">${mlpTeamBadgeHTML(t,40)}<span class="ss-sname">${escapeHTML(t.name)}${t.id===myTeam.id?' ⭐':''}</span></div>`;
+  let html = `<div class="card ss-tie" style="--tc:${tie.winnerTeamId?'var(--ball)':'var(--line-soft)'};">
+    <div class="ss-tiehead">${head(teamA,false)}<div class="ss-mid">${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB}</span>` : '<span class="vs">VS</span>'}</div>${head(teamB,true)}</div>
+    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'tag-green':'tag-down'):'tag-stay'}">${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'Victoire ✅':'Défaite'):'⏳ À jouer'}</span></div>`;
+  games.forEach((g,gi)=>{
+    const pa = mlpTieLineup(tie,'A',teamA,g.type), pb = mlpTieLineup(tie,'B',teamB,g.type);
+    const lab = (pair)=> pair ? pair.map(playerName).map(escapeHTML).join(' & ') : '?';
+    if(g.type==='dreambreaker'){
+      const need = [[teamA,'A'],[teamB,'B']].filter(([t])=>!t.dreambreakerPlayerId && t.id===myTeam.id);
+      if(need.length) html += `<p class="small" style="margin-top:10px;color:var(--danger);">DreamBreaker — choisis ton représentant :</p><select onchange="setMlpLeagueDreambreakerPlayer('${myTeam.id}',this.value)"><option value="">— ${escapeHTML(myTeam.name)} —</option>${myTeam.memberIds.map(id=>`<option value="${id}">${escapeHTML(playerName(id))}</option>`).join('')}</select>`;
+    }
+    html += `<div class="small" style="margin-top:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">${escapeHTML(mlpGameTypeLabel(g.type))}</div>
+      <div class="match-row">
+        <div class="team">${lab(pa)}</div>
+        <input class="pill-input" type="number" min="0" inputmode="numeric" data-ptie="${tie.id}" data-g="${gi}" data-s="A" value="${g.scoreA==null?'':g.scoreA}">
+        <div class="vs">VS</div>
+        <input class="pill-input" type="number" min="0" inputmode="numeric" data-ptie="${tie.id}" data-g="${gi}" data-s="B" value="${g.scoreB==null?'':g.scoreB}">
+        <div class="team" style="text-align:right;">${lab(pb)}</div>
+      </div>`;
+  });
+  html += `<button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="playerSaveMlpTie('${sessionId}','${tie.id}','${me.id}')">💾 ${tie.winnerTeamId?'Mettre à jour le résultat':'Envoyer le résultat'}</button>
+  </div>`;
+  return html;
+}
 function recomputeMlpTie(sessionId, tieId){
   try{
     const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
     if(!session){ showAlert("Session introuvable."); return; }
+    if(session.status!=='open'){ showAlert("Cette session est close : les scores sont verrouillés."); return; }
     const tie = (session.ties||[]).find(x=>x.id===tieId);
     if(!tie){ showAlert("Affrontement introuvable."); return; }
     const cfg = { mlpRosterSize: DATA.mlpRosterSize||4 };
@@ -6091,8 +6243,9 @@ function mlpHistoryHTML(){
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">Session du ${session.date}</h3>
-        <span class="tag tag-stay">${(session.ties||[]).length} affrontement${(session.ties||[]).length>1?'s':''}</span>
+        <span class="tag tag-stay">🔒 ${(session.ties||[]).length} affrontement${(session.ties||[]).length>1?'s':''}</span>
       </div>
+      ${isAdminView ? `<button class="btn-ghost" style="margin:8px 0;" onclick="reopenMlpSession('${session.id}')">🔓 Rouvrir pour corriger</button>` : ''}
       ${(session.ties||[]).map(tie=>{
         const teamA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId);
         const teamB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
@@ -6197,9 +6350,15 @@ function generateBracket(tournamentId){
     saveOrgTournamentDataAndRender();
   });
 }
+const TOURN_UNLOCK = {};
 function setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, which, value){
   const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.bracket) return;
+  if(t.status==='completed' && !TOURN_UNLOCK[tournamentId]){
+    render();
+    showConfirm("Ce tournoi est terminé. Corriger un score peut changer le gagnant et le classement final. Corriger quand même ?", ()=>{ TOURN_UNLOCK[tournamentId] = true; setBracketMatchScore(tournamentId, roundIndex, matchIndex, gameIndex, which, value); });
+    return;
+  }
   const m = t.bracket.rounds[roundIndex].matches[matchIndex];
   if(!m.games) m.games = t.teamFormat==='mlp' ? newMLPGames(t.mlpRosterSize||4) : newEmptyGames(1);
   const g = m.games[gameIndex];
@@ -6502,6 +6661,11 @@ function computePoolStandings(pool){
 function setPoolMatchScore(tournamentId, poolId, matchIndex, gameIndex, which, value){
   const t = orgTournaments().find(x=>x.id===tournamentId);
   if(!t || !t.pools) return;
+  if((t.bracket || t.status==='completed') && !TOURN_UNLOCK[tournamentId]){
+    render();
+    showConfirm("Les poules sont terminées (le bracket existe déjà). Modifier un score de poule ne met pas le bracket à jour automatiquement. Corriger quand même ?", ()=>{ TOURN_UNLOCK[tournamentId] = true; setPoolMatchScore(tournamentId, poolId, matchIndex, gameIndex, which, value); });
+    return;
+  }
   const pool = t.pools.find(p=>p.id===poolId);
   if(!pool) return;
   const m = pool.matches[matchIndex];
@@ -8635,6 +8799,10 @@ function onUnpublishSession(){
 }
 function setScore(gid, mi, which, val){
   const open = currentOpenSession();
+  // Verrou : on ne modifie jamais les scores d'une session close/finalisée, et un joueur
+  // ne peut saisir que si l'admin a activé la saisie par les joueurs.
+  if(!open || open.status!=='open'){ showAlert("Cette session est terminée : les scores sont verrouillés."); render(); return; }
+  if(SESSION_USER && SESSION_USER.role!=='admin' && !DATA.allowPlayerScoreEntry){ showAlert("La saisie des scores est réservée aux administrateurs."); render(); return; }
   const gd = open.groupsData.find(x=>x.groupId===gid);
   const m = gd.matches[mi];
   if(which==='A') m.scoreA = val===''? null : Number(val);
@@ -9060,6 +9228,48 @@ function showMatchHistoryModal(sessionId, onlyGroupId){
   const title = 'Matchs — session du ' + s.date + (g ? ' — ' + g.name : '');
   showContentModal(title, matchListInnerHTML(s, onlyGroupId));
 }
+// ---- Rouvrir une session terminée (format Échelle) ----
+function isLatestClosedSession(s){
+  const closed = (DATA.sessions||[]).filter(x=>x.status==='closed');
+  return closed.length>0 && closed[closed.length-1].id===s.id;
+}
+function reopenLadderSession(sessionId){
+  const s = DATA.sessions.find(x=>x.id===sessionId);
+  if(!s || s.status!=='closed') return;
+  if(!isLatestClosedSession(s)){ showAlert("Seule la dernière session terminée peut être rouverte : les suivantes dépendent d'elle."); return; }
+  const open = currentOpenSession();
+  const hasScores = open && (open.groupsData||[]).some(gd=>(gd.matches||[]).some(m=>m.scoreA!==null && m.scoreA!=='' && m.scoreA!==undefined || m.scoreB!==null && m.scoreB!=='' && m.scoreB!==undefined));
+  if(hasScores){ showAlert("La session suivante (" + open.date + ") a déjà des scores. Termine-la ou annule-la d'abord, puis rouvre celle-ci."); return; }
+  const exact = !!s.preSnapshot;
+  const msg = "Rouvrir la session du " + s.date + " ? Les montées/descentes et les changements de cote seront annulés, et tu pourras corriger les scores puis la terminer de nouveau."
+    + (open ? " La session suivante (" + open.date + "), encore vide, sera supprimée." : "")
+    + (exact ? "" : " ⚠️ Cette session est ancienne : les groupes seront restaurés, mais l'ordre des joueurs dans chaque groupe pourrait différer légèrement.");
+  showConfirm(msg, ()=>{
+    if(open) DATA.sessions = DATA.sessions.filter(x=>x.id!==open.id);
+    if(exact){
+      s.preSnapshot.forEach(snap=>{
+        const pl = DATA.players.find(p=>p.id===snap.id);
+        if(pl){ pl.groupId = snap.groupId; pl.order = snap.order; }
+      });
+    } else {
+      (s.movements||[]).forEach(m=>{
+        const pl = DATA.players.find(p=>p.id===m.playerId);
+        if(pl && pl.groupId===m.toGroupId) pl.groupId = m.fromGroupId;
+      });
+    }
+    Object.keys(s.ratingDeltas||{}).forEach(pid=>{
+      const pl = findRatablePerson(pid);
+      if(!pl) return;
+      pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
+      pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - 1);
+    });
+    delete s.standingsByGroup; delete s.movements; delete s.ratingDeltas; delete s.preSnapshot;
+    s.status = 'open';
+    s.reopenedAt = new Date().toISOString();
+    VIEW = { tab:'session', sessionSubTab:'groupes' };
+    saveAndRender();
+  });
+}
 function deleteSession(sessionId){
   const s = DATA.sessions.find(x=>x.id===sessionId);
   if(!s) return;
@@ -9109,6 +9319,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
         ${withDelete ? `<button class="btn-ghost-danger" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
       </div>
     </div>`;
+  if(withDelete && !viewerPlayerId && isLatestClosedSession(s)) html += `<button class="btn-ghost" style="margin:8px 0;" onclick="reopenLadderSession('${s.id}')">🔓 Rouvrir pour corriger les scores</button>`;
   groupsSorted().forEach(g=>{
     const rows = s.standingsByGroup ? s.standingsByGroup[g.id] : null;
     if(!rows || rows.length===0) return;
@@ -10464,22 +10675,8 @@ function mlpPlayerTeamHTML(me){
   if(open){
     const myTies = (open.ties||[]).filter(t=>t.teamAId===team.id || t.teamBId===team.id);
     if(myTies.length){
-      html += `<div class="card"><h3>Affrontements de la session en cours (${open.date})</h3>`;
-      myTies.forEach(tie=>{
-        const mineIsA = tie.teamAId===team.id;
-        const opp = (DATA.mlpTeams||[]).find(t=>t.id===(mineIsA?tie.teamBId:tie.teamAId));
-        const myPts = mineIsA ? tie.pointsA : tie.pointsB, oppPts = mineIsA ? tie.pointsB : tie.pointsA;
-        const statusTag = tie.winnerTeamId
-          ? (tie.winnerTeamId===team.id ? '<span class="tag tag-green">Victoire ✅</span>' : '<span class="tag tag-down">Défaite</span>')
-          : '<span class="tag tag-stay">À venir</span>';
-        html += `<div class="match-row me">
-          <div class="team"><strong>${escapeHTML(team.name)}</strong></div>
-          <div class="vs">${tie.winnerTeamId ? `${myPts} : ${oppPts}` : 'VS'}</div>
-          <div class="team" style="text-align:right;">${escapeHTML(opp?opp.name:'?')}</div>
-          <div style="flex-basis:100%;">${statusTag}</div>
-        </div>`;
-      });
-      html += `</div>`;
+      html += `<h3 style="margin:16px 0 4px;">Affrontements de la session (${escapeHTML(open.date)})</h3><p class="small" style="margin:0 0 10px;color:var(--muted);">Entre les scores de chaque partie après le match : le résultat se calcule automatiquement.</p>`;
+      myTies.forEach(tie=>{ html += mlpPlayerTieEntryHTML(tie, team, me, open.id); });
     }
   }
   return html;
