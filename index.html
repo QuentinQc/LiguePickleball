@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 122">
+<meta name="app-build" content="Version 123">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -692,7 +692,7 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .cal-today{box-shadow:inset 0 0 0 2px var(--green,#2e9d5b);font-weight:700;}
 .cal-sel{background:rgba(46,157,91,.16);}
 .cal-dots{display:flex;gap:3px;height:6px;}
-.cal-dots i,.cal-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;box-sizing:border-box;}
+.cal-dots i,.cal-legend i{display:inline-block;width:7px;height:7px;border-radius:50%;box-sizing:border-box;}
 .cal-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:8px;}
 .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
 .cal-h{margin:0 0 8px;font-size:14px;text-transform:capitalize;}
@@ -3367,9 +3367,9 @@ function calItemsFor(){
   const lgs = calLeaguesList();
   lgs.forEach(L=>{
   const real = new Set();
-  (L.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status, lg:L.name}); });
+  (L.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status, lg:L.name, lgId:L.id}); });
   const blocked = new Set(L.blockedDates||[]);
-  blocked.forEach(d=>add(d,{t:'blocked', lg:L.name}));
+  blocked.forEach(d=>add(d,{t:'blocked', lg:L.name, lgId:L.id}));
   const dow = L.playDayOfWeek;
   if(typeof dow==='number'){
     const a = L.seasonStartDate, b = L.seasonEndDate;
@@ -3378,13 +3378,20 @@ function calItemsFor(){
     for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
       if(d.getDay()!==dow) continue;
       const f = fmtDate(d);
-      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned', lg:L.name});
+      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned', lg:L.name, lgId:L.id});
     }
   }
   });
   (PARTNER_POSTS||[]).forEach(p=>{ if(p.play_date && p.status!=='closed') add(p.play_date,{t:'partner', p}); });
   (SOCIAL_EVENTS||[]).forEach(e=>add(e.event_date,{t:'event', e}));
   return map;
+}
+const CAL_PALETTE = ['#4C8DF6','#34B36B','#9B6BF2','#E5535D','#D4A017','#C45FB8','#7A8CA5'];
+const CAL_C_PARTNER = '#F2994A', CAL_C_EVENT = '#3FB5A6';
+function calLeagueColor(id){
+  let idx = (LEAGUES||[]).findIndex(x=>x.id===id);
+  if(idx<0) idx = 0;
+  return CAL_PALETTE[idx % CAL_PALETTE.length];
 }
 function calendarSheetHTML(){
   const today = fmtDate(new Date());
@@ -3395,36 +3402,41 @@ function calendarSheetHTML(){
   const lead = (first.getDay()+6)%7;
   const days = new Date(Y,M,0).getDate();
   const label = first.toLocaleDateString('fr-CA',{month:'long',year:'numeric'});
+  const dotOf = i=>{
+    if(i.t==='partner') return `<i style="background:${CAL_C_PARTNER}"></i>`;
+    if(i.t==='event') return `<i style="background:${CAL_C_EVENT}"></i>`;
+    if(i.t==='blocked') return '';
+    const c = calLeagueColor(i.lgId);
+    return i.t==='planned' ? `<i style="border:1.5px solid ${c}"></i>` : `<i style="background:${c}"></i>`;
+  };
   let cells = '';
   for(let i=0;i<lead;i++) cells += '<div class="cal-cell cal-empty"></div>';
   for(let d=1; d<=days; d++){
     const f = `${Y}-${String(M).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const its = items[f]||[];
-    const has = t=>its.some(i=>i.t===t);
-    const dots = [
-      has('session')?'<i style="background:var(--green,#2e9d5b)"></i>':'',
-      has('planned')?'<i style="border:1.5px solid var(--green,#2e9d5b)"></i>':'',
-      has('partner')?'<i style="background:#F2994A"></i>':'',
-      has('event')?'<i style="background:#3FB5A6"></i>':'',
-      has('blocked')?'<i style="background:#bbb"></i>':''
-    ].join('');
-    cells += `<button type="button" class="cal-cell ${f===today?'cal-today':''} ${f===CAL_SEL?'cal-sel':''}" onclick="calSelect('${f}')"><span>${d}</span><div class="cal-dots">${dots}</div></button>`;
+    const seen = new Set(); const dots = [];
+    its.forEach(i=>{ const h = dotOf(i); const key = h+(i.t==='planned'?'p':''); if(h && !seen.has(key)){ seen.add(key); dots.push(h); } });
+    const blockedOnly = its.length && its.every(i=>i.t==='blocked');
+    cells += `<button type="button" class="cal-cell ${f===today?'cal-today':''} ${f===CAL_SEL?'cal-sel':''}" ${blockedOnly?'style="opacity:.45;text-decoration:line-through;"':''} onclick="calSelect('${f}')"><span>${d}</span><div class="cal-dots">${dots.slice(0,4).join('')}</div></button>`;
   }
-  let list = '';
+  const row = (color, ico, title, sub, click)=>`<div class="cal-row ${click?'cal-click':''}" style="border-left:4px solid ${color};" ${click?`onclick="${click}"`:''}><span class="cal-badge" style="background:${color}22;">${ico}</span><div><b>${title}</b>${sub?`<div class="small">${sub}</div>`:''}</div></div>`;
   const rows = its=>its.map(i=>{
-    if(i.t==='session') return `<div class="cal-row"><span class="cal-badge" style="background:#e3f5ea;">🏓</span><div><b>Session de ligue</b><div class="small">${escapeHTML(i.lg||'')} · ${i.status==='closed'?'Terminée':'En cours'}</div></div></div>`;
-    if(i.t==='planned') return `<div class="cal-row"><span class="cal-badge" style="background:#eef7f1;">🏓</span><div><b>Session prévue</b><div class="small">${escapeHTML(i.lg||'')} · jour de jeu régulier</div></div></div>`;
-    if(i.t==='blocked') return `<div class="cal-row"><span class="cal-badge" style="background:#eee;">⛔</span><div><b>Pas de session</b><div class="small">${escapeHTML(i.lg||'')}</div></div></div>`;
-    if(i.t==='partner') return `<div class="cal-row cal-click" onclick="openPartnerPostDetail('${i.p.id}')"><span class="cal-badge" style="background:#fdebd9;">🤝</span><div><b>${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire</b><div class="small">${escapeHTML((i.p.message||'').slice(0,80))}</div></div></div>`;
-    return `<div class="cal-row cal-click" onclick="openEventDetail('${i.e.id}')"><span class="cal-badge" style="background:#d9f1ee;">🎉</span><div><b>${escapeHTML(i.e.title||'Événement')}</b><div class="small">${escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · '))}</div></div></div>`;
+    const c = calLeagueColor(i.lgId);
+    if(i.t==='session') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session · ${i.status==='closed'?'terminée':'en cours'}`);
+    if(i.t==='planned') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),'Session prévue');
+    if(i.t==='blocked') return row(c,'⛔',escapeHTML(i.lg||'Ligue'),'Pas de session');
+    if(i.t==='partner') return row(CAL_C_PARTNER,'🤝',`${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire`,escapeHTML((i.p.message||'').slice(0,80)),`openPartnerPostDetail('${i.p.id}')`);
+    return row(CAL_C_EVENT,'🎉',escapeHTML(i.e.title||'Événement'),escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · ')),`openEventDetail('${i.e.id}')`);
   }).join('');
+  let list;
   if(CAL_SEL){
     const its = items[CAL_SEL]||[];
     list = `<h4 class="cal-h">${escapeHTML(eventDateLabel(CAL_SEL))}</h4>` + (its.length ? rows(its) : '<p class="empty">Rien de prévu ce jour-là.</p>');
   } else {
-    const up = Object.keys(items).filter(d=>d>=today).sort().slice(0,12);
-    list = '<h4 class="cal-h">À venir</h4>' + (up.length ? up.map(d=>`<div class="cal-up">${escapeHTML(eventDateLabel(d))}</div>${rows(items[d])}`).join('') : '<p class="empty">Rien à venir.</p>');
+    list = '<p class="small" style="color:var(--muted);text-align:center;margin:6px 0 0;">Touche un jour pour voir le détail.</p>';
   }
+  const legend = calLeaguesList().map(L=>`<span><i style="background:${calLeagueColor(L.id)}"></i>${escapeHTML(L.name)}</span>`).join('')
+    + `<span><i style="background:${CAL_C_PARTNER}"></i>Partenaire</span><span><i style="background:${CAL_C_EVENT}"></i>Événement</span><span><i style="border:1.5px solid #999"></i>Session prévue</span>`;
   return `<div class="card">
     <div class="cal-nav">
       <button type="button" class="cal-btn" onclick="calNav(-1)" aria-label="Mois précédent">‹</button>
@@ -3432,9 +3444,9 @@ function calendarSheetHTML(){
       <button type="button" class="cal-btn" onclick="calNav(1)" aria-label="Mois suivant">›</button>
     </div>
     <div class="cal-grid">${['L','M','M','J','V','S','D'].map(x=>`<div class="cal-dow">${x}</div>`).join('')}${cells}</div>
-    <div class="cal-legend"><span><i style="background:var(--green,#2e9d5b)"></i>Session</span><span><i style="border:1.5px solid var(--green,#2e9d5b)"></i>Prévue</span><span><i style="background:#F2994A"></i>Partenaire</span><span><i style="background:#3FB5A6"></i>Événement</span></div>
-    <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="calToday()">Aujourd'hui</button>
-    <div style="margin-top:10px;">${list}</div>
+    <div class="cal-legend">${legend}</div>
+    <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="calToday()">Aujourd'hui</button>
+    <div style="margin-top:12px;">${list}</div>
   </div>`;
 }
 function calSelect(d){ CAL_SEL = (CAL_SEL===d ? null : d); render(); }
