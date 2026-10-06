@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 129">
+<meta name="app-build" content="Version 130">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -707,9 +707,11 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .topbar-main-3col .row{flex-wrap:nowrap;}
 @media (max-width:899px){
   .topbar-main-3col{grid-template-columns:auto 1fr auto;gap:6px;}
-  .topbar-quick-mobile{grid-column:2;justify-self:center;display:block;}
+  .topbar-main{position:relative;}
+  .topbar-quick-mobile{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;z-index:2;}
   .topbar-quick-desktop{display:none;}
-  .topbar-menu{left:50%;transform:translateX(-50%);}
+  .topbar-menu{left:50%;margin-left:-100px;}
+  .topbar-main:has(.view-slide[style*="--n:3"]) .topbar-quick-mobile{position:static;transform:none;grid-column:2;justify-self:center;}
   .topbar-main-3col .topbar-right{grid-column:3;min-width:0;}
   .topbar-ico{width:36px;height:36px;font-size:17px;}
   .topbar-icos{gap:5px;}
@@ -723,8 +725,8 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .topbar{padding:10px 10px;}
   .topbar-main-3col .hamburger-btn{font-size:28px;padding:6px 2px 6px 0;min-height:36px;}
   .topbar-main-3col .view-slide{padding:2px;}
-  .topbar-main-3col .view-slide button{padding:7px 6px;font-size:9px;}
-  .topbar-ico{width:34px;height:34px;}
+  .topbar-main-3col .view-slide button{padding:7px 4px;font-size:9px;}
+  .topbar-ico{width:32px;height:32px;font-size:16px;}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
