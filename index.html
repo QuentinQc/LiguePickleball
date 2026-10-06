@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006105300">
+<meta name="app-build" content="20261006112002">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -172,6 +172,23 @@ p{margin:4px 0;line-height:1.4;}
 .btn-icon:disabled{opacity:0.35;cursor:not-allowed;}
 input,select{font-family:var(--font-body);font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.2);color:var(--text);}
 input::placeholder{color:var(--muted);}
+textarea{font-family:var(--font-body);font-size:15px;line-height:1.45;padding:12px 14px;border-radius:14px;border:1px solid var(--line-soft-strong);background:rgba(0,0,0,0.22);color:var(--text);resize:none;min-height:48px;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;}
+textarea::placeholder{color:var(--muted);}
+textarea:focus{outline:none;border-color:var(--ball);box-shadow:0 0 0 3px rgba(207,234,92,.18);}
+input[type=text],input[type=email],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]){border-radius:12px;}
+input[type=date],input[type=time]{color-scheme:dark;}
+.ta-counter{text-align:right;font-size:11px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums;}
+.ta-counter.warn{color:var(--paddle);}
+.f-label{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;}
+.f-group{margin-bottom:14px;}
+.compose-box{background:var(--court-elevated-2);border:1px solid var(--line-soft-strong);border-radius:20px;padding:12px 14px 10px;transition:border-color .15s,box-shadow .15s;}
+.compose-box:focus-within{border-color:var(--ball);box-shadow:0 0 0 3px rgba(207,234,92,.15);}
+.compose-box textarea{width:100%;border:none;background:transparent;padding:2px 0;min-height:56px;box-shadow:none;border-radius:0;font-size:16px;}
+.compose-box textarea:focus{box-shadow:none;}
+.compose-foot{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line-soft);flex-wrap:wrap;}
+.compose-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.07);border:1px solid var(--line-soft);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;font-weight:600;color:var(--muted);}
+.compose-chip input{border:none;background:transparent;padding:4px 6px;min-height:0;font-size:13px;}
+.compose-send{margin-left:auto;border-radius:999px;padding:11px 22px;font-weight:800;}
 input:focus,select:focus{outline:2px solid var(--ball);outline-offset:1px;}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
 .field{margin-bottom:10px;}
@@ -1639,12 +1656,11 @@ function partnerBoardHTML(){
     <div class="card">
       <h3 style="margin:0 0 4px;">🤝 Trouver un partenaire</h3>
       <p class="small" style="margin:0 0 10px;color:var(--muted);">Besoin d'un ou une partenaire pour un match amical ? Publie une annonce visible par toute la ligue.</p>
-      <div class="modal-section" style="margin-top:0;">
-        <h3>Nouvelle annonce</h3>
-        <textarea id="partnerMessageInput" rows="2" maxlength="300" placeholder="Ex : Cherche un ou une partenaire pour jouer samedi matin, niveau intermédiaire." style="width:100%;"></textarea>
-        <div class="row" style="gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-          <label class="small" style="display:flex;align-items:center;gap:6px;">Date (optionnel) <input type="date" id="partnerDateInput"></label>
-          <button class="btn btn-primary" style="width:auto;margin-left:auto;" onclick="createPartnerPost()">Publier</button>
+      <div class="compose-box">
+        <textarea id="partnerMessageInput" rows="2" maxlength="300" placeholder="Écris ton annonce… ex : Cherche un partenaire samedi matin, niveau intermédiaire."></textarea>
+        <div class="compose-foot">
+          <label class="compose-chip">📅 Date <input type="date" id="partnerDateInput"></label>
+          <button class="btn btn-primary compose-send" onclick="createPartnerPost()">Publier ➤</button>
         </div>
       </div>
       <div id="partnerPostsList" style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">
@@ -1807,29 +1823,29 @@ async function loadSocialEvents(){
 function socialEventFormHTML(e){
   e = e || {};
   return `
-    <div class="modal-section" style="margin-top:0;">
-      <label class="small">Titre</label>
+    <div class="f-group">
+      <label class="f-label">🎉 Titre</label>
       <input type="text" id="eventTitleInput" value="${escapeHTML(e.title||'')}" style="width:100%;" placeholder="Ex : BBQ de fin de saison">
     </div>
-    <div class="modal-section">
-      <label class="small">Description (optionnel)</label>
-      <textarea id="eventDescInput" rows="3" style="width:100%;">${escapeHTML(e.description||'')}</textarea>
+    <div class="f-group">
+      <label class="f-label">🗒️ Description <span style="text-transform:none;font-weight:500;">(optionnel)</span></label>
+      <textarea id="eventDescInput" rows="3" maxlength="500" placeholder="Détails, quoi apporter, comment s'inscrire…" style="width:100%;">${escapeHTML(e.description||'')}</textarea>
     </div>
-    <div class="row" style="gap:8px;flex-wrap:wrap;">
-      <div class="modal-section" style="flex:1;min-width:140px;">
-        <label class="small">Date</label>
+    <div class="row" style="gap:10px;flex-wrap:wrap;">
+      <div class="f-group" style="flex:1;min-width:140px;">
+        <label class="f-label">📅 Date</label>
         <input type="date" id="eventDateInput" value="${e.event_date||''}" style="width:100%;">
       </div>
-      <div class="modal-section" style="flex:1;min-width:120px;">
-        <label class="small">Heure (optionnel)</label>
+      <div class="f-group" style="flex:1;min-width:120px;">
+        <label class="f-label">🕐 Heure</label>
         <input type="time" id="eventTimeInput" value="${e.event_time||''}" style="width:100%;">
       </div>
     </div>
-    <div class="modal-section">
-      <label class="small">Lieu (optionnel)</label>
-      <input type="text" id="eventLocationInput" value="${escapeHTML(e.location||'')}" style="width:100%;">
+    <div class="f-group">
+      <label class="f-label">📍 Lieu <span style="text-transform:none;font-weight:500;">(optionnel)</span></label>
+      <input type="text" id="eventLocationInput" value="${escapeHTML(e.location||'')}" style="width:100%;" placeholder="Ex : Parc central">
     </div>
-    <button class="btn btn-primary" style="width:100%;margin-top:6px;" onclick="saveSocialEvent(${e.id?`'${e.id}'`:'null'})">Enregistrer</button>`;
+    <button class="btn btn-primary" style="width:100%;border-radius:999px;padding:13px;font-weight:800;" onclick="saveSocialEvent(${e.id?`'${e.id}'`:'null'})">Enregistrer</button>`;
 }
 function openNewSocialEventModal(){ showContentModal('Nouvel événement', socialEventFormHTML()); }
 function openEditSocialEventModal(id){
@@ -3246,6 +3262,47 @@ try{
     });
   }
 }catch(e){}
+// ---- Zones de texte : hauteur automatique + compteur de caractères ----
+function enhanceTextarea(t){
+  if(!t || t.tagName!=='TEXTAREA' || t.closest('.chat-composer')) return;
+  t.style.height = 'auto';
+  t.style.height = Math.min(Math.max(t.scrollHeight, 48), 240) + 'px';
+  const max = parseInt(t.getAttribute('maxlength'),10);
+  if(max){
+    let c = t.nextElementSibling;
+    if(!c || !c.classList.contains('ta-counter')){
+      c = document.createElement('div'); c.className = 'ta-counter';
+      t.insertAdjacentElement('afterend', c);
+    }
+    c.textContent = t.value.length + ' / ' + max;
+    c.classList.toggle('warn', t.value.length > max*0.9);
+  }
+}
+document.addEventListener('input', e=>{ if(e.target && e.target.tagName==='TEXTAREA') enhanceTextarea(e.target); });
+document.addEventListener('focusin', e=>{ if(e.target && e.target.tagName==='TEXTAREA') enhanceTextarea(e.target); });
+// ---- Touche Entrée = valider : dans un champ de saisie, Entrée clique sur le bouton
+// principal du même bloc (Enregistrer, Publier, Ajouter…) s'il n'y en a qu'un seul.
+// Dans une zone de texte multiligne, c'est Ctrl/Cmd + Entrée (Entrée = nouvelle ligne). ----
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter' || e.isComposing || e.shiftKey || e.altKey) return;
+  const t = e.target;
+  if(!t || !t.tagName) return;
+  const isInput = t.tagName==='INPUT' && ['text','email','number','password','tel','url'].includes((t.getAttribute('type')||'text').toLowerCase());
+  const isArea = t.tagName==='TEXTAREA';
+  if(!isInput && !isArea) return;
+  if(isArea && !(e.ctrlKey || e.metaKey)) return;
+  if(isArea && t.closest('.chat-composer')) return; // le chat a sa propre logique
+  if(t.hasAttribute('data-noenter') || t.classList.contains('orgpick-search')) return;
+  let node = t.parentElement;
+  while(node && node!==document.body){
+    const btns = Array.from(node.querySelectorAll('button.btn-primary')).filter(b=>!b.disabled && b.offsetParent!==null);
+    if(btns.length){
+      if(btns.length===1){ e.preventDefault(); btns[0].click(); }
+      return;
+    }
+    node = node.parentElement;
+  }
+});
 let QUICK_MENU_OPEN = false;
 function quickIconsHTML(){
   const u = quickUnread();
@@ -6389,8 +6446,10 @@ function playerNotesSectionHTML(){
       <h3>📝 Notes admin</h3>
       <p class="small" style="margin-bottom:10px;color:var(--muted);">${helpText}</p>
       ${list}
-      <textarea id="newPlayerNoteInput" placeholder="Ajouter une note..." style="width:100%;min-height:60px;margin-top:6px;"></textarea>
-      <button class="btn btn-secondary" style="margin-top:8px;" onclick="addPlayerNote()">Ajouter la note</button>
+      <div class="compose-box" style="margin-top:8px;">
+        <textarea id="newPlayerNoteInput" rows="2" placeholder="Écrire une note…"></textarea>
+        <div class="compose-foot"><button class="btn btn-primary compose-send" onclick="addPlayerNote()">➕ Ajouter la note</button></div>
+      </div>
     </div>`;
 }
 async function addPlayerNote(){
