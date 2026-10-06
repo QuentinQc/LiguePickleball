@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006101109">
+<meta name="app-build" content="20261006102313">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -277,6 +277,15 @@ tr.me{background:rgba(207,234,92,0.1);}
 .chat-messages .wall-time a{color:inherit;}
 .chat-send{width:44px;height:44px;border-radius:50%;border:none;background:var(--ball);color:#0C2622;font-size:18px;cursor:pointer;flex:0 0 auto;}
 .chat-send:active{transform:scale(.92);}
+.topbar-icos{display:flex;gap:6px;align-items:center;position:relative;}
+.topbar-menu-backdrop{position:fixed;inset:0;z-index:890;}
+.topbar-menu{position:absolute;top:calc(100% + 10px);right:0;z-index:891;min-width:200px;background:var(--court-elevated-2);border:1px solid var(--line-soft-strong);border-radius:16px;padding:6px;box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;animation:chatPop .15s ease-out;}
+.topbar-menu-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:12px 14px;border-radius:12px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;}
+.topbar-menu-item.active{background:rgba(207,234,92,.16);color:var(--ball);}
+.topbar-menu-item:active{background:rgba(255,255,255,.08);}
+.topbar-ico{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto;}
+.topbar-ico.active{background:var(--ball);border-color:var(--ball);}
+.quick-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
 .chat-menu-backdrop{position:fixed;inset:0;z-index:890;background:rgba(0,0,0,.35);}
 .chat-menu{position:fixed;right:14px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:901;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 @media (max-width:640px){.chat-menu{bottom:calc(172px + env(safe-area-inset-bottom,0px));}}
@@ -2955,6 +2964,7 @@ function render(){
     div.innerHTML = modalHTML();
     document.body.appendChild(div);
   }
+  applyQuickView();
   updateChatFab();
 }
 
@@ -3007,7 +3017,8 @@ function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagl
         ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
       </div>
       <div class="topbar-center-info" style="justify-self:center;">${centerChips}</div>
-      <div class="row" style="gap:8px;align-items:center;justify-self:end;">
+      <div class="row" style="gap:8px;align-items:center;justify-self:end;grid-column:3;">
+        ${(switchContext==='admin'||switchContext==='member') && DATA ? quickIconsHTML() : ''}
         ${viewSlide||''}
         ${extraControls||''}
       </div>
@@ -3031,13 +3042,35 @@ function viewSlideHTML(options){
 // bas avec icône + texte prend le relais pour chaque onglet (voir CSS
 // .bottom-nav, masquée sur ordinateur). extraItems (optionnel) permet
 // d'ajouter des actions supplémentaires à cette barre du bas (ex: Absence).
+// ---- Icônes rapides du ruban du haut : Partenaire et Événements (plus des onglets). ----
+let QUICK_VIEW = null; // null | 'partenaire' | 'evenements'
+let QUICK_MENU_OPEN = false;
+function quickIconsHTML(){
+  const item = (k,ico,label)=>`<button type="button" class="topbar-menu-item ${QUICK_VIEW===k?'active':''}" onclick="openQuickView('${k}')"><span style="font-size:20px;">${ico}</span>${label}</button>`;
+  return `<div class="topbar-icos">
+    <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">📣</button>
+    ${QUICK_MENU_OPEN ? `<div class="topbar-menu-backdrop" onclick="toggleQuickMenu(false)"></div><div class="topbar-menu">${item('partenaire','🤝','Partenaire')}${item('evenements','🎉','Événements')}</div>` : ''}
+  </div>`;
+}
+function toggleQuickMenu(force){ QUICK_MENU_OPEN = typeof force==='boolean' ? force : !QUICK_MENU_OPEN; render(); }
+function openQuickView(k){ QUICK_MENU_OPEN = false; QUICK_VIEW = k; render(); window.scrollTo(0,0); }
+function closeQuickView(){ QUICK_VIEW = null; render(); }
+function applyQuickView(){
+  if(!QUICK_VIEW) return;
+  const c = document.getElementById('tabContent');
+  if(!c) return;
+  const title = QUICK_VIEW==='partenaire' ? '🤝 Partenaire' : '🎉 Événements';
+  const body = QUICK_VIEW==='partenaire' ? partnerBoardHTML() : socialEventsHTML();
+  c.innerHTML = `<div class="quick-head"><button class="btn-ghost" onclick="closeQuickView()">← Retour</button><h3 style="margin:0;">${title}</h3></div>${body}`;
+  document.querySelectorAll('.tabs .tab.active, .bottom-nav-item.active').forEach(el=>el.classList.remove('active'));
+}
 function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
   // extraItems (ex: Absence) doivent apparaître à la fois dans les pilules du
   // haut (ordinateur) et dans la barre du bas (mobile) — avant, ils
   // n'étaient ajoutés qu'à la barre du bas, donc invisibles sur ordinateur.
   const extraPillsHTML = (extraItems||[]).map(it=>`<div class="tab tab-action" onclick="${it.onclick}">${it.icon?it.icon+' ':''}${escapeHTML(it.label)}</div>`).join('');
-  const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}${extraPillsHTML}</div>`;
-  const bottomItems = tabs.map(([k,label,icon])=>({key:k, icon, label, onclick:`${setTabFn}('${k}')`}));
+  const pillsHTML = `<div class="tabs">${tabs.map(([k,label,icon])=>`<div class="tab ${k===activeKey?'active':''}" onclick="QUICK_VIEW=null;${setTabFn}('${k}')">${icon?icon+' ':''}${escapeHTML(label)}</div>`).join('')}${extraPillsHTML}</div>`;
+  const bottomItems = tabs.map(([k,label,icon])=>({key:k, icon, label, onclick:`QUICK_VIEW=null;${setTabFn}('${k}')`}));
   if(extraItems && extraItems.length){
     // Insérées au centre plutôt qu'à la fin, pour un équilibre visuel (ex :
     // le bouton surélevé Absence entre les onglets plutôt que collé au bord).
@@ -3433,7 +3466,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -3502,7 +3535,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['gamification','Palmarès','🏆'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -9088,11 +9121,11 @@ function switchRowHTML(id, checked, label){
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
   return DATA.leagueFormat === 'mlp'
-    ? [['equipe','Mon équipe'],['classement','Classement'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement','Mon groupe'],['stats','Statistiques'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
+    ? [['equipe','Mon équipe'],['classement','Classement'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
+    : [['classement','Mon groupe'],['stats','Statistiques'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
-  return [['dispo','Disponibilité'],['partenaire','Partenaire'],['evenements','Événements'],['gamification','Palmarès'],['historique','Historique']];
+  return [['dispo','Disponibilité'],['gamification','Palmarès'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
@@ -9279,7 +9312,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['gamification','Palmarès','🏆'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -9423,7 +9456,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -9466,7 +9499,7 @@ function renderPlayer(playerId){
   if(activeTab==='mur') scrollWallToBottom();
 }
 function renderMlpPlayer(me){
-  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['partenaire','Partenaire','🤝'],['evenements','Événements','🎉'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -10025,26 +10058,6 @@ function gamificationHTML(){
       : `<p class="small">Personne n'a de série de victoires en cours pour l'instant.</p>`}
   </div>`;
 
-  if(myId){
-    const myBadges = computeBadgesForId(myId, overall);
-    html += `<div class="card">
-      <h3>🎖️ Tes badges</h3>
-      ${myBadges.length
-        ? `<div style="display:flex;flex-direction:column;gap:8px;">${myBadges.map(b=>`<div class="wall-msg"><strong>${b.icon} ${escapeHTML(b.label)}</strong><div class="small" style="margin-top:2px;color:var(--muted);">${escapeHTML(b.detail)}</div></div>`).join('')}</div>`
-        : `<p class="small">Continue à jouer pour débloquer tes premiers badges !</p>`}
-    </div>`;
-  } else {
-    const allIds = Object.keys(overall).sort((a,b)=> statPersonName(a).localeCompare(statPersonName(b)));
-    const badgeRows = allIds.map(id=>{
-      const badges = computeBadgesForId(id, overall);
-      if(!badges.length) return '';
-      return `<div><strong>${escapeHTML(statPersonName(id))}</strong><div class="row" style="flex-wrap:wrap;gap:4px;margin-top:4px;">${badges.map(b=>`<span class="tag" title="${escapeHTML(b.detail)}">${b.icon} ${escapeHTML(b.label)}</span>`).join('')}</div></div>`;
-    }).filter(Boolean).join('');
-    html += `<div class="card">
-      <h3>🎖️ Badges de la ligue</h3>
-      ${badgeRows ? `<div style="display:flex;flex-direction:column;gap:10px;">${badgeRows}</div>` : `<p class="empty">Pas encore de badges décernés.</p>`}
-    </div>`;
-  }
   return html;
 }
 // Résultats de la dernière session jouée par le groupe actuel du joueur.
