@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261005183312">
+<meta name="app-build" content="20261006085902">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -252,14 +252,35 @@ tr.me{background:rgba(207,234,92,0.1);}
 .partner-body{padding:10px 14px;flex:1;min-width:0;}
 /* Trouver un partenaire — liste de pastilles cliquables (ouvre le détail en modale) */
 .partner-pill-list{display:flex;flex-wrap:wrap;gap:10px;}
-.orgpick-search{margin-bottom:8px;}
-.orgpick-list{max-height:45vh;overflow-y:auto;border:1px solid var(--line-soft);border-radius:12px;}
-.orgpick-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line-soft);}
-.orgpick-row:last-child{border-bottom:none;}
-.orgpick-row input[type=checkbox]{width:auto;flex:0 0 auto;margin:0;}
-.orgpick-all{padding:6px 12px;border-bottom:none;}
-.orgpick-name{display:block;font-weight:600;}
-.orgpick-meta{display:block;}
+.orgpick-intro{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45;}
+.orgpick-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
+.orgpick-search{margin:0;border-radius:999px;padding:11px 16px;}
+.orgpick-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.orgpick-chip{background:var(--court-elevated-2);color:var(--text);border:1px solid var(--line-soft);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+.orgpick-chip b{opacity:.65;font-weight:700;margin-left:2px;}
+.orgpick-chip.active{background:var(--ball);color:#0C2622;border-color:var(--ball);}
+.orgpick-chip-all{margin-left:auto;background:transparent;}
+.orgpick-list{max-height:42vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px;}
+.orgpick-row{display:flex;align-items:center;gap:11px;padding:8px 12px 8px 8px;cursor:pointer;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;transition:background .15s,border-color .15s;}
+.orgpick-row.selected{border-color:var(--ball);background:rgba(207,234,92,.12);}
+.orgpick-row input[type=checkbox]{position:absolute;opacity:0;pointer-events:none;width:0;height:0;}
+.orgpick-avatar{width:38px;height:38px;flex:0 0 auto;border-radius:50%;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:14px;}
+.orgpick-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.orgpick-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.orgpick-meta{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.orgpick-rating{font-size:12px;font-weight:700;color:var(--ball);font-variant-numeric:tabular-nums;}
+.orgpick-check{width:24px;height:24px;flex:0 0 auto;border-radius:50%;border:2px solid var(--line-soft-strong);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:transparent;}
+.orgpick-row.selected .orgpick-check{background:var(--ball);border-color:var(--ball);color:#0C2622;}
+.orgpick-noresult,.orgpick-empty{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px;}
+.orgpick-new{margin-top:12px;background:var(--court-elevated-2);border:1px dashed var(--line-soft-strong);border-radius:14px;padding:10px 14px;}
+.orgpick-new summary{cursor:pointer;font-weight:600;font-size:13px;}
+.orgpick-new textarea{margin-top:10px;width:100%;}
+.orgpick-footer{position:sticky;bottom:-1px;margin-top:14px;padding-top:12px;background:var(--court-light);border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:10px;}
+.orgpick-opts{display:flex;gap:8px;}
+.orgpick-opts select,.orgpick-opts span{flex:1;min-width:0;}
+.orgpick-opts select{width:100%;border-radius:999px;}
+.orgpick-go{width:100%;border-radius:999px;padding:13px;font-size:15px;font-weight:800;}
+.orgpick-go:disabled{opacity:.45;}
 .partner-pill{display:flex;align-items:center;gap:11px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:999px;padding:8px 20px 8px 8px;cursor:pointer;max-width:100%;transition:background .15s ease,border-color .15s ease,transform .1s ease;}
 .partner-pill:hover{border-color:var(--ball);background:rgba(207,234,92,0.06);}
 .partner-pill:active{transform:scale(0.97);}
@@ -3547,40 +3568,67 @@ async function openAddFromOrgModal(){
   });
   cands.sort((a,b)=>a.name.localeCompare(b.name));
   ORG_PICK_CANDIDATES = cands;
+  ORG_PICK_FILTER = 'all'; ORG_PICK_QUERY = '';
   const groups = DATA.groups || [];
+  const nAcc = cands.filter(c=>c.profileId).length, nNo = cands.length - nAcc;
   const html = `
-    <p class="small" style="margin-top:0;">Coche les personnes de l'organisation à ajouter à cette ligue. Leur cote (si connue) et leur compte sont repris automatiquement.</p>
+    <div class="orgpick-intro">Choisis qui ajouter à cette ligue. Les cotes, comptes et genres sont repris automatiquement.</div>
     ${cands.length ? `
-    <input class="orgpick-search" placeholder="🔍 Rechercher…" oninput="filterOrgPick(this.value)">
-    <label class="orgpick-row orgpick-all"><input type="checkbox" onchange="toggleOrgPickAll(this.checked)"><span><strong>Tout sélectionner</strong> <span class="small">(les résultats affichés)</span></span></label>
+    <div class="orgpick-toolbar">
+      <input class="orgpick-search" placeholder="🔍 Rechercher un nom…" oninput="filterOrgPick(this.value)">
+      <div class="orgpick-chips">
+        <button type="button" class="orgpick-chip active" data-f="all" onclick="setOrgPickFilter('all')">Tous <b>${cands.length}</b></button>
+        <button type="button" class="orgpick-chip" data-f="acc" onclick="setOrgPickFilter('acc')">✅ Avec compte <b>${nAcc}</b></button>
+        <button type="button" class="orgpick-chip" data-f="no" onclick="setOrgPickFilter('no')">Sans compte <b>${nNo}</b></button>
+        <button type="button" class="orgpick-chip orgpick-chip-all" onclick="toggleOrgPickAll()">☑ Tout cocher</button>
+      </div>
+    </div>
     <div class="orgpick-list">
-      ${cands.map((c,i)=>`<label class="orgpick-row" data-name="${escapeHTML(c.name.toLowerCase())}">
+      ${cands.map((c,i)=>{
+        const pr = c.profileId ? ALL_PROFILES.find(x=>x.id===c.profileId) : null;
+        return `<label class="orgpick-row" data-name="${escapeHTML(c.name.toLowerCase())}" data-acc="${c.profileId?'acc':'no'}">
         <input type="checkbox" class="orgpick-cb" value="${i}" onchange="updateOrgPickCount()">
-        <span style="min-width:0;flex:1;"><span class="orgpick-name">${escapeHTML(c.name)}</span><span class="small orgpick-meta">${c.meta}${c.leagues ? ' · '+escapeHTML(c.leagues) : ''}${c.rating!==null ? ' · cote '+c.rating.toFixed(2) : ''}</span></span>
-      </label>`).join('')}
-    </div>` : `<p class="small"><em>Tout le monde de l'organisation est déjà dans cette ligue.</em></p>`}
-    <div class="field" style="margin-top:12px;">
-      <label>Nouveaux noms, sans compte (un par ligne, optionnel)</label>
-      <textarea id="orgPickNewNames" rows="3" placeholder="Marie Tremblay&#10;Jean Roy" oninput="updateOrgPickCount()"></textarea>
-    </div>
-    <div class="row" style="gap:8px;">
-      <div class="field" style="flex:1;margin:0;"><label>Ajouter comme</label>
-        <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Joueurs</option><option value="remplacant">🔄 Remplaçants</option></select></div>
-      <div class="field" style="flex:1;margin:0;" id="orgPickPlaceWrap"><label>Placement</label>
-        <select id="orgPickPlace"><option value="wait">⏳ En attente</option>${groups.length ? '<option value="fill">Remplir les groupes dans l\'ordre</option>' : ''}</select></div>
-    </div>
-    <button class="btn btn-primary" id="orgPickBtn" style="width:100%;margin-top:14px;" onclick="confirmAddFromOrg()" disabled>Ajouter</button>`;
+        ${avatarHTML('orgpick-avatar', partnerInitials(c.name), pr && pr.avatar_url)}
+        <span class="orgpick-main"><span class="orgpick-name">${escapeHTML(c.name)}</span><span class="orgpick-meta">${c.profileId ? '✅ Compte' : 'Sans compte'}${c.leagues ? ' · '+escapeHTML(c.leagues) : ''}</span></span>
+        ${c.rating!==null ? `<span class="orgpick-rating">${c.rating.toFixed(2)}</span>` : ''}
+        <span class="orgpick-check">✓</span>
+      </label>`;}).join('')}
+      <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
+    </div>` : `<div class="orgpick-empty">🎉 Tout le monde de l'organisation est déjà dans cette ligue.</div>`}
+    <details class="orgpick-new">
+      <summary>➕ Ajouter de nouveaux noms (sans compte)</summary>
+      <textarea id="orgPickNewNames" rows="3" placeholder="Un nom par ligne&#10;Marie Tremblay&#10;Jean Roy" oninput="updateOrgPickCount()"></textarea>
+    </details>
+    <div class="orgpick-footer">
+      <div class="orgpick-opts">
+        <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Comme joueurs</option><option value="remplacant">🔄 Comme remplaçants</option></select>
+        <span id="orgPickPlaceWrap"><select id="orgPickPlace"><option value="wait">⏳ En attente</option>${groups.length ? '<option value="fill">📋 Remplir les groupes</option>' : ''}</select></span>
+      </div>
+      <button class="btn btn-primary orgpick-go" id="orgPickBtn" onclick="confirmAddFromOrg()" disabled>Ajouter</button>
+    </div>`;
   showContentModal('Ajouter depuis l\'organisation', html);
 }
-function filterOrgPick(q){
-  q = (q||'').trim().toLowerCase();
-  document.querySelectorAll('.orgpick-list .orgpick-row').forEach(r=>{ r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
-}
-function toggleOrgPickAll(checked){
+let ORG_PICK_FILTER = 'all', ORG_PICK_QUERY = '';
+function applyOrgPickFilter(){
+  let visible = 0;
   document.querySelectorAll('.orgpick-list .orgpick-row').forEach(r=>{
-    if(r.style.display==='none') return;
-    const cb = r.querySelector('.orgpick-cb'); if(cb) cb.checked = checked;
+    const ok = (!ORG_PICK_QUERY || (r.dataset.name||'').includes(ORG_PICK_QUERY)) && (ORG_PICK_FILTER==='all' || r.dataset.acc===ORG_PICK_FILTER);
+    r.style.display = ok ? '' : 'none';
+    if(ok) visible++;
   });
+  const nr = document.querySelector('.orgpick-noresult');
+  if(nr) nr.style.display = visible ? 'none' : '';
+}
+function filterOrgPick(q){ ORG_PICK_QUERY = (q||'').trim().toLowerCase(); applyOrgPickFilter(); }
+function setOrgPickFilter(f){
+  ORG_PICK_FILTER = f;
+  document.querySelectorAll('.orgpick-chip[data-f]').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
+  applyOrgPickFilter();
+}
+function toggleOrgPickAll(){
+  const rows = Array.from(document.querySelectorAll('.orgpick-list .orgpick-row')).filter(r=>r.style.display!=='none');
+  const allOn = rows.length && rows.every(r=>r.querySelector('.orgpick-cb').checked);
+  rows.forEach(r=>{ r.querySelector('.orgpick-cb').checked = !allOn; });
   updateOrgPickCount();
 }
 function parseOrgPickNewNames(){
@@ -3589,6 +3637,7 @@ function parseOrgPickNewNames(){
   return el.value.split('\n').map(s=>s.trim()).filter(Boolean);
 }
 function updateOrgPickCount(){
+  document.querySelectorAll('.orgpick-row').forEach(r=>{ const cb=r.querySelector('.orgpick-cb'); if(cb) r.classList.toggle('selected', cb.checked); });
   const n = document.querySelectorAll('.orgpick-cb:checked').length + parseOrgPickNewNames().length;
   const btn = document.getElementById('orgPickBtn');
   if(!btn) return;
