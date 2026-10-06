@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 120">
+<meta name="app-build" content="Version 122">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -3329,26 +3329,59 @@ document.addEventListener('keydown', e=>{
 });
 
 // ===== Calendrier (popup) =====
-let CAL_MONTH = null, CAL_SEL = null;
+let CAL_MONTH = null, CAL_SEL = null, CAL_LEAGUES = null;
+function curLeagueCalInfo(){
+  const l = (LEAGUES||[]).find(x=>x.id===CURRENT_LEAGUE_ID);
+  return DATA ? { id:CURRENT_LEAGUE_ID, name:(l&&l.name)||'Ligue', sessions:DATA.sessions, blockedDates:DATA.blockedDates, playDayOfWeek:DATA.playDayOfWeek, seasonStartDate:DATA.seasonStartDate, seasonEndDate:DATA.seasonEndDate } : null;
+}
+function calLeaguesList(){
+  const cur = curLeagueCalInfo();
+  const list = (CAL_LEAGUES||[]).filter(x=>!cur || x.id!==cur.id);
+  return (cur ? [cur] : []).concat(list);
+}
+// Charge les sessions de TOUTES les ligues du compte : pour un admin, les
+// ligues de l'organisation ; pour un joueur, celles où son compte est lié.
+async function loadCalLeagues(){
+  try{
+    let ids = [];
+    if(CURRENT_PROFILE && CURRENT_PROFILE.role==='admin') ids = myOrgLeagues().map(l=>l.id);
+    else if(CURRENT_PROFILE){
+      const { data } = await sb.from('profile_players').select('league_id').eq('profile_id', CURRENT_PROFILE.id);
+      ids = Array.from(new Set((data||[]).map(r=>r.league_id)));
+    }
+    ids = ids.filter(id=>id && id!==CURRENT_LEAGUE_ID);
+    const out = await Promise.all(ids.map(async id=>{
+      const { data } = await sb.from('league_data').select('data').eq('league_id', id).single();
+      const d = data && data.data; if(!d) return null;
+      const l = (LEAGUES||[]).find(x=>x.id===id);
+      return { id, name:(l&&l.name)||'Ligue', sessions:d.sessions, blockedDates:d.blockedDates, playDayOfWeek:d.playDayOfWeek, seasonStartDate:d.seasonStartDate, seasonEndDate:d.seasonEndDate };
+    }));
+    CAL_LEAGUES = out.filter(Boolean);
+    if(MODAL && MODAL.sheet==='calendrier') render();
+  }catch(e){ console.error('Calendrier : ligues', e); }
+}
 function calItemsFor(){
   const map = {};
   const add=(d,it)=>{ if(!d) return; (map[d]=map[d]||[]).push(it); };
   const today = fmtDate(new Date());
+  const lgs = calLeaguesList();
+  lgs.forEach(L=>{
   const real = new Set();
-  (DATA.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status}); });
-  const blocked = new Set(DATA.blockedDates||[]);
-  blocked.forEach(d=>add(d,{t:'blocked'}));
-  const dow = DATA.playDayOfWeek;
+  (L.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status, lg:L.name}); });
+  const blocked = new Set(L.blockedDates||[]);
+  blocked.forEach(d=>add(d,{t:'blocked', lg:L.name}));
+  const dow = L.playDayOfWeek;
   if(typeof dow==='number'){
-    const a = DATA.seasonStartDate, b = DATA.seasonEndDate;
+    const a = L.seasonStartDate, b = L.seasonEndDate;
     const start = new Date(Math.max(new Date(today+'T00:00:00'), a ? new Date(a+'T00:00:00') : 0));
     const end = b ? new Date(b+'T00:00:00') : new Date(new Date(today+'T00:00:00').getTime()+120*864e5);
     for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
       if(d.getDay()!==dow) continue;
       const f = fmtDate(d);
-      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned'});
+      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned', lg:L.name});
     }
   }
+  });
   (PARTNER_POSTS||[]).forEach(p=>{ if(p.play_date && p.status!=='closed') add(p.play_date,{t:'partner', p}); });
   (SOCIAL_EVENTS||[]).forEach(e=>add(e.event_date,{t:'event', e}));
   return map;
@@ -3379,9 +3412,9 @@ function calendarSheetHTML(){
   }
   let list = '';
   const rows = its=>its.map(i=>{
-    if(i.t==='session') return `<div class="cal-row"><span class="cal-badge" style="background:#e3f5ea;">🏓</span><div><b>Session de ligue</b><div class="small">${i.status==='closed'?'Terminée':'Ouverte'}</div></div></div>`;
-    if(i.t==='planned') return `<div class="cal-row"><span class="cal-badge" style="background:#eef7f1;">🏓</span><div><b>Session prévue</b><div class="small">Jour de jeu régulier</div></div></div>`;
-    if(i.t==='blocked') return `<div class="cal-row"><span class="cal-badge" style="background:#eee;">⛔</span><div><b>Pas de session</b></div></div>`;
+    if(i.t==='session') return `<div class="cal-row"><span class="cal-badge" style="background:#e3f5ea;">🏓</span><div><b>Session de ligue</b><div class="small">${escapeHTML(i.lg||'')} · ${i.status==='closed'?'Terminée':'En cours'}</div></div></div>`;
+    if(i.t==='planned') return `<div class="cal-row"><span class="cal-badge" style="background:#eef7f1;">🏓</span><div><b>Session prévue</b><div class="small">${escapeHTML(i.lg||'')} · jour de jeu régulier</div></div></div>`;
+    if(i.t==='blocked') return `<div class="cal-row"><span class="cal-badge" style="background:#eee;">⛔</span><div><b>Pas de session</b><div class="small">${escapeHTML(i.lg||'')}</div></div></div>`;
     if(i.t==='partner') return `<div class="cal-row cal-click" onclick="openPartnerPostDetail('${i.p.id}')"><span class="cal-badge" style="background:#fdebd9;">🤝</span><div><b>${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire</b><div class="small">${escapeHTML((i.p.message||'').slice(0,80))}</div></div></div>`;
     return `<div class="cal-row cal-click" onclick="openEventDetail('${i.e.id}')"><span class="cal-badge" style="background:#d9f1ee;">🎉</span><div><b>${escapeHTML(i.e.title||'Événement')}</b><div class="small">${escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · '))}</div></div></div>`;
   }).join('');
@@ -3419,7 +3452,7 @@ function quickIconsHTML(){
   </div>`;
 }
 function toggleQuickMenu(force){ QUICK_MENU_OPEN = typeof force==='boolean' ? force : !QUICK_MENU_OPEN; render(); }
-function openQuickView(k){ QUICK_MENU_OPEN = false; if(k==='calendrier'){ CAL_MONTH=null; CAL_SEL=null; } else markQuickSeen(k); MODAL_UNDER = null; MODAL = { kind:'content', sheet:k, title:k }; render(); }
+function openQuickView(k){ QUICK_MENU_OPEN = false; if(k==='calendrier'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); } else markQuickSeen(k); MODAL_UNDER = null; MODAL = { kind:'content', sheet:k, title:k }; render(); }
 function closeQuickView(){ if(QUICK_VIEW) markQuickSeen(QUICK_VIEW); QUICK_VIEW = null; render(); }
 function applyQuickView(){
   if(!QUICK_VIEW) return;
