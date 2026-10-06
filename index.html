@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006102313">
+<meta name="app-build" content="20261006103411">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -277,6 +277,11 @@ tr.me{background:rgba(207,234,92,0.1);}
 .chat-messages .wall-time a{color:inherit;}
 .chat-send{width:44px;height:44px;border-radius:50%;border:none;background:var(--ball);color:#0C2622;font-size:18px;cursor:pointer;flex:0 0 auto;}
 .chat-send:active{transform:scale(.92);}
+.topbar-dot{position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:var(--paddle);border:2px solid var(--court-light);}
+.topbar-ico{position:relative;}
+.notif-list{display:flex;flex-direction:column;gap:6px;}
+.notif-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:14px;padding:11px 14px;cursor:pointer;}
+.notif-row input[type=checkbox]{width:22px;height:22px;flex:0 0 auto;margin:0;accent-color:var(--ball);}
 .topbar-icos{display:flex;gap:6px;align-items:center;position:relative;}
 .topbar-menu-backdrop{position:fixed;inset:0;z-index:890;}
 .topbar-menu{position:absolute;top:calc(100% + 10px);right:0;z-index:891;min-width:200px;background:var(--court-elevated-2);border:1px solid var(--line-soft-strong);border-radius:16px;padding:6px;box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;animation:chatPop .15s ease-out;}
@@ -895,7 +900,8 @@ async function unsubscribeFromPush(){
 }
 function notificationDrawerButtonHTML(){
   if(!PUSH_SUPPORTED && !isIOSDevice()) return '';
-  return `<button class="btn-ghost" style="width:100%;text-align:left;" onclick="togglePushNotifications()">${PUSH_SUBSCRIBED ? '🔔 Désactiver les notifications' : '🔕 Activer les notifications'}</button>`;
+  return `<button class="btn-ghost" style="width:100%;text-align:left;" onclick="togglePushNotifications()">${PUSH_SUBSCRIBED ? '🔔 Désactiver les notifications' : '🔕 Activer les notifications'}</button>
+    <button class="btn-ghost" style="width:100%;text-align:left;margin-top:4px;" onclick="DRAWER_OPEN=false;openNotifSettings()">⚙️ Réglages des notifications</button>`;
 }
 // Bandeau fermable qui encourage à activer les notifications — réaffiché à
 // chaque ouverture de l'app (pas de mémorisation permanente du rejet) tant
@@ -1226,6 +1232,7 @@ async function loadDirectMessages(){
     DM_MESSAGES = data || []; DM_CONTACTS = c || []; DM_AVAILABLE = true;
   }catch(e){ DM_AVAILABLE = false; DM_MESSAGES = []; DM_CONTACTS = []; }
   updateChatFab();
+  applyPendingGo();
 }
 function dmContact(id){ return DM_CONTACTS.find(c=>c.id===id) || { id, display_name:'Joueur', avatar_url:null }; }
 function dmUnreadCount(){ const me = CURRENT_PROFILE && CURRENT_PROFILE.id; return DM_MESSAGES.filter(m=>m.recipient_id===me && !m.read_at).length; }
@@ -1676,6 +1683,7 @@ function setupRealtimeChannels(){
       .subscribe();
     loadDirectMessages();
   }
+  loadNotifPrefs();
 }
 // ---- Événements sociaux : calendrier à l'échelle de l'ORGANISATION (comme
 // le canal Général du mur) — un BBQ de fin de saison ou un tournoi social
@@ -2966,6 +2974,7 @@ function render(){
   }
   applyQuickView();
   updateChatFab();
+  if(PENDING_GO) setTimeout(applyPendingGo, 0);
 }
 
 // Le topbar de la page ne garde que le ☰ (s'il y a un tiroir) et le nom de
@@ -3044,17 +3053,112 @@ function viewSlideHTML(options){
 // d'ajouter des actions supplémentaires à cette barre du bas (ex: Absence).
 // ---- Icônes rapides du ruban du haut : Partenaire et Événements (plus des onglets). ----
 let QUICK_VIEW = null; // null | 'partenaire' | 'evenements'
+// ---- Préférences de notification (table notification_prefs) + pastilles « nouveau »
+// sur 📣. Les notifications elles-mêmes sont envoyées par la base de données
+// (voir notify-event.sql) en respectant ces préférences. ----
+let NOTIF_PREFS = null;
+async function loadNotifPrefs(){
+  if(!CURRENT_PROFILE) return;
+  try{
+    const { data, error } = await sb.from('notification_prefs').select('*').eq('profile_id', CURRENT_PROFILE.id).maybeSingle();
+    if(error) throw error;
+    if(data){ NOTIF_PREFS = data; }
+    else {
+      // Première fois : on part de maintenant, pour ne pas compter l'existant comme « nouveau ».
+      const now = new Date().toISOString();
+      const row = { profile_id: CURRENT_PROFILE.id, partner_seen_at: now, events_seen_at: now };
+      const r = await sb.from('notification_prefs').upsert(row).select().single();
+      NOTIF_PREFS = r.data || row;
+    }
+  }catch(e){ NOTIF_PREFS = null; }
+  render();
+}
+async function saveNotifPref(patch){
+  if(!CURRENT_PROFILE) return;
+  NOTIF_PREFS = Object.assign({}, NOTIF_PREFS || {}, patch);
+  try{ await sb.from('notification_prefs').upsert(Object.assign({ profile_id: CURRENT_PROFILE.id, updated_at: new Date().toISOString() }, patch)); }
+  catch(e){ console.error('Erreur préférences', e); }
+}
+function quickUnread(){
+  const me = CURRENT_PROFILE && CURRENT_PROFILE.id;
+  if(!NOTIF_PREFS || !me) return { partner:0, events:0 };
+  const ps = NOTIF_PREFS.partner_seen_at ? new Date(NOTIF_PREFS.partner_seen_at) : null;
+  const es = NOTIF_PREFS.events_seen_at ? new Date(NOTIF_PREFS.events_seen_at) : null;
+  return {
+    partner: (PARTNER_POSTS||[]).filter(p=>p.profile_id!==me && p.status!=='closed' && ps && new Date(p.created_at)>ps).length,
+    events: (SOCIAL_EVENTS||[]).filter(e=>e.created_by!==me && es && new Date(e.created_at)>es).length
+  };
+}
+function markQuickSeen(k){
+  const field = k==='partenaire' ? 'partner_seen_at' : 'events_seen_at';
+  saveNotifPref({ [field]: new Date().toISOString() });
+}
+function setNotifToggle(key, checked){ saveNotifPref({ [key]: !!checked }); }
+function setNotifQuietHour(key, v){ saveNotifPref({ [key]: parseInt(v,10) }); }
+function toggleMutedChannel(key, muted){
+  const cur = ((NOTIF_PREFS && NOTIF_PREFS.muted_channels) || []).filter(x=>x!==key);
+  if(muted) cur.push(key);
+  saveNotifPref({ muted_channels: cur });
+}
+function openNotifSettings(){ showContentModal('🔔 Notifications', notifSettingsHTML); }
+function notifSettingsHTML(){
+  const p = NOTIF_PREFS || {};
+  const on = (k)=> p[k] !== false;
+  const row = (key,label,sub)=>`<label class="notif-row"><span><strong>${label}</strong>${sub?`<span class="small" style="display:block;color:var(--muted);">${sub}</span>`:''}</span><input type="checkbox" ${on(key)?'checked':''} onchange="setNotifToggle('${key}',this.checked)"></label>`;
+  const hours = (sel,key)=>`<select onchange="setNotifQuietHour('${key}',this.value)" style="width:auto;">${Array.from({length:24},(_,h)=>`<option value="${h}" ${h===sel?'selected':''}>${String(h).padStart(2,'0')} h</option>`).join('')}</select>`;
+  const muted = p.muted_channels || [];
+  const chans = [{id:'general',name:'🌐 Général'}].concat(wallChannels().map(l=>({id:l.id,name:'🏓 '+l.name})));
+  return `<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification. Il faut d'abord activer les notifications sur cet appareil (menu ☰).</p>
+    <div class="notif-list">
+      ${row('wall','💬 Messages du mur','Seulement quand un canal était calme depuis 10 min')}
+      ${row('dm','✉️ Messages privés')}
+      <label class="notif-row"><span><strong>Aperçu des messages privés</strong><span class="small" style="display:block;color:var(--muted);">Afficher le texte sur l'écran verrouillé</span></span><input type="checkbox" ${p.dm_preview===true?'checked':''} onchange="setNotifToggle('dm_preview',this.checked)"></label>
+      ${row('partner','🤝 Annonces de partenaire','Nouvelles annonces et personnes intéressées par la tienne')}
+      ${row('events','🎉 Nouveaux événements')}
+    </div>
+    <h4 style="margin:16px 0 8px;">🌙 Heures calmes</h4>
+    <label class="notif-row"><span><strong>Aucune notification la nuit</strong></span><input type="checkbox" ${p.quiet_enabled===true?'checked':''} onchange="setNotifToggle('quiet_enabled',this.checked)"></label>
+    <div class="row" style="gap:8px;align-items:center;margin-top:8px;"><span class="small">De</span>${hours(p.quiet_start ?? 22,'quiet_start')}<span class="small">à</span>${hours(p.quiet_end ?? 7,'quiet_end')}</div>
+    <h4 style="margin:16px 0 8px;">🔕 Canaux en sourdine</h4>
+    <div class="notif-list">${chans.map(c=>`<label class="notif-row"><span>${escapeHTML(c.name)}</span><input type="checkbox" ${muted.includes(c.id)?'checked':''} onchange="toggleMutedChannel('${c.id}',this.checked)"></label>`).join('')}</div>`;
+}
+// ---- Ouverture directe depuis une notification (?go=partenaire, chat:<canal>, dm:<profil>) ----
+let PENDING_GO = null;
+function handleGo(go){ PENDING_GO = go; applyPendingGo(); }
+function applyPendingGo(){
+  if(!PENDING_GO || !SESSION_USER || !DATA || !CURRENT_PROFILE) return;
+  const go = PENDING_GO;
+  if(go.startsWith('dm:') && !DM_AVAILABLE) return; // réessayé quand les messages privés sont chargés
+  PENDING_GO = null;
+  if(go==='partenaire' || go==='evenements'){ QUICK_VIEW = go; markQuickSeen(go); render(); }
+  else if(go.startsWith('chat:')) openChat(go.slice(5));
+  else if(go.startsWith('dm:')) openDmThread(go.slice(3));
+}
+try{
+  const goParam = new URLSearchParams(location.search).get('go');
+  if(goParam){ PENDING_GO = goParam; history.replaceState(null, '', location.pathname + location.hash); }
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', e=>{
+      if(e.data && e.data.type==='push-click'){
+        const g = new URL(e.data.url, location.origin).searchParams.get('go');
+        if(g) handleGo(g);
+      }
+    });
+  }
+}catch(e){}
 let QUICK_MENU_OPEN = false;
 function quickIconsHTML(){
-  const item = (k,ico,label)=>`<button type="button" class="topbar-menu-item ${QUICK_VIEW===k?'active':''}" onclick="openQuickView('${k}')"><span style="font-size:20px;">${ico}</span>${label}</button>`;
+  const u = quickUnread();
+  const cnt = {partenaire:u.partner, evenements:u.events};
+  const item = (k,ico,label)=>`<button type="button" class="topbar-menu-item ${QUICK_VIEW===k?'active':''}" onclick="openQuickView('${k}')"><span style="font-size:20px;">${ico}</span>${label}${cnt[k]?`<span class="chat-menu-badge" style="margin-left:auto;">${cnt[k]}</span>`:''}</button>`;
   return `<div class="topbar-icos">
-    <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">📣</button>
+    <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">📣${(u.partner+u.events)>0 ? '<span class="topbar-dot"></span>' : ''}</button>
     ${QUICK_MENU_OPEN ? `<div class="topbar-menu-backdrop" onclick="toggleQuickMenu(false)"></div><div class="topbar-menu">${item('partenaire','🤝','Partenaire')}${item('evenements','🎉','Événements')}</div>` : ''}
   </div>`;
 }
 function toggleQuickMenu(force){ QUICK_MENU_OPEN = typeof force==='boolean' ? force : !QUICK_MENU_OPEN; render(); }
-function openQuickView(k){ QUICK_MENU_OPEN = false; QUICK_VIEW = k; render(); window.scrollTo(0,0); }
-function closeQuickView(){ QUICK_VIEW = null; render(); }
+function openQuickView(k){ QUICK_MENU_OPEN = false; QUICK_VIEW = k; markQuickSeen(k); render(); window.scrollTo(0,0); }
+function closeQuickView(){ if(QUICK_VIEW) markQuickSeen(QUICK_VIEW); QUICK_VIEW = null; render(); }
 function applyQuickView(){
   if(!QUICK_VIEW) return;
   const c = document.getElementById('tabContent');
