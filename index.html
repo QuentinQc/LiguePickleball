@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006085902">
+<meta name="app-build" content="20261006090324">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -252,6 +252,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .partner-body{padding:10px 14px;flex:1;min-width:0;}
 /* Trouver un partenaire — liste de pastilles cliquables (ouvre le détail en modale) */
 .partner-pill-list{display:flex;flex-wrap:wrap;gap:10px;}
+.addtab-bar{display:flex;gap:4px;padding:4px;background:var(--court-elevated-2);border-radius:999px;margin-bottom:14px;}
+.addtab{flex:1;border:none;background:transparent;color:var(--muted);padding:9px 8px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
+.addtab.active{background:var(--ball);color:#0C2622;}
+.orgpick-err{color:var(--paddle);font-size:13px;margin-top:8px;}
 .orgpick-intro{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45;}
 .orgpick-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
 .orgpick-search{margin:0;border-radius:999px;padding:11px 16px;}
@@ -3429,8 +3433,7 @@ function adminAllPeopleHTML(){
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="margin:0;">Tous <span class="small">(${all.length})</span></h2>
       <div class="row" style="gap:8px;justify-content:flex-end;">
-        <button class="btn btn-secondary" onclick="openAddFromOrgModal()">👥 Depuis l'organisation</button>
-        <button class="btn btn-primary" onclick="openAddPersonModal()">➕ Ajouter une personne</button>
+        <button class="btn btn-primary" onclick="openAddToLeagueModal()">➕ Ajouter</button>
       </div>
     </div>
     <p class="small">Réguliers et remplaçants ensemble — clique sur une ligne pour ouvrir la gestion de cette personne.</p>
@@ -3444,16 +3447,16 @@ function adminAllPeopleHTML(){
         <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
         <td>${x.linked ? '✅' : '—'}</td>
       </tr>`).join('')}
-      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddFromOrgModal()">👥 Ajouter des gens de l'organisation</button></td></tr>` : ''}
+      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddToLeagueModal()">➕ Ajouter des joueurs</button></td></tr>` : ''}
     </table>
   </div>`;
 }
 // Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
 // ligue (échelle ou MLP), permet d'ajouter un régulier, un remplaçant ou un
 // prospect depuis un seul endroit, en choisissant le type d'abord.
-function openAddPersonModal(){
+function addPersonFormHTML(){
   const groups = DATA.groups || [];
-  const html = `
+  return `
     <div class="field">
       <label>Type de personne</label>
       <select id="addPersonType" onchange="
@@ -3487,44 +3490,46 @@ function openAddPersonModal(){
       <div class="field"><label>Téléphone (optionnel)</label><input id="addPersonProspectPhone"></div>
       <div class="field"><label>Notes (optionnel)</label><input id="addPersonProspectNotes"></div>
     </div>`;
-  showFormModal('Ajouter une personne', html, ()=>{
-    const type = document.getElementById('addPersonType').value;
-    const rawName = document.getElementById('addPersonName').value.trim();
-    if(!rawName){ showAlert('Le nom est requis.'); return false; }
-    if(type==='regulier'){
-      const name = uniquePlayerName(rawName, DATA.players);
-      const groupEl = document.getElementById('addPersonGroup');
-      const desiredGroupId = groupEl ? groupEl.value : '';
-      const groupId = desiredGroupId || null;
-      const ratingEl = document.getElementById('addPersonRating');
-      const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
-      const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-      DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
-      if(groupId){
-        const count = DATA.players.filter(p=>p.groupId===groupId).length;
-        if(count > GROUP_MAX_PLAYERS()){
-          const desiredName = (DATA.groups.find(g=>g.id===groupId)||{}).name || 'ce groupe';
-          // Différée : la modale d'ajout se ferme d'abord, pour que cet avertissement
-          // ne soit pas immédiatement écrasé par cette fermeture.
-          setTimeout(()=>showAlert(`Attention : ${desiredName} a maintenant ${count} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`), 0);
-        }
+}
+function submitAddPerson(){
+  const err = document.getElementById('addPersonErr');
+  const type = document.getElementById('addPersonType').value;
+  const rawName = document.getElementById('addPersonName').value.trim();
+  if(!rawName){ if(err){ err.textContent = 'Le nom est requis.'; err.style.display='block'; } return; }
+  let overflowMsg = null;
+  if(type==='regulier'){
+    const name = uniquePlayerName(rawName, DATA.players);
+    const groupEl = document.getElementById('addPersonGroup');
+    const groupId = (groupEl && groupEl.value) || null;
+    const ratingEl = document.getElementById('addPersonRating');
+    const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
+    const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
+    DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
+    if(groupId){
+      const count = DATA.players.filter(p=>p.groupId===groupId).length;
+      if(count > GROUP_MAX_PLAYERS()){
+        const desiredName = (DATA.groups.find(g=>g.id===groupId)||{}).name || 'ce groupe';
+        overflowMsg = `Attention : ${desiredName} a maintenant ${count} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`;
       }
-    } else if(type==='remplacant'){
-      const entry = { id: uid('sub'), name: rawName, rating: RATING_DEFAULT, ratingGames: 0 };
-      const email = document.getElementById('addPersonSubEmail').value.trim();
-      const notes = document.getElementById('addPersonSubNotes').value.trim();
-      if(email) entry.email = email;
-      if(notes) entry.notes = notes;
-      DATA.substitutePool = DATA.substitutePool || [];
-      DATA.substitutePool.push(entry);
-    } else {
-      const email = document.getElementById('addPersonProspectEmail').value.trim();
-      const phone = document.getElementById('addPersonProspectPhone').value.trim();
-      const notes = document.getElementById('addPersonProspectNotes').value.trim();
-      DATA.prospects = DATA.prospects || [];
-      DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
     }
-  });
+  } else if(type==='remplacant'){
+    const entry = { id: uid('sub'), name: rawName, rating: RATING_DEFAULT, ratingGames: 0 };
+    const email = document.getElementById('addPersonSubEmail').value.trim();
+    const notes = document.getElementById('addPersonSubNotes').value.trim();
+    if(email) entry.email = email;
+    if(notes) entry.notes = notes;
+    DATA.substitutePool = DATA.substitutePool || [];
+    DATA.substitutePool.push(entry);
+  } else {
+    const email = document.getElementById('addPersonProspectEmail').value.trim();
+    const phone = document.getElementById('addPersonProspectPhone').value.trim();
+    const notes = document.getElementById('addPersonProspectNotes').value.trim();
+    DATA.prospects = DATA.prospects || [];
+    DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
+  }
+  MODAL = null;
+  saveAndRender();
+  if(overflowMsg) showAlert(overflowMsg);
 }
 // ---- Ajouter à la ligue des gens déjà connus de l'organisation (avec ou sans
 // compte), en lot — pensé pour remplir vite une nouvelle ligue. ----
@@ -3536,7 +3541,7 @@ function uniqueNameQuiet(name, list){
   while(taken.has((name.trim()+' ('+i+')').toLowerCase())) i++;
   return name.trim()+' ('+i+')';
 }
-async function openAddFromOrgModal(){
+async function openAddToLeagueModal(tab){
   if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation active."); return; }
   try{
     await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
@@ -3606,7 +3611,19 @@ async function openAddFromOrgModal(){
       </div>
       <button class="btn btn-primary orgpick-go" id="orgPickBtn" onclick="confirmAddFromOrg()" disabled>Ajouter</button>
     </div>`;
-  showContentModal('Ajouter depuis l\'organisation', html);
+  const startOrg = tab ? tab==='org' : cands.length>0;
+  const wrapped = `
+    <div class="addtab-bar">
+      <button type="button" class="addtab ${startOrg?'active':''}" data-t="org" onclick="setAddTab('org')">👥 Depuis l'organisation</button>
+      <button type="button" class="addtab ${startOrg?'':'active'}" data-t="new" onclick="setAddTab('new')">✨ Nouvelle personne</button>
+    </div>
+    <div id="addpane-org" style="${startOrg?'':'display:none;'}">${html}</div>
+    <div id="addpane-new" style="${startOrg?'display:none;':''}">
+      ${addPersonFormHTML()}
+      <div id="addPersonErr" class="orgpick-err" style="display:none;"></div>
+      <div class="orgpick-footer"><button class="btn btn-primary orgpick-go" onclick="submitAddPerson()">Ajouter</button></div>
+    </div>`;
+  showContentModal('Ajouter à la ligue', wrapped);
 }
 let ORG_PICK_FILTER = 'all', ORG_PICK_QUERY = '';
 function applyOrgPickFilter(){
@@ -3618,6 +3635,12 @@ function applyOrgPickFilter(){
   });
   const nr = document.querySelector('.orgpick-noresult');
   if(nr) nr.style.display = visible ? 'none' : '';
+}
+function setAddTab(t){
+  document.querySelectorAll('.addtab').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
+  const o=document.getElementById('addpane-org'), n=document.getElementById('addpane-new');
+  if(o) o.style.display = t==='org' ? '' : 'none';
+  if(n) n.style.display = t==='new' ? '' : 'none';
 }
 function filterOrgPick(q){ ORG_PICK_QUERY = (q||'').trim().toLowerCase(); applyOrgPickFilter(); }
 function setOrgPickFilter(f){
