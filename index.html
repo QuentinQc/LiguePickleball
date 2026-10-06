@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 130">
+<meta name="app-build" content="Version 131">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -5350,8 +5350,8 @@ function mlpTeamsSectionHTML(){
   const unassigned = DATA.players.filter(p=>!assignedIds.has(p.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Équipes MLP</h2>
-      <button class="btn btn-primary" onclick="openCreateMlpLeagueTeamModal()">➕ Créer une équipe</button>
+      <h3 style="margin:0;">Équipes MLP</h3>
+      <button class="btn btn-secondary" onclick="openCreateMlpLeagueTeamModal()">➕ Créer une équipe</button>
     </div>
     <p class="small">Composition requise : <strong>${mlpCompositionLabel(rosterSize)}</strong>. Modifiable à tout moment — les affrontements déjà joués gardent leurs résultats.</p>
   </div>`;
@@ -5469,7 +5469,7 @@ function mlpSessionsSectionHTML(){
   }
   const closedCount = (DATA.mlpSessions||[]).filter(s=>s.status==='closed').length;
   if(closedCount){
-    html += `<h2 style="margin-top:24px;">Sessions passées</h2>`;
+    html += `<h3 style="margin:22px 0 8px;">Sessions passées</h3>`;
     html += mlpHistoryHTML();
   }
   return html;
@@ -5591,20 +5591,22 @@ function mlpTieCardHTML(session, tie){
   const games = tie.games && tie.games.length ? tie.games : newMLPGames(DATA.mlpRosterSize||4);
   const aWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamAId;
   const bWon = tie.winnerTeamId && tie.winnerTeamId===tie.teamBId;
+  const nameA = `<span style="${aWon?'color:var(--ball);':''}">${escapeHTML(teamA?teamA.name:'?')}</span>`;
+  const nameB = `<span style="${bWon?'color:var(--ball);':''}">${escapeHTML(teamB?teamB.name:'?')}</span>`;
   let html = `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:flex-start;">
-      <div>
-        <div style="font-weight:${aWon?'700':'400'};">${escapeHTML(teamA?teamA.name:'?')} ${tie.pointsA!==null?`<span class="tag tag-green">${tie.pointsA} pts</span>`:''}</div>
-        <div style="font-weight:${bWon?'700':'400'};">${escapeHTML(teamB?teamB.name:'?')} ${tie.pointsB!==null?`<span class="tag tag-green">${tie.pointsB} pts</span>`:''}</div>
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;">${nameA} <span class="vs">VS</span> ${nameB}</h3>
+      <div class="row" style="gap:8px;align-items:center;">
+        ${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB} pts</span>` : '<span class="tag tag-stay">à jouer</span>'}
+        <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')" aria-label="Retirer l'affrontement">🗑️</button>
       </div>
-      <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')">🗑️</button>
     </div>`;
   if(!teamA || !teamB){ html += `</div>`; return html; }
   games.forEach((g,gi)=>{
     if(g.type==='dreambreaker'){
       const needA = !teamA.dreambreakerPlayerId, needB = !teamB.dreambreakerPlayerId;
       if(needA || needB){
-        html += `<div class="small" style="margin-top:6px;color:var(--danger);">DreamBreaker — choisis le ou la joueuse de chaque équipe :</div>`;
+        html += `<p class="small" style="margin-top:10px;color:var(--danger);">DreamBreaker — choisis le ou la joueuse de chaque équipe :</p>`;
         if(needA) html += `<select onchange="setMlpLeagueDreambreakerPlayer('${teamA.id}',this.value)"><option value="">— ${escapeHTML(teamA.name)} —</option>${teamA.memberIds.map(id=>`<option value="${id}">${escapeHTML(playerName(id))}</option>`).join('')}</select>`;
         if(needB) html += `<select onchange="setMlpLeagueDreambreakerPlayer('${teamB.id}',this.value)"><option value="">— ${escapeHTML(teamB.name)} —</option>${teamB.memberIds.map(id=>`<option value="${id}">${escapeHTML(playerName(id))}</option>`).join('')}</select>`;
         return;
@@ -5614,15 +5616,14 @@ function mlpTieCardHTML(session, tie){
     const pairB = mlpLeagueGamePlayers(teamB, g.type);
     const labelA = pairA ? pairA.map(playerName).join(' & ') : '?';
     const labelB = pairB ? pairB.map(playerName).join(' & ') : '?';
-    html += `<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;">
-      <div class="small" style="color:var(--muted);">${mlpGameTypeLabel(g.type)}</div>
-      <div class="small">${escapeHTML(labelA)} <span style="opacity:0.6;">vs</span> ${escapeHTML(labelB)}</div>
-      <div class="row" style="gap:10px;align-items:center;margin-top:6px;">
-        <input class="score-input" type="number" min="0" inputmode="numeric" value="${g.scoreA===null?'':g.scoreA}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'A',this.value)">
-        <span class="small">:</span>
-        <input class="score-input" type="number" min="0" inputmode="numeric" value="${g.scoreB===null?'':g.scoreB}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'B',this.value)">
-      </div>
-    </div>`;
+    html += `<div class="small" style="margin-top:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">${escapeHTML(mlpGameTypeLabel(g.type))}</div>
+      <div class="match-row">
+        <div class="team">${escapeHTML(labelA)}</div>
+        <input class="pill-input" type="number" min="0" inputmode="numeric" value="${g.scoreA===null?'':g.scoreA}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'A',this.value)">
+        <div class="vs">VS</div>
+        <input class="pill-input" type="number" min="0" inputmode="numeric" value="${g.scoreB===null?'':g.scoreB}" onchange="setMlpTieScore('${session.id}','${tie.id}',${gi},'B',this.value)">
+        <div class="team" style="text-align:right;">${escapeHTML(labelB)}</div>
+      </div>`;
   });
   html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>`;
   html += `</div>`;
@@ -5686,20 +5687,27 @@ function recomputeMlpTie(sessionId, tieId){
 function mlpHistoryHTML(){
   const closed = (DATA.mlpSessions||[]).filter(s=>s.status==='closed').slice().reverse();
   if(!closed.length) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
+  const isAdminView = SESSION_USER && SESSION_USER.role==='admin' && !ADMIN_VIEWING_AS;
   return closed.map(session=>`
     <div class="card">
-      <h3 style="margin-bottom:8px;">Session du ${session.date}</h3>
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Session du ${session.date}</h3>
+        <span class="tag tag-stay">${(session.ties||[]).length} affrontement${(session.ties||[]).length>1?'s':''}</span>
+      </div>
       ${(session.ties||[]).map(tie=>{
         const teamA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId);
         const teamB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
-        return `<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <span>${escapeHTML(teamA?teamA.name:'?')} <span style="opacity:0.6;">vs</span> ${escapeHTML(teamB?teamB.name:'?')}</span>
-          <span class="tag tag-green">${tie.pointsA}–${tie.pointsB} pts</span>
+        const aWon = tie.winnerTeamId===tie.teamAId, bWon = tie.winnerTeamId===tie.teamBId;
+        return `<div class="match-row">
+          <div class="team" style="${aWon?'color:var(--ball);font-weight:700;':''}">${escapeHTML(teamA?teamA.name:'?')}</div>
+          <div class="vs">${tie.pointsA===null||tie.pointsA===undefined?'—':tie.pointsA} : ${tie.pointsB===null||tie.pointsB===undefined?'—':tie.pointsB}</div>
+          <div class="team" style="text-align:right;${bWon?'color:var(--ball);font-weight:700;':''}">${escapeHTML(teamB?teamB.name:'?')}</div>
         </div>`;
       }).join('')}
     </div>`).join('');
 }
-function mlpStandingsHTML(){
+function mlpStandingsHTML(me){
+  const myTeam = me ? (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(me.id)) : null;
   const standings = {};
   (DATA.mlpTeams||[]).forEach(t=>{ standings[t.id] = { teamId:t.id, name:t.name, points:0, played:0, wins:0, losses:0 }; });
   (DATA.mlpSessions||[]).filter(s=>s.status==='closed').forEach(session=>{
@@ -5716,13 +5724,14 @@ function mlpStandingsHTML(){
       });
     });
   });
-  const rows = Object.values(standings).sort((a,b)=>b.points-a.points);
+  const rows = Object.values(standings).sort((a,b)=>b.points-a.points || b.wins-a.wins);
   if(!rows.length) return `<div class="card"><p class="empty">Aucun classement pour l'instant — crée des équipes et joue des sessions.</p></div>`;
+  const medal = i => i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1);
   return `<div class="card">
     <h2>Classement de la saison</h2>
     <p class="small">3 pts pour une victoire en règle, 2 pts pour une victoire au DreamBreaker, 1 pt pour une défaite au DreamBreaker, 0 pt pour une défaite en règle.</p>
     <table><tr><th>#</th><th>Équipe</th><th>J</th><th>V-D</th><th>Points</th></tr>
-    ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHTML(r.name)}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td><strong>${r.points}</strong></td></tr>`).join('')}
+    ${rows.map((r,i)=>`<tr class="${myTeam&&myTeam.id===r.teamId?'me':''}"><td>${medal(i)}</td><td>${escapeHTML(r.name)}${myTeam&&myTeam.id===r.teamId?' <span class="small">(toi)</span>':''}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td><strong>${r.points}</strong></td></tr>`).join('')}
     </table>
   </div>`;
 }
@@ -10019,7 +10028,7 @@ function renderMlpPlayer(me){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML() : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : mlpPlayerTeamHTML(me)))))));
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML(me) : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : mlpPlayerTeamHTML(me)))))));
   if(activeTab==='mur') scrollWallToBottom();
 }
 function mlpPlayerTeamHTML(me){
@@ -10027,21 +10036,28 @@ function mlpPlayerTeamHTML(me){
   if(!team) return `<div class="card"><p class="empty">Tu n'es pas encore assigné(e) à une équipe — contacte un administrateur.</p></div>`;
   let html = `<div class="card">
     <h2>${escapeHTML(team.name)}</h2>
-    <p class="small">Coéquipiers : ${team.memberIds.map(id=>escapeHTML(playerName(id))+(id===me.id?' (toi)':'')).join(', ')}</p>
+    <table>
+      <tr><th>Coéquipiers</th></tr>
+      ${team.memberIds.map(id=>`<tr class="${id===me.id?'me':''}"><td>${escapeHTML(playerName(id))}${id===me.id?' <span class="small">(toi)</span>':''}</td></tr>`).join('')}
+    </table>
   </div>`;
   const open = (DATA.mlpSessions||[]).find(s=>s.status==='open');
   if(open){
     const myTies = (open.ties||[]).filter(t=>t.teamAId===team.id || t.teamBId===team.id);
     if(myTies.length){
-      html += `<div class="card"><h3 style="margin-bottom:8px;">Session du ${open.date}</h3>`;
+      html += `<div class="card"><h3>Affrontements de la session en cours (${open.date})</h3>`;
       myTies.forEach(tie=>{
-        const opp = (DATA.mlpTeams||[]).find(t=>t.id===(tie.teamAId===team.id?tie.teamBId:tie.teamAId));
+        const mineIsA = tie.teamAId===team.id;
+        const opp = (DATA.mlpTeams||[]).find(t=>t.id===(mineIsA?tie.teamBId:tie.teamAId));
+        const myPts = mineIsA ? tie.pointsA : tie.pointsB, oppPts = mineIsA ? tie.pointsB : tie.pointsA;
         const statusTag = tie.winnerTeamId
           ? (tie.winnerTeamId===team.id ? '<span class="tag tag-green">Victoire ✅</span>' : '<span class="tag tag-down">Défaite</span>')
           : '<span class="tag tag-stay">À venir</span>';
-        html += `<div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <span>Contre <strong>${escapeHTML(opp?opp.name:'?')}</strong></span>
-          ${statusTag}
+        html += `<div class="match-row me">
+          <div class="team"><strong>${escapeHTML(team.name)}</strong></div>
+          <div class="vs">${tie.winnerTeamId ? `${myPts} : ${oppPts}` : 'VS'}</div>
+          <div class="team" style="text-align:right;">${escapeHTML(opp?opp.name:'?')}</div>
+          <div style="flex-basis:100%;">${statusTag}</div>
         </div>`;
       });
       html += `</div>`;
