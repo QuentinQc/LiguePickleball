@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 127">
+<meta name="app-build" content="Version 129">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -448,7 +448,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .topbar{margin-bottom:18px;background:linear-gradient(120deg, var(--court-light), var(--court));border-radius:14px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);position:sticky;top:env(safe-area-inset-top);z-index:500;box-shadow:0 8px 18px -10px rgba(0,0,0,0.4);transition:transform .22s ease;}
 .topbar.topbar-hidden{transform:translateY(calc(-100% - env(safe-area-inset-top) - 24px));}
 .topbar-main{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.topbar-main-3col{display:grid;grid-template-columns:1fr auto 1fr;}
+.topbar-main-3col{display:grid;grid-template-columns:auto 1fr auto;}
 .topbar-center-info{display:none;align-items:center;gap:8px;}
 .tci-chip{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:7px 14px;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease;font:inherit;color:inherit;}
 .tci-chip:not(.tci-chip-static):hover{background:rgba(255,255,255,0.16);border-color:rgba(255,255,255,0.3);}
@@ -700,6 +700,32 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .cal-row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;border:1px solid var(--border,#e5e5e5);margin-bottom:6px;}
 .cal-click{cursor:pointer;}
 .cal-badge{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;}
+
+.topbar-menu{left:0;right:auto;}
+.topbar-quick-mobile{display:none;}
+.topbar-quick-desktop{display:inline-flex;}
+.topbar-main-3col .row{flex-wrap:nowrap;}
+@media (max-width:899px){
+  .topbar-main-3col{grid-template-columns:auto 1fr auto;gap:6px;}
+  .topbar-quick-mobile{grid-column:2;justify-self:center;display:block;}
+  .topbar-quick-desktop{display:none;}
+  .topbar-menu{left:50%;transform:translateX(-50%);}
+  .topbar-main-3col .topbar-right{grid-column:3;min-width:0;}
+  .topbar-ico{width:36px;height:36px;font-size:17px;}
+  .topbar-icos{gap:5px;}
+  .topbar-main-3col .view-slide button{padding:7px 9px;font-size:10px;letter-spacing:0;}
+  .topbar-main-3col .hamburger-btn{padding-right:4px;}
+}
+.vs-short{display:none;}
+.view-slide{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;}
+@media (max-width:520px){ .vs-full{display:none;} .vs-short{display:inline;} }
+@media (max-width:420px){
+  .topbar{padding:10px 10px;}
+  .topbar-main-3col .hamburger-btn{font-size:28px;padding:6px 2px 6px 0;min-height:36px;}
+  .topbar-main-3col .view-slide{padding:2px;}
+  .topbar-main-3col .view-slide button{padding:7px 6px;font-size:9px;}
+  .topbar-ico{width:34px;height:34px;}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -3165,9 +3191,10 @@ function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagl
       <div class="row" style="gap:8px;align-items:center;justify-self:start;">
         ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
       </div>
+      <div class="topbar-quick-mobile">${(switchContext==='admin'||switchContext==='member') && DATA ? quickIconsHTML() : ''}</div>
       <div class="topbar-center-info" style="justify-self:center;">${centerChips}</div>
-      <div class="row" style="gap:8px;align-items:center;justify-self:end;grid-column:3;">
-        ${(switchContext==='admin'||switchContext==='member') && DATA ? quickIconsHTML() : ''}
+      <div class="row topbar-right" style="gap:8px;align-items:center;justify-self:end;grid-column:3;">
+        <span class="topbar-quick-desktop">${(switchContext==='admin'||switchContext==='member') && DATA ? quickIconsHTML() : ''}</span>
         ${viewSlide||''}
         ${extraControls||''}
       </div>
@@ -3183,7 +3210,7 @@ function viewSlideHTML(options){
   const activeIndex = Math.max(0, options.findIndex(o=>o.active));
   return `<div class="view-slide" style="--n:${options.length};">
     <div class="view-slide-thumb" style="transform:translateX(${activeIndex * 100}%);"></div>
-    ${options.map(o=>`<button class="${o.active?'active':''}" ${o.active?'disabled':''} onclick="${o.onclick}">${escapeHTML(o.label)}</button>`).join('')}
+    ${options.map(o=>`<button class="${o.active?'active':''}" ${o.active?'disabled':''} onclick="${o.onclick}">${o.label.length>8 ? `<span class="vs-full">${escapeHTML(o.label)}</span><span class="vs-short">${escapeHTML(o.label.slice(0,5))}.</span>` : escapeHTML(o.label)}</button>`).join('')}
   </div>`;
 }
 // Barre d'onglets horizontale classique (pilules), affichée directement sur
