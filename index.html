@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 139">
+<meta name="app-build" content="Version 140">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1134,12 +1134,14 @@ function notifySessionPublished(session){
 }
 // Appelé quand l'admin finalise une session (montées/descentes appliquées) —
 // prévient les joueurs que les résultats/le classement sont à jour.
-function notifySessionResultsPublished(finishedDate){
+function notifySessionResultsPublished(finishedDate, corrected){
   if(!CURRENT_LEAGUE_ID || !finishedDate) return;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    title: '🏆 Résultats publiés',
-    body: `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} sont disponibles.`,
+    title: corrected ? '✏️ Résultats corrigés' : '🏆 Résultats publiés',
+    body: corrected
+      ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores, classement et cotes sont mis à jour : jette un œil à ta position.`
+      : `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} sont disponibles.`,
     url: '/'
   });
 }
@@ -6049,6 +6051,7 @@ function closeMlpSession(sessionId){
   const session = (DATA.mlpSessions||[]).find(s=>s.id===sessionId);
   if(!session) return;
   session.status = 'closed';
+  notifySessionResultsPublished(session.date, !!session.reopenedAt);
   saveAndRender();
 }
 function mlpTieCardHTML(session, tie){
@@ -6242,7 +6245,7 @@ function mlpHistoryHTML(){
   return closed.map(session=>`
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;">Session du ${session.date}</h3>
+        <h3 style="margin:0;">Session du ${session.date}${session.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
         <span class="tag tag-stay">🔒 ${(session.ties||[]).length} affrontement${(session.ties||[]).length>1?'s':''}</span>
       </div>
       ${isAdminView ? `<button class="btn-ghost" style="margin:8px 0;" onclick="reopenMlpSession('${session.id}')">🔓 Rouvrir pour corriger</button>` : ''}
@@ -8849,8 +8852,9 @@ function onFinalize(){
   const incomplete = open.groupsData.some(gd=>gd.matches.some(m=>m.scoreA===null || m.scoreB===null));
   const afterFinalize = ()=>{
     const finishedDate = open.date;
+    const wasCorrection = !!open.reopenedAt;
     finalizeSession(open);
-    notifySessionResultsPublished(finishedDate);
+    notifySessionResultsPublished(finishedDate, wasCorrection);
     if(DATA.autoStartSessions){
       autoStartNextSession(finishedDate);
     }
@@ -9313,7 +9317,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
   const showRating = !viewerPlayerId || DATA.showRatingToPlayers; // toujours visible pour l'admin (pas de viewerPlayerId)
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">Session du ${s.date}</h3>
+      <h3 style="margin:0;">Session du ${s.date}${s.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
       <div class="row" style="gap:8px;">
         <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})">🎾 Matchs${viewerPlayerId ? ' de mon groupe' : ''}</button>
         ${withDelete ? `<button class="btn-ghost-danger" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
