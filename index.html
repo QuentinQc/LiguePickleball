@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="20261006112002">
+<meta name="app-build" content="Version 120">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -680,6 +680,26 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .team{min-width:90px;font-size:13px;}
   .pill-input{width:48px;}
 }
+
+.compose-launch{padding:12px 14px;color:var(--muted);font-size:15px;}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.cal-title{font-weight:700;text-transform:capitalize;font-size:16px;}
+.cal-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border,#ddd);background:transparent;font-size:20px;cursor:pointer;color:inherit;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-dow{text-align:center;font-size:11px;color:var(--muted);padding:2px 0;}
+.cal-cell{aspect-ratio:1/1;border:none;background:transparent;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:14px;color:inherit;cursor:pointer;padding:0;}
+.cal-empty{cursor:default;}
+.cal-today{box-shadow:inset 0 0 0 2px var(--green,#2e9d5b);font-weight:700;}
+.cal-sel{background:rgba(46,157,91,.16);}
+.cal-dots{display:flex;gap:3px;height:6px;}
+.cal-dots i,.cal-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;box-sizing:border-box;}
+.cal-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:8px;}
+.cal-legend span{display:inline-flex;align-items:center;gap:5px;}
+.cal-h{margin:0 0 8px;font-size:14px;text-transform:capitalize;}
+.cal-up{font-size:12px;color:var(--muted);margin:10px 0 4px;text-transform:capitalize;}
+.cal-row{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;border:1px solid var(--border,#e5e5e5);margin-bottom:6px;}
+.cal-click{cursor:pointer;}
+.cal-badge{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -1398,10 +1418,10 @@ function updateChatFab(){
 }
 function sheetModalHTML(){
   const k = MODAL.sheet;
-  const ico = k==='partenaire' ? '🤝' : '🎉';
-  const title = k==='partenaire' ? 'Partenaire' : 'Événements';
-  const sub = k==='partenaire' ? 'Trouver un partenaire ou un match amical' : "Calendrier de l'organisation";
-  const body = k==='partenaire' ? partnerBoardHTML() : socialEventsHTML();
+  const ico = k==='partenaire' ? '🤝' : k==='calendrier' ? '📅' : '🎉';
+  const title = k==='partenaire' ? 'Partenaire' : k==='calendrier' ? 'Calendrier' : 'Événements';
+  const sub = k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
+  const body = k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet">
       <div class="chat-head">
@@ -1896,12 +1916,16 @@ function eventDateLabel(s){ const d = new Date(s+'T00:00:00'); return d.toLocale
 function socialEventsHTML(){
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
   return `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">📅 Événements sociaux</h3>
-      ${isAdmin ? `<button class="btn btn-secondary" onclick="openNewSocialEventModal()">+ Nouvel événement</button>` : ''}
-    </div>
-    <p class="small" style="margin:6px 0 10px;color:var(--muted);">Visible par tous les membres de l'organisation.</p>
-    <div id="socialEventsList">${socialEventsListHTML()}</div>
+    <h3 style="margin:0 0 4px;">🎉 Événements</h3>
+    <p class="small" style="margin:0 0 10px;color:var(--muted);">Soirées, tournois et rencontres sociales, visibles par tous les membres de l'organisation.</p>
+    ${isAdmin ? `<div class="compose-box" style="cursor:pointer;" onclick="openNewSocialEventModal()">
+        <div class="compose-launch">✏️ Organiser un événement…</div>
+        <div class="compose-foot">
+          <span class="compose-chip" style="pointer-events:none;">📅 Date · lieu · heure</span>
+          <button type="button" class="btn btn-primary compose-send" onclick="event.stopPropagation();openNewSocialEventModal()">Créer ➤</button>
+        </div>
+      </div>` : ''}
+    <div id="socialEventsList" style="margin-top:${isAdmin?14:0}px;">${socialEventsListHTML()}</div>
   </div>`;
 }
 // Liste compacte : une pastille par événement, cliquer dessus ouvre le détail
@@ -3303,18 +3327,99 @@ document.addEventListener('keydown', e=>{
     node = node.parentElement;
   }
 });
+
+// ===== Calendrier (popup) =====
+let CAL_MONTH = null, CAL_SEL = null;
+function calItemsFor(){
+  const map = {};
+  const add=(d,it)=>{ if(!d) return; (map[d]=map[d]||[]).push(it); };
+  const today = fmtDate(new Date());
+  const real = new Set();
+  (DATA.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status}); });
+  const blocked = new Set(DATA.blockedDates||[]);
+  blocked.forEach(d=>add(d,{t:'blocked'}));
+  const dow = DATA.playDayOfWeek;
+  if(typeof dow==='number'){
+    const a = DATA.seasonStartDate, b = DATA.seasonEndDate;
+    const start = new Date(Math.max(new Date(today+'T00:00:00'), a ? new Date(a+'T00:00:00') : 0));
+    const end = b ? new Date(b+'T00:00:00') : new Date(new Date(today+'T00:00:00').getTime()+120*864e5);
+    for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+      if(d.getDay()!==dow) continue;
+      const f = fmtDate(d);
+      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned'});
+    }
+  }
+  (PARTNER_POSTS||[]).forEach(p=>{ if(p.play_date && p.status!=='closed') add(p.play_date,{t:'partner', p}); });
+  (SOCIAL_EVENTS||[]).forEach(e=>add(e.event_date,{t:'event', e}));
+  return map;
+}
+function calendarSheetHTML(){
+  const today = fmtDate(new Date());
+  if(!CAL_MONTH) CAL_MONTH = today.slice(0,7);
+  const [Y,M] = CAL_MONTH.split('-').map(Number);
+  const items = calItemsFor();
+  const first = new Date(Y,M-1,1);
+  const lead = (first.getDay()+6)%7;
+  const days = new Date(Y,M,0).getDate();
+  const label = first.toLocaleDateString('fr-CA',{month:'long',year:'numeric'});
+  let cells = '';
+  for(let i=0;i<lead;i++) cells += '<div class="cal-cell cal-empty"></div>';
+  for(let d=1; d<=days; d++){
+    const f = `${Y}-${String(M).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const its = items[f]||[];
+    const has = t=>its.some(i=>i.t===t);
+    const dots = [
+      has('session')?'<i style="background:var(--green,#2e9d5b)"></i>':'',
+      has('planned')?'<i style="border:1.5px solid var(--green,#2e9d5b)"></i>':'',
+      has('partner')?'<i style="background:#F2994A"></i>':'',
+      has('event')?'<i style="background:#3FB5A6"></i>':'',
+      has('blocked')?'<i style="background:#bbb"></i>':''
+    ].join('');
+    cells += `<button type="button" class="cal-cell ${f===today?'cal-today':''} ${f===CAL_SEL?'cal-sel':''}" onclick="calSelect('${f}')"><span>${d}</span><div class="cal-dots">${dots}</div></button>`;
+  }
+  let list = '';
+  const rows = its=>its.map(i=>{
+    if(i.t==='session') return `<div class="cal-row"><span class="cal-badge" style="background:#e3f5ea;">🏓</span><div><b>Session de ligue</b><div class="small">${i.status==='closed'?'Terminée':'Ouverte'}</div></div></div>`;
+    if(i.t==='planned') return `<div class="cal-row"><span class="cal-badge" style="background:#eef7f1;">🏓</span><div><b>Session prévue</b><div class="small">Jour de jeu régulier</div></div></div>`;
+    if(i.t==='blocked') return `<div class="cal-row"><span class="cal-badge" style="background:#eee;">⛔</span><div><b>Pas de session</b></div></div>`;
+    if(i.t==='partner') return `<div class="cal-row cal-click" onclick="openPartnerPostDetail('${i.p.id}')"><span class="cal-badge" style="background:#fdebd9;">🤝</span><div><b>${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire</b><div class="small">${escapeHTML((i.p.message||'').slice(0,80))}</div></div></div>`;
+    return `<div class="cal-row cal-click" onclick="openEventDetail('${i.e.id}')"><span class="cal-badge" style="background:#d9f1ee;">🎉</span><div><b>${escapeHTML(i.e.title||'Événement')}</b><div class="small">${escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · '))}</div></div></div>`;
+  }).join('');
+  if(CAL_SEL){
+    const its = items[CAL_SEL]||[];
+    list = `<h4 class="cal-h">${escapeHTML(eventDateLabel(CAL_SEL))}</h4>` + (its.length ? rows(its) : '<p class="empty">Rien de prévu ce jour-là.</p>');
+  } else {
+    const up = Object.keys(items).filter(d=>d>=today).sort().slice(0,12);
+    list = '<h4 class="cal-h">À venir</h4>' + (up.length ? up.map(d=>`<div class="cal-up">${escapeHTML(eventDateLabel(d))}</div>${rows(items[d])}`).join('') : '<p class="empty">Rien à venir.</p>');
+  }
+  return `<div class="card">
+    <div class="cal-nav">
+      <button type="button" class="cal-btn" onclick="calNav(-1)" aria-label="Mois précédent">‹</button>
+      <div class="cal-title">${escapeHTML(label)}</div>
+      <button type="button" class="cal-btn" onclick="calNav(1)" aria-label="Mois suivant">›</button>
+    </div>
+    <div class="cal-grid">${['L','M','M','J','V','S','D'].map(x=>`<div class="cal-dow">${x}</div>`).join('')}${cells}</div>
+    <div class="cal-legend"><span><i style="background:var(--green,#2e9d5b)"></i>Session</span><span><i style="border:1.5px solid var(--green,#2e9d5b)"></i>Prévue</span><span><i style="background:#F2994A"></i>Partenaire</span><span><i style="background:#3FB5A6"></i>Événement</span></div>
+    <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="calToday()">Aujourd'hui</button>
+    <div style="margin-top:10px;">${list}</div>
+  </div>`;
+}
+function calSelect(d){ CAL_SEL = (CAL_SEL===d ? null : d); render(); }
+function calNav(n){ const [Y,M]=CAL_MONTH.split('-').map(Number); const d=new Date(Y,M-1+n,1); CAL_MONTH=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; CAL_SEL=null; render(); }
+function calToday(){ CAL_MONTH=null; CAL_SEL=fmtDate(new Date()); render(); }
 let QUICK_MENU_OPEN = false;
 function quickIconsHTML(){
   const u = quickUnread();
   const cnt = {partenaire:u.partner, evenements:u.events};
   const item = (k,ico,label)=>`<button type="button" class="topbar-menu-item ${QUICK_VIEW===k?'active':''}" onclick="openQuickView('${k}')"><span style="font-size:20px;">${ico}</span>${label}${cnt[k]?`<span class="chat-menu-badge" style="margin-left:auto;">${cnt[k]}</span>`:''}</button>`;
   return `<div class="topbar-icos">
+    <button class="topbar-ico" onclick="openQuickView('calendrier')" aria-label="Calendrier" title="Calendrier">📅</button>
     <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">📣${(u.partner+u.events)>0 ? '<span class="topbar-dot"></span>' : ''}</button>
     ${QUICK_MENU_OPEN ? `<div class="topbar-menu-backdrop" onclick="toggleQuickMenu(false)"></div><div class="topbar-menu">${item('partenaire','🤝','Partenaire')}${item('evenements','🎉','Événements')}</div>` : ''}
   </div>`;
 }
 function toggleQuickMenu(force){ QUICK_MENU_OPEN = typeof force==='boolean' ? force : !QUICK_MENU_OPEN; render(); }
-function openQuickView(k){ QUICK_MENU_OPEN = false; markQuickSeen(k); MODAL_UNDER = null; MODAL = { kind:'content', sheet:k, title:k }; render(); }
+function openQuickView(k){ QUICK_MENU_OPEN = false; if(k==='calendrier'){ CAL_MONTH=null; CAL_SEL=null; } else markQuickSeen(k); MODAL_UNDER = null; MODAL = { kind:'content', sheet:k, title:k }; render(); }
 function closeQuickView(){ if(QUICK_VIEW) markQuickSeen(QUICK_VIEW); QUICK_VIEW = null; render(); }
 function applyQuickView(){
   if(!QUICK_VIEW) return;
@@ -10534,7 +10639,7 @@ function modalFormSaveClick(){
   dropModal();
   saveAndRender();
 }
-function closeModal(){ if(MODAL && MODAL.sheet) markQuickSeen(MODAL.sheet); dropModal(); render(); }
+function closeModal(){ if(MODAL && (MODAL.sheet==='partenaire'||MODAL.sheet==='evenements')) markQuickSeen(MODAL.sheet); dropModal(); render(); }
 function modalConfirmClick(){
   if(!MODAL) return;
   const cb = MODAL.onConfirm;
