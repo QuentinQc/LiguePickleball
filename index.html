@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 131">
+<meta name="app-build" content="Version 132">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4299,7 +4299,10 @@ function uniqueNameQuiet(name, list){
   while(taken.has((name.trim()+' ('+i+')').toLowerCase())) i++;
   return name.trim()+' ('+i+')';
 }
-async function openAddToLeagueModal(tab){
+let ORG_PICK_TEAM = null, ORG_PICK_MAX = null; // mode « ajout dans une équipe MLP »
+async function openAddToLeagueModal(tab, teamId){
+  ORG_PICK_TEAM = teamId || null; ORG_PICK_MAX = null;
+  if(ORG_PICK_TEAM){ const tm=(DATA.mlpTeams||[]).find(t=>t.id===ORG_PICK_TEAM); ORG_PICK_MAX = tm ? Math.max(0,(DATA.mlpRosterSize||4)-tm.memberIds.length) : 0; }
   if(!CURRENT_ORGANIZATION_ID){ showAlert("Aucune organisation active."); return; }
   try{
     await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
@@ -4335,7 +4338,7 @@ async function openAddToLeagueModal(tab){
   const groups = DATA.groups || [];
   const nAcc = cands.filter(c=>c.profileId).length, nNo = cands.length - nAcc;
   const html = `
-    <div class="orgpick-intro">Choisis qui ajouter à cette ligue. Les cotes, comptes et genres sont repris automatiquement.</div>
+    <div class="orgpick-intro">${ORG_PICK_TEAM ? `Choisis des personnes de l'organisation à ajouter à cette équipe (${ORG_PICK_MAX} place${ORG_PICK_MAX>1?'s':''} libre${ORG_PICK_MAX>1?'s':''}). Elles sont aussi ajoutées à la ligue.` : "Choisis qui ajouter à cette ligue. Les cotes, comptes et genres sont repris automatiquement."}</div>
     ${cands.length ? `
     <div class="orgpick-toolbar">
       <input class="orgpick-search" placeholder="🔍 Rechercher un nom…" oninput="filterOrgPick(this.value)">
@@ -4359,14 +4362,14 @@ async function openAddToLeagueModal(tab){
       <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
     </div>` : `<div class="orgpick-empty">🎉 Tout le monde de l'organisation est déjà dans cette ligue.</div>`}
     <div class="orgpick-footer">
-      <div class="orgpick-opts">
+      ${ORG_PICK_TEAM ? '' : `<div class="orgpick-opts">
         <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Comme joueurs</option><option value="remplacant">🔄 Comme remplaçants</option></select>
         <span id="orgPickPlaceWrap"><select id="orgPickPlace"><option value="wait">⏳ En attente</option>${groups.length ? '<option value="fill">📋 Remplir les groupes</option>' : ''}</select></span>
-      </div>
+      </div>`}
       <button class="btn btn-primary orgpick-go" id="orgPickBtn" onclick="confirmAddFromOrg()" disabled>Ajouter</button>
     </div>`;
   const startOrg = tab ? tab==='org' : cands.length>0;
-  const wrapped = `
+  const wrapped = ORG_PICK_TEAM ? html : `
     <div class="addtab-bar">
       <button type="button" class="addtab ${startOrg?'active':''}" data-t="org" onclick="setAddTab('org')">👥 Depuis l'organisation</button>
       <button type="button" class="addtab ${startOrg?'':'active'}" data-t="new" onclick="setAddTab('new')">✨ Nouvelle personne</button>
@@ -4377,7 +4380,7 @@ async function openAddToLeagueModal(tab){
       <div id="addPersonErr" class="orgpick-err" style="display:none;"></div>
       <div class="orgpick-footer"><button class="btn btn-primary orgpick-go" onclick="submitAddPerson()">Ajouter</button></div>
     </div>`;
-  showContentModal('Ajouter à la ligue', wrapped);
+  showContentModal(ORG_PICK_TEAM ? "Ajouter à l'équipe" : 'Ajouter à la ligue', wrapped);
 }
 let ORG_PICK_FILTER = 'all', ORG_PICK_QUERY = '';
 function applyOrgPickFilter(){
@@ -4418,6 +4421,7 @@ function updateOrgPickCount(){
   const n = document.querySelectorAll('.orgpick-cb:checked').length + parseOrgPickNewNames().length;
   const btn = document.getElementById('orgPickBtn');
   if(!btn) return;
+  if(ORG_PICK_TEAM && ORG_PICK_MAX!==null && n>ORG_PICK_MAX){ btn.disabled = true; btn.textContent = ORG_PICK_MAX ? `Maximum ${ORG_PICK_MAX} (places libres)` : 'Équipe complète'; return; }
   btn.disabled = n===0;
   btn.textContent = n ? `Ajouter ${n} personne${n>1?'s':''}` : 'Ajouter';
 }
@@ -4430,7 +4434,8 @@ async function confirmAddFromOrg(){
   const picked = Array.from(document.querySelectorAll('.orgpick-cb:checked')).map(el=>ORG_PICK_CANDIDATES[parseInt(el.value,10)]).filter(Boolean);
   const newNames = parseOrgPickNewNames();
   if(!picked.length && !newNames.length) return;
-  const type = document.getElementById('orgPickType').value;
+  const teamMode = ORG_PICK_TEAM;
+  const type = teamMode ? 'joueur' : document.getElementById('orgPickType').value;
   const placeEl = document.getElementById('orgPickPlace');
   const fill = type==='joueur' && placeEl && placeEl.value==='fill';
   const btn = document.getElementById('orgPickBtn');
@@ -4458,6 +4463,7 @@ async function confirmAddFromOrg(){
     }
   }
   const links = [];
+  const addedIds = [];
   all.forEach(c=>{
     let obj;
     if(type==='remplacant'){
@@ -4468,12 +4474,17 @@ async function confirmAddFromOrg(){
       const groupId = groupForNext();
       obj = { id: uid('p'), name: uniqueNameQuiet(c.name, DATA.players), groupId, rating: typeof c.rating==='number' ? c.rating : RATING_DEFAULT, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' };
       DATA.players.push(obj);
+      addedIds.push(obj.id);
     }
     if(c.orgMemberId) obj.orgMemberId = c.orgMemberId;
     if(c.email) obj.email = c.email;
     if(c.gender) obj.gender = c.gender;
     if(c.profileId) links.push(type==='remplacant' ? { profile_id:c.profileId, league_id:CURRENT_LEAGUE_ID, substitute_id:obj.id } : { profile_id:c.profileId, league_id:CURRENT_LEAGUE_ID, player_id:obj.id });
   });
+  if(teamMode){
+    const tm = (DATA.mlpTeams||[]).find(t=>t.id===teamMode);
+    if(tm){ addedIds.forEach(id=>{ if(tm.memberIds.length < (DATA.mlpRosterSize||4) && !tm.memberIds.includes(id)) tm.memberIds.push(id); }); }
+  }
   await saveData();
   if(SAVE_ERROR) errors.push(SAVE_ERROR);
   if(links.length){
@@ -4482,8 +4493,10 @@ async function confirmAddFromOrg(){
   }
   try{ await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]); }catch(e){}
   MODAL = null;
+  ORG_PICK_TEAM = null; ORG_PICK_MAX = null;
   render();
   if(errors.length) showAlert("Ajout terminé avec des erreurs : " + errors.join(' / '));
+  else if(teamMode) openMlpTeamRosterModal(teamMode);
   else showAlert(`✅ ${all.length} personne${all.length>1?'s ajoutées':' ajoutée'} à la ligue.`);
 }
 function setPlayersSubTab(t){ VIEW.playersSubTab = t; render(); }
@@ -5419,6 +5432,8 @@ function mlpTeamRosterModalHTML(teamId){
     </div>`;
   }).join('') : `<p class="small">Aucun membre pour l'instant.</p>`;
   html += `<h3 style="margin-top:16px;">Ajouter un joueur</h3>`;
+  html += `<button class="btn btn-secondary" style="width:100%;margin-bottom:8px;" ${team.memberIds.length>=rosterSize?'disabled':''} onclick="openAddToLeagueModal('org','${teamId}')">👥 Choisir dans l'organisation</button>`;
+  html += `<p class="small" style="margin:0 0 6px;color:var(--muted);">Ou parmi les joueurs de la ligue :</p>`;
   html += available.length ? available.map(p=>`
     <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
       <span>${escapeHTML(p.name)}</span>
