@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 153">
+<meta name="app-build" content="Version 154">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -471,6 +471,9 @@ tr.me{background:rgba(207,234,92,0.1);}
 .vis-grp:not(:first-child){margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);}
 .sc-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 12px;}
 .sc-ctl .sc-btn{padding:8px 12px;font-size:13px;}
+.match-row{position:relative;}
+.sc-mark{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);z-index:1;font-size:9.5px;line-height:1;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,159,10,.45);background:#2b2412;color:#FF9F0A;cursor:pointer;}
+.sc-mark.inline{position:static;transform:none;margin-left:8px;}
 .sc-chip{font-size:12px;color:var(--muted);background:rgba(255,255,255,0.06);border-radius:999px;padding:4px 10px;}
 .sc-chip.ok{color:var(--ball);background:rgba(207,234,92,0.12);}
 .sc-chip.warn{color:#FF9F0A;background:rgba(255,159,10,0.12);}
@@ -6113,7 +6116,7 @@ function mlpTieCardHTML(session, tie){
       <div class="ss-mid">${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB}</span>` : '<span class="vs">VS</span>'}</div>
       ${side(teamB,bWon,true,'B')}
     </div>
-    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?'tag-green':'tag-stay'}">${tie.winnerTeamId?'✅ Terminé':'⏳ à jouer'}</span>
+    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?'tag-green':'tag-stay'}">${tie.winnerTeamId?'✅ Terminé':'⏳ à jouer'}</span>${scoreMarkHTML('mlp', tie.id, null, tie, true, true)}
       <button class="btn-ghost-danger" onclick="removeMlpTie('${session.id}','${tie.id}')" aria-label="Retirer l'affrontement">🗑️</button></div>`;
   if(!teamA || !teamB){ html += `</div>`; return html; }
   games.forEach((g,gi)=>{
@@ -6139,7 +6142,7 @@ function mlpTieCardHTML(session, tie){
         <div class="team" style="text-align:right;">${labelB}</div>
       </div>`;
   });
-  html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>` + scoreMentionHTML(tie,true);
+  html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>` ;
   html += `</div>`;
   return html;
 }
@@ -6240,7 +6243,7 @@ function mlpPlayerTieEntryHTML(tie, myTeam, me, sessionId){
   const head = (t, right)=>`<div class="ss-side ${right?'r':''}" style="--tc:${mlpTeamColor(t)};">${mlpTeamBadgeHTML(t,40)}<span class="ss-sname">${escapeHTML(t.name)}${t.id===myTeam.id?' ⭐':''}</span></div>`;
   let html = `<div class="card ss-tie" style="--tc:${tie.winnerTeamId?'var(--ball)':'var(--line-soft)'};">
     <div class="ss-tiehead">${head(teamA,false)}<div class="ss-mid">${tie.winnerTeamId ? `<span class="tag tag-green">${tie.pointsA}–${tie.pointsB}</span>` : '<span class="vs">VS</span>'}</div>${head(teamB,true)}</div>
-    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'tag-green':'tag-down'):'tag-stay'}">${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'Victoire ✅':'Défaite'):'⏳ À jouer'}</span></div>`;
+    <div class="ss-tiebar"><span class="tag ${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'tag-green':'tag-down'):'tag-stay'}">${tie.winnerTeamId?(tie.winnerTeamId===myTeam.id?'Victoire ✅':'Défaite'):'⏳ À jouer'}</span>${scoreMarkHTML('mlp', tie.id, null, tie, true, true)}</div>`;
   games.forEach((g,gi)=>{
     const pa = mlpTieLineup(tie,'A',teamA,g.type), pb = mlpTieLineup(tie,'B',teamB,g.type);
     const lab = (pair)=> pair ? pair.map(playerName).map(escapeHTML).join(' & ') : '?';
@@ -6259,7 +6262,7 @@ function mlpPlayerTieEntryHTML(tie, myTeam, me, sessionId){
   });
   if(DATA.mlpPlayerScoreEntry === false) return html.replace(/<input class="pill-input"[^>]*data-s="([AB])"[^>]*value="([^"]*)">/g,(m,sd,v)=>`<div class="vs" style="font-weight:700;">${v===''?'—':v}</div>`) + `<p class="small" style="margin-top:10px;color:var(--muted);">Les scores sont entrés par un administrateur.</p></div>`;
   html += `<button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="playerSaveMlpTie('${sessionId}','${tie.id}','${me.id}')">${tie.winnerTeamId?'Mettre à jour le résultat':'Enregistrer le résultat'}</button>
-  ${scoreMentionHTML(tie,true)}
+
   </div>`;
   return html;
 }
@@ -8535,7 +8538,8 @@ function adminSessionHTML(){
           <div class="vs">VS</div>
           <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${g.id}','${mi}','B',this.value)">
           <div class="team" style="text-align:right;">${m.teamB.length ? m.teamB.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
-        </div>${scoreMentionHTML(m,false)}`;
+          ${scoreMarkHTML('ladder', g.id, mi, m, false)}
+        </div>`;
     });
     if(!manual && m_hasSitOut(gd.matches)){
       html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?playerName(m.sit):'—').join(', ')}</p>`;
@@ -8863,18 +8867,27 @@ function scoreHas(u, isMlp){
   return isMlp ? (u.games||[]).some(g=>g.scoreA!=null||g.scoreB!=null) : (u.scoreA!=null||u.scoreB!=null);
 }
 function scoreComplete(u, isMlp){ return isMlp ? !!u.winnerTeamId : (u.scoreA!=null && u.scoreB!=null); }
-// Mention sous un score : « Saisi par X à 12 h 44 » ou « Score modifié par X à … (avant : 11–7) ».
-function scoreMentionHTML(u, isMlp){
-  if(!scoreComplete(u,isMlp) || !u.sByName) return '';
-  let when = '';
-  if(u.sAt){
-    const d = new Date(u.sAt), same = d.toDateString()===new Date().toDateString();
-    when = ' ' + (same ? 'à ' : 'le ' + d.toLocaleDateString('fr-CA',{day:'numeric',month:'short'}) + ' à ') + scoreClock(u.sAt);
+// Repère discret « ✏️ modifié » posé sur la ligne (ne change pas sa hauteur) ;
+// un toucher ouvre le détail : par qui, quand, ancien score.
+function scoreMarkHTML(kind, a, b, u, isMlp, inline){
+  if(!scoreComplete(u,isMlp) || !u.sEdited) return '';
+  return `<button class="sc-mark${inline?' inline':''}" onclick="openScoreInfo('${kind}','${a}',${b==null?'null':"'"+b+"'"})">✏️ modifié</button>`;
+}
+function openScoreInfo(kind, a, b){
+  let u = null, isMlp = kind==='mlp', ctx = '', now = '';
+  if(!isMlp){
+    const open = currentOpenSession(); const gd = open && open.groupsData.find(x=>x.groupId===a); u = gd && gd.matches[+b];
+    if(u){ ctx = ladderMatchCtx(open, a, u); now = scoreText(u,false); }
+  } else {
+    (DATA.mlpSessions||[]).forEach(ss=>{ const t=(ss.ties||[]).find(x=>x.id===a); if(t) u=t; });
+    if(u){ ctx = mlpTieCtx(u); now = `${u.pointsA}–${u.pointsB}`; }
   }
-  const by = escapeHTML(u.sByName);
-  return u.sEdited
-    ? `<div class="sc-ctl"><span class="sc-chip warn">✏️ Score modifié par ${by}${when}${u.sPrev?' · avant : '+escapeHTML(u.sPrev):''}</span></div>`
-    : `<div class="sc-ctl"><span class="sc-chip ok">✓ Saisi par ${by}${when}</span></div>`;
+  if(!u) return;
+  const d = u.sAt ? new Date(u.sAt) : null;
+  const when = d ? d.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'}) + ' à ' + scoreClock(u.sAt) : '';
+  showContentModal('✏️ Score modifié', `<p style="margin:0 0 6px;font-weight:600;">${escapeHTML(ctx)}</p>
+    <p class="small" style="margin:0 0 4px;">Modifié par <b>${escapeHTML(u.sByName||'?')}</b>${when?' — '+escapeHTML(when):''}</p>
+    <p class="small" style="margin:0;">${u.sPrev?'Avant : <b>'+escapeHTML(u.sPrev)+'</b> → ':''}Maintenant : <b>${escapeHTML(now)}</b></p>`);
 }
 function scoreClock(iso){ try{ return new Date(iso).toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 function scoreIsAdmin(){ return !!(SESSION_USER && SESSION_USER.role==='admin'); }
@@ -8884,7 +8897,10 @@ function scoreLogAdd(entry){
   DATA.scoreLog.push(Object.assign({ at: new Date().toISOString() }, entry));
   if(DATA.scoreLog.length > 200) DATA.scoreLog = DATA.scoreLog.slice(-200);
 }
-function scoreAdminLabel(){ return (CURRENT_PROFILE && (CURRENT_PROFILE.full_name || CURRENT_PROFILE.name)) || 'Admin'; }
+function scoreAdminLabel(){
+  try{ if(MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.player_id){ const n = playerName(MY_LINK_IN_CURRENT_LEAGUE.player_id); if(n && n!=='?') return n; } }catch(e){}
+  return (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
+}
 // Notifie (un par un) les comptes liés à ces joueurs.
 async function notifyScorePlayers(playerIds, title, body){
   try{
@@ -8921,10 +8937,6 @@ async function scoreReloadFromServer(){
 }
 // Bloc de contrôle affiché sous un match / affrontement côté joueur
 // Ligne d'état discrète sous un match (échelle) : enregistrement automatique.
-function scoreStatusHTML(kind, sessionId, a, b, u, lk){
-  if(scoreComplete(u,false)) return scoreMentionHTML(u,false);
-  return (u.scoreA!=null||u.scoreB!=null) ? `<div class="sc-ctl"><span class="sc-chip">Entre l'autre score pour enregistrer</span></div>` : '';
-}
 async function playerSubmitLadderScore(gid, mi, auto){
   if(auto){ const ea0=document.getElementById(`sc_${gid}_${mi}_A`), eb0=document.getElementById(`sc_${gid}_${mi}_B`); if(!ea0||!eb0||ea0.value===''||eb0.value==='') return; }
   const open = currentOpenSession();
@@ -11769,8 +11781,9 @@ function playerGroupHTML(me){
           <div class="team">${m.teamA.map(playerName).map(escapeHTML).join(' & ')}</div>
           <div class="vs">${scoreDisplay}</div>
           <div class="team" style="text-align:right;">${m.teamB.map(playerName).map(escapeHTML).join(' & ')}</div>
+          ${scoreMarkHTML('ladder', me.groupId, mi, m, false)}
         </div>`;
-        if(entryOn && mine) html += scoreStatusHTML('ladder', open.id, me.groupId, mi, m, lk);
+        
       });
       html += `</div>`;
     }
