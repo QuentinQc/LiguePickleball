@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 141">
+<meta name="app-build" content="Version 142">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -3582,7 +3582,8 @@ function calItemsFor(){
   if(typeof dow==='number'){
     const a = L.seasonStartDate, b = L.seasonEndDate;
     const start = new Date(Math.max(new Date(today+'T00:00:00'), a ? new Date(a+'T00:00:00') : 0));
-    const end = b ? new Date(b+'T00:00:00') : new Date(new Date(today+'T00:00:00').getTime()+120*864e5);
+    const horizon = new Date(today+'T00:00:00'); horizon.setMonth(horizon.getMonth()+3); // fenêtre de 3 mois
+    const end = (b && new Date(b+'T00:00:00') < horizon) ? new Date(b+'T00:00:00') : horizon;
     for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
       if(d.getDay()!==dow) continue;
       const f = fmtDate(d);
