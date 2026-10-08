@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 146">
+<meta name="app-build" content="Version 148">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -460,6 +460,17 @@ tr.me{background:rgba(207,234,92,0.1);}
 }
 /* Interrupteur à glissière (on/off), pour les réglages booléens — plus clair
    qu'une case à cocher pour ce genre de choix "activé / désactivé". */
+.st-sec{margin:18px 2px 8px;}
+.st-sec-t{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ball);}
+.st-sec-h{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
+.vis-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;}
+.vis-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
+.vis-txt{flex:1;min-width:0;}
+.vis-l{font-size:14.5px;font-weight:600;}
+.vis-grp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 0 0;}
+.vis-grp:not(:first-child){margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);}
+.pal-off{opacity:.55;border-style:dashed;}
+.pal-offtag{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;}
 .switch-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;}
 .switch-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
 .switch-row .switch-label{font-size:14px;color:var(--line);}
@@ -649,6 +660,8 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .subtabs::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.3);border-radius:4px;}
 .subtabs::-webkit-scrollbar-track{background:transparent;}
 .subtabs .tab{flex:0 0 auto;white-space:nowrap;}
+.st-tabs{gap:4px;}
+.st-tabs .tab{flex:1 1 0;padding-left:4px;padding-right:4px;text-align:center;font-size:12.5px;}
 
 /* ---------- Bureau (écrans larges) : plus d'air, colonnes qui ne s'étirent pas à l'infini ---------- */
 @media (min-width:900px){
@@ -826,6 +839,17 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .pbi{width:1.1em;height:1.1em;vertical-align:-0.2em;display:inline-block;flex:none;}
 .ss-emoji .pbi{width:42px;height:42px;}
 .icon-badge .pbi,.cal-badge .pbi{width:1.3em;height:1.3em;vertical-align:middle;}
+.pal-card{padding:14px;}
+.pal-head{display:flex;gap:12px;align-items:center;margin-bottom:10px;}
+.pal-ico{width:40px;height:40px;border-radius:12px;background:rgba(214,255,60,.14);display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;}
+.pal-hint{font-size:12px;color:var(--muted);margin-top:2px;}
+.pal-list{display:flex;flex-direction:column;gap:6px;}
+.pal-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.pal-row.me{border-color:var(--ball);background:rgba(214,255,60,.1);}
+.pal-rank{width:24px;text-align:center;font-size:18px;flex:none;}
+.pal-name{flex:1;min-width:0;font-weight:600;font-size:14px;display:flex;flex-direction:column;}
+.pal-sub{font-weight:400;font-size:11.5px;color:var(--muted);}
+.pal-val{font-weight:700;font-size:14px;color:var(--ball);white-space:nowrap;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -4223,42 +4247,7 @@ function renderMlpAdmin(){
 // d'invitation, sauvegarde, etc. ne dépendent pas du format) ; Ligue et Jeu
 // ont leur propre contenu, propre au format MLP (pas de taille de groupe, de
 // format de match à 4/5 joueurs ni de départage individuel en MLP).
-function mlpSettingsSectionHTML(){
-  const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','🏆 Ligue'],['jeu',pbIcon()+' Jeu'],['avance','⚙️ Avancé']];
-  let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
-  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
-  if(sub==='jeu') html += mlpSettingsJeuTabHTML();
-  else if(sub==='avance') html += settingsAvanceTabHTML();
-  else html += mlpSettingsLigueTabHTML();
-  return html;
-}
-function mlpSettingsLigueTabHTML(){
-  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  let html = '<div class="card-grid">';
-  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''}`, "openGeneralInfoModal()");
-  html += settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()");
-  html += '</div>';
-  html += `<div class="card">
-    <h3>➕ Nouvelle ligue</h3>
-    <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
-    <button class="btn btn-secondary" onclick="onCreateLeague()">Créer une nouvelle ligue</button>
-  </div>`;
-  html += `<div class="card">
-    <h3 style="color:var(--danger);">🗑️ Zone dangereuse</h3>
-    <p class="small" style="margin-bottom:10px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, équipes, sessions et classement. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
-    <button class="btn btn-danger" onclick="onDeleteLeague()">Supprimer cette ligue</button>
-  </div>`;
-  return html;
-}
-function mlpSettingsJeuTabHTML(){
-  let html = '';
-  const totalPlayerTabs = playerTabDefs().length, hiddenPlayerTabsCount = (DATA.hiddenPlayerTabs||[]).length;
-  const totalSubTabs = subTabDefs().length, hiddenSubTabsCount = (DATA.hiddenSubTabs||[]).length;
-  html += settingsRow('🗂️', 'Onglets visibles', `Joueurs : ${hiddenPlayerTabsCount ? (totalPlayerTabs-hiddenPlayerTabsCount)+'/'+totalPlayerTabs+' onglets' : 'tous visibles'} · Remplaçants : ${hiddenSubTabsCount ? (totalSubTabs-hiddenSubTabsCount)+'/'+totalSubTabs+' onglets' : 'tous visibles'}`, "openTabVisibilityModal()");
-  return html;
-}
+function mlpSettingsSectionHTML(){ return adminSettingsSectionHTML(); }
 // Onglet « Session » unifié : sous-onglets Groupes (échelle + gestion des
 // absences/remplaçants) et Résultats (matchs, scores, publication).
 function adminSessionSectionHTML(){
@@ -6100,6 +6089,7 @@ function closeMlpSession(sessionId){
   if(!session) return;
   session.status = 'closed';
   notifySessionResultsPublished(session.date, !!session.reopenedAt);
+  if(!session.reopenedAt) notifySessionAwards();
   saveAndRender();
 }
 function mlpTieCardHTML(session, tie){
@@ -6193,6 +6183,7 @@ function mlpApplyTieResult(tie){
 // Saisie des scores par un joueur des deux équipes : on relit la ligue à jour
 // (pour ne pas écraser d'autres changements), on applique, puis on sauvegarde.
 async function playerSaveMlpTie(sessionId, tieId, meId){
+  if(DATA.mlpPlayerScoreEntry === false){ showAlert("La saisie des scores est réservée aux administrateurs."); return; }
   try{
     const inputs = Array.from(document.querySelectorAll(`input[data-ptie="${tieId}"]`));
     const { data, error } = await sb.from('league_data').select('data').eq('league_id', CURRENT_LEAGUE_ID).single();
@@ -6254,6 +6245,7 @@ function mlpPlayerTieEntryHTML(tie, myTeam, me, sessionId){
         <div class="team" style="text-align:right;">${lab(pb)}</div>
       </div>`;
   });
+  if(DATA.mlpPlayerScoreEntry === false) return html.replace(/<input class="pill-input"[^>]*data-s="([AB])"[^>]*value="([^"]*)">/g,(m,sd,v)=>`<div class="vs" style="font-weight:700;">${v===''?'—':v}</div>`) + `<p class="small" style="margin-top:10px;color:var(--muted);">Les scores sont entrés par un administrateur.</p></div>`;
   html += `<button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="playerSaveMlpTie('${sessionId}','${tie.id}','${me.id}')">💾 ${tie.winnerTeamId?'Mettre à jour le résultat':'Envoyer le résultat'}</button>
   </div>`;
   return html;
@@ -8903,6 +8895,7 @@ function onFinalize(){
     const wasCorrection = !!open.reopenedAt;
     finalizeSession(open);
     notifySessionResultsPublished(finishedDate, wasCorrection);
+    if(!wasCorrection) notifySessionAwards();
     if(DATA.autoStartSessions){
       autoStartNextSession(finishedDate);
     }
@@ -9432,14 +9425,78 @@ function settingsRow(icon, title, summary, onClickFn){
     <span class="small" style="font-size:18px;opacity:.6;flex-shrink:0;">›</span>
   </div>`;
 }
+function settingsSection(title, hint){
+  return `<div class="st-sec"><div class="st-sec-t">${title}</div>${hint?`<div class="st-sec-h">${hint}</div>`:''}</div>`;
+}
+// Réglages : 4 tiroirs — Ligue (identité/calendrier), Règles (jeu),
+// Joueurs (ce qu'ils voient et peuvent faire), Avancé (test, sauvegarde, danger).
+// Même structure pour tous les formats ; seules les lignes propres à un format changent.
 function adminSettingsSectionHTML(){
-  const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','🏆 Ligue'],['jeu',pbIcon()+' Jeu'],['avance','⚙️ Avancé']];
+  let sub = VIEW.settingsSubTab || 'ligue';
+  if(sub==='jeu') sub = 'regles';
+  const subTabs = [['ligue','🏆 Ligue'],['regles',pbIcon()+' Règles'],['joueurs','👥 Joueurs'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
-  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
-  if(sub==='jeu') html += settingsJeuTabHTML();
+  html += `<div class="subtabs st-tabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
+  if(sub==='regles') html += settingsReglesTabHTML();
+  else if(sub==='joueurs') html += settingsJoueursTabHTML();
   else if(sub==='avance') html += settingsAvanceTabHTML();
   else html += settingsLigueTabHTML();
+  return html;
+}
+// ---- Interrupteurs à enregistrement immédiat ----
+function visSwitch(label, desc, checked, js){
+  return `<div class="vis-row"><div class="vis-txt"><div class="vis-l">${label}</div>${desc?`<div class="small">${desc}</div>`:''}</div><label class="switch"><input type="checkbox" ${checked?'checked':''} onchange="${js}"><span class="switch-slider"></span></label></div>`;
+}
+function setDataFlag(k, v){ DATA[k] = !!v; saveAndRender(); }
+function toggleHiddenKey(listKey, key, visible, defsFn){
+  const set = new Set(DATA[listKey]||[]);
+  if(visible) set.delete(key); else set.add(key);
+  if(defsFn && !visible){
+    const all = defsFn().map(d=>d[0]);
+    if(all.every(k=>set.has(k))){ showAlert("Garde au moins un onglet visible."); render(); return; }
+  }
+  DATA[listKey] = [...set];
+  saveAndRender();
+}
+function palAwardDefs(){
+  const mlp = DATA.leagueFormat==='mlp';
+  const all = [
+    ['progression','📈','Progression','ladder'],['grimpeurs','🧗','Grimpeurs / montées','ladder'],
+    ['mvp','⭐','MVP','mlp'],['dreambreaker','🎯','Roi du DreamBreaker','mlp'],['mixte','🤝','Spécialiste du mixte','mlp'],['differentiel','🛡️','Différentiel d\'équipe','mlp'],
+    ['duo','👯','Duo de choc','all'],['machine','⚡','Machine à points','ladder'],['serres','😮','Matchs les plus serrés','all'],
+    ['geants','🦖','Chasseurs de géants','ladder'],['remplacants','🦸','Remplaçants au grand cœur','ladder'],
+    ['joueurmois','🏅','Joueur du mois','all'],['series','🔥','Séries de victoires','all'],['assiduite','📅','Assiduité','all'],['records','🏛️','Onglet Records','all']
+  ];
+  return all.filter(x=>x[3]==='all' || x[3]===(mlp?'mlp':'ladder'));
+}
+function settingsJoueursTabHTML(){
+  const mlp = DATA.leagueFormat==='mlp';
+  let html = `<div class="card" style="display:flex;align-items:center;gap:12px;">
+    <div style="flex:1;min-width:0;"><div style="font-weight:600;">Aperçu</div><div class="small">Vois l'app exactement comme tes joueurs la voient.</div></div>
+    <button class="btn btn-secondary" onclick="toggleAdminPlayerView()">👁️ Voir comme un joueur</button>
+  </div>`;
+  html += settingsSection('Onglets', 'Ce qui apparaît dans le portail. Au moins un onglet reste toujours visible.');
+  html += '<div class="card">';
+  html += `<div class="vis-grp">Joueurs réguliers</div>`;
+  html += playerTabDefs().map(([k,l])=>visSwitch(escapeHTML(l), '', !(DATA.hiddenPlayerTabs||[]).includes(k), `toggleHiddenKey('hiddenPlayerTabs','${k}',this.checked,playerTabDefs)`)).join('');
+  html += `<div class="vis-grp">Remplaçants</div>`;
+  html += subTabDefs().map(([k,l])=>visSwitch(escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('');
+  html += '</div>';
+  html += settingsSection('Informations', 'La cote reste utilisée en arrière-plan même si elle est cachée. Toi (admin), tu la vois toujours.');
+  html += '<div class="card">';
+  html += visSwitch('Cote des joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`);
+  html += visSwitch('Cote des remplaçants', 'Un remplaçant voit sa propre cote.', DATA.showRatingToSubs, `setDataFlag('showRatingToSubs',this.checked)`);
+  if(!mlp) html += visSwitch('Groupe avant publication', 'Montre le groupe dès que la session est créée, avant sa publication. Désactivé : le joueur voit son groupe seulement une fois la session publiée.', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`);
+  html += '</div>';
+  html += settingsSection('Scores', mlp ? 'Qui peut inscrire les résultats des affrontements.' : 'Qui peut inscrire les scores des matchs.');
+  html += '<div class="card">';
+  if(mlp) html += visSwitch('Saisie par les joueurs', 'Les joueurs des deux équipes peuvent entrer les scores de leur affrontement. Désactivé : ils les voient seulement, tu les entres.', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`);
+  else html += visSwitch('Saisie par les joueurs', 'Les joueurs entrent leurs propres scores. Désactivé : réservé aux administrateurs.', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`);
+  html += '</div>';
+  html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés.');
+  html += '<div class="card">';
+  html += palAwardDefs().map(([k,ico,l])=>visSwitch(ico+' '+escapeHTML(l), '', !(DATA.palHidden||[]).includes(k), `toggleHiddenKey('palHidden','${k}',this.checked)`)).join('');
+  html += '</div>';
   return html;
 }
 function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
@@ -9594,48 +9651,42 @@ function settingsLigueTabHTML(){
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
   const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP' }[DATA.leagueFormat] || 'Échelle';
   const calSummary = DATA.autoStartSessions
-    ? `Démarrage automatique activé${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
-    : 'Démarrage manuel (par défaut)';
-  let html = '<div class="card-grid">';
+    ? `Démarrage automatique${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
+    : 'Démarrage manuel';
+  let html = settingsSection('Identité', 'Nom, horaire et format de la ligue.');
+  html += '<div class="card-grid">';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
-  if(DATA.leagueFormat === 'mlp'){
-    html += settingsRow('⚧️', 'Composition des équipes MLP', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()");
-  } else {
-    html += settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()");
-  }
   html += '</div>';
-  html += `<div class="card">
-    <h3>➕ Nouvelle ligue</h3>
-    <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
-    <button class="btn btn-secondary" onclick="onCreateLeague()">Créer une nouvelle ligue</button>
-  </div>`;
-  html += `<div class="card">
-    <h3 style="color:var(--danger);">🗑️ Zone dangereuse</h3>
-    <p class="small" style="margin-bottom:10px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, groupes, historique et statistiques. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
-    <button class="btn btn-danger" onclick="onDeleteLeague()">Supprimer cette ligue</button>
-  </div>`;
+  if(DATA.leagueFormat !== 'mlp'){
+    html += settingsSection('Calendrier');
+    html += '<div class="card-grid">' + settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()") + '</div>';
+  }
   return html;
 }
-function settingsJeuTabHTML(){
+function settingsReglesTabHTML(){
+  let html = '';
+  if(DATA.leagueFormat === 'mlp'){
+    html += settingsSection('Équipes');
+    html += '<div class="card-grid">' + settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()") + '</div>';
+    return html;
+  }
   const matchupSummary = DATA.matchupMode==='manual'
-    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (groupes de 4), ${(DATA.manualMatchupTemplate5||[]).length} matchs (groupes de 5)`
-    : 'Automatique — génération et rotation par l\'app';
-  let html = '<div class="card-grid">';
+    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (4 j.), ${(DATA.manualMatchupTemplate5||[]).length} matchs (5 j.)`
+    : 'Automatique';
+  html += settingsSection('Groupes et matchs');
+  html += '<div class="card-grid">';
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
-  html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
-  const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
-  html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
-  html += settingsRow('👁️', 'Visibilité de la cote', `Joueurs : ${DATA.showRatingToPlayers ? 'visible' : 'cachée'} · Remplaçants : ${DATA.showRatingToSubs ? 'visible' : 'cachée'}`, "openRatingVisibilityModal()");
-  const totalPlayerTabs = playerTabDefs().length, hiddenPlayerTabs = (DATA.hiddenPlayerTabs||[]).length;
-  const totalSubTabs = subTabDefs().length, hiddenSubTabsCount = (DATA.hiddenSubTabs||[]).length;
-  html += settingsRow('🗂️', 'Onglets visibles', `Joueurs : ${hiddenPlayerTabs ? (totalPlayerTabs-hiddenPlayerTabs)+'/'+totalPlayerTabs+' onglets' : 'tous visibles'} · Remplaçants : ${hiddenSubTabsCount ? (totalSubTabs-hiddenSubTabsCount)+'/'+totalSubTabs+' onglets' : 'tous visibles'}`, "openTabVisibilityModal()");
+  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
   html += '</div>';
+  html += settingsSection('Classement');
+  const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
+  html += '<div class="card-grid">' + settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()") + '</div>';
   return html;
 }
 function settingsAvanceTabHTML(){
-  let html = '<div class="card-grid">';
+  let html = settingsSection('Outils');
+  html += '<div class="card-grid">';
   html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
   html += '</div>';
   html += `<div class="card">
@@ -9646,6 +9697,17 @@ function settingsAvanceTabHTML(){
       <button class="btn btn-secondary" onclick="triggerImport()">Importer une sauvegarde</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
     </div>
+  </div>`;
+  html += settingsSection('Gestion des ligues');
+  html += `<div class="card">
+    <h3>➕ Nouvelle ligue</h3>
+    <p class="small" style="margin-bottom:10px;">Ajoute une nouvelle ligue dans cette organisation.</p>
+    <button class="btn btn-secondary" onclick="onCreateLeague()">Créer une nouvelle ligue</button>
+  </div>`;
+  html += `<div class="card">
+    <h3 style="color:var(--danger);">🗑️ Zone dangereuse</h3>
+    <p class="small" style="margin-bottom:10px;">Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, ${DATA.leagueFormat==='mlp'?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.</p>
+    <button class="btn btn-danger" onclick="onDeleteLeague()">Supprimer cette ligue</button>
   </div>`;
   return html;
 }
@@ -11193,45 +11255,294 @@ function computeBadgesForId(id, stats){
   if(total>=10 && winRate>=0.65) badges.push({ icon:'🎯', label:"Taux de victoire d'élite", detail:`${Math.round(winRate*100)}% de victoires sur ${total} matchs.` });
   return badges;
 }
-function gamificationHTML(){
-  const overall = computeLeagueGameStats(null);
-  const now = new Date();
-  const monthKey = now.toISOString().slice(0,7);
-  const monthStats = computeLeagueGameStats(monthKey);
-  const monthLabel = now.toLocaleDateString('fr-CA', { month:'long', year:'numeric' });
-
-  const monthCandidates = Object.keys(monthStats)
-    .map(id=>{ const s=monthStats[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total?s.wins/total:0 }; })
-    .filter(c=>c.total>=3)
-    .sort((a,b)=> b.rate-a.rate || b.wins-a.wins);
-  const playerOfMonth = monthCandidates[0];
-
-  const streakLeaders = Object.keys(overall)
-    .map(id=>({ id, streak: currentStreak(overall[id].timeline) }))
-    .filter(x=>x.streak.type==='W' && x.streak.length>=2)
-    .sort((a,b)=> b.streak.length - a.streak.length)
-    .slice(0,8);
-
-  let myId = null;
-  if(SESSION_USER){
-    if(SESSION_USER.role==='player') myId = SESSION_USER.playerId;
-    else if(SESSION_USER.role==='substitute') myId = SESSION_USER.substituteId;
+// ======================= PALMARÈS =======================
+// Tout est calculé à partir de l'historique (sessions closes) déjà en mémoire.
+// Idée directrice : récompenser la PROGRESSION et l'ENGAGEMENT autant que le niveau
+// (comparer des % de victoires entre groupes de niveaux différents serait injuste).
+let PAL_TAB = 'session';
+function palSetTab(k){ PAL_TAB = k; render(); }
+function palIsMlp(){ return DATA.leagueFormat==='mlp'; }
+function palClosedSessions(){
+  const arr = (palIsMlp() ? (DATA.mlpSessions||[]) : (DATA.sessions||[])).filter(s=>s.status==='closed');
+  return arr.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+}
+function palScopeSessions(scope){
+  const all = palClosedSessions();
+  if(scope==='session') return all.length ? [all[all.length-1]] : [];
+  if(scope==='mois'){ const mk = fmtDate(new Date()).slice(0,7); return all.filter(s=>s.date && s.date.slice(0,7)===mk); }
+  if(scope==='saison'){ const st = DATA.seasonStartDate; return st ? all.filter(s=>s.date>=st) : all; }
+  return all;
+}
+function palName(id){
+  if(palIsMlp()){ const p = (DATA.players||[]).find(x=>x.id===id); return p ? p.name : '?'; }
+  return statPersonName(id);
+}
+function palMyId(){
+  if(SESSION_USER && SESSION_USER.playerId) return SESSION_USER.playerId;
+  if(SESSION_USER && SESSION_USER.substituteId) return SESSION_USER.substituteId;
+  return (MY_LINK_IN_CURRENT_LEAGUE && (MY_LINK_IN_CURRENT_LEAGUE.player_id || MY_LINK_IN_CURRENT_LEAGUE.substitute_id)) || null;
+}
+// Parties décidées (avec score, sans égalité) des sessions données.
+function palGames(sessions){
+  const out = [];
+  sessions.forEach(s=>{
+    if(!palIsMlp()){
+      (s.groupsData||[]).forEach(gd=>{
+        let target = 11; try{ target = targetPointsFor(activeRosterForGroup(s, gd.groupId).length) || 11; }catch(e){}
+        (gd.matches||[]).forEach(m=>{
+          if(m.scoreA==null || m.scoreB==null || m.scoreA==='' || m.scoreB==='') return;
+          const sa = Number(m.scoreA), sb = Number(m.scoreB); if(sa===sb) return;
+          out.push({ s, date:s.date, a:(m.teamA||[]).map(normalizeStatId).filter(Boolean), b:(m.teamB||[]).map(normalizeStatId).filter(Boolean), sa, sb, target });
+        });
+      });
+    } else {
+      (s.ties||[]).forEach(tie=>{
+        const tA = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamAId), tB = (DATA.mlpTeams||[]).find(t=>t.id===tie.teamBId);
+        (tie.games||[]).forEach(g=>{
+          if(g.scoreA==null || g.scoreB==null || g.scoreA==='' || g.scoreB==='' || Number(g.scoreA)===Number(g.scoreB)) return;
+          out.push({ s, date:s.date, a:(mlpTieLineup(tie,'A',tA,g.type)||[]), b:(mlpTieLineup(tie,'B',tB,g.type)||[]), sa:Number(g.scoreA), sb:Number(g.scoreB), target:11, type:g.type, teamA:tie.teamAId, teamB:tie.teamBId });
+        });
+      });
+    }
+  });
+  return out;
+}
+function palPlayerStats(games){
+  const st = {};
+  const add = (id, won, forPts, target)=>{
+    const o = st[id] || (st[id] = { w:0, l:0, n:0, scaled:0 });
+    if(won) o.w++; else o.l++; o.n++; o.scaled += (forPts/(target||11))*11;
+  };
+  games.forEach(g=>{
+    const aWon = g.sa>g.sb;
+    g.a.forEach(id=>add(id, aWon, g.sa, g.target));
+    g.b.forEach(id=>add(id, !aWon, g.sb, g.target));
+  });
+  return st;
+}
+function palPairStats(games){
+  const st = {};
+  games.forEach(g=>{
+    if(g.type==='dreambreaker') return;
+    [[g.a, g.sa>g.sb],[g.b, g.sb>g.sa]].forEach(([team, won])=>{
+      if(team.length!==2 || team[0]===team[1]) return;
+      const key = team.slice().sort().join('|');
+      const o = st[key] || (st[key] = { ids:team.slice().sort(), w:0, n:0 });
+      o.n++; if(won) o.w++;
+    });
+  });
+  return Object.values(st);
+}
+function palPlayedSet(session){ const set = new Set(); palGames([session]).forEach(g=>g.a.concat(g.b).forEach(id=>set.add(id))); return set; }
+function palRatingGains(sessions){
+  const sum = {};
+  sessions.forEach(s=>Object.keys(s.ratingDeltas||{}).forEach(pid=>{
+    const id = normalizeStatId(pid); if(!id) return;
+    sum[id] = (sum[id]||0) + s.ratingDeltas[pid];
+  }));
+  return sum;
+}
+function palPromotions(sessions){
+  const cnt = {};
+  sessions.forEach(s=>(s.movements||[]).forEach(m=>{
+    if(m.reason==='absence') return;
+    const f = groupById(m.fromGroupId), t = groupById(m.toGroupId);
+    if(f && t && t.order < f.order) cnt[m.playerId] = (cnt[m.playerId]||0) + 1;
+  }));
+  return cnt;
+}
+function palSubstituteCounts(sessions){
+  const cnt = {};
+  sessions.forEach(s=>{
+    const seen = new Set();
+    (s.groupsData||[]).forEach(gd=>Object.values(gd.substitutes||{}).forEach(v=>{ const id = normalizeStatId(v); if(id) seen.add(id); }));
+    seen.forEach(id=>{ cnt[id] = (cnt[id]||0) + 1; });
+  });
+  return cnt;
+}
+function palAttendance(){ // séries d'assiduité (sessions consécutives jouées)
+  const all = palClosedSessions().map(palPlayedSet);
+  const current = {}, best = {};
+  const ids = new Set(); all.forEach(set=>set.forEach(id=>ids.add(id)));
+  ids.forEach(id=>{
+    let run = 0, b = 0;
+    all.forEach(set=>{ if(set.has(id)){ run++; b = Math.max(b,run); } else run = 0; });
+    current[id] = run; best[id] = b;
+  });
+  return { current, best };
+}
+function palTop(obj, n, minVal, fmt){
+  return Object.keys(obj).map(id=>({ id, v:obj[id] })).filter(x=>x.v>=minVal).sort((a,b)=>b.v-a.v).slice(0,n);
+}
+function palRowsHTML(rows, myId){
+  const medals = ['🥇','🥈','🥉'];
+  return `<div class="pal-list">${rows.map((r,i)=>`<div class="pal-row ${r.id && r.id===myId || (r.ids && r.ids.includes(myId))?'me':''}">
+    <span class="pal-rank">${i<3?medals[i]:(i+1)}</span>
+    <span class="pal-name">${r.html || escapeHTML(r.name)}${r.sub?`<span class="pal-sub">${escapeHTML(r.sub)}</span>`:''}</span>
+    <span class="pal-val">${escapeHTML(r.value)}</span></div>`).join('')}</div>`;
+}
+function palAwardKey(title){
+  const t = title;
+  if(/^Progression|^Plus forte progression/.test(t)) return 'progression';
+  if(/^Grimpeurs|^Plus de montées/.test(t)) return 'grimpeurs';
+  if(t==='MVP') return 'mvp';
+  if(/DreamBreaker/.test(t)) return 'dreambreaker';
+  if(/mixte/.test(t)) return 'mixte';
+  if(/^Meilleur différentiel/.test(t)) return 'differentiel';
+  if(/^Duo de choc|^Meilleurs duos/.test(t)) return 'duo';
+  if(/^Machine/.test(t)) return 'machine';
+  if(/serrés/.test(t)) return 'serres';
+  if(/géants/.test(t)) return 'geants';
+  if(/^Remplaçants/.test(t)) return 'remplacants';
+  if(/^Joueur du mois/.test(t)) return 'joueurmois';
+  if(/^Séries|^Plus longue série/.test(t)) return 'series';
+  if(/ssiduité/.test(t)) return 'assiduite';
+  return null;
+}
+function palIsPlayerView(){ return !(SESSION_USER && SESSION_USER.role==='admin' && !ADMIN_VIEWING_AS); }
+function palCard(icon, title, hint, rows, myId){
+  if(!rows || !rows.length) return '';
+  const key = palAwardKey(title);
+  const off = !!(key && (DATA.palHidden||[]).includes(key));
+  if(palIsPlayerView() && (off || (title==='Meilleures cotes' && !DATA.showRatingToPlayers))) return '';
+  if(off) return `<div class="card pal-card pal-off"><div class="pal-offtag">🙈 Masqué aux joueurs</div><div class="pal-head"><span class="pal-ico">${icon}</span><div><h3 style="margin:0;">${escapeHTML(title)}</h3><div class="pal-hint">${escapeHTML(hint)}</div></div></div>${palRowsHTML(rows, myId)}</div>`;
+  return `<div class="card pal-card"><div class="pal-head"><span class="pal-ico">${icon}</span><div><h3 style="margin:0;">${escapeHTML(title)}</h3><div class="pal-hint">${escapeHTML(hint)}</div></div></div>${palRowsHTML(rows, myId)}</div>`;
+}
+function palFmtGain(v){ return (v>=0?'+':'') + v.toFixed(3); }
+function palMatchText(g){
+  const nm = ids=>ids.map(palName).join(' & ');
+  const w = g.sa>g.sb;
+  return { text: `${nm(w?g.a:g.b)} ${Math.max(g.sa,g.sb)}–${Math.min(g.sa,g.sb)} ${nm(w?g.b:g.a)}`, date: g.date };
+}
+// ---- Cartes communes à une période (session / mois / saison) ----
+function palPeriodCards(scope, myId){
+  const sessions = palScopeSessions(scope);
+  const games = palGames(sessions);
+  const minG = scope==='session' ? 2 : (scope==='mois' ? 3 : 5);
+  const minPair = scope==='session' ? 2 : (scope==='mois' ? 3 : 4);
+  const stats = palPlayerStats(games);
+  let html = '';
+  const nameRow = (id,value,sub)=>({ id, name:palName(id), value, sub });
+  if(!palIsMlp()){
+    const gains = palTop(palRatingGains(sessions), 3, 0.0005);
+    html += palCard('📈','Progression','Le plus gros gain de cote — équitable entre tous les niveaux.', gains.map(x=>nameRow(x.id, palFmtGain(x.v))), myId);
+    const promo = palTop(palPromotions(sessions), 5, 1);
+    html += palCard('🧗','Grimpeurs', scope==='session'?'Ont monté d\'un groupe à la dernière session.':'Le plus de montées de groupe.', promo.map(x=>nameRow(x.id, scope==='session'?'monte ⬆️':x.v+' montée'+(x.v>1?'s':''))), myId);
+  } else {
+    const wins = palTop(Object.fromEntries(Object.entries(stats).map(([id,o])=>[id,o.w])), 3, 2);
+    html += palCard('⭐','MVP','Le plus de parties gagnées.', wins.filter(x=>stats[x.id].n>=minG).map(x=>nameRow(x.id, x.v+' V', stats[x.id].w+'-'+stats[x.id].l)), myId);
+    const dbWins = {}; games.filter(g=>g.type==='dreambreaker').forEach(g=>(g.sa>g.sb?g.a:g.b).forEach(id=>{ dbWins[id]=(dbWins[id]||0)+1; }));
+    html += palCard('🎯','Roi du DreamBreaker','Le plus de victoires en DreamBreaker.', palTop(dbWins,3,1).map(x=>nameRow(x.id, x.v+' V')), myId);
+    const mix = {}; Object.keys(stats).forEach(id=>{ mix[id] = { w:0, n:0 }; });
+    games.filter(g=>g.type==='mixed1'||g.type==='mixed2').forEach(g=>{ const aW = g.sa>g.sb; g.a.forEach(id=>{ mix[id].n++; if(aW) mix[id].w++; }); g.b.forEach(id=>{ mix[id].n++; if(!aW) mix[id].w++; }); });
+    const mixRows = Object.keys(mix).filter(id=>mix[id].n>=(scope==='session'?2:3)).map(id=>({ id, rate:mix[id].w/mix[id].n, w:mix[id].w, n:mix[id].n })).sort((a,b)=>b.rate-a.rate||b.w-a.w).slice(0,3);
+    html += palCard('🤝','Spécialiste du mixte','Meilleur taux de victoire en double mixte.', mixRows.map(x=>nameRow(x.id, Math.round(x.rate*100)+' %', x.w+'/'+x.n)), myId);
+    // Équipes : différentiel de points
+    const diff = {}; games.forEach(g=>{ if(!g.teamA) return; diff[g.teamA]=(diff[g.teamA]||0)+g.sa-g.sb; diff[g.teamB]=(diff[g.teamB]||0)+g.sb-g.sa; });
+    const tRows = Object.keys(diff).map(id=>({ id, v:diff[id] })).sort((a,b)=>b.v-a.v).slice(0,3).filter(x=>x.v>0);
+    html += palCard('🛡️','Meilleur différentiel d\'équipe','Points marqués moins points accordés, toutes parties.', tRows.map(x=>{ const t=(DATA.mlpTeams||[]).find(y=>y.id===x.id); return { id:x.id, html:t?mlpTeamPillHTML(t):'?', name:'', value:'+'+x.v }; }), myId);
   }
-
-  let html = `<div class="card">
-    <h3>🏅 Joueur du mois — ${escapeHTML(monthLabel)}</h3>
-    ${playerOfMonth
-      ? `<p>🏆 <strong>${escapeHTML(statPersonName(playerOfMonth.id))}</strong> — ${playerOfMonth.wins} victoire${playerOfMonth.wins>1?'s':''} sur ${playerOfMonth.total} (${Math.round(playerOfMonth.rate*100)}%) ce mois-ci.</p>`
-      : `<p class="small">Pas encore assez de matchs joués ce mois-ci (minimum 3) pour désigner un joueur du mois.</p>`}
-  </div>
-  <div class="card">
-    <h3>🔥 Séries en cours</h3>
-    ${streakLeaders.length
-      ? `<table><tr><th>Joueur</th><th>Série</th></tr>${streakLeaders.map(x=>`<tr><td>${escapeHTML(statPersonName(x.id))}</td><td>${x.streak.length} victoires 🔥</td></tr>`).join('')}</table>`
-      : `<p class="small">Personne n'a de série de victoires en cours pour l'instant.</p>`}
-  </div>`;
-
+  // Duo de choc
+  const pairs = palPairStats(games).filter(p=>p.n>=minPair).sort((a,b)=>(b.w/b.n)-(a.w/a.n)||b.w-a.w).slice(0,3);
+  html += palCard('👯','Duo de choc','Meilleure paire de partenaires (minimum '+minPair+' matchs ensemble).', pairs.map(p=>({ ids:p.ids, name:p.ids.map(palName).join(' & '), value:Math.round(p.w/p.n*100)+' %', sub:p.w+' V / '+p.n+' matchs' })), myId);
+  // Machine à points (ladder surtout)
+  if(!palIsMlp()){
+    const mach = Object.keys(stats).filter(id=>stats[id].n>=minG).map(id=>({ id, v:stats[id].scaled/stats[id].n })).sort((a,b)=>b.v-a.v).slice(0,3);
+    html += palCard('⚡','Machine à points','Moyenne de points marqués par match (ramenée à une partie de 11).', mach.map(x=>nameRow(x.id, x.v.toFixed(1)+' pts')), myId);
+  }
+  // Match le plus serré
+  const tight = games.filter(g=>Math.abs(g.sa-g.sb)<=2).sort((a,b)=>Math.abs(a.sa-a.sb)-Math.abs(b.sa-b.sb) || (b.sa+b.sb)-(a.sa+a.sb)).slice(0,3);
+  html += palCard('😮','Matchs les plus serrés','Les victoires à l\'arraché.', tight.map(g=>{ const m=palMatchText(g); return { html:escapeHTML(m.text), name:'', value:'', sub:m.date }; }), myId);
+  // Chasseur de géants (ladder, cotes actuelles)
+  if(!palIsMlp()){
+    const avg = ids=>ids.reduce((s,id)=>s+ratingOf(id),0)/Math.max(1,ids.length);
+    const up = games.filter(g=>g.a.length&&g.b.length).map(g=>{ const w=g.sa>g.sb?g.a:g.b, l=g.sa>g.sb?g.b:g.a; return { g, gap: avg(l)-avg(w) }; }).filter(x=>x.gap>=0.15).sort((a,b)=>b.gap-a.gap).slice(0,3);
+    html += palCard('🦖','Chasseurs de géants','Victoires contre des adversaires mieux cotés (cotes actuelles).', up.map(x=>{ const m=palMatchText(x.g); return { html:escapeHTML(m.text), name:'', value:'+'+x.gap.toFixed(2), sub:m.date }; }), myId);
+    const subs = palTop(palSubstituteCounts(sessions), 3, 1);
+    html += palCard('🦸','Remplaçants au grand cœur','Ont dépanné le plus de groupes — merci !', subs.map(x=>nameRow(x.id, x.v+' fois')), myId);
+  }
   return html;
+}
+function palSeasonExtras(myId){
+  let html = '';
+  const all = palClosedSessions();
+  const games = palGames(all);
+  // Séries de victoires en cours
+  const tl = {}; games.forEach(g=>{ const aW=g.sa>g.sb; g.a.forEach(id=>(tl[id]=tl[id]||[]).push(aW?'W':'L')); g.b.forEach(id=>(tl[id]=tl[id]||[]).push(aW?'L':'W')); });
+  const streaks = Object.keys(tl).map(id=>({ id, s:currentStreak(tl[id]) })).filter(x=>x.s.type==='W' && x.s.length>=3).sort((a,b)=>b.s.length-a.s.length).slice(0,5);
+  html += palCard('🔥','Séries en cours','Victoires consécutives (3 et plus).', streaks.map(x=>({ id:x.id, name:palName(x.id), value:x.s.length+' V' })), myId);
+  const att = palAttendance();
+  html += palCard('📅','Assiduité','Sessions jouées d\'affilée (3 et plus).', palTop(att.current, 5, 3).map(x=>({ id:x.id, name:palName(x.id), value:x.v+' sessions' })), myId);
+  return html;
+}
+function palMonthPlayer(myId){
+  const games = palGames(palScopeSessions('mois'));
+  const st = palPlayerStats(games);
+  const c = Object.keys(st).map(id=>({ id, w:st[id].w, n:st[id].n, rate:st[id].w/st[id].n })).filter(x=>x.n>=3).sort((a,b)=>b.rate-a.rate||b.w-a.w).slice(0,3);
+  const label = new Date().toLocaleDateString('fr-CA',{ month:'long', year:'numeric' });
+  return palCard('🏅','Joueur du mois — '+label,'Meilleur % de victoires (minimum 3 matchs). À lire avec le niveau du groupe en tête.', c.map(x=>({ id:x.id, name:palName(x.id), value:Math.round(x.rate*100)+' %', sub:x.w+' V / '+x.n })), myId);
+}
+function palRecords(myId){
+  let html = '';
+  const all = palClosedSessions();
+  const games = palGames(all);
+  const nameRow = (id,value,sub)=>({ id, name:palName(id), value, sub });
+  const tl = {}; games.forEach(g=>{ const aW=g.sa>g.sb; g.a.forEach(id=>(tl[id]=tl[id]||[]).push(aW?'W':'L')); g.b.forEach(id=>(tl[id]=tl[id]||[]).push(aW?'L':'W')); });
+  const best = {}; Object.keys(tl).forEach(id=>{ best[id] = bestStreak(tl[id],'W'); });
+  html += palCard('💪','Plus longue série de victoires','Record de la ligue.', palTop(best,3,3).map(x=>nameRow(x.id, x.v+' V')), myId);
+  const att = palAttendance();
+  html += palCard('📅','Plus longue assiduité','Sessions jouées d\'affilée, record.', palTop(att.best,3,3).map(x=>nameRow(x.id, x.v+' sessions')), myId);
+  if(!palIsMlp()){
+    const rat = {}; (DATA.players||[]).forEach(p=>{ if(typeof p.rating==='number') rat[p.id]=p.rating; });
+    html += palCard('⭐','Meilleures cotes','Les cotes les plus élevées actuellement.', palTop(rat,3,0).map(x=>nameRow(x.id, x.v.toFixed(2))), myId);
+    html += palCard('🧗','Plus de montées','Cumul de montées de groupe.', palTop(palPromotions(all),3,1).map(x=>nameRow(x.id, x.v+' montées')), myId);
+    const gains = palRatingGains(all);
+    html += palCard('📈','Plus forte progression','Gain de cote cumulé.', palTop(gains,3,0.001).map(x=>nameRow(x.id, palFmtGain(x.v))), myId);
+  }
+  const pairs = palPairStats(games).filter(p=>p.n>=5).sort((a,b)=>(b.w/b.n)-(a.w/a.n)||b.w-a.w).slice(0,3);
+  html += palCard('👯','Meilleurs duos de tous les temps','Minimum 5 matchs ensemble.', pairs.map(p=>({ ids:p.ids, name:p.ids.map(palName).join(' & '), value:Math.round(p.w/p.n*100)+' %', sub:p.w+' V / '+p.n })), myId);
+  return html;
+}
+function gamificationHTML(){
+  const myId = palMyId();
+  let tabs = [['session','Session'],['mois','Mois'],['saison','Saison'],['records','Records']];
+  if(palIsPlayerView() && (DATA.palHidden||[]).includes('records')) tabs = tabs.filter(t=>t[0]!=='records');
+  if(!tabs.some(t=>t[0]===PAL_TAB)) PAL_TAB = 'session';
+  let html = `<div class="subtabs" style="margin-bottom:14px;">${tabs.map(([k,l])=>`<div class="tab ${PAL_TAB===k?'active':''}" onclick="palSetTab('${k}')">${l}</div>`).join('')}</div>`;
+  const closed = palClosedSessions();
+  if(!closed.length) return html + `<div class="card"><p class="empty">Le palmarès se remplira dès la première session terminée. 🏆</p></div>`;
+  let body = '';
+  if(PAL_TAB==='session'){
+    const last = closed[closed.length-1];
+    body = `<p class="small" style="margin:0 0 10px;color:var(--muted);">Palmarès de la session du ${escapeHTML(last.date)}</p>` + palPeriodCards('session', myId);
+  } else if(PAL_TAB==='mois'){
+    body = palMonthPlayer(myId) + palPeriodCards('mois', myId);
+  } else if(PAL_TAB==='saison'){
+    body = palSeasonExtras(myId) + palPeriodCards('saison', myId);
+  } else {
+    body = palRecords(myId);
+  }
+  return html + (body.trim() ? body : `<div class="card"><p class="small">Pas encore assez de matchs pour cette période (certains prix demandent un minimum de matchs).</p></div>`);
+}
+// Résumé court du palmarès de la dernière session (pour la notification).
+function palSessionHeadline(){
+  try{
+    const sessions = palScopeSessions('session'); if(!sessions.length) return '';
+    const parts = [];
+    if(!palIsMlp()){
+      const g = palTop(palRatingGains(sessions), 1, 0.0005)[0]; if(g) parts.push(`📈 Progression : ${palName(g.id)} (${palFmtGain(g.v)})`);
+      const p = palTop(palPromotions(sessions), 1, 1)[0]; if(p) parts.push(`🧗 Montée : ${palName(p.id)}`);
+    } else {
+      const st = palPlayerStats(palGames(sessions));
+      const m = Object.keys(st).map(id=>({ id, w:st[id].w })).sort((a,b)=>b.w-a.w)[0]; if(m && m.w>=2) parts.push(`⭐ MVP : ${palName(m.id)} (${m.w} V)`);
+    }
+    return parts.join(' · ');
+  }catch(e){ return ''; }
+}
+function notifySessionAwards(){
+  const body = palSessionHeadline();
+  if(!body || !CURRENT_LEAGUE_ID) return;
+  invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, title:'🏅 Palmarès de la session', body: `${currentLeagueLabel()} — ${body}`, url:'/' });
 }
 // Résultats de la dernière session jouée par le groupe actuel du joueur.
 function previousGroupSessionInnerHTML(me){
@@ -11288,7 +11599,7 @@ function playerGroupHTML(me){
   if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
   // Le groupe n'est montré que lorsqu'une session est PUBLIÉE (et que le joueur n'y est pas absent) :
   // avant, la composition peut encore changer et ne reflète pas la session à venir.
-  const groupVisible = !!(open && open.published && !isAbsent(open, me.id));
+  const groupVisible = !!(open && (open.published || DATA.showGroupBeforePublish) && !isAbsent(open, me.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
       <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : '—') : 'Mon groupe'}</h2>
@@ -11564,6 +11875,8 @@ function migrateData(){
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
+  if(DATA.showGroupBeforePublish === undefined) DATA.showGroupBeforePublish = false;
+  if(!Array.isArray(DATA.palHidden)) DATA.palHidden = [];
   if(DATA.seasonStartDate === undefined) DATA.seasonStartDate = null;
   if(DATA.tiebreakCriteria === undefined) DATA.tiebreakCriteria = defaultTiebreakCriteria();
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
