@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 154">
+<meta name="app-build" content="Version 155">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -472,8 +472,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .sc-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 12px;}
 .sc-ctl .sc-btn{padding:8px 12px;font-size:13px;}
 .match-row{position:relative;}
-.sc-mark{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);z-index:1;font-size:9.5px;line-height:1;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,159,10,.45);background:#2b2412;color:#FF9F0A;cursor:pointer;}
-.sc-mark.inline{position:static;transform:none;margin-left:8px;}
+.sc-mark{position:absolute;left:calc(50% + 58px);top:50%;transform:translateY(-50%);z-index:1;font-size:11px;line-height:1;width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(255,159,10,.5);background:#2b2412;color:#FF9F0A;cursor:pointer;}
+.sc-mark.inline{position:static;transform:none;margin-left:8px;width:auto;height:auto;border-radius:999px;padding:3px 9px;font-size:10px;}
 .sc-chip{font-size:12px;color:var(--muted);background:rgba(255,255,255,0.06);border-radius:999px;padding:4px 10px;}
 .sc-chip.ok{color:var(--ball);background:rgba(207,234,92,0.12);}
 .sc-chip.warn{color:#FF9F0A;background:rgba(255,159,10,0.12);}
@@ -8871,7 +8871,7 @@ function scoreComplete(u, isMlp){ return isMlp ? !!u.winnerTeamId : (u.scoreA!=n
 // un toucher ouvre le détail : par qui, quand, ancien score.
 function scoreMarkHTML(kind, a, b, u, isMlp, inline){
   if(!scoreComplete(u,isMlp) || !u.sEdited) return '';
-  return `<button class="sc-mark${inline?' inline':''}" onclick="openScoreInfo('${kind}','${a}',${b==null?'null':"'"+b+"'"})">✏️ modifié</button>`;
+  return `<button class="sc-mark${inline?' inline':''}" onclick="openScoreInfo('${kind}','${a}',${b==null?'null':"'"+b+"'"})" aria-label="Score modifié — voir le détail">✏️${inline?' modifié':''}</button>`;
 }
 function openScoreInfo(kind, a, b){
   let u = null, isMlp = kind==='mlp', ctx = '', now = '';
