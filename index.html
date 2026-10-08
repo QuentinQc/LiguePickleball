@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 140">
+<meta name="app-build" content="Version 141">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1758,7 +1758,17 @@ async function createPartnerPost(){
   if(!message || !CURRENT_PROFILE || !CURRENT_LEAGUE_ID) return;
   const author_name = myDisplayName();
   const play_date = (dateEl && dateEl.value) ? dateEl.value : null;
-  const { error } = await sb.from('partner_posts').insert({ league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date });
+  const timeEl = document.getElementById('partnerTimeInput');
+  const play_time = (play_date && timeEl && timeEl.value) ? timeEl.value : null;
+  const row = { league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date };
+  if(play_time) row.play_time = play_time;
+  let { error } = await sb.from('partner_posts').insert(row);
+  if(error && play_time){
+    // Colonne play_time pas encore créée côté Supabase : on publie quand même, sans l'heure.
+    delete row.play_time;
+    ({ error } = await sb.from('partner_posts').insert(row));
+    if(!error) showAlert("Annonce publiée, mais l'heure n'a pas pu être enregistrée (SQL « calendar-times.sql » à exécuter dans Supabase).");
+  }
   if(error){ showAlert("L'annonce n'a pas pu être publiée."); return; }
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   render();
@@ -1805,6 +1815,7 @@ function partnerBoardHTML(){
         <textarea id="partnerMessageInput" rows="2" maxlength="300" placeholder="Écris ton annonce… ex : Cherche un partenaire samedi matin, niveau intermédiaire."></textarea>
         <div class="compose-foot">
           <label class="compose-chip">📅 Date <input type="date" id="partnerDateInput"></label>
+          <label class="compose-chip">🕖 Heure <input type="time" id="partnerTimeInput"></label>
           <button class="btn btn-primary compose-send" onclick="createPartnerPost()">Publier ➤</button>
         </div>
       </div>
@@ -1885,7 +1896,7 @@ function partnerPostDetailInnerHTML(id){
       </div>
       <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
     </div>
-    ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}</div>` : ''}
+    ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
     ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
       <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', partnerInitials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
@@ -3495,11 +3506,41 @@ async function copyCalFeed(){
 function confirmRegenCalFeed(){
   showConfirm("Générer un nouveau lien ? L'ancien cessera de fonctionner : il faudra se réabonner.", ()=>openCalSubscribe(true));
 }
+// ===== Heures (sessions, annonces) =====
+// Extrait une heure d'une étiquette libre du genre « Mardi 19h », « Lundi 19h30 » ou « 19:30 ».
+function parseTimeFromLabel(label){
+  const m = String(label||'').match(/(\d{1,2})\s*(?:h|:)\s*(\d{2})?/i);
+  if(!m) return null;
+  const h = parseInt(m[1],10), mn = m[2] ? parseInt(m[2],10) : 0;
+  if(h<0 || h>23 || mn<0 || mn>59) return null;
+  return String(h).padStart(2,'0')+':'+String(mn).padStart(2,'0');
+}
+function fmtHM(t){ // '19:00' -> '19h00'
+  if(!t) return '';
+  const [h,m] = String(t).slice(0,5).split(':');
+  return `${parseInt(h,10)}h${m||'00'}`;
+}
+function addMinutesHM(t, mins){
+  const [h,m] = String(t).slice(0,5).split(':').map(Number);
+  const tot = (h*60+m+mins) % 1440;
+  return String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
+}
+// Heure de début + durée d'une ligue : réglage explicite, sinon déduite de l'étiquette « Jour et heure ».
+function leagueTimeOf(L){
+  const lg = (LEAGUES||[]).find(x=>x.id===(L&&L.id));
+  const start = (L && L.playTime) || parseTimeFromLabel(L && L.scheduleLabel) || parseTimeFromLabel(lg && lg.schedule_label) || null;
+  const dur = (L && L.sessionDurationMin) || 120;
+  return { start, dur };
+}
+function leagueTimeRangeLabel(L){
+  const t = leagueTimeOf(L);
+  return t.start ? `${fmtHM(t.start)} – ${fmtHM(addMinutesHM(t.start, t.dur))}` : '';
+}
 // ===== Calendrier (popup) =====
 let CAL_MONTH = null, CAL_SEL = null, CAL_LEAGUES = null;
 function curLeagueCalInfo(){
   const l = (LEAGUES||[]).find(x=>x.id===CURRENT_LEAGUE_ID);
-  return DATA ? { id:CURRENT_LEAGUE_ID, name:(l&&l.name)||'Ligue', sessions:DATA.sessions, blockedDates:DATA.blockedDates, playDayOfWeek:DATA.playDayOfWeek, seasonStartDate:DATA.seasonStartDate, seasonEndDate:DATA.seasonEndDate } : null;
+  return DATA ? { id:CURRENT_LEAGUE_ID, name:(l&&l.name)||'Ligue', sessions:DATA.sessions, blockedDates:DATA.blockedDates, playDayOfWeek:DATA.playDayOfWeek, seasonStartDate:DATA.seasonStartDate, seasonEndDate:DATA.seasonEndDate, playTime:DATA.playTime, sessionDurationMin:DATA.sessionDurationMin } : null;
 }
 function calLeaguesList(){
   const cur = curLeagueCalInfo();
@@ -3521,7 +3562,7 @@ async function loadCalLeagues(){
       const { data } = await sb.from('league_data').select('data').eq('league_id', id).single();
       const d = data && data.data; if(!d) return null;
       const l = (LEAGUES||[]).find(x=>x.id===id);
-      return { id, name:(l&&l.name)||'Ligue', sessions:d.sessions, blockedDates:d.blockedDates, playDayOfWeek:d.playDayOfWeek, seasonStartDate:d.seasonStartDate, seasonEndDate:d.seasonEndDate };
+      return { id, name:(l&&l.name)||'Ligue', sessions:d.sessions, blockedDates:d.blockedDates, playDayOfWeek:d.playDayOfWeek, seasonStartDate:d.seasonStartDate, seasonEndDate:d.seasonEndDate, playTime:d.playTime, sessionDurationMin:d.sessionDurationMin };
     }));
     CAL_LEAGUES = out.filter(Boolean);
     if(MODAL && MODAL.sheet==='calendrier') render();
@@ -3534,7 +3575,7 @@ function calItemsFor(){
   const lgs = calLeaguesList();
   lgs.forEach(L=>{
   const real = new Set();
-  (L.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status, lg:L.name, lgId:L.id}); });
+  (L.sessions||[]).forEach(x=>{ real.add(x.date); add(x.date,{t:'session', status:x.status, lg:L.name, lgId:L.id, L}); });
   const blocked = new Set(L.blockedDates||[]);
   blocked.forEach(d=>add(d,{t:'blocked', lg:L.name, lgId:L.id}));
   const dow = L.playDayOfWeek;
@@ -3545,7 +3586,7 @@ function calItemsFor(){
     for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
       if(d.getDay()!==dow) continue;
       const f = fmtDate(d);
-      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned', lg:L.name, lgId:L.id});
+      if(!real.has(f) && !blocked.has(f)) add(f,{t:'planned', lg:L.name, lgId:L.id, L});
     }
   }
   });
@@ -3589,10 +3630,10 @@ function calendarSheetHTML(){
   const row = (color, ico, title, sub, click)=>`<div class="cal-row ${click?'cal-click':''}" style="border-left:4px solid ${color};" ${click?`onclick="${click}"`:''}><span class="cal-badge" style="background:${color}22;">${ico}</span><div><b>${title}</b>${sub?`<div class="small">${sub}</div>`:''}</div></div>`;
   const rows = its=>its.map(i=>{
     const c = calLeagueColor(i.lgId);
-    if(i.t==='session') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session · ${i.status==='closed'?'terminée':'en cours'}`);
-    if(i.t==='planned') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),'Session prévue');
+    if(i.t==='session') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session · ${i.status==='closed'?'terminée':'en cours'}${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
+    if(i.t==='planned') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session prévue${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
     if(i.t==='blocked') return row(c,'⛔',escapeHTML(i.lg||'Ligue'),'Pas de session');
-    if(i.t==='partner') return row(CAL_C_PARTNER,'🤝',`${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire`,escapeHTML((i.p.message||'').slice(0,80)),`openPartnerPostDetail('${i.p.id}')`);
+    if(i.t==='partner') return row(CAL_C_PARTNER,'🤝',`${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire`,escapeHTML(((i.p.play_time?'🕖 '+fmtHM(i.p.play_time)+' · ':'')+(i.p.message||'')).slice(0,90)),`openPartnerPostDetail('${i.p.id}')`);
     return row(CAL_C_EVENT,'🎉',escapeHTML(i.e.title||'Événement'),escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · ')),`openEventDetail('${i.e.id}')`);
   }).join('');
   let list;
@@ -9989,6 +10030,10 @@ function openGeneralInfoModal(){
         ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
       </select>
     </div>
+    <div class="row">
+      <div class="field" style="flex:1;min-width:140px;"><label>Heure de début des sessions (calendrier)</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
+    </div>
     <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>`;
   showFormModal('Informations générales', html, saveGeneralInfoForm);
 }
@@ -9997,6 +10042,8 @@ function saveGeneralInfoForm(){
   const dayVal = document.getElementById('setPlayDay').value;
   DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
   DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
+  DATA.playTime = document.getElementById('setPlayTime').value || undefined;
+  DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
   const scheduleLabel = document.getElementById('setLeagueSchedule').value.trim();
   updateCurrentLeagueMeta(DATA.leagueName, scheduleLabel);
 }
