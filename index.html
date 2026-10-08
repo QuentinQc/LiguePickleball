@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 156">
+<meta name="app-build" content="Version 157">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -9638,6 +9638,8 @@ function settingsJoueursTabHTML(){
   html += '<div class="card-grid">';
   html += settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement(s) enregistré(s)`, 'openScoreLogModal()');
   html += '</div>';
+  const palOffP = (DATA.hiddenPlayerTabs||[]).includes('gamification'), palOffS = (DATA.hiddenSubTabs||[]).includes('gamification');
+  if(palOffP || palOffS) html += `<div class="card" style="border-color:#FF9F0A;"><div class="small">🙈 L'onglet Palmarès est masqué pour ${palOffP&&palOffS?'les joueurs et les remplaçants':(palOffP?'les joueurs':'les remplaçants')} (réglage « Onglets » plus haut) : personne de ce groupe ne voit le palmarès ni ne reçoit sa notification de fin de session.</div></div>`;
   html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés. Si la cote est cachée, les prix basés sur la cote le sont aussi.');
   html += '<div class="card">';
   html += palAwardDefs().map(([k,ico,l])=>{
@@ -11700,7 +11702,14 @@ function palSessionHeadline(){
 function notifySessionAwards(){
   const body = palSessionHeadline();
   if(!body || !CURRENT_LEAGUE_ID) return;
-  invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, title:'🏅 Palmarès de la session', body: `${currentLeagueLabel()} — ${body}`, url:'/' });
+  // Respecte l'onglet Palmarès : pas de notification vers un rôle qui ne le voit pas.
+  const playersSee = !(DATA.hiddenPlayerTabs||[]).includes('gamification');
+  const subsSee = !(DATA.hiddenSubTabs||[]).includes('gamification');
+  if(!playersSee && !subsSee) return;
+  const payload = { league_id: CURRENT_LEAGUE_ID, title:'🏅 Palmarès de la session', body: `${currentLeagueLabel()} — ${body}`, url:'/' };
+  if(playersSee && !subsSee) payload.audience = 'players';
+  else if(!playersSee && subsSee) payload.audience = 'substitutes';
+  invokeSendNotification(payload);
 }
 // Résultats de la dernière session jouée par le groupe actuel du joueur.
 function previousGroupSessionInnerHTML(me){
