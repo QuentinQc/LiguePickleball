@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 150">
+<meta name="app-build" content="Version 153">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -471,6 +471,10 @@ tr.me{background:rgba(207,234,92,0.1);}
 .vis-grp:not(:first-child){margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);}
 .sc-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 12px;}
 .sc-ctl .sc-btn{padding:8px 12px;font-size:13px;}
+.sc-chip{font-size:12px;color:var(--muted);background:rgba(255,255,255,0.06);border-radius:999px;padding:4px 10px;}
+.sc-chip.ok{color:var(--ball);background:rgba(207,234,92,0.12);}
+.sc-chip.warn{color:#FF9F0A;background:rgba(255,159,10,0.12);}
+.sc-link{background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px 2px;cursor:pointer;}
 .sc-note,.sc-lock{flex:1 1 100%;color:var(--muted);}
 .sc-corr{padding:10px 0;border-top:1px solid rgba(255,255,255,0.08);}
 .pal-off{opacity:.55;border-style:dashed;}
@@ -4177,7 +4181,7 @@ function renderAdmin(){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  if(VIEW.tab==='session') c.innerHTML = scoreCorrectionsCardHTML() + adminSessionSectionHTML();
+  if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
@@ -4235,7 +4239,7 @@ function renderMlpAdmin(){
   `;
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
-  else if(VIEW.tab==='sessions') c.innerHTML = scoreCorrectionsCardHTML() + mlpSessionsSectionHTML();
+  else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
   else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
@@ -6135,7 +6139,7 @@ function mlpTieCardHTML(session, tie){
         <div class="team" style="text-align:right;">${labelB}</div>
       </div>`;
   });
-  html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>`;
+  html += `<button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="recomputeMlpTie('${session.id}','${tie.id}')">🔄 Valider ce résultat</button>` + scoreMentionHTML(tie,true);
   html += `</div>`;
   return html;
 }
@@ -6155,7 +6159,7 @@ function setMlpTieScore(sessionId, tieId, gameIndex, which, value){
     const tie = session.ties.find(x=>x.id===tieId);
     if(!tie){ showAlert("Affrontement introuvable (id: "+tieId+")."); return; }
     if(!tie.games || !tie.games.length) tie.games = newMLPGames(DATA.mlpRosterSize||4);
-    if(tie.sBy!=='admin') scoreAdminTouch(tie, true, mlpTieCtx(tie), (DATA.mlpTeams||[]).filter(t=>t.id===tie.teamAId||t.id===tie.teamBId).flatMap(t=>t.memberIds));
+    scoreAdminTouch(tie, true, mlpTieCtx(tie), (DATA.mlpTeams||[]).filter(t=>t.id===tie.teamAId||t.id===tie.teamBId).flatMap(t=>t.memberIds));
     const g = tie.games[gameIndex];
     if(!g){ showAlert("Joute introuvable (index "+gameIndex+")."); return; }
     if(which==='A') g.scoreA = value===''?null:Number(value);
@@ -6200,8 +6204,7 @@ async function playerSaveMlpTie(sessionId, tieId, meId){
     if(!tie){ showAlert("Affrontement introuvable (il a peut-être été modifié)."); return; }
     const mine = (fresh.mlpTeams||[]).some(t=>(t.id===tie.teamAId||t.id===tie.teamBId) && t.memberIds.includes(meId));
     if(!mine){ showAlert("Tu ne fais pas partie de cet affrontement."); return; }
-    { const pd = DATA; DATA = fresh; const lk0 = scoreLockState(tie,true); DATA = pd;
-      if(lk0.state==='locked'){ DATA = fresh; render(); showAlert("Ce résultat est déjà saisi et verrouillé (par "+lk0.by+"). Utilise « Signaler une erreur » si c'est faux."); return; } }
+    const wasDone = !!tie.winnerTeamId, prevTxt = wasDone ? `${tie.pointsA}–${tie.pointsB}` : '';
     tie.games = (tie.games && tie.games.length) ? tie.games : newMLPGames(fresh.mlpRosterSize||4);
     let bad = false;
     inputs.forEach(inp=>{
@@ -6220,6 +6223,7 @@ async function playerSaveMlpTie(sessionId, tieId, meId){
       p_points_a: tie.pointsA==null ? null : tie.pointsA, p_points_b: tie.pointsB==null ? null : tie.pointsB
     });
     if(e2){ DATA = prev; showAlert("La sauvegarde a échoué : " + e2.message + " (le SQL « mlp-score-entry.sql » est-il exécuté dans Supabase ?)"); return; }
+    if(wasDone){ tie.sEdited = true; tie.sPrev = prevTxt; }
     tie.sBy = CURRENT_PROFILE ? CURRENT_PROFILE.id : null; tie.sByName = playerName(meId); tie.sAt = new Date().toISOString();
     render();
     showAlert(decided ? "✅ Résultat enregistré." : "Scores enregistrés. Le résultat sera déterminé quand toutes les parties auront un score.");
@@ -6253,14 +6257,9 @@ function mlpPlayerTieEntryHTML(tie, myTeam, me, sessionId){
         <div class="team" style="text-align:right;">${lab(pb)}</div>
       </div>`;
   });
-  const lkM = scoreLockState(tie,true);
-  if(DATA.mlpPlayerScoreEntry !== false && lkM.state==='locked'){
-    html = html.replace(/<input class="pill-input"[^>]*data-s="([AB])"[^>]*value="([^"]*)">/g,(m,sd,v)=>`<div class="vs" style="font-weight:700;">${v===''?'—':v}</div>`);
-    return html + `<div class="sc-ctl">${scoreControlsHTML('mlp', sessionId, tie.id, 0, tie, lkM, '')}</div></div>`;
-  }
   if(DATA.mlpPlayerScoreEntry === false) return html.replace(/<input class="pill-input"[^>]*data-s="([AB])"[^>]*value="([^"]*)">/g,(m,sd,v)=>`<div class="vs" style="font-weight:700;">${v===''?'—':v}</div>`) + `<p class="small" style="margin-top:10px;color:var(--muted);">Les scores sont entrés par un administrateur.</p></div>`;
-  html += `<button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="playerSaveMlpTie('${sessionId}','${tie.id}','${me.id}')">💾 ${tie.winnerTeamId?'Mettre à jour le résultat':'Envoyer le résultat'}</button>
-  <div class="small sc-note">${lkM.state==='mine' ? `🔓 Modifiable par toi jusqu'à ${scoreClock(lkM.until)}, puis verrouillé.` : `Une fois envoyé, le résultat est verrouillé${scoreWindowMin()?` (tu pourras le corriger pendant ${scoreWindowMin()} min)`:''}.`}</div>
+  html += `<button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="playerSaveMlpTie('${sessionId}','${tie.id}','${me.id}')">${tie.winnerTeamId?'Mettre à jour le résultat':'Enregistrer le résultat'}</button>
+  ${scoreMentionHTML(tie,true)}
   </div>`;
   return html;
 }
@@ -8536,7 +8535,7 @@ function adminSessionHTML(){
           <div class="vs">VS</div>
           <input class="pill-input" type="number" min="0" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${g.id}','${mi}','B',this.value)">
           <div class="team" style="text-align:right;">${m.teamB.length ? m.teamB.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
-        </div>`;
+        </div>${scoreMentionHTML(m,false)}`;
     });
     if(!manual && m_hasSitOut(gd.matches)){
       html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?playerName(m.sit):'—').join(', ')}</p>`;
@@ -8860,19 +8859,26 @@ function onUnpublishSession(){
 //    une courte fenêtre (DATA.scoreEditWindowMin). Ensuite : demande de
 //    correction approuvée par un admin. 4) Journal + notification claire.
 //    5) Les mêmes règles sont appliquées par le serveur (score-security.sql).
-function scoreWindowMin(){ return typeof DATA.scoreEditWindowMin==='number' ? DATA.scoreEditWindowMin : 15; }
 function scoreHas(u, isMlp){
   return isMlp ? (u.games||[]).some(g=>g.scoreA!=null||g.scoreB!=null) : (u.scoreA!=null||u.scoreB!=null);
 }
+function scoreComplete(u, isMlp){ return isMlp ? !!u.winnerTeamId : (u.scoreA!=null && u.scoreB!=null); }
+// Mention sous un score : « Saisi par X à 12 h 44 » ou « Score modifié par X à … (avant : 11–7) ».
+function scoreMentionHTML(u, isMlp){
+  if(!scoreComplete(u,isMlp) || !u.sByName) return '';
+  let when = '';
+  if(u.sAt){
+    const d = new Date(u.sAt), same = d.toDateString()===new Date().toDateString();
+    when = ' ' + (same ? 'à ' : 'le ' + d.toLocaleDateString('fr-CA',{day:'numeric',month:'short'}) + ' à ') + scoreClock(u.sAt);
+  }
+  const by = escapeHTML(u.sByName);
+  return u.sEdited
+    ? `<div class="sc-ctl"><span class="sc-chip warn">✏️ Score modifié par ${by}${when}${u.sPrev?' · avant : '+escapeHTML(u.sPrev):''}</span></div>`
+    : `<div class="sc-ctl"><span class="sc-chip ok">✓ Saisi par ${by}${when}</span></div>`;
+}
 function scoreClock(iso){ try{ return new Date(iso).toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 function scoreIsAdmin(){ return !!(SESSION_USER && SESSION_USER.role==='admin'); }
-function scoreLockState(u, isMlp){
-  if(scoreIsAdmin() || !scoreHas(u,isMlp)) return { state:'open' };
-  const mine = !!(u.sBy && CURRENT_PROFILE && u.sBy===CURRENT_PROFILE.id);
-  const until = u.sAt ? new Date(u.sAt).getTime() + scoreWindowMin()*60000 : 0;
-  if(mine && Date.now() <= until) return { state:'mine', until: new Date(until).toISOString() };
-  return { state:'locked', by: u.sByName || 'un joueur', at: u.sAt || null };
-}
+function scoreLockState(u, isMlp){ return { state:'open' }; }
 function scoreLogAdd(entry){
   DATA.scoreLog = DATA.scoreLog || [];
   DATA.scoreLog.push(Object.assign({ at: new Date().toISOString() }, entry));
@@ -8902,84 +8908,25 @@ function mlpTieCtx(tie){
   return `${a?a.name:'?'} vs ${b?b.name:'?'}`;
 }
 // Appelé AVANT qu'un admin modifie une unité : marque l'unité « admin »,
-// journalise et — si on écrase un score saisi par un joueur — prévient les joueurs.
+// et journalise l'ancien score.
 function scoreAdminTouch(u, isMlp, ctx, playerIds){
-  const had = scoreHas(u,isMlp);
-  const byPlayer = had && u.sBy && u.sBy!=='admin';
+  const had = scoreComplete(u,isMlp);
   const old = had ? scoreText(u,isMlp) : '';
+  if(had){ u.sEdited = true; u.sPrev = isMlp ? `${u.pointsA}–${u.pointsB}` : old; scoreLogAdd({ kind:'admin', by:scoreAdminLabel(), ctx, old }); }
   u.sBy = 'admin'; u.sByName = scoreAdminLabel(); u.sAt = new Date().toISOString();
-  if(had) scoreLogAdd({ kind:'admin', by:scoreAdminLabel(), ctx, old });
-  if(byPlayer){
-    notifyScorePlayers(playerIds, '✏️ Score modifié par un admin', `${currentLeagueLabel()} — ${ctx} : l'ancien score (${old}) a été MODIFIÉ par un administrateur. Vérifie le nouveau score.`);
-  }
-}
-// ---- Demande de correction (joueur) ----
-function playerPendingCorrection(kind, key){
-  return (DATA.scoreCorrections||[]).find(c=>c.status==='pending' && c.kind===kind && c.key===key && CURRENT_PROFILE && c.byProfile===CURRENT_PROFILE.id);
-}
-let CORR_STATE = null;
-function openScoreCorrectionModal(kind, sessionId, a, b){
-  // kind 'ladder' : a = groupId, b = index du match ; kind 'mlp' : a = tieId
-  let rows = '', ctx = '', old = '';
-  if(kind==='ladder'){
-    const open = (DATA.sessions||[]).find(x=>x.id===sessionId); const gd = open && open.groupsData.find(x=>x.groupId===a); const m = gd && gd.matches[b];
-    if(!m) return;
-    ctx = ladderMatchCtx(open, a, m); old = scoreText(m,false);
-    rows = `<div class="match-row"><div class="team">${m.teamA.map(playerName).map(escapeHTML).join(' & ')}</div><input class="pill-input" type="number" min="0" inputmode="numeric" id="corr_0_A" value="${m.scoreA==null?'':m.scoreA}"><div class="vs">:</div><input class="pill-input" type="number" min="0" inputmode="numeric" id="corr_0_B" value="${m.scoreB==null?'':m.scoreB}"><div class="team" style="text-align:right;">${m.teamB.map(playerName).map(escapeHTML).join(' & ')}</div></div>`;
-  } else {
-    const ss = (DATA.mlpSessions||[]).find(x=>x.id===sessionId); const tie = ss && (ss.ties||[]).find(x=>x.id===a);
-    if(!tie) return;
-    ctx = mlpTieCtx(tie); old = scoreText(tie,true);
-    rows = (tie.games||[]).map((g,gi)=>`<div class="small" style="margin-top:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">${escapeHTML(mlpGameTypeLabel(g.type))}</div><div class="match-row"><input class="pill-input" type="number" min="0" inputmode="numeric" id="corr_${gi}_A" value="${g.scoreA==null?'':g.scoreA}"><div class="vs">VS</div><input class="pill-input" type="number" min="0" inputmode="numeric" id="corr_${gi}_B" value="${g.scoreB==null?'':g.scoreB}"></div>`).join('');
-  }
-  CORR_STATE = { kind, sessionId, a, b, ctx, old };
-  showContentModal('Signaler une erreur de score', `
-    <p class="small" style="margin:0 0 4px;">${escapeHTML(ctx)}</p>
-    <p class="small" style="margin:0 0 10px;color:var(--muted);">Score actuel : ${escapeHTML(old)}. Entre le score que tu penses correct : un administrateur vérifiera et approuvera ou non la correction.</p>
-    ${rows}
-    <label style="display:block;margin:12px 0 4px;font-weight:600;">Note (facultatif)</label>
-    <input type="text" id="corr_note" maxlength="200" placeholder="Ex. : on avait joué à 11, pas 9">
-    <button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="submitScoreCorrection()">Envoyer la demande</button>`);
-}
-async function submitScoreCorrection(){
-  const st = CORR_STATE; if(!st) return;
-  const val = id=>{ const e=document.getElementById(id); return e && e.value!=='' ? Number(e.value) : null; };
-  let nw, key;
-  if(st.kind==='ladder'){
-    nw = [{ scoreA: val('corr_0_A'), scoreB: val('corr_0_B') }];
-    if(nw[0].scoreA==null || nw[0].scoreB==null || nw[0].scoreA<0 || nw[0].scoreB<0){ showAlert("Entre les deux scores."); return; }
-    key = st.a+':'+st.b;
-  } else {
-    const ss = (DATA.mlpSessions||[]).find(x=>x.id===st.sessionId); const tie = ss && (ss.ties||[]).find(x=>x.id===st.a);
-    nw = (tie.games||[]).map((g,gi)=>({ scoreA: val(`corr_${gi}_A`), scoreB: val(`corr_${gi}_B`) }));
-    key = st.a;
-  }
-  const note = (document.getElementById('corr_note')||{}).value || '';
-  const req = { kind:st.kind, sessionId:st.sessionId, key, groupId: st.kind==='ladder'?st.a:null, matchIdx: st.kind==='ladder'?st.b:null, tieId: st.kind==='mlp'?st.a:null, ctx:st.ctx, old:st.old, scores:nw, note:note.slice(0,200) };
-  const { error } = await sb.rpc('score_request_correction', { p_league_id: CURRENT_LEAGUE_ID, p_request: req });
-  if(error){ showAlert("Impossible d'envoyer la demande : " + error.message + " (le SQL « score-security.sql » est-il exécuté dans Supabase ?)"); return; }
-  dropModal();
-  CORR_STATE = null;
-  invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, audience:'admins', title:'⚠️ Correction de score demandée', body:`${currentLeagueLabel()} — ${st.ctx} : un joueur signale une erreur (score actuel ${st.old}).`, url:'/' });
-  await scoreReloadFromServer();
-  showAlert("✅ Demande envoyée. Un administrateur la vérifiera.");
 }
 async function scoreReloadFromServer(){
   try{ const l = await loadData(CURRENT_LEAGUE_ID); if(l){ DATA = l; migrateData(); } }catch(e){ console.error(e); }
   render();
 }
 // Bloc de contrôle affiché sous un match / affrontement côté joueur
-function scoreControlsHTML(kind, sessionId, a, b, u, lk, submitJs){
-  const isMlp = kind==='mlp';
-  const key = isMlp ? a : a+':'+b;
-  const pend = playerPendingCorrection(kind, key);
-  if(lk.state==='open') return `<button class="btn btn-secondary sc-btn" onclick="${submitJs}">💾 Envoyer le score</button><div class="small sc-note">Une fois envoyé, le score est verrouillé${scoreWindowMin()?` (tu pourras le corriger pendant ${scoreWindowMin()} min)`:''}.</div>`;
-  if(lk.state==='mine') return `<button class="btn btn-secondary sc-btn" onclick="${submitJs}">💾 Mettre à jour</button><div class="small sc-note">🔓 Modifiable par toi jusqu'à ${scoreClock(lk.until)}, puis verrouillé.</div>`;
-  return `<div class="sc-lock small">🔒 Saisi par ${escapeHTML(lk.by)}${lk.at?' à '+scoreClock(lk.at):''}</div>` + (pend
-    ? `<span class="tag tag-orange">⏳ Correction demandée</span>`
-    : `<button class="btn-ghost sc-btn" onclick="openScoreCorrectionModal('${kind}','${sessionId}','${a}'${isMlp?'':','+b})">⚠️ Signaler une erreur</button>`);
+// Ligne d'état discrète sous un match (échelle) : enregistrement automatique.
+function scoreStatusHTML(kind, sessionId, a, b, u, lk){
+  if(scoreComplete(u,false)) return scoreMentionHTML(u,false);
+  return (u.scoreA!=null||u.scoreB!=null) ? `<div class="sc-ctl"><span class="sc-chip">Entre l'autre score pour enregistrer</span></div>` : '';
 }
-async function playerSubmitLadderScore(gid, mi){
+async function playerSubmitLadderScore(gid, mi, auto){
+  if(auto){ const ea0=document.getElementById(`sc_${gid}_${mi}_A`), eb0=document.getElementById(`sc_${gid}_${mi}_B`); if(!ea0||!eb0||ea0.value===''||eb0.value==='') return; }
   const open = currentOpenSession();
   if(!open || open.status!=='open'){ showAlert("Cette session est terminée : les scores sont verrouillés."); return; }
   if(!scoreIsAdmin() && !DATA.allowPlayerScoreEntry){ showAlert("La saisie des scores est réservée aux administrateurs."); return; }
@@ -8987,66 +8934,14 @@ async function playerSubmitLadderScore(gid, mi){
   const ea = document.getElementById(`sc_${gid}_${mi}_A`), eb = document.getElementById(`sc_${gid}_${mi}_B`);
   const sa = ea && ea.value!=='' ? Number(ea.value) : null, sb_ = eb && eb.value!=='' ? Number(eb.value) : null;
   if(sa==null || sb_==null || sa<0 || sb_<0 || sa>99 || sb_>99){ showAlert("Entre les deux scores (nombres entiers)."); return; }
-  const lk = scoreLockState(m,false);
-  if(lk.state==='locked'){ showAlert("Ce score est déjà saisi et verrouillé. Utilise « Signaler une erreur »."); render(); return; }
   const { error } = await sb.rpc('ladder_submit_score', { p_league_id: CURRENT_LEAGUE_ID, p_session_id: open.id, p_group_id: gid, p_match_idx: mi, p_score_a: sa, p_score_b: sb_ });
   if(error){
-    if(/LOCKED/.test(error.message||'')) showAlert("Ce score vient d'être saisi par quelqu'un d'autre et il est verrouillé. Utilise « Signaler une erreur » si c'est faux.");
-    else showAlert("La sauvegarde a échoué : " + error.message + " (le SQL « score-security.sql » est-il exécuté dans Supabase ?)");
+    showAlert("La sauvegarde a échoué : " + error.message + " (le SQL « score-security.sql » est-il exécuté dans Supabase ?)");
     await scoreReloadFromServer(); return;
   }
   await scoreReloadFromServer();
-  showAlert("✅ Score enregistré.");
 }
 // ---- Côté admin : boîte de réception des corrections ----
-function scoreCorrectionsCardHTML(){
-  const pend = (DATA.scoreCorrections||[]).filter(c=>c.status==='pending');
-  if(!pend.length) return '';
-  return `<div class="card" style="border-color:var(--ball);">
-    <h3 style="margin:0 0 4px;">⚠️ Corrections de score à vérifier (${pend.length})</h3>
-    ${pend.map(c=>{
-      const nw = c.scores||[];
-      const nwTxt = c.kind==='ladder' ? `${nw[0].scoreA}–${nw[0].scoreB}` : nw.filter(g=>g.scoreA!=null||g.scoreB!=null).map(g=>`${g.scoreA==null?'–':g.scoreA}-${g.scoreB==null?'–':g.scoreB}`).join(' · ');
-      return `<div class="sc-corr"><div style="font-weight:600;">${escapeHTML(c.ctx||'')}</div>
-        <div class="small">Demandé par ${escapeHTML(c.byName||'un joueur')}${c.at?' à '+scoreClock(c.at):''}</div>
-        <div class="small">Actuel : <b>${escapeHTML(c.old||'')}</b> → Proposé : <b>${escapeHTML(nwTxt)}</b></div>
-        ${c.note?`<div class="small" style="font-style:italic;">« ${escapeHTML(c.note)} »</div>`:''}
-        <div class="row" style="margin-top:8px;"><button class="btn btn-primary" onclick="approveScoreCorrection('${c.id}')">✅ Approuver</button><button class="btn btn-secondary" onclick="rejectScoreCorrection('${c.id}')">Refuser</button></div></div>`;
-    }).join('')}
-  </div>`;
-}
-function approveScoreCorrection(id){
-  const c = (DATA.scoreCorrections||[]).find(x=>x.id===id); if(!c || c.status!=='pending') return;
-  let ids = [], old = '';
-  if(c.kind==='ladder'){
-    const open = (DATA.sessions||[]).find(x=>x.id===c.sessionId);
-    const gd = open && open.status==='open' && open.groupsData.find(x=>x.groupId===c.groupId); const m = gd && gd.matches[c.matchIdx];
-    if(!m){ showAlert("Cette session n'est plus ouverte : la correction ne peut plus être appliquée ici. Rouvre la session si nécessaire."); return; }
-    old = scoreText(m,false); ids = [...m.teamA, ...m.teamB];
-    m.scoreA = c.scores[0].scoreA; m.scoreB = c.scores[0].scoreB;
-    m.sBy = 'admin'; m.sByName = scoreAdminLabel(); m.sAt = new Date().toISOString();
-  } else {
-    const ss = (DATA.mlpSessions||[]).find(x=>x.id===c.sessionId); const tie = ss && ss.status==='open' && (ss.ties||[]).find(x=>x.id===c.tieId);
-    if(!tie){ showAlert("Cette session n'est plus ouverte : la correction ne peut plus être appliquée ici."); return; }
-    old = scoreText(tie,true);
-    (tie.games||[]).forEach((g,gi)=>{ if(c.scores[gi]){ g.scoreA = c.scores[gi].scoreA; g.scoreB = c.scores[gi].scoreB; } });
-    mlpApplyTieResult(tie);
-    tie.sBy = 'admin'; tie.sByName = scoreAdminLabel(); tie.sAt = new Date().toISOString();
-    ids = (DATA.mlpTeams||[]).filter(t=>t.id===tie.teamAId||t.id===tie.teamBId).flatMap(t=>t.memberIds);
-  }
-  c.status = 'approved'; c.resolvedAt = new Date().toISOString();
-  const nwTxt = c.kind==='ladder' ? `${c.scores[0].scoreA}–${c.scores[0].scoreB}` : c.scores.filter(g=>g.scoreA!=null||g.scoreB!=null).map(g=>`${g.scoreA==null?'–':g.scoreA}-${g.scoreB==null?'–':g.scoreB}`).join(' · ');
-  scoreLogAdd({ kind:'correction', by:scoreAdminLabel(), ctx:c.ctx, old, nw:nwTxt, req:c.byName });
-  notifyScorePlayers(ids, '✏️ Score CORRIGÉ', `${currentLeagueLabel()} — ${c.ctx} : le score est corrigé, ${old} → ${nwTxt}.`);
-  saveAndRender();
-}
-function rejectScoreCorrection(id){
-  const c = (DATA.scoreCorrections||[]).find(x=>x.id===id); if(!c || c.status!=='pending') return;
-  c.status = 'rejected'; c.resolvedAt = new Date().toISOString();
-  scoreLogAdd({ kind:'reject', by:scoreAdminLabel(), ctx:c.ctx, old:c.old, req:c.byName });
-  if(c.byProfile) invokeSendNotification({ profile_id:c.byProfile, title:'Correction refusée', body:`${currentLeagueLabel()} — ${c.ctx} : ta demande de correction a été examinée et le score reste ${c.old}.`, url:'/' });
-  saveAndRender();
-}
 function openScoreLogModal(){
   const L = (DATA.scoreLog||[]).slice().reverse().slice(0,60);
   const lab = { entry:'Saisie', edit:'Modification', admin:'Modifié par admin', correction:'Correction approuvée', reject:'Correction refusée', request:'Correction demandée' };
@@ -9062,7 +8957,7 @@ function setScore(gid, mi, which, val){
   if(SESSION_USER && SESSION_USER.role!=='admin'){ showAlert("Utilise le bouton « Envoyer le score »."); render(); return; }
   const gd = open.groupsData.find(x=>x.groupId===gid);
   const m = gd.matches[mi];
-  if(SESSION_USER && SESSION_USER.role==='admin' && m.sBy!=='admin') scoreAdminTouch(m, false, ladderMatchCtx(open, gid, m), [...m.teamA, ...m.teamB]);
+  if(SESSION_USER && SESSION_USER.role==='admin') scoreAdminTouch(m, false, ladderMatchCtx(open, gid, m), [...m.teamA, ...m.teamB]);
   if(which==='A') m.scoreA = val===''? null : Number(val);
   else m.scoreB = val===''? null : Number(val);
   saveData();
@@ -9662,7 +9557,6 @@ function adminSettingsSectionHTML(){
 function visSwitch(label, desc, checked, js){
   return `<div class="vis-row"><div class="vis-txt"><div class="vis-l">${label}</div>${desc?`<div class="small">${desc}</div>`:''}</div><label class="switch"><input type="checkbox" ${checked?'checked':''} onchange="${js}"><span class="switch-slider"></span></label></div>`;
 }
-function setScoreWindow(v){ DATA.scoreEditWindowMin = Number(v)||0; saveAndRender(); }
 function setDataFlag(k, v){ DATA[k] = !!v; saveAndRender(); }
 function toggleHiddenKey(listKey, key, visible, defsFn){
   const set = new Set(DATA[listKey]||[]);
@@ -9709,9 +9603,10 @@ function settingsJoueursTabHTML(){
   if(mlp) html += visSwitch('Saisie par les joueurs', 'Les joueurs des deux équipes peuvent entrer les scores de leur affrontement. Désactivé : ils les voient seulement, tu les entres.', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`);
   else html += visSwitch('Saisie par les joueurs', 'Les joueurs entrent leurs propres scores. Désactivé : réservé aux administrateurs.', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`);
   html += '</div>';
-  html += settingsSection('Sécurité des scores', 'Le premier score envoyé est verrouillé. Seul son auteur peut le corriger pendant une courte fenêtre; ensuite, une correction passe par une demande que tu approuves.');
-  html += `<div class="card"><div class="vis-row"><div class="vis-txt"><div class="vis-l">Fenêtre de correction</div><div class="small">Temps pendant lequel l'auteur d'un score peut le modifier.</div></div><select style="width:auto;" onchange="setScoreWindow(this.value)">${[0,5,10,15,30,60].map(v=>`<option value="${v}" ${scoreWindowMin()===v?'selected':''}>${v?v+' min':'Aucune'}</option>`).join('')}</select></div></div>`;
-  html += settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement(s) enregistré(s)${(DATA.scoreCorrections||[]).filter(c=>c.status==='pending').length?' · corrections en attente':''}`, 'openScoreLogModal()');
+  html += settingsSection('Journal', 'Chaque saisie ou modification de score est enregistrée : qui, quand, ancien et nouveau score.');
+  html += '<div class="card-grid">';
+  html += settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement(s) enregistré(s)`, 'openScoreLogModal()');
+  html += '</div>';
   html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés. Si la cote est cachée, les prix basés sur la cote le sont aussi.');
   html += '<div class="card">';
   html += palAwardDefs().map(([k,ico,l])=>{
@@ -11868,14 +11763,14 @@ function playerGroupHTML(me){
         const lk = entryOn ? scoreLockState(m,false) : null;
         const editable = !!lk && (lk.state==='open' || lk.state==='mine');
         const scoreDisplay = editable
-          ? `<input class="pill-input" type="number" min="0" inputmode="numeric" id="sc_${me.groupId}_${mi}_A" value="${m.scoreA===null?'':m.scoreA}"> : <input class="pill-input" type="number" min="0" inputmode="numeric" id="sc_${me.groupId}_${mi}_B" value="${m.scoreB===null?'':m.scoreB}">`
+          ? `<input class="pill-input" type="number" min="0" inputmode="numeric" id="sc_${me.groupId}_${mi}_A" value="${m.scoreA===null?'':m.scoreA}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)"> : <input class="pill-input" type="number" min="0" inputmode="numeric" id="sc_${me.groupId}_${mi}_B" value="${m.scoreB===null?'':m.scoreB}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)">`
           : `${m.scoreA===null?'—':m.scoreA} : ${m.scoreB===null?'—':m.scoreB}`;
         html += `<div class="match-row ${mine?'me':''}">
           <div class="team">${m.teamA.map(playerName).map(escapeHTML).join(' & ')}</div>
           <div class="vs">${scoreDisplay}</div>
           <div class="team" style="text-align:right;">${m.teamB.map(playerName).map(escapeHTML).join(' & ')}</div>
         </div>`;
-        if(entryOn && mine) html += `<div class="sc-ctl">${scoreControlsHTML('ladder', open.id, me.groupId, mi, m, lk, `playerSubmitLadderScore('${me.groupId}',${mi})`)}</div>`;
+        if(entryOn && mine) html += scoreStatusHTML('ladder', open.id, me.groupId, mi, m, lk);
       });
       html += `</div>`;
     }
@@ -12113,9 +12008,7 @@ function migrateData(){
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
   if(DATA.showGroupBeforePublish === undefined) DATA.showGroupBeforePublish = false;
   if(!Array.isArray(DATA.palHidden)) DATA.palHidden = [];
-  if(typeof DATA.scoreEditWindowMin !== 'number') DATA.scoreEditWindowMin = 15;
   if(!Array.isArray(DATA.scoreLog)) DATA.scoreLog = [];
-  if(!Array.isArray(DATA.scoreCorrections)) DATA.scoreCorrections = [];
   if(DATA.seasonStartDate === undefined) DATA.seasonStartDate = null;
   if(DATA.tiebreakCriteria === undefined) DATA.tiebreakCriteria = defaultTiebreakCriteria();
   if(DATA.seasonEndDate === undefined) DATA.seasonEndDate = null;
