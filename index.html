@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 148">
+<meta name="app-build" content="Version 149">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -9493,9 +9493,12 @@ function settingsJoueursTabHTML(){
   if(mlp) html += visSwitch('Saisie par les joueurs', 'Les joueurs des deux équipes peuvent entrer les scores de leur affrontement. Désactivé : ils les voient seulement, tu les entres.', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`);
   else html += visSwitch('Saisie par les joueurs', 'Les joueurs entrent leurs propres scores. Désactivé : réservé aux administrateurs.', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`);
   html += '</div>';
-  html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés.');
+  html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés. Si la cote est cachée, les prix basés sur la cote le sont aussi.');
   html += '<div class="card">';
-  html += palAwardDefs().map(([k,ico,l])=>visSwitch(ico+' '+escapeHTML(l), '', !(DATA.palHidden||[]).includes(k), `toggleHiddenKey('palHidden','${k}',this.checked)`)).join('');
+  html += palAwardDefs().map(([k,ico,l])=>{
+    if(PAL_RATING_KEYS.includes(k) && !DATA.showRatingToPlayers) return `<div class="vis-row" style="opacity:.55;"><div class="vis-txt"><div class="vis-l">${ico} ${escapeHTML(l)}</div><div class="small">Masqué automatiquement : la cote est cachée aux joueurs.</div></div><label class="switch"><input type="checkbox" disabled><span class="switch-slider"></span></label></div>`;
+    return visSwitch(ico+' '+escapeHTML(l), '', !(DATA.palHidden||[]).includes(k), `toggleHiddenKey('palHidden','${k}',this.checked)`);
+  }).join('');
   html += '</div>';
   return html;
 }
@@ -11399,13 +11402,23 @@ function palAwardKey(title){
   if(/ssiduité/.test(t)) return 'assiduite';
   return null;
 }
+// Prix qui exposent la cote (gain de cote, cotes, écart de cotes) : masqués
+// automatiquement quand l'admin cache la cote à ce rôle.
+const PAL_RATING_KEYS = ['progression','geants'];
+function palRatingVisible(){
+  if(!palIsPlayerView()) return true;
+  const sub = (SESSION_USER && SESSION_USER.role==='substitute') || ADMIN_VIEWING_AS==='substitute';
+  return !!(sub ? DATA.showRatingToSubs : DATA.showRatingToPlayers);
+}
+function palIsRatingAward(key,title){ return PAL_RATING_KEYS.includes(key) || title==='Meilleures cotes'; }
 function palIsPlayerView(){ return !(SESSION_USER && SESSION_USER.role==='admin' && !ADMIN_VIEWING_AS); }
 function palCard(icon, title, hint, rows, myId){
   if(!rows || !rows.length) return '';
   const key = palAwardKey(title);
   const off = !!(key && (DATA.palHidden||[]).includes(key));
-  if(palIsPlayerView() && (off || (title==='Meilleures cotes' && !DATA.showRatingToPlayers))) return '';
-  if(off) return `<div class="card pal-card pal-off"><div class="pal-offtag">🙈 Masqué aux joueurs</div><div class="pal-head"><span class="pal-ico">${icon}</span><div><h3 style="margin:0;">${escapeHTML(title)}</h3><div class="pal-hint">${escapeHTML(hint)}</div></div></div>${palRowsHTML(rows, myId)}</div>`;
+  if(palIsPlayerView() && (off || (palIsRatingAward(key,title) && !palRatingVisible()))) return '';
+  const ratingOff = !off && palIsRatingAward(key,title) && !DATA.showRatingToPlayers;
+  if(off || ratingOff) return `<div class="card pal-card pal-off"><div class="pal-offtag">🙈 Masqué aux joueurs${ratingOff?' (cote cachée)':''}</div><div class="pal-head"><span class="pal-ico">${icon}</span><div><h3 style="margin:0;">${escapeHTML(title)}</h3><div class="pal-hint">${escapeHTML(hint)}</div></div></div>${palRowsHTML(rows, myId)}</div>`;
   return `<div class="card pal-card"><div class="pal-head"><span class="pal-ico">${icon}</span><div><h3 style="margin:0;">${escapeHTML(title)}</h3><div class="pal-hint">${escapeHTML(hint)}</div></div></div>${palRowsHTML(rows, myId)}</div>`;
 }
 function palFmtGain(v){ return (v>=0?'+':'') + v.toFixed(3); }
@@ -11530,7 +11543,7 @@ function palSessionHeadline(){
     const sessions = palScopeSessions('session'); if(!sessions.length) return '';
     const parts = [];
     if(!palIsMlp()){
-      const g = palTop(palRatingGains(sessions), 1, 0.0005)[0]; if(g) parts.push(`📈 Progression : ${palName(g.id)} (${palFmtGain(g.v)})`);
+      const g = (DATA.showRatingToPlayers && !(DATA.palHidden||[]).includes('progression')) ? palTop(palRatingGains(sessions), 1, 0.0005)[0] : null; if(g) parts.push(`📈 Progression : ${palName(g.id)} (${palFmtGain(g.v)})`);
       const p = palTop(palPromotions(sessions), 1, 1)[0]; if(p) parts.push(`🧗 Montée : ${palName(p.id)}`);
     } else {
       const st = palPlayerStats(palGames(sessions));
