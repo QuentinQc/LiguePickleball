@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 143">
+<meta name="app-build" content="Version 146">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -823,6 +823,9 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
 .ss-pl.ss-sel{outline:2px solid var(--ball);}
 .ss-pl.ss-lift{opacity:.35;}
 .ss-pl.ss-over{outline:2px dashed var(--ball);background:rgba(214,255,60,.14);}
+.pbi{width:1.1em;height:1.1em;vertical-align:-0.2em;display:inline-block;flex:none;}
+.ss-emoji .pbi{width:42px;height:42px;}
+.icon-badge .pbi,.cal-badge .pbi{width:1.3em;height:1.3em;vertical-align:middle;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
@@ -1537,7 +1540,7 @@ function updateChatFab(){
   const convos = DM_AVAILABLE ? DM_CONTACTS.map(c=>{ const p = dmPair(c.id); return { c, last: p[p.length-1]||null, unread: dmUnreadFrom(c.id) }; })
     .filter(x=>x.last).sort((x,y)=>new Date(y.last.created_at)-new Date(x.last.created_at)).slice(0,5) : [];
   menu.innerHTML = `<button type="button" class="chat-menu-item" onclick="openChat('general')">🌐 Général</button>`
-    + wallChannels().map(l=>`<button type="button" class="chat-menu-item" onclick="openChat('${l.id}')">🏓 ${escapeHTML(l.name)}</button>`).join('')
+    + wallChannels().map(l=>`<button type="button" class="chat-menu-item" onclick="openChat('${l.id}')">${pbIcon()} ${escapeHTML(l.name)}</button>`).join('')
     + convos.map(x=>`<button type="button" class="chat-menu-item" onclick="openDmThread('${x.c.id}')">${avatarHTML('chat-menu-av', partnerInitials(x.c.display_name), x.c.avatar_url)}${escapeHTML(x.c.display_name||'Joueur')}${x.unread ? `<span class="chat-menu-badge">${x.unread}</span>` : ''}</button>`).join('')
     + (DM_AVAILABLE ? `<button type="button" class="chat-menu-item chat-menu-more" onclick="openDmList()" aria-label="Toutes les conversations">⋯${dmCount ? `<span class="chat-menu-badge">${dmCount}</span>` : ''}</button>` : '');
 }
@@ -3387,7 +3390,7 @@ function notifSettingsHTML(){
   const row = (key,label,sub)=>`<label class="notif-row"><span><strong>${label}</strong>${sub?`<span class="small" style="display:block;color:var(--muted);">${sub}</span>`:''}</span><input type="checkbox" ${on(key)?'checked':''} onchange="setNotifToggle('${key}',this.checked)"></label>`;
   const hours = (sel,key)=>`<select onchange="setNotifQuietHour('${key}',this.value)" style="width:auto;">${Array.from({length:24},(_,h)=>`<option value="${h}" ${h===sel?'selected':''}>${String(h).padStart(2,'0')} h</option>`).join('')}</select>`;
   const muted = p.muted_channels || [];
-  const chans = [{id:'general',name:'🌐 Général'}].concat(wallChannels().map(l=>({id:l.id,name:'🏓 '+l.name})));
+  const chans = [{id:'general',name:'🌐 Général'}].concat(wallChannels().map(l=>({id:l.id,name:l.name})));
   return `<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification. Il faut d'abord activer les notifications sur cet appareil (menu ☰).</p>
     <div class="notif-list">
       ${row('wall','💬 Messages du mur','Seulement quand un canal était calme depuis 10 min')}
@@ -3506,6 +3509,9 @@ async function copyCalFeed(){
 function confirmRegenCalFeed(){
   showConfirm("Générer un nouveau lien ? L'ancien cessera de fonctionner : il faudra se réabonner.", ()=>openCalSubscribe(true));
 }
+// Icône de balle de pickleball (balle trouée), à la place des emojis 🎾/🏓 : ceux-ci
+// représentent une balle de tennis / une raquette de ping-pong.
+function pbIcon(){ return '<svg class="pbi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#D9F23A" stroke="#8DA300" stroke-width="1.2"/><g fill="#6C7F00"><circle cx="12.0" cy="12.0" r="1.25"/><circle cx="16.6" cy="12.0" r="1.25"/><circle cx="14.3" cy="16.0" r="1.25"/><circle cx="9.7" cy="16.0" r="1.25"/><circle cx="7.4" cy="12.0" r="1.25"/><circle cx="9.7" cy="8.0" r="1.25"/><circle cx="14.3" cy="8.0" r="1.25"/><circle cx="18.9" cy="16.0" r="1.25"/><circle cx="12.0" cy="20.0" r="1.25"/><circle cx="5.1" cy="16.0" r="1.25"/><circle cx="5.1" cy="8.0" r="1.25"/><circle cx="12.0" cy="4.0" r="1.25"/><circle cx="18.9" cy="8.0" r="1.25"/></g></svg>'; }
 // ===== Heures (sessions, annonces) =====
 // Extrait une heure d'une étiquette libre du genre « Mardi 19h », « Lundi 19h30 » ou « 19:30 ».
 function parseTimeFromLabel(label){
@@ -3631,8 +3637,8 @@ function calendarSheetHTML(){
   const row = (color, ico, title, sub, click)=>`<div class="cal-row ${click?'cal-click':''}" style="border-left:4px solid ${color};" ${click?`onclick="${click}"`:''}><span class="cal-badge" style="background:${color}22;">${ico}</span><div><b>${title}</b>${sub?`<div class="small">${sub}</div>`:''}</div></div>`;
   const rows = its=>its.map(i=>{
     const c = calLeagueColor(i.lgId);
-    if(i.t==='session') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session${i.status==='closed'?' · terminée':''}${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
-    if(i.t==='planned') return row(c,'🏓',escapeHTML(i.lg||'Ligue'),`Session${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
+    if(i.t==='session') return row(c,pbIcon(),escapeHTML(i.lg||'Ligue'),`Session${i.status==='closed'?' · terminée':''}${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
+    if(i.t==='planned') return row(c,pbIcon(),escapeHTML(i.lg||'Ligue'),`Session${leagueTimeRangeLabel(i.L)?' · 🕖 '+leagueTimeRangeLabel(i.L):''}`);
     if(i.t==='blocked') return row(c,'⛔',escapeHTML(i.lg||'Ligue'),'Pas de session');
     if(i.t==='partner') return row(CAL_C_PARTNER,'🤝',`${escapeHTML(i.p.author_name||'Joueur')} cherche un partenaire`,escapeHTML(((i.p.play_time?'🕖 '+fmtHM(i.p.play_time)+' · ':'')+(i.p.message||'')).slice(0,90)),`openPartnerPostDetail('${i.p.id}')`);
     return row(CAL_C_EVENT,'🎉',escapeHTML(i.e.title||'Événement'),escapeHTML([i.e.event_time,i.e.location].filter(Boolean).join(' · ')),`openEventDetail('${i.e.id}')`);
@@ -4219,7 +4225,7 @@ function renderMlpAdmin(){
 // format de match à 4/5 joueurs ni de départage individuel en MLP).
 function mlpSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  const subTabs = [['ligue','🏆 Ligue'],['jeu',pbIcon()+' Jeu'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
   html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='jeu') html += mlpSettingsJeuTabHTML();
@@ -4415,7 +4421,7 @@ function addPersonFormHTML(){
         document.getElementById('addPersonSubFields').style.display = this.value==='remplacant' ? 'block' : 'none';
         document.getElementById('addPersonProspectFields').style.display = this.value==='prospect' ? 'block' : 'none';
       ">
-        <option value="regulier">🎾 Joueur régulier</option>
+        <option value="regulier">Joueur régulier</option>
         <option value="remplacant">🔄 Remplaçant</option>
         <option value="prospect">📇 Prospect</option>
       </select>
@@ -4558,7 +4564,7 @@ async function openAddToLeagueModal(tab, teamId){
     </div>` : `<div class="orgpick-empty">🎉 Tout le monde de l'organisation est déjà dans cette ligue.</div>`}
     <div class="orgpick-footer">
       ${ORG_PICK_TEAM ? '' : `<div class="orgpick-opts">
-        <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">🎾 Comme joueurs</option><option value="remplacant">🔄 Comme remplaçants</option></select>
+        <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">Comme joueurs</option><option value="remplacant">🔄 Comme remplaçants</option></select>
         <span id="orgPickPlaceWrap"><select id="orgPickPlace"><option value="wait">⏳ En attente</option>${groups.length ? '<option value="fill">📋 Remplir les groupes</option>' : ''}</select></span>
       </div>`}
       <button class="btn btn-primary orgpick-go" id="orgPickBtn" onclick="confirmAddFromOrg()" disabled>Ajouter</button>
@@ -5809,7 +5815,7 @@ function mlpSessionsSectionHTML(){
   let html = '';
   if(!open){
     html += `<div class="card ss-hero">
-      <div class="ss-emoji">🏓</div>
+      <div class="ss-emoji">${pbIcon()}</div>
       <h3 style="margin:6px 0 4px;">Nouvelle session</h3>
       <p class="small" style="margin:0 0 12px;">Choisis la date de jeu, puis génère ou compose les affrontements entre les équipes.</p>
       ${mlpTeamStripHTML()}
@@ -9361,7 +9367,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId){
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Session du ${s.date}${s.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
       <div class="row" style="gap:8px;">
-        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})">🎾 Matchs${viewerPlayerId ? ' de mon groupe' : ''}</button>
+        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})">${pbIcon()} Matchs${viewerPlayerId ? ' de mon groupe' : ''}</button>
         ${withDelete ? `<button class="btn-ghost-danger" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
       </div>
     </div>`;
@@ -9428,7 +9434,7 @@ function settingsRow(icon, title, summary, onClickFn){
 }
 function adminSettingsSectionHTML(){
   const sub = VIEW.settingsSubTab || 'ligue';
-  const subTabs = [['ligue','🏆 Ligue'],['jeu','🏓 Jeu'],['avance','⚙️ Avancé']];
+  const subTabs = [['ligue','🏆 Ligue'],['jeu',pbIcon()+' Jeu'],['avance','⚙️ Avancé']];
   let html = settingsRow('📖', 'Guide', 'Comment utiliser l\'application', 'showAdminGuideModal()');
   html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSettingsSubTab2('${k}')">${l}</div>`).join('')}</div>`;
   if(sub==='jeu') html += settingsJeuTabHTML();
@@ -9617,7 +9623,7 @@ function settingsJeuTabHTML(){
   let html = '<div class="card-grid">';
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow('🏓', 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
+  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} matchs / ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} matchs / ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
   html += settingsRow('📝', 'Saisie des scores', DATA.allowPlayerScoreEntry ? 'Les joueurs peuvent saisir leurs propres scores' : 'Réservée aux administrateurs', "openScoreEntryModal()");
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
   html += settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()");
@@ -10630,7 +10636,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe','🎾'],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement','Mon groupe',pbIcon()],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -10745,7 +10751,7 @@ function playerGuideHTML(){
     <h3 style="margin-top:14px;">Voir tes matchs</h3>
     <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
     <h3 style="margin-top:14px;">Historique</h3>
-    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées, avec ton évolution de cote en vert/rouge. La pastille « 🎾 Matchs de mon groupe » ouvre le détail des matchs.</p>
+    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées, avec ton évolution de cote en vert/rouge. La pastille « ${pbIcon()} Matchs de mon groupe » ouvre le détail des matchs.</p>
     <h3 style="margin-top:14px;">La cote évolutive</h3>
     <p class="small">Ta cote évolue automatiquement après chaque match compté (adversaire affronté, écart de score, nombre de matchs joués). Le bouton « Comment fonctionne la cote ? » dans Mon groupe donne l'explication complète.</p>
     <h3 style="margin-top:14px;">Plusieurs ligues</h3>
@@ -11241,7 +11247,7 @@ function previousGroupSessionInnerHTML(me){
   let html = `<div class="card-divider"></div>
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h3 style="margin:0;">Session précédente (${s.date})</h3>
-      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}','${gid}')">🎾 Mes matchs</button>
+      <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}','${gid}')">${pbIcon()} Mes matchs</button>
     </div>
     <table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}<th></th></tr>`;
   rows.forEach((r,i)=>{
@@ -11280,20 +11286,23 @@ function playerGroupHTML(me){
   if(open && isAbsent(open, me.id)) absenceBadges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
   const planned = plannedAbsencesForPlayer(me.id);
   if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
+  // Le groupe n'est montré que lorsqu'une session est PUBLIÉE (et que le joueur n'y est pas absent) :
+  // avant, la composition peut encore changer et ne reflète pas la session à venir.
+  const groupVisible = !!(open && open.published && !isAbsent(open, me.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
-      <h2 style="margin:0;">${escapeHTML(g ? g.name : '—')}</h2>
+      <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : '—') : 'Mon groupe'}</h2>
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">🚫 Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
-    <table>
+    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la session du '+escapeHTML(open.date)+'.' : 'Ton groupe sera visible dès la publication de la prochaine session.'}</p>` : `<table>
       <tr><th>Nom</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}</tr>
       ${groupMembers.map(p=>{
         const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
         return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td>${DATA.showRatingToPlayers ? `<td>${rating.toFixed(2)}</td>` : ''}</tr>`;
       }).join('')}
       ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
-    </table>
+    </table>`}
     ${previousGroupSessionInnerHTML(me)}
   </div>`;
   if(open){
@@ -11302,7 +11311,7 @@ function playerGroupHTML(me){
     if(amAbsent){
       html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la session du ${open.date} — le groupe et les scores de cette session ne sont pas affichés. Contacte un administrateur si c'est une erreur.</p></div>`;
     } else if(!open.published){
-      html += `<div class="card"><p class="small">La session du ${open.date} est en préparation. Tes matchs seront visibles ici une fois qu'un administrateur l'aura publiée.</p></div>`;
+      // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
     } else if(gd && gd.matches.length){
       html += `<div class="card"><h3>Matchs de la session en cours (${open.date})</h3>`;
       if(DATA.allowPlayerScoreEntry && !OFFLINE_MODE){
