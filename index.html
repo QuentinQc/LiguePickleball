@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 157">
+<meta name="app-build" content="Version 158">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2885,6 +2885,12 @@ function removePlannedAbsence(id){
 function toggleAbsence(playerId){
   const open = currentOpenSession();
   if(!open) return;
+  if(isPlayerActor()){
+    if(isAbsent(open, playerId)) return;
+    const hp = DATA.players.find(p=>p.id===playerId), dt = open.date;
+    selfAction('absent_session', { playerId }).then(ok=>{ if(ok) notifyAdminsPlayerAbsent(hp && hp.name, dt); });
+    return;
+  }
   if(!open.absences) open.absences = [];
   const idx = open.absences.indexOf(playerId);
   const groupsToRefresh = new Set();
@@ -4109,6 +4115,7 @@ async function logout(){
 
 // ---- Admin ----
 function renderAdmin(){
+  processPendingRegen();
   if(!CURRENT_LEAGUE_ID){
     // Aucune ligue n'existe encore (dans cette organisation).
     const orgSwitcher0 = MY_ORGANIZATIONS.length > 1 ? `
@@ -4199,6 +4206,7 @@ function renderAdmin(){
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
+  processPendingRegen();
   const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['gamification','Palmarès','🏆'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
@@ -6150,6 +6158,7 @@ function setMlpLeagueDreambreakerPlayer(teamId, playerId){
   if(!playerId) return;
   const team = (DATA.mlpTeams||[]).find(t=>t.id===teamId);
   if(!team) return;
+  if(isPlayerActor()){ selfAction('mlp_dreambreaker', { teamId, playerId }); return; }
   team.dreambreakerPlayerId = playerId;
   saveAndRender();
 }
@@ -7392,6 +7401,11 @@ function togglePlayerInjured(pid){
 function toggleMyInjured(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p || p.injured) return;
+  if(isPlayerActor()){
+    const pn = p.name;
+    selfAction('injured', { playerId: pid }).then(ok=>{ if(ok) notifyAdminsPlayerInjured(pn); });
+    return;
+  }
   p.lastGroupId = p.groupId || p.lastGroupId || null;
   p.groupId = null;
   p.injured = true;
@@ -8930,6 +8944,30 @@ function scoreAdminTouch(u, isMlp, ctx, playerIds){
   const old = had ? scoreText(u,isMlp) : '';
   if(had){ u.sEdited = true; u.sPrev = isMlp ? `${u.pointsA}–${u.pointsB}` : old; scoreLogAdd({ kind:'admin', by:scoreAdminLabel(), ctx, old }); }
   u.sBy = 'admin'; u.sByName = scoreAdminLabel(); u.sAt = new Date().toISOString();
+}
+// Actions d'un joueur (non admin) : passent par une fonction SQL sécurisée
+// (player_self_action) qui vérifie que le compte est bien lié au joueur visé.
+async function selfAction(action, payload){
+  const { error } = await sb.rpc('player_self_action', { p_league_id: CURRENT_LEAGUE_ID, p_action: action, p_payload: payload });
+  if(error){ showAlert("Action impossible : " + error.message + " (le SQL « player-actions.sql » est-il exécuté dans Supabase ?)"); return false; }
+  await scoreReloadFromServer();
+  return true;
+}
+function isPlayerActor(){ return !!(SESSION_USER && SESSION_USER.role!=='admin'); }
+// Quand un joueur se déclare absent, le serveur ne peut pas recalculer les matchs :
+// il marque les groupes concernés, et l'admin les recalcule à sa prochaine ouverture.
+function processPendingRegen(){
+  try{
+    const open = currentOpenSession();
+    if(!open || !Array.isArray(open.regenGroups) || !open.regenGroups.length) return;
+    if(!SESSION_USER || SESSION_USER.role!=='admin' || OFFLINE_MODE) return;
+    open.regenGroups.forEach(gid=>{
+      const gd = open.groupsData.find(x=>x.groupId===gid);
+      if(gd && !gd.matches.some(m=>m.scoreA!=null||m.scoreB!=null)) regenerateGroupMatches(open, gid);
+    });
+    open.regenGroups = [];
+    saveData();
+  }catch(e){ console.error(e); }
 }
 async function scoreReloadFromServer(){
   try{ const l = await loadData(CURRENT_LEAGUE_ID); if(l){ DATA = l; migrateData(); } }catch(e){ console.error(e); }
@@ -10760,6 +10798,11 @@ function toggleSubAvailability(subId){
   if(!open) return;
   open.availableSubs = open.availableSubs || [];
   const idx = open.availableSubs.indexOf(subId);
+  if(isPlayerActor()){
+    const sub0 = (DATA.substitutePool||[]).find(s=>s.id===subId), dt = open.date, becoming = idx===-1;
+    selfAction('sub_available', { subId, available: becoming }).then(ok=>{ if(ok && becoming) notifyAdminsSubAvailable(sub0 && sub0.name, dt); });
+    return;
+  }
   if(idx===-1){
     open.availableSubs.push(subId);
     // Notifie les admins seulement quand c'est le remplaçant lui-même qui
@@ -11883,6 +11926,11 @@ function submitPlannedAbsence(playerId){
   const start = document.getElementById('paStart').value;
   const end = document.getElementById('paEnd').value;
   if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return; }
+  if(isPlayerActor()){
+    const hp = DATA.players.find(x=>x.id===playerId);
+    selfAction('planned_absence', { playerId, startDate:start, endDate:end }).then(ok=>{ if(ok){ notifyAdminsPlannedAbsence(hp && hp.name, start, end); render(); } });
+    return;
+  }
   addPlannedAbsence(playerId, start, end);
   const p = DATA.players.find(x=>x.id===playerId);
   notifyAdminsPlannedAbsence(p && p.name, start, end);
