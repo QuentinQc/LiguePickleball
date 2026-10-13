@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 158">
+<meta name="app-build" content="Version 159">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1157,14 +1157,14 @@ function notifySessionPublished(session){
   // une absence, les remplaçants à indiquer leur disponibilité.
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'players',
+    audience: 'players', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
     body: `${leagueLabel} — session du ${session.date}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
     url: '/'
   });
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'substitutes',
+    audience: 'substitutes', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
     body: `${leagueLabel} — une session est prévue le ${session.date}. Indique ta disponibilité si tu peux remplacer.`,
     url: '/'
@@ -1175,7 +1175,7 @@ function notifySessionPublished(session){
 function notifySessionResultsPublished(finishedDate, corrected){
   if(!CURRENT_LEAGUE_ID || !finishedDate) return;
   invokeSendNotification({
-    league_id: CURRENT_LEAGUE_ID,
+    league_id: CURRENT_LEAGUE_ID, category: 'league_results',
     title: corrected ? '✏️ Résultats corrigés' : '🏆 Résultats publiés',
     body: corrected
       ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores, classement et cotes sont mis à jour : jette un œil à ta position.`
@@ -1201,7 +1201,7 @@ function notifyAdminsPlayerAbsent(playerName, sessionDate){
   if(!CURRENT_LEAGUE_ID) return;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'admins',
+    audience: 'admins', category: 'admin_alerts',
     title: '🚫 Absence signalée',
     body: `${playerName || 'Un joueur'} a indiqué être absent(e) pour la session du ${sessionDate} (${currentLeagueLabel()}).`,
     url: '/'
@@ -1212,7 +1212,7 @@ function notifyAdminsPlayerInjured(playerName){
   if(!CURRENT_LEAGUE_ID) return;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'admins',
+    audience: 'admins', category: 'admin_alerts',
     title: '🤕 Blessure signalée',
     body: `${playerName || 'Un joueur'} s'est déclaré(e) blessé(e) (${currentLeagueLabel()}). Il/elle reste hors de son groupe jusqu'à sa réintégration par un admin.`,
     url: '/'
@@ -1225,7 +1225,7 @@ function notifyAdminsPlannedAbsence(playerName, startDate, endDate){
   const range = startDate===endDate ? `le ${startDate}` : `du ${startDate} au ${endDate}`;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'admins',
+    audience: 'admins', category: 'admin_alerts',
     title: '🌴 Absence prolongée signalée',
     body: `${playerName || 'Un joueur'} a indiqué être absent(e) ${range} (${currentLeagueLabel()}).`,
     url: '/'
@@ -1237,7 +1237,7 @@ function notifyAdminsSubAvailable(subName, sessionDate){
   if(!CURRENT_LEAGUE_ID) return;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
-    audience: 'admins',
+    audience: 'admins', category: 'admin_alerts',
     title: '🙋 Remplaçant disponible',
     body: `${subName || 'Un remplaçant'} a indiqué être disponible pour la session du ${sessionDate} (${currentLeagueLabel()}).`,
     url: '/'
@@ -1248,7 +1248,7 @@ function notifyAdminsSubAvailable(subName, sessionDate){
 function notifyCustomAnnouncement(message){
   if(!CURRENT_LEAGUE_ID || !message) return;
   invokeSendNotification({
-    league_id: CURRENT_LEAGUE_ID,
+    league_id: CURRENT_LEAGUE_ID, category: 'league_announce',
     title: '📣 ' + currentLeagueLabel(),
     body: message,
     url: '/'
@@ -3434,6 +3434,12 @@ function notifSettingsHTML(){
   const chans = [{id:'general',name:'🌐 Général'}].concat(wallChannels().map(l=>({id:l.id,name:l.name})));
   return `<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification. Il faut d'abord activer les notifications sur cet appareil (menu ☰).</p>
     <div class="notif-list">
+      <h4 style="margin:4px 0 6px;">🏓 Ma ligue</h4>
+      ${row('league_sessions','📅 Nouvelles sessions','Quand une session est publiée')}
+      ${row('league_results','🏆 Résultats et palmarès','Résultats publiés ou corrigés, palmarès de la session')}
+      ${row('league_announce','📣 Annonces de l\'admin')}
+      ${(SESSION_USER && SESSION_USER.role==='admin') ? row('admin_alerts','🛎️ Alertes admin','Absences, blessures et remplaçants disponibles signalés par les joueurs') : ''}
+      <h4 style="margin:14px 0 6px;">💬 Communauté</h4>
       ${row('wall','💬 Messages du mur','Seulement quand un canal était calme depuis 10 min')}
       ${row('dm','✉️ Messages privés')}
       <label class="notif-row"><span><strong>Aperçu des messages privés</strong><span class="small" style="display:block;color:var(--muted);">Afficher le texte sur l'écran verrouillé</span></span><input type="checkbox" ${p.dm_preview===true?'checked':''} onchange="setNotifToggle('dm_preview',this.checked)"></label>
@@ -11749,7 +11755,7 @@ function notifySessionAwards(){
   const playersSee = !(DATA.hiddenPlayerTabs||[]).includes('gamification');
   const subsSee = !(DATA.hiddenSubTabs||[]).includes('gamification');
   if(!playersSee && !subsSee) return;
-  const payload = { league_id: CURRENT_LEAGUE_ID, title:'🏅 Palmarès de la session', body: `${currentLeagueLabel()} — ${body}`, url:'/' };
+  const payload = { league_id: CURRENT_LEAGUE_ID, category:'league_results', title:'🏅 Palmarès de la session', body: `${currentLeagueLabel()} — ${body}`, url:'/' };
   if(playersSee && !subsSee) payload.audience = 'players';
   else if(!playersSee && subsSee) payload.audience = 'substitutes';
   invokeSendNotification(payload);
