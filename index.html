@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 162">
+<meta name="app-build" content="Version 163">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -985,8 +985,8 @@ let WALL_REALTIME_CHANNEL = null;   // canal Supabase Realtime abonné à org_me
 let PARTNER_REALTIME_CHANNEL = null; // canal Supabase Realtime abonné à partner_posts pour la ligue courante
 
 // ===== Nouveau menu (essai) : activé depuis le tiroir, mémorisé sur l'appareil =====
-let MODERN_NAV = false;
-try{ MODERN_NAV = localStorage.getItem('dinkeo_modern_nav')==='1'; }catch(e){}
+let MODERN_NAV = true; // activé par défaut ; un choix explicite (tiroir) est mémorisé
+try{ if(localStorage.getItem('dinkeo_modern_nav')==='0') MODERN_NAV = false; }catch(e){}
 let MORE_SHEET_OPEN = false;
 function applyModernNavClass(){ document.body.classList.toggle('modern-nav', MODERN_NAV); }
 function toggleModernNav(){
@@ -3901,7 +3901,7 @@ function drawerHTML(contextHTML, subtitle){
           ${headerInfo ? `<div class="small" style="color:var(--muted);">${escapeHTML(headerInfo)}</div>` : ''}
         </div>
       </div>
-      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}<div class="drawer-extra-block"><button class="btn-ghost" style="width:100%;text-align:left;" onclick="toggleModernNav()">✨ Nouveau menu (essai) : ${MODERN_NAV?'activé — revenir à l\'ancien':'essayer'}</button></div></div>
+      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}<div class="drawer-extra-block"><button class="btn-ghost" style="width:100%;text-align:left;" onclick="toggleModernNav()">✨ Nouveau menu : ${MODERN_NAV?'activé — revenir à l\'ancien':'réactiver'}</button></div></div>
       ${SESSION_USER ? `
       <div class="drawer-footer">
         <div class="drawer-avatar">${escapeHTML(initial)}</div>
