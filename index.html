@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 165">
+<meta name="app-build" content="Version 166">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -775,6 +775,17 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
   body.modern-nav h2{font-size:22px;}
   body.modern-nav .topbar h2,body.modern-nav .drawer-header h2{font-size:15px;}
 }
+
+.org-hub{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px;}
+.org-tile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;background:rgba(255,255,255,.06);border:1px solid var(--line-soft-strong);border-radius:22px;padding:16px;min-height:128px;cursor:pointer;color:var(--text);font-family:var(--font-body);}
+.org-tile:active{background:rgba(255,255,255,.12);}
+.org-tile-ico{width:42px;height:42px;border-radius:14px;background:rgba(207,234,92,.14);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.org-tile-t{font:700 17px var(--font-body);margin-top:auto;}
+.org-tile-s{font-size:12px;color:var(--muted);}
+.org-tile-s.warn{color:var(--ball);font-weight:700;}
+.org-back{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 14px;padding:10px 4px;background:none;border:0;color:var(--muted);font:600 15px var(--font-body);cursor:pointer;text-align:left;}
+.org-back span{font-size:26px;line-height:1;color:var(--ball);}
+.org-back b{color:var(--text);font-weight:800;margin-left:2px;}
 .compose-launch{padding:12px 14px;color:var(--muted);font-size:15px;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .cal-title{font-weight:700;text-transform:capitalize;font-size:16px;}
@@ -9868,11 +9879,14 @@ function openOrganizationPage(){
     loadOrgTournamentData(CURRENT_ORGANIZATION_ID), loadOrgVideoData(currentLeagueOrgId())
   ]).then(()=>{
     ADMIN_SHOWING_ORG = true;
+    VIEW.orgHub = true; // accueil en tuiles (mobile, nouveau menu)
     render();
   });
 }
 function closeOrganizationPage(){ ADMIN_SHOWING_ORG = false; render(); }
-function setOrgSubTab(t){ VIEW.orgSubTab = t; render(); }
+function setOrgSubTab(t){ VIEW.orgSubTab = t; VIEW.orgHub = false; render(); }
+function orgBackToHub(){ VIEW.orgHub = true; render(); }
+function isMobileModern(){ return MODERN_NAV && window.matchMedia('(max-width:640px)').matches; }
 function organizationStatsSummary(){
   const orgLeagues = myOrgLeagues();
   const orgLeagueIds = new Set(orgLeagues.map(l=>l.id));
@@ -9904,7 +9918,24 @@ function organizationHeroHTML(){
 function renderOrganizationManagement(){
   const sub = VIEW.orgSubTab || 'general';
   const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['rapport','📊 Rapport'],['comptes','🔑 Comptes'],['videos','🎬 Vidéos'],['tournois','🏆 Tournois']];
-  app.innerHTML = `
+  if(isMobileModern()){
+    const topbar = topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null);
+    if(VIEW.orgHub===true){
+      const st = organizationStatsSummary();
+      const sub1 = { general:'Nom et lien d\'invitation', membres:`${st.members} personne${st.members>1?'s':''}`, rapport:'Qui joue où', comptes: st.pending>0 ? `${st.pending} en attente` : 'Accès et approbations', videos:'Vidéos des matchs', tournois:'Tournois de l\'organisation' };
+      app.innerHTML = `${topbar}${storageBannerHTML()}${pushPromoBannerHTML()}${organizationHeroHTML()}
+        <div class="org-hub">${subTabs.map(([k,l])=>{
+          const sp = l.indexOf(' ');
+          return `<button type="button" class="org-tile" onclick="setOrgSubTab('${k}')"><span class="org-tile-ico">${l.slice(0,sp)}</span><span class="org-tile-t">${escapeHTML(l.slice(sp+1))}</span><span class="org-tile-s ${k==='comptes'&&st.pending>0?'warn':''}">${escapeHTML(sub1[k]||'')}</span></button>`;
+        }).join('')}</div>
+        <div id="orgTabContent"></div>`;
+      return;
+    }
+    const cur = subTabs.find(t=>t[0]===sub) || subTabs[0];
+    app.innerHTML = `${topbar}${storageBannerHTML()}${pushPromoBannerHTML()}
+      <button type="button" class="org-back" onclick="orgBackToHub()"><span>‹</span> Organisation <b>${escapeHTML(cur[1])}</b></button>
+      <div id="orgTabContent"></div>`;
+  } else app.innerHTML = `
     ${topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null)}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
     ${organizationHeroHTML()}
