@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 160">
+<meta name="app-build" content="Version 161">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -195,6 +195,14 @@ input[type=date],input[type=time]{color-scheme:dark;}
 input:focus,select:focus{outline:2px solid var(--ball);outline-offset:1px;}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
 .field{margin-bottom:10px;}
+.org-filter{display:flex;flex-direction:column;gap:10px;margin:12px 0 6px;}
+.org-filter-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.org-filter-label{font-family:var(--font-display);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-right:2px;}
+.org-chip{cursor:pointer;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-family:var(--font-body);font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;}
+.org-chip.active{background:var(--ball);color:#10231D;border-color:var(--ball);}
+.org-filter-count{font-size:13px;color:var(--muted);}
+th.sortable{cursor:pointer;user-select:none;}
+th.sortable.active{color:var(--ball);}
 table{width:100%;border-collapse:collapse;margin-top:8px;}
 th{text-align:left;font-family:var(--font-display);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.15);}
 th.sortable{cursor:pointer;user-select:none;}
@@ -9785,10 +9793,131 @@ function organizationGeneralHTML(){
 // séparément dans chacune. Bassin construit en fusionnant, sur toutes les
 // ligues de l'organisation, les joueurs/remplaçants qui partagent le même
 // compte (profil lié) ou, à défaut, le même nom. Voir loadOrgRoster().
+// ---- Filtres / tri partagés par Membres et Rapport (état gardé dans VIEW).
+function orgFilterState(){
+  if(!VIEW.orgFilter) VIEW.orgFilter = { q:'', league:'', status:'', sort:'name', sortDir:1 };
+  return VIEW.orgFilter;
+}
+function orgEntryMatches(e){
+  const f = orgFilterState();
+  const q = (f.q||'').trim().toLowerCase();
+  if(q && !((e.name||'').toLowerCase().includes(q) || (e.email||'').toLowerCase().includes(q))) return false;
+  const rows = f.league ? e.rows.filter(r=>r.leagueId===f.league) : e.rows;
+  if(f.league && !rows.length) return false;
+  switch(f.status){
+    case 'joueur': return rows.some(r=>r.type==='joueur');
+    case 'remplaçant': return rows.some(r=>r.type==='remplaçant');
+    case 'sans-ligue': return e.rows.length===0;
+    case 'compte': return !!e.profileId;
+    case 'sans-compte': return !e.profileId;
+  }
+  return true;
+}
+// Retourne [{e, i}] filtrés et triés ; i = index dans ORG_ROSTER_ENTRIES_CACHE
+// (les boutons de fiche/suppression s'y réfèrent, donc on le conserve).
+function orgFilteredEntries(entries){
+  const f = orgFilterState();
+  const rank = (e, leagueId)=>{ const r=e.rows.find(x=>x.leagueId===leagueId); return !r ? 2 : (r.type==='joueur' ? 0 : 1); };
+  const list = entries.map((e,i)=>({e,i})).filter(x=>orgEntryMatches(x.e));
+  const byName = (x,y)=>x.e.name.localeCompare(y.e.name);
+  list.sort((x,y)=>{
+    let c = 0;
+    if(f.sort==='leagues') c = y.e.rows.length - x.e.rows.length;
+    else if(f.sort==='compte') c = (y.e.profileId?1:0) - (x.e.profileId?1:0);
+    else if(f.sort && f.sort.indexOf('L:')===0){ const id=f.sort.slice(2); c = (rank(x.e,id)-rank(y.e,id)) * f.sortDir; }
+    else if(f.sort==='name') c = byName(x,y) * f.sortDir;
+    return c || byName(x,y);
+  });
+  return list;
+}
+function orgFilterBarHTML(kind){
+  const f = orgFilterState();
+  const leagues = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
+  const chip = (key,val,label)=>`<button type="button" class="org-chip ${f[key]===val?'active':''}" onclick="setOrgFilter('${key}','${val}')">${label}</button>`;
+  const statuses = [['','Tous'],['joueur','Joueur'],['remplaçant','🔄 Remplaçant'],['sans-ligue','Sans ligue'],['compte','Compte lié'],['sans-compte','Sans compte']];
+  return `<div class="org-filter">
+    <input type="search" id="orgFilterQ" placeholder="Rechercher un nom ou un courriel…" value="${escapeHTML(f.q||'')}" oninput="setOrgFilter('q',this.value,true)">
+    <div class="org-filter-row"><span class="org-filter-label">Ligue</span>${chip('league','','Toutes')}${leagues.map(l=>chip('league',l.id,escapeHTML(l.schedule_label||l.name))).join('')}</div>
+    <div class="org-filter-row"><span class="org-filter-label">Statut</span>${statuses.map(([v,l])=>chip('status',v,l)).join('')}</div>
+    <div class="org-filter-row">
+      ${kind==='membres' ? `<span class="org-filter-label">Trier par</span>
+      <select onchange="setOrgFilter('sort',this.value)" style="width:auto;">
+        <option value="name" ${f.sort==='name'?'selected':''}>Nom (A→Z)</option>
+        <option value="leagues" ${f.sort==='leagues'?'selected':''}>Nombre de ligues</option>
+        <option value="compte" ${f.sort==='compte'?'selected':''}>Compte lié d'abord</option>
+      </select>` : ''}
+      <span class="org-filter-count" id="orgFilterCount"></span>
+      <button type="button" class="org-chip" onclick="resetOrgFilters()">Réinitialiser</button>
+      <button type="button" class="org-chip" onclick="exportOrgListCSV()">⬇️ Exporter (CSV)</button>
+    </div>
+  </div>`;
+}
+function setOrgFilter(key, val, keepFocus){
+  const f = orgFilterState();
+  // Les chips déjà actives se désélectionnent (retour à « Toutes »/« Tous »).
+  if(!keepFocus && (key==='league'||key==='status') && f[key]===val) val = '';
+  f[key] = val;
+  if(key==='sort' && !String(val).startsWith('L:')) f.sortDir = 1;
+  if(keepFocus) refreshOrgList(); else render();
+}
+function setOrgReportSort(key){
+  const f = orgFilterState();
+  if(f.sort===key) f.sortDir = -f.sortDir; else { f.sort = key; f.sortDir = 1; }
+  render();
+}
+function resetOrgFilters(){ VIEW.orgFilter = null; render(); }
+function refreshOrgList(){
+  const kind = VIEW.orgSubTab;
+  const host = document.getElementById('orgListBody');
+  if(!host) return;
+  host.innerHTML = kind==='rapport' ? orgReportBodyHTML() : orgMembersBodyHTML();
+}
+function exportOrgListCSV(){
+  const leagues = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
+  const list = orgFilteredEntries(ORG_ROSTER_ENTRIES_CACHE);
+  const esc = v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const head = ['Nom','Courriel','Compte lié'].concat(leagues.map(l=>l.schedule_label||l.name));
+  const lines = [head.map(esc).join(',')];
+  list.forEach(({e})=>{
+    lines.push([e.name, e.email||'', e.profileId?'Oui':'Non'].concat(leagues.map(l=>{
+      const r = e.rows.find(x=>x.leagueId===l.id);
+      return r ? (r.type==='remplaçant'?'Remplaçant':'Joueur') : '';
+    })).map(esc).join(','));
+  });
+  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'membres-organisation.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function orgUpdateCount(shown, total){
+  const el = document.getElementById('orgFilterCount');
+  if(el) el.textContent = shown + ' sur ' + total;
+}
+function orgMembersBodyHTML(){
+  const entries = ORG_ROSTER_ENTRIES_CACHE;
+  const list = orgFilteredEntries(entries);
+  const initialsOf = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  setTimeout(()=>orgUpdateCount(list.length, entries.length), 0);
+  return `<div class="member-list">
+    ${list.map(({e,i})=>`<div class="member-row">
+      ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
+      <div class="member-info">
+        <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+        ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
+        <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
+      </div>
+      <div class="member-actions">
+        ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
+      </div>
+    </div>`).join('')}
+    ${entries.length===0 ? `<p class="empty">Aucun membre pour l'instant</p>` : (list.length===0 ? `<p class="empty">Aucun résultat avec ces filtres</p>` : '')}
+  </div>`;
+}
 function organizationMembersCardHTML(){
   const entries = organizationRosterEntries();
   ORG_ROSTER_ENTRIES_CACHE = entries;
-  const initialsOf = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   return `<div class="card">
     <div class="section-heading" style="justify-content:space-between;">
       <div class="row" style="gap:10px;align-items:center;">
@@ -9798,50 +9927,47 @@ function organizationMembersCardHTML(){
       <button class="btn btn-secondary" onclick="openAddOrgMemberModal()">+ Nouvelle personne</button>
     </div>
     <p class="small" style="margin:8px 0 4px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
-    <div class="member-list">
-      ${entries.map((e,i)=>`<div class="member-row">
-        ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
-        <div class="member-info">
-          <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
-          ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
-          <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
-        </div>
-        <div class="member-actions">
-          ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
-        </div>
-      </div>`).join('')}
-      ${entries.length===0 ? `<p class="empty">Aucun membre pour l'instant</p>` : ''}
-    </div>
+    ${orgFilterBarHTML('membres')}
+    <div id="orgListBody">${orgMembersBodyHTML()}</div>
   </div>`;
 }
 // Rapport : vue d'ensemble en tableau de tous les joueurs de l'organisation,
 // une colonne par ligue, pour voir en un coup d'œil qui joue où et avec
 // quel statut — plutôt que de devoir ouvrir chaque fiche séparément.
-function organizationReportHTML(){
+// Les en-têtes de colonne (Nom / chaque ligue) sont cliquables pour trier.
+function orgReportBodyHTML(){
+  const f = orgFilterState();
   const leagues = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
-  const entries = organizationRosterEntries();
-  ORG_ROSTER_ENTRIES_CACHE = entries;
+  const entries = ORG_ROSTER_ENTRIES_CACHE;
+  const list = orgFilteredEntries(entries);
+  setTimeout(()=>orgUpdateCount(list.length, entries.length), 0);
+  if(!entries.length || !leagues.length) return `<p class="empty">Aucun joueur pour l'instant.</p>`;
+  if(!list.length) return `<p class="empty">Aucun résultat avec ces filtres</p>`;
   const cellFor = (entry, leagueId)=>{
     const row = entry.rows.find(r=>r.leagueId===leagueId);
     if(!row) return '<span class="small" style="opacity:.35;">—</span>';
     return `<span class="tag ${row.type==='remplaçant'?'tag-yellow':'tag-up'}">${row.type==='remplaçant'?'🔄 Rempl.':'Joueur'}</span>`;
   };
-  let html = `<div class="card">
+  const arrow = key=> f.sort===key ? (f.sortDir>0?' ▲':' ▼') : '';
+  const th = (key,label)=>`<th class="sortable ${f.sort===key?'active':''}" onclick="setOrgReportSort('${key}')">${label}${arrow(key)}</th>`;
+  const shownLeagues = f.league ? leagues.filter(l=>l.id===f.league) : leagues;
+  return `<div style="overflow-x:auto;"><table>
+    <tr>${th('name','Nom')}${shownLeagues.map(l=>th('L:'+l.id, escapeHTML(l.schedule_label||l.name))).join('')}</tr>
+    ${list.map(({e,i})=>`<tr>
+      <td class="clickable-row" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}</td>
+      ${shownLeagues.map(l=>`<td>${cellFor(e, l.id)}</td>`).join('')}
+    </tr>`).join('')}
+  </table></div>`;
+}
+function organizationReportHTML(){
+  const entries = organizationRosterEntries();
+  ORG_ROSTER_ENTRIES_CACHE = entries;
+  return `<div class="card">
     <div class="section-heading"><span class="icon-badge">📊</span><h3 style="margin:0;">Rapport des joueurs <span class="small">(${entries.length})</span></h3></div>
-    <p class="small" style="margin:8px 0 4px;">Vue d'ensemble de tous les joueurs de l'organisation et de leur statut dans chaque ligue. Clique sur un nom pour voir sa fiche et la modifier.</p>`;
-  if(!entries.length || !leagues.length){
-    html += `<p class="empty">Aucun joueur pour l'instant.</p>`;
-  } else {
-    html += `<table>
-      <tr><th>Nom</th>${leagues.map(l=>`<th>${escapeHTML(l.schedule_label || l.name)}</th>`).join('')}</tr>
-      ${entries.map((e,i)=>`<tr>
-        <td class="clickable-row" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}</td>
-        ${leagues.map(l=>`<td>${cellFor(e, l.id)}</td>`).join('')}
-      </tr>`).join('')}
-    </table>`;
-  }
-  html += `</div>`;
-  return html;
+    <p class="small" style="margin:8px 0 4px;">Vue d'ensemble de tous les joueurs de l'organisation et de leur statut dans chaque ligue. Clique sur un nom pour voir sa fiche, ou sur un en-tête de colonne pour trier.</p>
+    ${orgFilterBarHTML('rapport')}
+    <div id="orgListBody">${orgReportBodyHTML()}</div>
+  </div>`;
 }
 function settingsLigueTabHTML(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
