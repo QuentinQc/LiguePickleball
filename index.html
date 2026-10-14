@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 163">
+<meta name="app-build" content="Version 164">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -743,6 +743,34 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .dk.active span{max-width:96px;opacity:1;}
 .dk.raised{background:var(--paddle);color:#fff;}
 .dk .mt-emoji{font-size:21px;line-height:1;}
+
+/* ---------- Nouveau menu, étape 2 : feuilles, cartes, sections ---------- */
+.m-grab,.sec-picker{display:none;}
+.sec-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:rgba(255,255,255,.06);border:1px solid var(--line-soft-strong);border-radius:16px;padding:15px 16px;margin-bottom:8px;color:var(--text);font:600 16px var(--font-body);cursor:pointer;}
+.sec-item.active{border-color:var(--ball);color:var(--ball);}
+@media (max-width:640px){
+  body.modern-nav .subtabs.sp-hidden{display:none;}
+  body.modern-nav .sec-picker{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 16px;background:rgba(255,255,255,.07);border:1px solid var(--line-soft-strong);border-radius:16px;color:var(--text);font:600 16px var(--font-body);cursor:pointer;text-align:left;}
+  body.modern-nav .sec-picker .sp-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--font-display);}
+  body.modern-nav .sec-picker b{flex:1;font-weight:700;}
+  body.modern-nav .sec-picker i{font-style:normal;color:var(--ball);}
+  /* tiroir -> feuille de profil */
+  body.modern-nav .drawer-overlay{align-items:flex-end;z-index:950;}
+  #secSheet .more-bg{z-index:940;}
+  #secSheet .more-sheet{z-index:950;}
+  body.modern-nav .drawer-panel{width:100%;max-width:none;height:auto;max-height:88vh;border-radius:28px 28px 0 0;border:0;border-top:1px solid var(--line-soft-strong);background:#0F322D;box-shadow:0 -12px 40px rgba(0,0,0,.5);animation:moreUp .28s ease-out;}
+  body.modern-nav .drawer-header{padding-top:22px;}
+  /* modales -> feuilles par le bas */
+  body.modern-nav .m-ov{align-items:flex-end!important;padding:0!important;}
+  body.modern-nav .m-box{max-width:none!important;border-radius:28px 28px 0 0!important;max-height:90vh!important;border:0!important;border-top:1px solid var(--line-soft-strong)!important;background:#0F322D!important;padding-bottom:calc(22px + env(safe-area-inset-bottom))!important;animation:moreUp .28s ease-out;}
+  body.modern-nav .m-grab{display:block;width:40px;height:4px;border-radius:4px;background:var(--line-soft-strong);margin:-6px auto 14px;}
+  /* cartes et titres */
+  body.modern-nav .card{border-radius:22px;border-color:transparent;background:rgba(255,255,255,.05);padding:16px;}
+  body.modern-nav .modal-section{border-radius:18px;}
+  body.modern-nav .btn{border-radius:999px;}
+  body.modern-nav h2{font-size:22px;}
+  body.modern-nav .topbar h2,body.modern-nav .drawer-header h2{font-size:15px;}
+}
 .compose-launch{padding:12px 14px;color:var(--muted);font-size:15px;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .cal-title{font-weight:700;text-transform:capitalize;font-size:16px;}
@@ -1013,6 +1041,39 @@ const NAV_SVG = {
 };
 function navIconHTML(key, emoji){
   return NAV_SVG[key] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[key]}</svg>` : `<span class="mt-emoji">${emoji||'•'}</span>`;
+}
+
+// Sous-onglets -> sélecteur de section (mobile, nouveau menu)
+function closeSectionSheet(){ const e=document.getElementById('secSheet'); if(e) e.remove(); }
+function openSectionSheet(tabs){
+  closeSectionSheet();
+  const w=document.createElement('div'); w.id='secSheet';
+  w.innerHTML='<div class="more-bg"></div><div class="more-sheet" style="padding-bottom:calc(24px + env(safe-area-inset-bottom));"><div class="more-grab"></div><div class="sec-list"></div></div>';
+  const list=w.querySelector('.sec-list');
+  tabs.forEach(t=>{
+    const b=document.createElement('button'); b.type='button';
+    b.className='sec-item'+(t.classList.contains('active')?' active':'');
+    b.innerHTML=t.innerHTML;
+    b.onclick=()=>{ closeSectionSheet(); t.click(); };
+    list.appendChild(b);
+  });
+  w.querySelector('.more-bg').onclick=closeSectionSheet;
+  document.body.appendChild(w);
+}
+function modernizeSubtabs(){
+  closeSectionSheet();
+  if(!MODERN_NAV || !window.matchMedia('(max-width:640px)').matches) return;
+  document.querySelectorAll('#app .subtabs').forEach(st=>{
+    if(st.dataset.sp) return;
+    const tabs=Array.from(st.querySelectorAll('.tab'));
+    if(tabs.length<3 || /flex-wrap:\s*wrap/.test(st.getAttribute('style')||'')) return;
+    st.dataset.sp='1'; st.classList.add('sp-hidden');
+    const act=tabs.find(t=>t.classList.contains('active'))||tabs[0];
+    const btn=document.createElement('button'); btn.type='button'; btn.className='sec-picker';
+    btn.innerHTML='<span class="sp-l">Section</span><b>'+act.innerHTML+'</b><i>▾</i>';
+    btn.onclick=()=>openSectionSheet(tabs);
+    st.parentNode.insertBefore(btn, st);
+  });
 }
 let DRAWER_OPEN = false; // tiroir de navigation latéral (remplace les onglets horizontaux)
 let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
@@ -3366,6 +3427,7 @@ function render(){
     document.body.appendChild(div);
   }
   applyQuickView();
+  modernizeSubtabs();
   updateChatFab();
   if(PENDING_GO) setTimeout(applyPendingGo, 0);
 }
@@ -3852,8 +3914,13 @@ function bottomNavHTML(items, activeKey){
   if(MODERN_NAV){
     const normal = items.filter(it=>!it.raised);
     const needMore = normal.length > 4;
-    const mainSet = needMore ? normal.slice(0,3) : normal;
-    const rest = needMore ? normal.slice(3) : [];
+    const PRIO = ['session','joueurs','historique'];
+    let mainSet = normal;
+    if(needMore){
+      mainSet = PRIO.map(k=>normal.find(it=>it.key===k)).filter(Boolean);
+      normal.forEach(it=>{ if(mainSet.length<3 && !mainSet.includes(it)) mainSet.push(it); });
+    }
+    const rest = needMore ? normal.filter(it=>!mainSet.includes(it)) : [];
     const dockItems = items.filter(it=>it.raised || mainSet.includes(it));
     const isAdmin = SESSION_USER && SESSION_USER.role==='admin' && !(typeof ADMIN_VIEWING_AS!=='undefined' && ADMIN_VIEWING_AS && ADMIN_VIEWING_AS!=='admin');
     const restActive = rest.some(it=>it.key===activeKey);
@@ -12224,7 +12291,7 @@ function modalHTML(){
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
         <button class="btn btn-primary" onclick="modalFormSaveClick()">Enregistrer</button>
       </div>` : ''}`;
-    return `<div style="${overlay}" onclick="if(event.target===this) closeModal()"><div style="${box}">${inner}</div></div>`;
+    return `<div class="m-ov" style="${overlay}" onclick="if(event.target===this) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}</div></div>`;
   }
   const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:380px;width:100%;border:1px solid rgba(255,255,255,0.15);';
   let inner = `<p style="margin:0 0 14px;white-space:pre-line;">${escapeHTML(MODAL.message)}</p>`;
