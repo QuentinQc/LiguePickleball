@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 164">
+<meta name="app-build" content="Version 165">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -750,6 +750,10 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .sec-item.active{border-color:var(--ball);color:var(--ball);}
 @media (max-width:640px){
   body.modern-nav .subtabs.sp-hidden{display:none;}
+  body.modern-nav .subtabs.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:4px;overflow:visible;background:rgba(255,255,255,.07);border:1px solid var(--line-soft-strong);border-radius:999px;}
+  body.modern-nav .subtabs.seg .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:7px 2px;font-size:11px;letter-spacing:0;border:0;background:transparent;border-radius:999px;text-align:center;min-width:0;}
+  body.modern-nav .subtabs.seg .tab.active{background:var(--ball);color:var(--court);}
+  body.modern-nav .subtabs.seg .tab-count{font-family:var(--font-body);font-size:16px;font-weight:800;line-height:1.1;letter-spacing:0;}
   body.modern-nav .sec-picker{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 16px;background:rgba(255,255,255,.07);border:1px solid var(--line-soft-strong);border-radius:16px;color:var(--text);font:600 16px var(--font-body);cursor:pointer;text-align:left;}
   body.modern-nav .sec-picker .sp-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--font-display);}
   body.modern-nav .sec-picker b{flex:1;font-weight:700;}
@@ -1067,6 +1071,7 @@ function modernizeSubtabs(){
     if(st.dataset.sp) return;
     const tabs=Array.from(st.querySelectorAll('.tab'));
     if(tabs.length<3 || /flex-wrap:\s*wrap/.test(st.getAttribute('style')||'')) return;
+    if(tabs.length<=4){ st.dataset.sp='1'; st.classList.add('seg'); return; }
     st.dataset.sp='1'; st.classList.add('sp-hidden');
     const act=tabs.find(t=>t.classList.contains('active'))||tabs[0];
     const btn=document.createElement('button'); btn.type='button'; btn.className='sec-picker';
@@ -4469,7 +4474,9 @@ function adminPlayersSectionHTML(){
   const isMlp = DATA.leagueFormat === 'mlp';
   const sub = (isMlp && VIEW.playersSubTab==='reguliers') ? 'tous' : (VIEW.playersSubTab || 'tous');
   const subTabs = isMlp ? [['tous','Joueurs'],['remplacants','Remplaçants'],['prospects','Prospects']] : [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
-  let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  const nPlayers = (DATA.players||[]).length, nSubs = (DATA.substitutePool||[]).length, nProspects = (DATA.prospects||[]).length;
+  const counts = { tous: isMlp ? nPlayers : nPlayers + nSubs, reguliers: nPlayers, remplacants: nSubs, prospects: nProspects };
+  let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}<span class="tab-count"> ${counts[k]}</span></div>`).join('')}</div>`;
   html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
   return html;
 }
