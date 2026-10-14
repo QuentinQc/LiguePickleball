@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 161">
+<meta name="app-build" content="Version 162">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -716,6 +716,33 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .pill-input{width:48px;}
 }
 
+
+/* ---------- Nouveau menu (essai) : dock flottant + feuille « Plus » ---------- */
+.avatar-btn{width:38px;height:38px;border-radius:50%;background:var(--ball);color:var(--court);border:0;font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;font-family:var(--font-body);}
+body.modern-nav .topbar-ico svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+body.modern-nav .topbar-ico{background:rgba(255,255,255,0.07);color:var(--text);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
+body.modern-nav .topbar-ico.active{color:var(--court);}
+.more-bg{position:fixed;inset:0;z-index:880;background:rgba(0,0,0,.5);}
+.more-sheet{position:fixed;left:0;right:0;bottom:0;z-index:890;background:#0F322D;border-radius:28px 28px 0 0;border-top:1px solid var(--line-soft-strong);padding:10px 18px calc(104px + env(safe-area-inset-bottom));animation:moreUp .28s ease-out;}
+@keyframes moreUp{from{transform:translateY(100%);}to{transform:none;}}
+.more-grab{width:40px;height:4px;border-radius:4px;background:var(--line-soft-strong);margin:0 auto 14px;}
+.more-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.more-tile{background:rgba(255,255,255,.06);border:1px solid var(--line-soft-strong);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text);text-align:left;font:600 15px var(--font-body);}
+.more-tile svg,.dk svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.more-tile svg{stroke:var(--ball);}
+.more-tile .mt-emoji{font-size:24px;line-height:1;}
+.more-tile.active{border-color:var(--ball);}
+@media (max-width:640px){
+  body.modern-nav .bottom-nav-spacer{height:96px;}
+  body.modern-nav .bottom-nav{z-index:900;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));padding:7px;border-radius:999px;background:rgba(18,58,52,.74);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 40px rgba(0,0,0,.45);justify-content:space-between;gap:2px;overflow:visible;}
+  body.modern-nav .topbar{background:transparent;border:0;box-shadow:none;padding-left:2px;padding-right:2px;}
+}
+.dk{border:0;background:none;color:var(--muted);height:48px;min-width:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 13px;font:700 14px var(--font-body);cursor:pointer;transition:background .25s,color .25s;}
+.dk span{max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:max-width .25s,opacity .25s;}
+.dk.active{background:var(--ball);color:var(--court);}
+.dk.active span{max-width:96px;opacity:1;}
+.dk.raised{background:var(--paddle);color:#fff;}
+.dk .mt-emoji{font-size:21px;line-height:1;}
 .compose-launch{padding:12px 14px;color:var(--muted);font-size:15px;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .cal-title{font-weight:700;text-transform:capitalize;font-size:16px;}
@@ -956,6 +983,37 @@ let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
 let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation de la ligue affichée (partagées entre ses ligues)
 let WALL_REALTIME_CHANNEL = null;   // canal Supabase Realtime abonné à org_messages pour l'organisation courante
 let PARTNER_REALTIME_CHANNEL = null; // canal Supabase Realtime abonné à partner_posts pour la ligue courante
+
+// ===== Nouveau menu (essai) : activé depuis le tiroir, mémorisé sur l'appareil =====
+let MODERN_NAV = false;
+try{ MODERN_NAV = localStorage.getItem('dinkeo_modern_nav')==='1'; }catch(e){}
+let MORE_SHEET_OPEN = false;
+function applyModernNavClass(){ document.body.classList.toggle('modern-nav', MODERN_NAV); }
+function toggleModernNav(){
+  MODERN_NAV = !MODERN_NAV;
+  try{ localStorage.setItem('dinkeo_modern_nav', MODERN_NAV?'1':'0'); }catch(e){}
+  MORE_SHEET_OPEN = false; DRAWER_OPEN = false;
+  applyModernNavClass(); render();
+}
+function toggleMoreSheet(force){ MORE_SHEET_OPEN = typeof force==='boolean' ? force : !MORE_SHEET_OPEN; render(); }
+const NAV_SVG = {
+  joueurs:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
+  session:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  sessions:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  gamification:'<path d="M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 20h8"/>',
+  historique:'<path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4M12 8v4l3 2"/>',
+  rapports:'<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  classement:'<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  reglages:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+  equipes:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
+  org:'<path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/>',
+  more:'<circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  bell:'<path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/>'
+};
+function navIconHTML(key, emoji){
+  return NAV_SVG[key] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[key]}</svg>` : `<span class="mt-emoji">${emoji||'•'}</span>`;
+}
 let DRAWER_OPEN = false; // tiroir de navigation latéral (remplace les onglets horizontaux)
 let PASSWORD_RECOVERY_MODE = false; // vrai après avoir cliqué un lien "mot de passe oublié"
 
@@ -3288,6 +3346,7 @@ function storageBannerHTML(){
 }
 
 function render(){
+  applyModernNavClass();
   ensurePushStatusChecked();
   if(PASSWORD_RECOVERY_MODE){ renderSetNewPassword(); }
   else if(!SESSION_USER){ renderLogin(); }
@@ -3357,7 +3416,7 @@ function topbarHTML(subtitle, contextHTML, extraControls, viewSlide, brand, tagl
   <div class="topbar">
     <div class="topbar-main topbar-main-3col">
       <div class="row" style="gap:8px;align-items:center;justify-self:start;">
-        ${showDrawer ? `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>` : ''}
+        ${showDrawer ? (MODERN_NAV ? `<button class="avatar-btn" onclick="toggleDrawer()" aria-label="Menu">${escapeHTML(((CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || (SESSION_USER && SESSION_USER.email) || '?').trim().charAt(0).toUpperCase() || '?')}</button>` : `<button class="hamburger-btn" onclick="toggleDrawer()" aria-label="Menu">☰</button>`) : ''}
       </div>
       <div class="topbar-quick-mobile">${(switchContext==='admin'||switchContext==='member') && DATA ? quickIconsHTML() : ''}</div>
       <div class="topbar-center-info" style="justify-self:center;">${centerChips}</div>
@@ -3734,8 +3793,8 @@ function quickIconsHTML(){
   const cnt = {partenaire:u.partner, evenements:u.events};
   const item = (k,ico,label)=>`<button type="button" class="topbar-menu-item ${QUICK_VIEW===k?'active':''}" onclick="openQuickView('${k}')"><span style="font-size:20px;">${ico}</span>${label}${cnt[k]?`<span class="chat-menu-badge" style="margin-left:auto;">${cnt[k]}</span>`:''}</button>`;
   return `<div class="topbar-icos">
-    <button class="topbar-ico" onclick="openQuickView('calendrier')" aria-label="Calendrier" title="Calendrier">📅</button>
-    <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">📣${(u.partner+u.events)>0 ? '<span class="topbar-dot"></span>' : ''}</button>
+    <button class="topbar-ico" onclick="openQuickView('calendrier')" aria-label="Calendrier" title="Calendrier">${MODERN_NAV ? navIconHTML('cal') : '📅'}</button>
+    <button class="topbar-ico ${(QUICK_VIEW||QUICK_MENU_OPEN)?'active':''}" onclick="toggleQuickMenu()" aria-label="Annonces" title="Annonces">${MODERN_NAV ? navIconHTML('bell') : '📣'}${(u.partner+u.events)>0 ? '<span class="topbar-dot"></span>' : ''}</button>
     ${QUICK_MENU_OPEN ? `<div class="topbar-menu-backdrop" onclick="toggleQuickMenu(false)"></div><div class="topbar-menu">${item('partenaire','🤝','Partenaire')}${item('evenements','🎉','Événements')}</div>` : ''}
   </div>`;
 }
@@ -3790,6 +3849,23 @@ function openLeagueSwitcherPopover(switchContext){
 // cercle surélevé (action principale mise en avant, comme le QR code dans
 // l'app de référence).
 function bottomNavHTML(items, activeKey){
+  if(MODERN_NAV){
+    const normal = items.filter(it=>!it.raised);
+    const needMore = normal.length > 4;
+    const mainSet = needMore ? normal.slice(0,3) : normal;
+    const rest = needMore ? normal.slice(3) : [];
+    const dockItems = items.filter(it=>it.raised || mainSet.includes(it));
+    const isAdmin = SESSION_USER && SESSION_USER.role==='admin' && !(typeof ADMIN_VIEWING_AS!=='undefined' && ADMIN_VIEWING_AS && ADMIN_VIEWING_AS!=='admin');
+    const restActive = rest.some(it=>it.key===activeKey);
+    const dock = dockItems.map(it=> it.raised
+      ? `<button class="dk raised" onclick="${it.onclick}" aria-label="${escapeHTML(it.label)}"><span class="mt-emoji">${it.icon}</span></button>`
+      : `<button class="dk ${it.key===activeKey?'active':''}" onclick="${it.onclick}" aria-label="${escapeHTML(it.label)}">${navIconHTML(it.key,it.icon)}<span>${escapeHTML(it.label)}</span></button>`).join('');
+    const moreBtn = (needMore || isAdmin) ? `<button class="dk ${(MORE_SHEET_OPEN||restActive)?'active':''}" onclick="toggleMoreSheet()" aria-label="Plus">${navIconHTML('more')}<span>Plus</span></button>` : '';
+    const tiles = rest.map(it=>`<button class="more-tile ${it.key===activeKey?'active':''}" onclick="MORE_SHEET_OPEN=false;${it.onclick}">${navIconHTML(it.key,it.icon)}<span>${escapeHTML(it.label)}</span></button>`).join('')
+      + (isAdmin ? `<button class="more-tile" onclick="MORE_SHEET_OPEN=false;openOrganizationPage()">${navIconHTML('org')}<span>Organisation</span></button>` : '');
+    const sheet = (MORE_SHEET_OPEN && tiles) ? `<div class="more-bg" onclick="toggleMoreSheet(false)"></div><div class="more-sheet"><div class="more-grab"></div><div class="more-grid">${tiles}</div></div>` : '';
+    return `${sheet}<div class="bottom-nav">${dock}${moreBtn}</div>`;
+  }
   return `<div class="bottom-nav">
     ${items.map(it=>it.raised ? `
       <button class="bottom-nav-item raised" onclick="${it.onclick}">
@@ -3825,7 +3901,7 @@ function drawerHTML(contextHTML, subtitle){
           ${headerInfo ? `<div class="small" style="color:var(--muted);">${escapeHTML(headerInfo)}</div>` : ''}
         </div>
       </div>
-      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}</div>
+      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}<div class="drawer-extra-block"><button class="btn-ghost" style="width:100%;text-align:left;" onclick="toggleModernNav()">✨ Nouveau menu (essai) : ${MODERN_NAV?'activé — revenir à l\'ancien':'essayer'}</button></div></div>
       ${SESSION_USER ? `
       <div class="drawer-footer">
         <div class="drawer-avatar">${escapeHTML(initial)}</div>
