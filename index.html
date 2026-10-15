@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 168">
+<meta name="app-build" content="Version 170">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1028,17 +1028,10 @@ let ORG_VIDEO_DATA = { folders: [], videos: [] }; // vidéos de l'organisation d
 let WALL_REALTIME_CHANNEL = null;   // canal Supabase Realtime abonné à org_messages pour l'organisation courante
 let PARTNER_REALTIME_CHANNEL = null; // canal Supabase Realtime abonné à partner_posts pour la ligue courante
 
-// ===== Nouveau menu (essai) : activé depuis le tiroir, mémorisé sur l'appareil =====
-let MODERN_NAV = true; // activé par défaut ; un choix explicite (tiroir) est mémorisé
-try{ if(localStorage.getItem('dinkeo_modern_nav')==='0') MODERN_NAV = false; }catch(e){}
+// ===== Menu moderne (toujours actif) =====
+const MODERN_NAV = true;
 let MORE_SHEET_OPEN = false;
 function applyModernNavClass(){ document.body.classList.toggle('modern-nav', MODERN_NAV); }
-function toggleModernNav(){
-  MODERN_NAV = !MODERN_NAV;
-  try{ localStorage.setItem('dinkeo_modern_nav', MODERN_NAV?'1':'0'); }catch(e){}
-  MORE_SHEET_OPEN = false; DRAWER_OPEN = false;
-  applyModernNavClass(); render();
-}
 function toggleMoreSheet(force){ MORE_SHEET_OPEN = typeof force==='boolean' ? force : !MORE_SHEET_OPEN; render(); }
 const NAV_SVG = {
   joueurs:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
@@ -4045,7 +4038,7 @@ function drawerHTML(contextHTML, subtitle){
           ${headerInfo ? `<div class="small" style="color:var(--muted);">${escapeHTML(headerInfo)}</div>` : ''}
         </div>
       </div>
-      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}<div class="drawer-extra-block"><button class="btn-ghost" style="width:100%;text-align:left;" onclick="toggleModernNav()">✨ Nouveau menu : ${MODERN_NAV?'activé — revenir à l\'ancien':'réactiver'}</button></div></div>
+      <div class="drawer-extra" onclick="closeDrawer()">${contextHTML}</div>
       ${SESSION_USER ? `
       <div class="drawer-footer">
         <div class="drawer-avatar">${escapeHTML(initial)}</div>
