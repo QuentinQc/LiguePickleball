@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 176">
+<meta name="app-build" content="Version 177">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4588,7 +4588,7 @@ function adminPlayersSectionHTML(){
   if(sub !== 'prospects'){
     html += `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter ou retirer des joueurs</div><div class="small">Tout se gère dans Organisation › Membres.</div></div>
-      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
+      <button class="btn btn-secondary" onclick="openOrganizationPage('membres')">👥 Membres de l'organisation</button>
     </div>`;
   }
   html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
@@ -9894,14 +9894,15 @@ function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
 // propre pop-up sans faire disparaître le contexte. Accessible depuis le
 // tiroir plutôt que noyée dans les réglages de la ligue actuelle, puisque
 // ça couvre TOUTES les ligues de l'organisation plutôt qu'une seule.
-function openOrganizationPage(){
+function openOrganizationPage(tab){
   DRAWER_OPEN = false;
   Promise.all([
     loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers(),
     loadOrgTournamentData(CURRENT_ORGANIZATION_ID), loadOrgVideoData(currentLeagueOrgId())
   ]).then(()=>{
     ADMIN_SHOWING_ORG = true;
-    VIEW.orgHub = true; // accueil en tuiles (mobile, nouveau menu)
+    if(tab){ VIEW.orgSubTab = tab; VIEW.orgHub = false; } // accès direct à une section
+    else VIEW.orgHub = true; // accueil en tuiles (mobile, nouveau menu)
     render();
   });
 }
