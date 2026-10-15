@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 172">
+<meta name="app-build" content="Version 174">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -867,6 +867,9 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .pl-main{flex:1;min-width:0;display:flex;flex-direction:column;}
 .pl-name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pl-sub{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+.pl-rating{flex:none;font-variant-numeric:tabular-nums;font-weight:800;font-size:13px;color:var(--ball);}
+.pl-sorts{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.pl-row .tag{margin-left:4px;}
 .pl-x,.pl-add{width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;flex:none;font-size:15px;}
 .pl-x{background:rgba(233,85,107,.15);color:var(--danger);}
 .pl-add{background:var(--ball);color:#0C2622;font-weight:700;}
@@ -4554,111 +4557,102 @@ function adminPlayersSectionHTML(){
   const nPlayers = (DATA.players||[]).length, nSubs = (DATA.substitutePool||[]).length, nProspects = (DATA.prospects||[]).length;
   const counts = { tous: isMlp ? nPlayers : nPlayers + nSubs, reguliers: nPlayers, remplacants: nSubs, prospects: nProspects };
   let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}<span class="tab-count"> ${counts[k]}</span></div>`).join('')}</div>`;
+  if(sub !== 'prospects'){
+    html += `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter ou retirer des joueurs</div><div class="small">Tout se gère dans Organisation › Membres.</div></div>
+      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
+    </div>`;
+  }
   html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
   return html;
 }
 
-// Liste des joueurs propre au format MLP : équipe (pastille de couleur), genre,
-// compte — sans les notions d'échelle (groupe, cote, « en attente »).
-let MLP_PL_FILTER = 'all';
-function mlpPlayersHTML(){
-  const teams = DATA.mlpTeams||[];
-  const linkedIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.player_id).map(l=>l.player_id));
-  const list = DATA.players.slice().sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr'));
-  const withTeam = list.filter(p=>mlpTeamOf(p.id)).length;
-  const f = MLP_PL_FILTER;
-  return `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Joueurs <span class="small">(${list.length})</span></h2>
-      <button class="btn btn-primary" onclick="openAddToLeagueModal()">➕ Ajouter</button>
+// ---------- Liste de personnes : un seul modèle moderne pour tous les sous-onglets Joueurs ----------
+let PL_STATE = {};
+function plListHTML(o){
+  const st = PL_STATE[o.id] || (PL_STATE[o.id] = { f:'all' });
+  if(!(o.chips||[]).some(c=>c[0]===st.f)) st.f = 'all';
+  const rows = o.rows || [];
+  const cnt = k => k==='all' ? rows.length : rows.filter(r=>(r.f||[]).includes(k)).length;
+  const chips = (o.chips||[]);
+  return `<div class="card" id="pl_${o.id}">
+    <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h2 style="margin:0;">${o.title} <span class="small">(${rows.length})</span></h2>
+      ${o.actions||''}
     </div>
-    <p class="small">Touche un joueur pour gérer sa fiche : équipe, genre, compte.</p>
-    ${list.length ? `
-    <input class="orgpick-search" placeholder="🔍 Rechercher un joueur…" oninput="filterMlpPlayers()" id="mlpPlSearch" style="margin-bottom:8px;width:100%;">
-    <div class="orgpick-chips" style="margin-bottom:10px;">
-      <button type="button" class="orgpick-chip ${f==='all'?'active':''}" data-pf="all" onclick="setMlpPlFilter('all')">Tous <b>${list.length}</b></button>
-      <button type="button" class="orgpick-chip ${f==='team'?'active':''}" data-pf="team" onclick="setMlpPlFilter('team')">Avec équipe <b>${withTeam}</b></button>
-      <button type="button" class="orgpick-chip ${f==='none'?'active':''}" data-pf="none" onclick="setMlpPlFilter('none')">Sans équipe <b>${list.length-withTeam}</b></button>
-    </div>
-    <div class="pl-list" id="mlpPlList">${list.map(p=>{
-      const tm = mlpTeamOf(p.id);
-      const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===p.id);
-      const pr = link ? (ALL_PROFILES||[]).find(x=>x.id===link.profile_id) : null;
-      const isAdm = pr && pr.role==='admin';
-      return `<div class="pl-row" style="--tc:${mlpTeamColor(tm)};" data-name="${escapeHTML(normSearch(p.name))}" data-t="${tm?'team':'none'}" onclick="openPlayerDetailModal('${p.id}')">
-        ${avatarHTML('pl-av', partnerInitials(p.name), pr && pr.avatar_url, tm?`background:${mlpTeamColor(tm)};`:'')}
-        <span class="pl-main"><span class="pl-name">${escapeHTML(p.name)}${isAdm?' <span class="tag tag-up">👑</span>':''}${p.injured?' <span class="tag tag-down">🤕</span>':''}</span>
-          <span class="pl-sub">${mlpGenderDot(p.gender)} ${p.gender==='F'?'Femme':p.gender==='M'?'Homme':'Genre ?'}${linkedIds.has(p.id)?' · ✅ Compte':''}</span></span>
-        ${mlpTeamPillHTML(tm)}
-      </div>`;}).join('')}
+    ${o.hint ? `<p class="small" style="margin:6px 0 10px;">${o.hint}</p>` : ''}
+    ${rows.length ? `
+    <input class="orgpick-search" placeholder="🔍 Rechercher un nom…" oninput="plApply('${o.id}')" style="margin-bottom:8px;width:100%;">
+    ${chips.length>1 ? `<div class="orgpick-chips" style="margin-bottom:8px;">${chips.map(([k,l])=>`<button type="button" class="orgpick-chip ${st.f===k?'active':''}" data-f="${k}" onclick="plSetFilter('${o.id}','${k}')">${l} <b>${cnt(k)}</b></button>`).join('')}</div>` : ''}
+    ${(o.sorts||[]).length ? `<div class="pl-sorts"><span class="small">Trier</span>${o.sorts.map(x=>`<button type="button" class="orgpick-chip ${x.active?'active':''}" onclick="${x.onclick}">${x.label}${x.arrow||''}</button>`).join('')}</div>` : ''}
+    <div class="pl-list">${rows.map(r=>`<div class="pl-row" style="${r.style||''}${(st.f!=='all' && !(r.f||[]).includes(st.f))?'display:none;':''}" data-name="${escapeHTML(normSearch(r.name))}" data-f="${(r.f||[]).join(' ')}" onclick="${r.click}">
+      ${avatarHTML('pl-av', partnerInitials(r.name), r.avatarUrl, r.avStyle||'')}
+      <span class="pl-main"><span class="pl-name">${escapeHTML(r.name)}${r.tags||''}</span><span class="pl-sub">${r.sub||''}</span></span>
+      ${typeof r.rating==='number' ? `<span class="pl-rating">${r.rating.toFixed(2)}</span>` : ''}${r.right||''}
+    </div>`).join('')}
       <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
-    </div>` : `<p class="empty">Aucun joueur pour l'instant.<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddToLeagueModal()">➕ Ajouter des joueurs</button></p>`}
+    </div>` : `<p class="empty">${o.empty||'Personne pour l\'instant.'}</p>`}
   </div>`;
 }
-function setMlpPlFilter(f){
-  MLP_PL_FILTER = f;
-  document.querySelectorAll('[data-pf]').forEach(b=>b.classList.toggle('active', b.dataset.pf===f));
-  filterMlpPlayers();
-}
-function filterMlpPlayers(){
-  const q = normSearch((document.getElementById('mlpPlSearch')||{}).value||'');
+function plApply(id){
+  const st = PL_STATE[id]; const root = document.getElementById('pl_'+id);
+  if(!st || !root) return;
+  const q = normSearch((root.querySelector('.orgpick-search')||{}).value||'');
   let vis = 0;
-  document.querySelectorAll('#mlpPlList .pl-row').forEach(r=>{
-    const ok = (!q || (r.dataset.name||'').includes(q)) && (MLP_PL_FILTER==='all' || r.dataset.t===MLP_PL_FILTER);
+  root.querySelectorAll('.pl-row').forEach(r=>{
+    const okF = st.f==='all' || (' '+(r.dataset.f||'')+' ').includes(' '+st.f+' ');
+    const ok = okF && (!q || (r.dataset.name||'').includes(q));
     r.style.display = ok ? '' : 'none'; if(ok) vis++;
   });
-  const nr = document.querySelector('#mlpPlList .orgpick-noresult'); if(nr) nr.style.display = vis ? 'none' : '';
+  const nr = root.querySelector('.orgpick-noresult'); if(nr) nr.style.display = vis ? 'none' : '';
 }
-// Vue combinée en lecture seule : réguliers et remplaçants ensemble, avec
-// leur type, pour un coup d'œil rapide sur tout le monde.
+function plSetFilter(id, f){
+  const st = PL_STATE[id] || (PL_STATE[id] = { f:'all' }); st.f = f;
+  const root = document.getElementById('pl_'+id);
+  if(root) root.querySelectorAll('.orgpick-chip[data-f]').forEach(b=>b.classList.toggle('active', b.dataset.f===f));
+  plApply(id);
+}
+// Liste des joueurs propre au format MLP : équipe (pastille de couleur), genre,
+// compte — sans les notions d'échelle (groupe, cote, « en attente »).
+function mlpPlayersHTML(){
+  const linkedIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.player_id).map(l=>l.player_id));
+  const list = DATA.players.slice().sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr'));
+  const rows = list.map(p=>{
+    const tm = mlpTeamOf(p.id);
+    const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.player_id===p.id);
+    const pr = link ? (ALL_PROFILES||[]).find(x=>x.id===link.profile_id) : null;
+    return { name:p.name, f:[tm?'team':'none'], click:`openPlayerDetailModal('${p.id}')`,
+      style:`--tc:${mlpTeamColor(tm)};`, avatarUrl: pr && pr.avatar_url, avStyle: tm?`background:${mlpTeamColor(tm)};`:'',
+      tags:`${pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : ''}${p.injured?' <span class="tag tag-down">🤕</span>':''}`,
+      sub:`${mlpGenderDot(p.gender)} ${p.gender==='F'?'Femme':p.gender==='M'?'Homme':'Genre ?'}${linkedIds.has(p.id)?' · ✅ Compte':''}`,
+      right: mlpTeamPillHTML(tm) };
+  });
+  return plListHTML({ id:'mlp', title:'Joueurs', hint:'Touche un joueur pour gérer sa fiche : équipe, genre, compte.', rows,
+    chips:[['all','Tous'],['team','Avec équipe'],['none','Sans équipe']], empty:'Aucun joueur pour l\'instant.' });
+}
+// Vue combinée : réguliers et remplaçants ensemble, avec leur type.
 function adminAllPeopleHTML(){
-  const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.player_id).map(l=>l.player_id));
-  const linkedSubIds = new Set(LEAGUE_PLAYER_LINKS.filter(l=>l.substitute_id).map(l=>l.substitute_id));
   const openSessionForBadge = currentOpenSession();
-  const isAdminAccount = (link)=>{
-    if(!link) return false;
-    const pr = ALL_PROFILES.find(x=>x.id===link.profile_id);
-    return pr && pr.role === 'admin';
-  };
-  const regulars = DATA.players.map(p=>{
-    const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
-    return {
-      id: p.id, name: p.name, type: 'regulier', injured: !!p.injured,
-      absent: !!(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)),
-      group: groupById(p.groupId), rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-      linked: linkedPlayerIds.has(p.id), isAdmin: isAdminAccount(link), openModal: `openPlayerDetailModal('${p.id}')`
-    };
+  const profOf = (link)=> link ? ALL_PROFILES.find(x=>x.id===link.profile_id) : null;
+  const rows = [];
+  DATA.players.forEach(p=>{
+    const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id), pr = profOf(link), g = groupById(p.groupId);
+    const waiting = !g && !p.injured;
+    rows.push({ name:p.name, f:['reg'].concat(waiting?['wait']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
+      rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
+      tags:`${pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : ''}${p.injured?' <span class="tag tag-down">🤕</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">🚫</span>':''}${waiting?' <span class="tag tag-stay">⏳</span>':''}`,
+      sub:`Régulier · ${escapeHTML(g ? g.name : 'En attente')}${link?' · ✅ Compte':''}` });
   });
-  const subs = (DATA.substitutePool||[]).map(s=>{
-    const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===s.id);
-    return {
-      id: s.id, name: s.name, type: 'remplacant', injured: false, absent: false,
-      group: null, rating: typeof s.rating==='number' ? s.rating : RATING_DEFAULT,
-      linked: linkedSubIds.has(s.id), isAdmin: isAdminAccount(link), openModal: `openSubstituteDetailModal('${s.id}')`
-    };
+  (DATA.substitutePool||[]).forEach(sb_=>{
+    const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===sb_.id), pr = profOf(link);
+    rows.push({ name:sb_.name, f:['sub'], click:`openSubstituteDetailModal('${sb_.id}')`, avatarUrl: pr && pr.avatar_url,
+      rating: typeof sb_.rating==='number' ? sb_.rating : RATING_DEFAULT,
+      tags: pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : '',
+      sub:`🔄 Remplaçant${link?' · ✅ Compte':''}` });
   });
-  const all = regulars.concat(subs).sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  return `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Tous <span class="small">(${all.length})</span></h2>
-      <div class="row" style="gap:8px;justify-content:flex-end;">
-        <button class="btn btn-primary" onclick="openAddToLeagueModal()">➕ Ajouter</button>
-      </div>
-    </div>
-    <p class="small">Réguliers et remplaçants ensemble — clique sur une ligne pour ouvrir la gestion de cette personne.</p>
-    <table>
-      <tr><th>Nom</th><th>Type</th><th>Statut</th><th>Groupe</th><th>Cote</th><th>Compte</th></tr>
-      ${all.map(x=>`<tr class="clickable-row" onclick="${x.openModal}">
-        <td>${escapeHTML(x.name)}${x.isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
-        <td>${x.type==='regulier' ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-yellow">Remplaçant</span>'}</td>
-        <td>${x.injured ? '<span class="tag tag-down">🤕 Blessé</span> ' : ''}${x.absent ? '<span class="tag tag-orange">🚫 Absent</span> ' : ''}${(!x.group && x.type==='regulier' && !x.injured) ? '<span class="tag tag-stay">⏳ En attente</span>' : ''}</td>
-        <td>${x.group ? escapeHTML(x.group.name) : '—'}</td>
-        <td>${x.rating!==null ? x.rating.toFixed(2) : '—'}</td>
-        <td>${x.linked ? '✅' : '—'}</td>
-      </tr>`).join('')}
-      ${all.length===0 ? `<tr><td colspan="6" class="empty">Personne pour l'instant<br><button class="btn btn-primary" style="margin-top:10px;" onclick="openAddToLeagueModal()">➕ Ajouter des joueurs</button></td></tr>` : ''}
-    </table>
-  </div>`;
+  rows.sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr'));
+  return plListHTML({ id:'all', title:'Tous', hint:'Réguliers et remplaçants ensemble — touche une personne pour la gérer.', rows,
+    chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants'],['wait','⏳ En attente']] });
 }
 // Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
 // ligue (échelle ou MLP), permet d'ajouter un régulier, un remplaçant ou un
@@ -4979,36 +4973,18 @@ function adminSubstitutePoolHTML(){
   });
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const linkedSubIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.substitute_id).map(l=>l.substitute_id));
-  return `
-    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter un remplaçant</div><div class="small">Les ajouts et retraits se font maintenant dans Organisation › Membres, pour tout gérer au même endroit.</div></div>
-      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
-        ${pool.some(s=>s.email) ? `<button class="btn btn-secondary" onclick="emailAvailabilityRequest()">📧 Demander qui est disponible</button>` : ''}
-      </div>
-      <p class="small">Clique sur un remplaçant pour le modifier, gérer son compte, ou le retirer.</p>
-      <table>
-        <tr>
-          <th class="sortable" onclick="setSubsSort('name')">Nom${arrow('name')}</th>
-          <th class="sortable" onclick="setSubsSort('rating')">Cote${arrow('rating')}</th>
-          <th class="sortable" onclick="setSubsSort('email')">Courriel${arrow('email')}</th>
-          <th class="sortable" onclick="setSubsSort('notes')">Notes${arrow('notes')}</th>
-          <th>Compte</th>
-        </tr>
-        ${pool.map(s=>`<tr class="clickable-row" onclick="openSubstituteDetailModal('${s.id}')">
-          <td>${escapeHTML(s.name)}</td>
-          <td>${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</td>
-          <td>${escapeHTML(s.email||'—')}</td>
-          <td>${escapeHTML(s.notes||'—')}</td>
-          <td>${linkedSubIds.has(s.id) ? '✅' : '—'}</td>
-        </tr>`).join('')}
-        ${pool.length===0 ? `<tr><td colspan="5" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
-      </table>
-      <p class="small">Ces personnes apparaissent automatiquement comme choix rapides dans le menu de remplaçant, lors d'une absence en session.</p>
-    </div>`;
+  const rows = pool.map(x=>{
+    const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===x.id);
+    const pr = link ? ALL_PROFILES.find(y=>y.id===link.profile_id) : null;
+    return { name:x.name, f:[linkedSubIds.has(x.id)?'acc':'noacc'], click:`openSubstituteDetailModal('${x.id}')`, avatarUrl: pr && pr.avatar_url,
+      rating: typeof x.rating==='number' ? x.rating : RATING_DEFAULT,
+      sub:[linkedSubIds.has(x.id)?'✅ Compte':null, x.email?escapeHTML(x.email):null, x.notes?escapeHTML(x.notes):null].filter(Boolean).join(' · ') || '—' };
+  });
+  return plListHTML({ id:'sub', title:'Remplaçants', hint:'Touche un remplaçant pour le modifier, gérer son compte ou le retirer. Ils apparaissent comme choix rapides lors d\'une absence en session.', rows,
+    chips:[['all','Tous'],['acc','✅ Avec compte'],['noacc','Sans compte']],
+    sorts:[['name','Nom'],['rating','Cote'],['email','Courriel']].map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setSubsSort('${k}')` })),
+    actions: pool.some(x=>x.email) ? `<button class="btn btn-secondary" onclick="emailAvailabilityRequest()">📧 Demander qui est disponible</button>` : '',
+    empty:'Aucun remplaçant enregistré pour l\'instant.' });
 }
 function adminProspectsHTML(){
   const sortBy = VIEW.prospectsSortBy || 'name';
@@ -5020,6 +4996,8 @@ function adminProspectsHTML(){
     return sortDir==='asc' ? cmp : -cmp;
   });
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
+  const rows = pool.map(x=>({ name:x.name, f:[], click:`openProspectDetailModal('${x.id}')`,
+    sub:[x.email?escapeHTML(x.email):null, x.phone?escapeHTML(x.phone):null, x.notes?escapeHTML(x.notes):null].filter(Boolean).join(' · ') || '—' }));
   return `
     <div class="card">
       <h3>Ajouter un prospect</h3>
@@ -5031,26 +5009,9 @@ function adminProspectsHTML(){
         <input id="newProspectNotes" placeholder="Notes (optionnel)" style="flex:1;min-width:160px;">
         <button class="btn btn-secondary" onclick="addProspectToPool()">Ajouter</button>
       </div>
-    </div>
-    <div class="card">
-      <h2>Prospects <span class="small">(${pool.length})</span></h2>
-      <p class="small">Clique sur un prospect pour le modifier, le convertir en joueur régulier, ou le retirer.</p>
-      <table>
-        <tr>
-          <th class="sortable" onclick="setProspectsSort('name')">Nom${arrow('name')}</th>
-          <th class="sortable" onclick="setProspectsSort('email')">Courriel${arrow('email')}</th>
-          <th class="sortable" onclick="setProspectsSort('phone')">Téléphone${arrow('phone')}</th>
-          <th class="sortable" onclick="setProspectsSort('notes')">Notes${arrow('notes')}</th>
-        </tr>
-        ${pool.map(p=>`<tr class="clickable-row" onclick="openProspectDetailModal('${p.id}')">
-          <td>${escapeHTML(p.name)}</td>
-          <td>${escapeHTML(p.email||'—')}</td>
-          <td>${escapeHTML(p.phone||'—')}</td>
-          <td>${escapeHTML(p.notes||'—')}</td>
-        </tr>`).join('')}
-        ${pool.length===0 ? `<tr><td colspan="4" class="empty">Aucun prospect enregistré pour l'instant</td></tr>` : ''}
-      </table>
-    </div>`;
+    </div>` + plListHTML({ id:'pro', title:'Prospects', hint:'Touche un prospect pour le modifier, le convertir en joueur régulier ou le retirer.', rows,
+      sorts:[['name','Nom'],['email','Courriel'],['phone','Téléphone']].map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setProspectsSort('${k}')` })),
+      empty:'Aucun prospect enregistré pour l\'instant.' });
 }
 function setProspectsSort(col){
   if(VIEW.prospectsSortBy === col){ VIEW.prospectsSortDir = VIEW.prospectsSortDir === 'asc' ? 'desc' : 'asc'; }
@@ -7363,41 +7324,22 @@ function adminPlayersHTML(){
   });
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const groups = groupsSorted();
-  const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.player_id));
   const openSessionForBadge = currentOpenSession();
-  return `
-    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter un joueur</div><div class="small">Les ajouts et retraits se font maintenant dans Organisation › Membres, pour tout gérer au même endroit.</div></div>
-      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <h2>Réguliers <span class="small">(${players.length})</span></h2>
-      </div>
-      <p class="small">Clique sur un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte, ou le retirer.</p>
-      <table>
-        <tr>
-          <th class="sortable" onclick="setRegularsSort('name')">Nom${arrow('name')}</th>
-          <th class="sortable" onclick="setRegularsSort('group')">Groupe${arrow('group')}</th>
-          <th class="sortable" onclick="setRegularsSort('rating')">Cote${arrow('rating')}</th>
-          <th>Compte</th>
-        </tr>
-        ${players.map(p=>{
-          const g = groupById(p.groupId);
-          const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
-          const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
-          const linkedProfile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
-          const isAdmin = linkedProfile && linkedProfile.role === 'admin';
-          return `<tr class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">
-            <td>${escapeHTML(p.name)}${p.status==='new' ? ' <span class="small">🆕</span>' : ''}${p.injured ? ' <span class="tag tag-down">🤕 Blessé</span>' : ''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge, p.id)) ? ' <span class="tag tag-orange">🚫 Absent</span>' : ''}${isAdmin ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</td>
-            <td>${escapeHTML(g ? g.name : 'En attente')}</td>
-            <td>${rating.toFixed(2)}</td>
-            <td>${linkedPlayerIds.has(p.id) ? '✅' : '—'}</td>
-          </tr>`;
-        }).join('')}
-        ${players.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
-      </table>
-    </div>`;
+  const rows = players.map(p=>{
+    const g = groupById(p.groupId);
+    const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
+    const pr = link ? ALL_PROFILES.find(x=>x.id===link.profile_id) : null;
+    const waiting = !g && !p.injured;
+    return { name:p.name, f:[g?'g_'+g.id:'wait'].concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
+      rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
+      tags:`${p.status==='new'?' <span class="small">🆕</span>':''}${pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : ''}${p.injured?' <span class="tag tag-down">🤕</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">🚫</span>':''}`,
+      sub:`${escapeHTML(g ? g.name : 'En attente')}${link?' · ✅ Compte':''}` };
+  });
+  const nInj = rows.filter(r=>r.f.includes('inj')).length;
+  const chips = [['all','Tous']].concat(groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), [['wait','⏳ En attente']], nInj ? [['inj','🤕 Blessés']] : []);
+  return plListHTML({ id:'reg', title:'Réguliers', hint:'Touche un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte ou le retirer.', rows, chips,
+    sorts:[['name','Nom'],['group','Groupe'],['rating','Cote']].map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setRegularsSort('${k}')` })),
+    empty:'Aucun joueur pour l\'instant.' });
 }
 // Contenu détaillé (pop-up) pour gérer un joueur : infos, actions, et compte lié.
 function playerDetailModalHTML(pid){
