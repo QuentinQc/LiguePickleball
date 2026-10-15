@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 174">
+<meta name="app-build" content="Version 175">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2852,6 +2852,20 @@ function firstGroupWithRoom(groupsList, playersList){
     if(count < GROUP_MAX_PLAYERS()) return g.id;
   }
   return sorted.length ? sorted[0].id : null;
+}
+// Place pour un NOUVEAU joueur dans les données d'une ligue donnée : premier groupe
+// qui n'est pas plein, sinon aucun groupe (le joueur reste « en attente d'assignation »).
+function newPlayerPlacement(leagueData){
+  const max = leagueData.groupMaxPlayers || 5;
+  const groups = (leagueData.groups||[]).slice().sort((a,b)=>a.order-b.order);
+  const players = leagueData.players || [];
+  for(const g of groups){
+    const members = players.filter(x=>x.groupId===g.id);
+    if(members.length < max){
+      return { groupId: g.id, order: members.reduce((m,x)=>Math.max(m, typeof x.order==='number'?x.order:0), 0) + 1, waiting:false };
+    }
+  }
+  return { groupId: null, order: 0, waiting:true };
 }
 // Prochaine valeur d'ordre pour placer un joueur en fin de son groupe.
 function nextOrderInGroup(groupId){
@@ -7658,12 +7672,10 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
   leagueData.players = leagueData.players || [];
   leagueData.groups = leagueData.groups || [];
-  const groupId = firstGroupWithRoom(leagueData.groups, leagueData.players);
-  if(!groupId){ showAlert("Cette ligue n'a pas encore de groupe (ou tous sont pleins à 5 joueurs) — crée-en un d'abord (en y basculant)."); return null; }
+  const place = newPlayerPlacement(leagueData);
   const finalName = uniquePlayerName(name, leagueData.players);
-  const groupMembers = leagueData.players.filter(x=>x.groupId===groupId);
-  const nextOrder = groupMembers.reduce((m,x)=>Math.max(m, typeof x.order==='number'?x.order:0), 0) + 1;
-  const newPlayer = { id: uid('p'), name: finalName, groupId, order: nextOrder };
+  const newPlayer = { id: uid('p'), name: finalName, groupId: place.groupId, order: place.order };
+  if(place.waiting) newPlayer.status = 'new'; // aucun groupe avec de la place : en attente d'assignation
   leagueData.players.push(newPlayer);
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
@@ -7796,12 +7808,10 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
   } else {
     leagueData.players = leagueData.players || [];
     leagueData.groups = leagueData.groups || [];
-    const groupId = firstGroupWithRoom(leagueData.groups, leagueData.players);
-    if(!groupId){ showAlert("Cette ligue n'a pas encore de groupe (ou tous sont pleins) — crée-en un d'abord (en y basculant)."); return null; }
+    const place = newPlayerPlacement(leagueData);
     const finalName = uniquePlayerName(name, leagueData.players);
-    const groupMembers = leagueData.players.filter(x=>x.groupId===groupId);
-    const nextOrder = groupMembers.reduce((m,x)=>Math.max(m, typeof x.order==='number'?x.order:0), 0) + 1;
-    const newPlayer = { id: uid('p'), name: finalName, groupId, order: nextOrder };
+    const newPlayer = { id: uid('p'), name: finalName, groupId: place.groupId, order: place.order };
+    if(place.waiting) newPlayer.status = 'new'; // aucun groupe avec de la place : en attente d'assignation
     if(email) newPlayer.email = email;
     if(orgMemberId) newPlayer.orgMemberId = orgMemberId;
     leagueData.players.push(newPlayer);
