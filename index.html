@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 170">
+<meta name="app-build" content="Version 172">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2910,6 +2910,9 @@ function uniquePlayerName(desiredName, playersList, excludePlayerId){
   return finalName;
 }
 
+function normPersonName(n){
+  return String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
 // ---------- session lifecycle ----------
 // Retourne la date (YYYY-MM-DD) du prochain jour correspondant au jour de jeu
 // configuré pour la ligue (aujourd'hui inclus si on est justement ce jour-là).
@@ -4977,15 +4980,9 @@ function adminSubstitutePoolHTML(){
   const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const linkedSubIds = new Set((LEAGUE_PLAYER_LINKS||[]).filter(l=>l.substitute_id).map(l=>l.substitute_id));
   return `
-    <div class="card">
-      <h3>Ajouter un remplaçant</h3>
-      <p class="small">Une liste de personnes disponibles pour dépanner à l'occasion — elles ne font partie d'aucun groupe régulier.</p>
-      <div class="row">
-        <input id="newSubName" placeholder="Nom" style="flex:1;min-width:120px;">
-        <input id="newSubEmail" type="email" placeholder="Courriel (optionnel)" style="flex:1;min-width:160px;">
-        <input id="newSubNotes" placeholder="Notes (optionnel, ex: dispo mardis)" style="flex:1;min-width:160px;">
-        <button class="btn btn-secondary" onclick="addSubstituteToPool()">Ajouter</button>
-      </div>
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter un remplaçant</div><div class="small">Les ajouts et retraits se font maintenant dans Organisation › Membres, pour tout gérer au même endroit.</div></div>
+      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;">
@@ -7218,19 +7215,6 @@ function setSubsSort(col){
   else { VIEW.subsSortBy = col; VIEW.subsSortDir = 'asc'; }
   render();
 }
-function addSubstituteToPool(){
-  const nameEl = document.getElementById('newSubName');
-  const emailEl = document.getElementById('newSubEmail');
-  const notesEl = document.getElementById('newSubNotes');
-  const name = nameEl.value.trim();
-  if(!name) return;
-  const entry = { id: uid('sub'), name, rating: RATING_DEFAULT, ratingGames: 0 };
-  if(emailEl.value.trim()) entry.email = emailEl.value.trim();
-  if(notesEl.value.trim()) entry.notes = notesEl.value.trim();
-  DATA.substitutePool = DATA.substitutePool || [];
-  DATA.substitutePool.push(entry);
-  saveAndRender();
-}
 // Pop-up de gestion d'un remplaçant : infos, et gestion de son compte (lier
 // un compte en attente comme remplaçant, changer son rôle, le délier).
 function substituteDetailModalHTML(subId){
@@ -7382,19 +7366,9 @@ function adminPlayersHTML(){
   const linkedPlayerIds = new Set(LEAGUE_PLAYER_LINKS.map(l=>l.player_id));
   const openSessionForBadge = currentOpenSession();
   return `
-    <div class="card">
-      <h3>Ajouter un joueur</h3>
-      <div class="row">
-        <input id="newPlayerName" placeholder="Nom du joueur" style="flex:1;min-width:140px;">
-        <select id="newPlayerGroup">
-          <option value="">— En attente (à placer plus tard) —</option>
-          ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
-        </select>
-        <input id="newPlayerRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="Cote (${RATING_DEFAULT.toFixed(1)} par défaut)" style="width:170px;">
-        <button class="btn btn-secondary" onclick="addPlayerFromList()">Ajouter</button>
-      </div>
-      <p class="small">Laisse « En attente » si tu n'es pas encore prêt à le placer — tu pourras le glisser-déposer dans un groupe depuis l'onglet Session → Groupes. Le genre (pour les équipes de tournoi MLP) se configure maintenant depuis la fiche du membre, dans Organisation → Membres.</p>
-      ${groups.length===0 ? `<p class="small" style="color:var(--danger);">Crée d'abord un groupe dans l'onglet Groupes.</p>` : ''}
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter un joueur</div><div class="small">Les ajouts et retraits se font maintenant dans Organisation › Membres, pour tout gérer au même endroit.</div></div>
+      <button class="btn btn-secondary" onclick="openOrganizationPage()">👥 Membres de l'organisation</button>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;">
@@ -7658,24 +7632,6 @@ function setRegularsSort(col){
   else { VIEW.regularsSortBy = col; VIEW.regularsSortDir = 'asc'; }
   render();
 }
-function addPlayerFromList(){
-  const nameEl = document.getElementById('newPlayerName');
-  const groupEl = document.getElementById('newPlayerGroup');
-  const ratingEl = document.getElementById('newPlayerRating');
-  const rawName = nameEl.value.trim();
-  const desiredGroupId = groupEl.value;
-  if(!rawName) return;
-  const name = uniquePlayerName(rawName, DATA.players);
-  let groupId = null;
-  if(desiredGroupId){
-    groupId = resolveGroupAssignment(desiredGroupId, DATA.groups, DATA.players);
-    if(!groupId) return;
-  }
-  const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
-  const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-  DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
-  saveAndRender();
-}
 // L'ancien bouton "Renommer" du popup joueur a été retiré : un nom n'est
 // pas propre à une ligue (la même personne peut être dans plusieurs), donc
 // renommer ne se fait plus que depuis la fiche du membre, où ça se répercute
@@ -7753,6 +7709,8 @@ async function loadAllProfilePlayers(){
 // Ajoute un joueur (par son compte lié) dans une AUTRE ligue : crée un nouveau
 // joueur là-bas (dans son premier groupe) et lie le compte à celui-ci.
 async function addPlayerToLeagueForProfile(leagueId, profileId, name){
+  const { data: ex } = await sb.from('profile_players').select('player_id,substitute_id').eq('profile_id', profileId).eq('league_id', leagueId).maybeSingle();
+  if(ex) return ex.player_id || ex.substitute_id; // ce compte a déjà une place dans cette ligue
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
@@ -7777,6 +7735,8 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name){
 // compte reste "en attente" ou pointe vers rien, d'où le message « Profil de
 // remplaçant introuvable » côté joueur.
 async function addSubstituteToLeagueForProfile(leagueId, profileId, name){
+  const { data: ex } = await sb.from('profile_players').select('player_id,substitute_id').eq('profile_id', profileId).eq('league_id', leagueId).maybeSingle();
+  if(ex) return ex.player_id || ex.substitute_id;
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
@@ -7877,6 +7837,11 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
+  // Déjà dans cette ligue (même fiche membre, joueur ou remplaçant) : on ne recrée pas de doublon.
+  if(orgMemberId){
+    const already = (leagueData.players||[]).concat(leagueData.substitutePool||[]).find(x=>x.orgMemberId===orgMemberId);
+    if(already) return already.id;
+  }
   let createdId;
   if(type==='remplacant'){
     leagueData.substitutePool = leagueData.substitutePool || [];
@@ -7953,19 +7918,31 @@ function openAddOrgMemberModal(){
     </div>`;
   showFormModal('Nouvelle personne', html, saveAddOrgMemberForm);
 }
+let ORG_ADD_BUSY = false;
 function saveAddOrgMemberForm(){
+  if(ORG_ADD_BUSY) return false;
   const name = document.getElementById('orgMemberName').value.trim();
   if(!name){ showAlert("Le nom est requis."); return false; }
   const email = document.getElementById('orgMemberEmail').value.trim();
+  // Doublon : même nom (sans accents ni majuscules) ou même courriel déjà dans l'organisation.
+  const nn = normPersonName(name), ee = email.toLowerCase();
+  const known = organizationRosterEntries().find(e=> normPersonName(e.name)===nn || (ee && e.email && e.email.toLowerCase()===ee));
+  if(known){
+    showAlert(`« ${known.name} » existe déjà dans l'organisation. Ouvre sa fiche (Membres) pour l'ajouter à une ligue. Si c'est une autre personne, précise le nom (ex. initiale).`);
+    return false;
+  }
+  ORG_ADD_BUSY = true;
   const picks = readPerLeagueTypes('orgMemberLeague');
   (async ()=>{
     // La personne est d'abord créée une fois pour toutes dans org_members —
     // c'est SON identifiant qui sera repris dans chaque ligue cochée, plutôt
     // que de recréer une fiche indépendante à chaque fois.
-    const member = await createOrgMember(name, email, null, null);
-    if(!member) return;
-    for(const { leagueId, type } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id); }
-    await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
+    try{
+      const member = await createOrgMember(name, email, null, null);
+      if(!member) return;
+      for(const { leagueId, type } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id); }
+      await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
+    } finally { ORG_ADD_BUSY = false; }
   })();
 }
 // L'ancien bouton "+ Assigner" de la liste (et sa modale dédiée) a été
