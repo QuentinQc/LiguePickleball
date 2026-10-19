@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 181">
+<meta name="app-build" content="Version 182">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -10722,14 +10722,15 @@ function openGroupSizeModal(){
   const html = `
     <div class="row">
       <div class="field" style="flex:1;min-width:140px;"><label>Minimum de joueurs par groupe</label><input id="setGroupMin" type="number" min="1" value="${DATA.groupMinPlayers || 4}"></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input id="setGroupMax" type="number" min="1" value="${DATA.groupMaxPlayers || 5}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input id="setGroupMax" type="number" min="1" max="6" value="${DATA.groupMaxPlayers || 5}"></div>
     </div>
-    <p class="small">Contrôle l'avertissement de déséquilibre et la limite appliquée à l'ajout/déplacement de joueurs.</p>`;
+    <p class="small">Contrôle l'avertissement de déséquilibre et la limite appliquée à l'ajout/déplacement de joueurs.</p>
+    <p class="small"><b>Groupes de 6 :</b> mets le maximum à <b>6</b> pour que les groupes se remplissent jusqu'à 6 joueurs. Un groupe de 6 joue alors ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points (4 matchs par joueur, aucun duo répété). Le format se règle dans « Format des matchs ». Un groupe de 5 joue toujours 10 matchs.</p>`;
   showFormModal('Taille des groupes', html, saveGroupSizeForm);
 }
 function saveGroupSizeForm(){
   DATA.groupMinPlayers = Math.max(1, parseInt(document.getElementById('setGroupMin').value,10) || 4);
-  DATA.groupMaxPlayers = Math.max(DATA.groupMinPlayers||1, parseInt(document.getElementById('setGroupMax').value,10) || 5);
+  DATA.groupMaxPlayers = Math.min(GROUP_HARD_MAX, Math.max(DATA.groupMinPlayers||1, parseInt(document.getElementById('setGroupMax').value,10) || 5));
 }
 
 // ---- Pop-up : Génération des matchs (auto/manuel), avec accès aux modèles ----
