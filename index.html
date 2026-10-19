@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 180">
+<meta name="app-build" content="Version 181">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2665,7 +2665,7 @@ function shuffle(arr){
   return a;
 }
 // Règle standard : 5 joueurs → 10 matchs (à 9 points) ; 4 joueurs → 6 matchs (à 11 points) ;
-// 6 joueurs (exception) → 9 matchs (à 9 points), 6 matchs joués par joueur.
+// 6 joueurs (exception) → 6 matchs (à 11 points), 4 matchs joués par joueur, aucun duo répété.
 // Le mode test (Réglages) permet de contourner temporairement cette règle pour essayer l'app rapidement.
 function matchesCountFor(n){
   if(DATA.testMode){
@@ -2673,13 +2673,13 @@ function matchesCountFor(n){
     if(n === 5) return Math.max(1, DATA.testMatches5 || 3);
     return Math.max(1, DATA.matchesPerSession || 3);
   }
-  if(n === 6) return Math.max(1, DATA.rules6Matches || 9);
+  if(n === 6) return Math.max(1, DATA.rules6Matches || 6);
   if(n === 5) return Math.max(1, DATA.rules5Matches || 10);
   if(n === 4) return Math.max(1, DATA.rules4Matches || 6);
   return DATA.matchesPerSession || 10; // repli pour une taille de groupe atypique
 }
 function targetPointsFor(n){
-  if(n === 6) return Math.max(1, DATA.rules6Points || 9);
+  if(n === 6) return Math.max(1, DATA.rules6Points || 11);
   if(n === 5) return Math.max(1, DATA.rules5Points || 9);
   if(n === 4) return Math.max(1, DATA.rules4Points || 11);
   return 11;
@@ -2722,14 +2722,13 @@ const FIVE_PLAYER_ROTATION = [
   { bench:1, teamA:[0,2], teamB:[3,4] }, // position2 au banc — 1&3 vs 4&5
   { bench:0, teamA:[1,3], teamB:[2,4] }  // position1 au banc — 2&4 vs 3&5
 ];
-// Rotation fixe pour un groupe de 6 (exception) : 9 matchs, 2 joueurs au banc par match.
-// Calculée pour que chaque joueur joue exactement 6 matchs, soit partenaire de chacun des 5 autres
-// 1 ou 2 fois (un seul duo répété), affronte chacun 2 ou 3 fois, sans jamais jouer avec le même
-// partenaire deux matchs de suite ni rester au banc deux matchs de suite. Positions 0 à 5, mélangées une fois par session.
+// Rotation fixe pour un groupe de 6 (exception) : 6 matchs, 2 joueurs au banc par match.
+// Chaque joueur joue exactement 4 matchs avec 4 partenaires différents (aucun duo répété : 12 duos
+// distincts), affronte chaque autre joueur 1 ou 2 fois et ne reste jamais au banc deux matchs de suite.
+// Positions 0 à 5, mélangées une fois par session.
 const SIX_PLAYER_ROTATION = [
-  { teamA:[1,2], teamB:[0,5] }, { teamA:[2,3], teamB:[4,5] }, { teamA:[0,3], teamB:[1,4] },
-  { teamA:[1,5], teamB:[2,4] }, { teamA:[1,3], teamB:[0,2] }, { teamA:[3,5], teamB:[0,4] },
-  { teamA:[1,2], teamB:[3,4] }, { teamA:[0,1], teamB:[2,5] }, { teamA:[3,4], teamB:[0,5] }
+  { teamA:[0,2], teamB:[1,4] }, { teamA:[0,3], teamB:[1,5] }, { teamA:[0,4], teamB:[2,5] },
+  { teamA:[1,2], teamB:[3,5] }, { teamA:[0,5], teamB:[3,4] }, { teamA:[1,3], teamB:[2,4] }
 ];
 function generateSixPlayerMatches(playerIds, target){
   const p = shuffle(playerIds);
@@ -2982,7 +2981,7 @@ function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
   const count = playersList.filter(p=>p.groupId===desiredGroupId).length;
   if(count + 1 === 6){
     const nm6 = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
-    showAlert(`${nm6} aura 6 joueurs (exception acceptée) : rotation fixe de ${DATA.rules6Matches||9} matchs à ${DATA.rules6Points||9} points, 6 matchs joués par joueur.`);
+    showAlert(`${nm6} aura 6 joueurs (exception acceptée) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.`);
   } else if(count >= GROUP_MAX_PLAYERS()){
     const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
     showAlert(`Attention : ${desiredName} aura maintenant ${count+1} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`);
@@ -8585,7 +8584,7 @@ function adminGroupsHTML(){
         <button class="btn-ghost-danger" onclick="deleteGroup('${g.id}')">supprimer</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
-      ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||9} matchs à ${DATA.rules6Points||9} points, 6 matchs joués par joueur.</p>` : ''}
+      ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
       <table>
         <tr><th>#</th><th>Nom</th><th>Session précédente</th></tr>
         ${ps.map((p,i)=>{
@@ -10267,7 +10266,7 @@ function settingsReglesTabHTML(){
   html += '<div class="card-grid">';
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts · 6 joueurs : ${DATA.rules6Matches||9} × ${DATA.rules6Points||9} pts`, "openMatchFormatModal()");
+  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts · 6 joueurs : ${DATA.rules6Matches||6} × ${DATA.rules6Points||11} pts`, "openMatchFormatModal()");
   html += '</div>';
   html += settingsSection('Classement');
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
@@ -10875,10 +10874,10 @@ function openMatchFormatModal(){
       <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
     </div>
     <div class="row">
-      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 6 (exception)</label><input id="setRules6Matches" type="number" min="1" value="${DATA.rules6Matches || 9}"></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 6</label><input id="setRules6Points" type="number" min="1" value="${DATA.rules6Points || 9}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 6 (exception)</label><input id="setRules6Matches" type="number" min="1" value="${DATA.rules6Matches || 6}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 6</label><input id="setRules6Points" type="number" min="1" value="${DATA.rules6Points || 11}"></div>
     </div>
-    <p class="small">Un groupe de 6 (exception) utilise une rotation fixe équilibrée de 9 matchs : chaque joueur en joue 6. Un autre nombre répète ou coupe cette rotation. Pour une taille autre que 4, 5 ou 6, les matchs sont générés plus simplement (paires successives).</p>`;
+    <p class="small">Un groupe de 6 (exception) utilise une rotation fixe équilibrée de 6 matchs : chaque joueur en joue 4, avec 4 partenaires différents. Un autre nombre répète ou coupe cette rotation. Pour une taille autre que 4, 5 ou 6, les matchs sont générés plus simplement (paires successives).</p>`;
   showFormModal('Format des matchs', html, saveMatchFormatForm);
 }
 function saveMatchFormatForm(){
@@ -10886,8 +10885,8 @@ function saveMatchFormatForm(){
   DATA.rules4Points = Math.max(1, parseInt(document.getElementById('setRules4Points').value,10) || 11);
   DATA.rules5Matches = Math.max(1, parseInt(document.getElementById('setRules5Matches').value,10) || 10);
   DATA.rules5Points = Math.max(1, parseInt(document.getElementById('setRules5Points').value,10) || 9);
-  DATA.rules6Matches = Math.max(1, parseInt(document.getElementById('setRules6Matches').value,10) || 9);
-  DATA.rules6Points = Math.max(1, parseInt(document.getElementById('setRules6Points').value,10) || 9);
+  DATA.rules6Matches = Math.max(1, parseInt(document.getElementById('setRules6Matches').value,10) || 6);
+  DATA.rules6Points = Math.max(1, parseInt(document.getElementById('setRules6Points').value,10) || 11);
 }
 
 // ---- Pop-up : Mode test ----
@@ -11475,7 +11474,7 @@ function leagueRulesHTML(){
       <tr><th>Taille du groupe</th><th>Matchs</th><th>Points par match</th></tr>
       <tr><td>4 joueurs</td><td>${DATA.rules4Matches||6}</td><td>${DATA.rules4Points||11}</td></tr>
       <tr><td>5 joueurs</td><td>${DATA.rules5Matches||10}</td><td>${DATA.rules5Points||9}</td></tr>
-      <tr><td>6 joueurs (exception)</td><td>${DATA.rules6Matches||9}</td><td>${DATA.rules6Points||9}</td></tr>
+      <tr><td>6 joueurs (exception)</td><td>${DATA.rules6Matches||6}</td><td>${DATA.rules6Points||11}</td></tr>
     </table>
     <h3 style="margin-top:14px;">Ordre de départage en cas d'égalité</h3>
     ${enabledCriteria.length ? `<ol style="margin:0;padding-left:20px;">${enabledCriteria.map(c=>`<li class="small">${c}</li>`).join('')}</ol>` : `<p class="small">Aucun critère activé — les égalités ne sont pas départagées.</p>`}
@@ -12513,8 +12512,10 @@ function migrateData(){
   if(DATA.rules4Points === undefined) DATA.rules4Points = 11;
   if(DATA.rules5Matches === undefined) DATA.rules5Matches = 10;
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
-  if(DATA.rules6Matches === undefined) DATA.rules6Matches = 9;
-  if(DATA.rules6Points === undefined) DATA.rules6Points = 9;
+  if(DATA.rules6Matches === undefined) DATA.rules6Matches = 6;
+  if(DATA.rules6Points === undefined) DATA.rules6Points = 11;
+  // v181 : ancienne valeur par défaut (9 matchs à 9 points) → nouvelle rotation (6 matchs à 11 points)
+  if(DATA.rules6Matches === 9 && DATA.rules6Points === 9){ DATA.rules6Matches = 6; DATA.rules6Points = 11; }
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
   if(DATA.showGroupBeforePublish === undefined) DATA.showGroupBeforePublish = false;
