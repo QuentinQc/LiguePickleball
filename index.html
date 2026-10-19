@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 179">
+<meta name="app-build" content="Version 180">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -2664,7 +2664,8 @@ function shuffle(arr){
   for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
-// Règle standard : 5 joueurs → 10 matchs (à 9 points) ; 4 joueurs → 6 matchs (à 11 points).
+// Règle standard : 5 joueurs → 10 matchs (à 9 points) ; 4 joueurs → 6 matchs (à 11 points) ;
+// 6 joueurs (exception) → 9 matchs (à 9 points), 6 matchs joués par joueur.
 // Le mode test (Réglages) permet de contourner temporairement cette règle pour essayer l'app rapidement.
 function matchesCountFor(n){
   if(DATA.testMode){
@@ -2672,11 +2673,13 @@ function matchesCountFor(n){
     if(n === 5) return Math.max(1, DATA.testMatches5 || 3);
     return Math.max(1, DATA.matchesPerSession || 3);
   }
+  if(n === 6) return Math.max(1, DATA.rules6Matches || 9);
   if(n === 5) return Math.max(1, DATA.rules5Matches || 10);
   if(n === 4) return Math.max(1, DATA.rules4Matches || 6);
   return DATA.matchesPerSession || 10; // repli pour une taille de groupe atypique
 }
 function targetPointsFor(n){
+  if(n === 6) return Math.max(1, DATA.rules6Points || 9);
   if(n === 5) return Math.max(1, DATA.rules5Points || 9);
   if(n === 4) return Math.max(1, DATA.rules4Points || 11);
   return 11;
@@ -2719,6 +2722,31 @@ const FIVE_PLAYER_ROTATION = [
   { bench:1, teamA:[0,2], teamB:[3,4] }, // position2 au banc — 1&3 vs 4&5
   { bench:0, teamA:[1,3], teamB:[2,4] }  // position1 au banc — 2&4 vs 3&5
 ];
+// Rotation fixe pour un groupe de 6 (exception) : 9 matchs, 2 joueurs au banc par match.
+// Calculée pour que chaque joueur joue exactement 6 matchs, soit partenaire de chacun des 5 autres
+// 1 ou 2 fois (un seul duo répété), affronte chacun 2 ou 3 fois, sans jamais jouer avec le même
+// partenaire deux matchs de suite ni rester au banc deux matchs de suite. Positions 0 à 5, mélangées une fois par session.
+const SIX_PLAYER_ROTATION = [
+  { teamA:[1,2], teamB:[0,5] }, { teamA:[2,3], teamB:[4,5] }, { teamA:[0,3], teamB:[1,4] },
+  { teamA:[1,5], teamB:[2,4] }, { teamA:[1,3], teamB:[0,2] }, { teamA:[3,5], teamB:[0,4] },
+  { teamA:[1,2], teamB:[3,4] }, { teamA:[0,1], teamB:[2,5] }, { teamA:[3,4], teamB:[0,5] }
+];
+function generateSixPlayerMatches(playerIds, target){
+  const p = shuffle(playerIds);
+  const matches = [];
+  let i = 0;
+  while(matches.length < target){
+    const r = SIX_PLAYER_ROTATION[i % SIX_PLAYER_ROTATION.length];
+    const used = r.teamA.concat(r.teamB);
+    const bench = [0,1,2,3,4,5].filter(x=>!used.includes(x));
+    matches.push({ sit:p[bench[0]], sit2:p[bench[1]], teamA:[p[r.teamA[0]],p[r.teamA[1]]], teamB:[p[r.teamB[0]],p[r.teamB[1]]], scoreA:null, scoreB:null });
+    i++;
+  }
+  return matches.slice(0, target);
+}
+function sitLabel(m){
+  return [m.sit, m.sit2].filter(Boolean).map(id=>playerName(id)).join(' et ');
+}
 function generateFivePlayerMatches(playerIds, target){
   const p = shuffle(playerIds);
   const matches = [];
@@ -2740,6 +2768,7 @@ function generateMatches(playerIds){
   if(playerIds.length < 2) return [];
   const target = matchesCountFor(playerIds.length);
   if(playerIds.length === 5) return generateFivePlayerMatches(playerIds, target);
+  if(playerIds.length === 6) return generateSixPlayerMatches(playerIds, target);
   let matches = [];
   let guard = 0;
   while(matches.length < target && guard < 20){
@@ -2883,6 +2912,7 @@ function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order)
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
 function GROUP_MAX_PLAYERS(){ return DATA.groupMaxPlayers || 5; }
+const GROUP_HARD_MAX = 6; // exception : un groupe peut occasionnellement compter 6 joueurs (rotation spéciale)
 function GROUP_MIN_PLAYERS(){ return DATA.groupMinPlayers || 4; }
 // Retourne le premier groupe (selon l'ordre de l'échelle) qui a encore de la
 // place (moins de GROUP_MAX_PLAYERS() joueurs), ou null si tous sont pleins.
@@ -2950,7 +2980,10 @@ function onRowDrop(ev, gid, targetPid){
 // avertit et retourne plutôt le premier groupe disponible.
 function resolveGroupAssignment(desiredGroupId, groupsList, playersList){
   const count = playersList.filter(p=>p.groupId===desiredGroupId).length;
-  if(count >= GROUP_MAX_PLAYERS()){
+  if(count + 1 === 6){
+    const nm6 = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
+    showAlert(`${nm6} aura 6 joueurs (exception acceptée) : rotation fixe de ${DATA.rules6Matches||9} matchs à ${DATA.rules6Points||9} points, 6 matchs joués par joueur.`);
+  } else if(count >= GROUP_MAX_PLAYERS()){
     const desiredName = (groupsList.find(g=>g.id===desiredGroupId)||{}).name || 'ce groupe';
     showAlert(`Attention : ${desiredName} aura maintenant ${count+1} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`);
   }
@@ -3042,7 +3075,7 @@ function matchesFromTemplate(session, gid){
 // Point d'entrée unique pour la génération des matchs d'un groupe : respecte
 // le mode choisi dans Réglages (automatique ou modèle manuel par position).
 function matchesForGroup(session, gid){
-  if(DATA.matchupMode === 'manual') return matchesFromTemplate(session, gid);
+  if(DATA.matchupMode === 'manual' && playersInGroup(gid).length !== 6) return matchesFromTemplate(session, gid); // un groupe de 6 (exception) utilise toujours la rotation fixe
   const ids = activeRosterForGroup(session, gid);
   return ids.length >= 2 ? generateMatches(ids) : [];
 }
@@ -8542,7 +8575,8 @@ function adminGroupsHTML(){
     const ps = playersInGroup(g.id).filter(p=>!(open && isAbsent(open, p.id))).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const absentInGroup = open ? playersInGroup(g.id).filter(p=>isAbsent(open, p.id)) : [];
     const displayCount = ps.length + absentInGroup.length;
-    const outOfRange = displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS());
+    const outOfRange = displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS()) && displayCount !== 6;
+    const isSix = displayCount === 6;
     html += `
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;">
@@ -8551,6 +8585,7 @@ function adminGroupsHTML(){
         <button class="btn-ghost-danger" onclick="deleteGroup('${g.id}')">supprimer</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
+      ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||9} matchs à ${DATA.rules6Points||9} points, 6 matchs joués par joueur.</p>` : ''}
       <table>
         <tr><th>#</th><th>Nom</th><th>Session précédente</th></tr>
         ${ps.map((p,i)=>{
@@ -8784,7 +8819,7 @@ function adminSessionHTML(){
         </div>`;
     });
     if(!manual && m_hasSitOut(gd.matches)){
-      html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?playerName(m.sit):'—').join(', ')}</p>`;
+      html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?sitLabel(m):'—').join(', ')}</p>`;
     }
     html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">régénérer les matchs de ce groupe</button>`;
     if(DATA.testMode && gd.matches.length){
@@ -8941,7 +8976,7 @@ function printableMatchSheetsHTML(session){
                 <span class="ms-vs">–</span>
                 <span class="ms-score-box"></span>
               </div>
-              ${m.sit ? `<div class="ms-sit">Repos : ${escapeHTML(playerName(m.sit))}</div>` : ''}
+              ${m.sit ? `<div class="ms-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
             </div>
             <div class="ms-team-names ms-team-names-right">${m.teamB.map(id=>`<div class="ms-player-name">${escapeHTML(playerName(id))}</div>`).join('')}</div>
           </div>
@@ -9040,8 +9075,8 @@ function sessionCompletionIssues(session){
   const issues = [];
   groupsSorted().forEach(g=>{
     const memberCount = playersInGroup(g.id).length;
-    if(memberCount > GROUP_MAX_PLAYERS()){
-      issues.push(`${g.name} : ${memberCount} joueurs, au-dessus de la limite de ${GROUP_MAX_PLAYERS()} — déplace des joueurs avant de publier`);
+    if(memberCount > Math.max(GROUP_MAX_PLAYERS(), GROUP_HARD_MAX)){
+      issues.push(`${g.name} : ${memberCount} joueurs, au-dessus de la limite de ${GROUP_HARD_MAX} — déplace des joueurs avant de publier`);
     }
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
@@ -10232,7 +10267,7 @@ function settingsReglesTabHTML(){
   html += '<div class="card-grid">';
   html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
   html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts`, "openMatchFormatModal()");
+  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts · 6 joueurs : ${DATA.rules6Matches||9} × ${DATA.rules6Points||9} pts`, "openMatchFormatModal()");
   html += '</div>';
   html += settingsSection('Classement');
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
@@ -10839,7 +10874,11 @@ function openMatchFormatModal(){
       <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 5</label><input id="setRules5Matches" type="number" min="1" value="${DATA.rules5Matches || 10}"></div>
       <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
     </div>
-    <p class="small">Pour une taille de groupe différente de 4 ou 5, les matchs sont générés de façon plus simple (paires successives) plutôt qu'avec une rotation optimisée.</p>`;
+    <div class="row">
+      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 6 (exception)</label><input id="setRules6Matches" type="number" min="1" value="${DATA.rules6Matches || 9}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 6</label><input id="setRules6Points" type="number" min="1" value="${DATA.rules6Points || 9}"></div>
+    </div>
+    <p class="small">Un groupe de 6 (exception) utilise une rotation fixe équilibrée de 9 matchs : chaque joueur en joue 6. Un autre nombre répète ou coupe cette rotation. Pour une taille autre que 4, 5 ou 6, les matchs sont générés plus simplement (paires successives).</p>`;
   showFormModal('Format des matchs', html, saveMatchFormatForm);
 }
 function saveMatchFormatForm(){
@@ -10847,6 +10886,8 @@ function saveMatchFormatForm(){
   DATA.rules4Points = Math.max(1, parseInt(document.getElementById('setRules4Points').value,10) || 11);
   DATA.rules5Matches = Math.max(1, parseInt(document.getElementById('setRules5Matches').value,10) || 10);
   DATA.rules5Points = Math.max(1, parseInt(document.getElementById('setRules5Points').value,10) || 9);
+  DATA.rules6Matches = Math.max(1, parseInt(document.getElementById('setRules6Matches').value,10) || 9);
+  DATA.rules6Points = Math.max(1, parseInt(document.getElementById('setRules6Points').value,10) || 9);
 }
 
 // ---- Pop-up : Mode test ----
@@ -11434,6 +11475,7 @@ function leagueRulesHTML(){
       <tr><th>Taille du groupe</th><th>Matchs</th><th>Points par match</th></tr>
       <tr><td>4 joueurs</td><td>${DATA.rules4Matches||6}</td><td>${DATA.rules4Points||11}</td></tr>
       <tr><td>5 joueurs</td><td>${DATA.rules5Matches||10}</td><td>${DATA.rules5Points||9}</td></tr>
+      <tr><td>6 joueurs (exception)</td><td>${DATA.rules6Matches||9}</td><td>${DATA.rules6Points||9}</td></tr>
     </table>
     <h3 style="margin-top:14px;">Ordre de départage en cas d'égalité</h3>
     ${enabledCriteria.length ? `<ol style="margin:0;padding-left:20px;">${enabledCriteria.map(c=>`<li class="small">${c}</li>`).join('')}</ol>` : `<p class="small">Aucun critère activé — les égalités ne sont pas départagées.</p>`}
@@ -12471,6 +12513,8 @@ function migrateData(){
   if(DATA.rules4Points === undefined) DATA.rules4Points = 11;
   if(DATA.rules5Matches === undefined) DATA.rules5Matches = 10;
   if(DATA.rules5Points === undefined) DATA.rules5Points = 9;
+  if(DATA.rules6Matches === undefined) DATA.rules6Matches = 9;
+  if(DATA.rules6Points === undefined) DATA.rules6Points = 9;
   if(DATA.matchupMode === undefined) DATA.matchupMode = 'auto';
   if(DATA.allowPlayerScoreEntry === undefined) DATA.allowPlayerScoreEntry = false;
   if(DATA.showGroupBeforePublish === undefined) DATA.showGroupBeforePublish = false;
