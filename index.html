@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 205">
+<meta name="app-build" content="Version 206">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1070,6 +1070,32 @@ table tr:not(:first-child) td{background:rgba(0,0,0,.14);}
 table tr:not(:first-child) td:first-child{border-radius:12px 0 0 12px;padding-left:12px;}
 table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-right:12px;}
 .card > h3.sess-date{font-size:20px;}
+
+/* v206 : recherche de partenaire, nouveau visuel */
+.pc{padding:16px;}
+.pc-title{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px;}
+.pc textarea{min-height:84px;font-size:16px;}
+.pc-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.pc-field{flex:1;min-width:140px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:600;}
+.pc-field input{border-radius:12px;}
+.pc-send{width:100%;margin-top:12px;min-height:52px;font-size:17px;font-weight:800;border-radius:16px;}
+.pc-status{display:none;margin-top:10px;font-size:15px;padding:10px 12px;border-radius:12px;}
+.pc-status.show{display:block;}
+.pc-status.err{background:rgba(233,85,107,.16);color:#FF9AA9;}
+.pc-status.ok{background:rgba(159,191,58,.2);color:var(--ball);}
+.pc-sec{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 2px 8px;}
+.pc-list{display:flex;flex-direction:column;gap:10px;}
+.pc-card{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;}
+.pc-card.mine{border-color:rgba(207,234,92,.45);}
+.pc-card.closed{opacity:.55;}
+.pc-head{display:flex;align-items:center;gap:12px;}
+.pc-who{flex:1;min-width:0;}
+.pc-name{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pc-when{font-size:14px;font-weight:600;color:var(--ball);}
+.pc-msg{font-size:16px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
+.pc-foot{display:flex;align-items:center;gap:12px;margin-top:2px;}
+.pc-join{width:auto;min-height:44px;padding:8px 18px;font-size:15px;border-radius:14px;}
+.pc-count{font-size:14px;color:var(--muted);}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -2086,28 +2112,50 @@ async function cleanupExpiredPartnerPosts(leagueId){
   const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString();
   await sb.from('partner_posts').delete().eq('league_id', leagueId).eq('status', 'closed').lt('closed_at', cutoff);
 }
-async function createPartnerPost(){
-  const msgEl = document.getElementById('partnerMessageInput');
-  const dateEl = document.getElementById('partnerDateInput');
+function partnerStatus(msg, kind){
+  const el = document.getElementById('partnerStatus');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.className = 'pc-status' + (msg ? ' show '+(kind||'err') : '');
+}
+let PARTNER_BUSY = false;
+async function createPartnerPost(btn){
+  if(PARTNER_BUSY) return;
+  const root = (btn && btn.closest) ? btn.closest('.compose-box') : null;
+  const q = (id)=> (root && root.querySelector('#'+id)) || document.getElementById(id);
+  const msgEl = q('partnerMessageInput'), dateEl = q('partnerDateInput'), timeEl = q('partnerTimeInput');
   const message = msgEl ? msgEl.value.trim() : '';
-  if(!message || !CURRENT_PROFILE || !CURRENT_LEAGUE_ID) return;
+  if(!message){ partnerStatus("Écris d'abord ton annonce.", 'err'); if(msgEl) msgEl.focus(); return; }
+  if(!CURRENT_PROFILE){ partnerStatus("Connexion requise pour publier.", 'err'); return; }
+  if(!CURRENT_LEAGUE_ID){ partnerStatus("Aucune ligue sélectionnée.", 'err'); return; }
   const author_name = myDisplayName();
   const play_date = (dateEl && dateEl.value) ? dateEl.value : null;
-  const timeEl = document.getElementById('partnerTimeInput');
   const play_time = (play_date && timeEl && timeEl.value) ? timeEl.value : null;
   const row = { league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date };
   if(play_time) row.play_time = play_time;
-  let { error } = await sb.from('partner_posts').insert(row);
-  if(error && play_time){
-    // Colonne play_time pas encore créée côté Supabase : on publie quand même, sans l'heure.
-    delete row.play_time;
+  PARTNER_BUSY = true;
+  if(btn){ btn.disabled = true; btn.textContent = 'Publication…'; }
+  partnerStatus('', '');
+  let error = null;
+  try{
     ({ error } = await sb.from('partner_posts').insert(row));
-    if(!error) showAlert("Annonce publiée, mais l'heure n'a pas pu être enregistrée (SQL « calendar-times.sql » à exécuter dans Supabase).");
+    if(error && play_time){
+      delete row.play_time; // colonne play_time absente côté Supabase : on publie sans l'heure
+      ({ error } = await sb.from('partner_posts').insert(row));
+    }
+  }catch(e){ error = e; }
+  PARTNER_BUSY = false;
+  if(error){
+    console.error('partner_posts insert', error);
+    if(btn){ btn.disabled = false; btn.textContent = 'Publier'; }
+    partnerStatus("Impossible de publier : " + (error.message || 'erreur inconnue') + '.', 'err');
+    return;
   }
-  if(error){ showAlert("L'annonce n'a pas pu être publiée."); return; }
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  PARTNER_FLASH = true;
   render();
 }
+let PARTNER_FLASH = false;
 // Ajoute/retire la personne connectée de la liste des intéressés d'une
 // annonce. Lecture-modification-écriture simple (pas de fonction serveur) —
 // comme le reste de l'appli, le dernier qui écrit gagne en cas de double-clic
@@ -2142,21 +2190,22 @@ function deletePartnerPost(id){
   });
 }
 function partnerBoardHTML(){
+  const today = fmtDate(new Date());
+  const flash = PARTNER_FLASH; PARTNER_FLASH = false;
   return `
-    <div class="card">
-      <h3 style="margin:0 0 4px;">🤝 Trouver un partenaire</h3>
-      <p class="small" style="margin:0 0 10px;color:var(--muted);">Besoin d'un ou une partenaire pour un match amical ? Publie une annonce visible par toute la ligue.</p>
-      <div class="compose-box">
-        <textarea id="partnerMessageInput" rows="2" maxlength="300" placeholder="Écris ton annonce… ex : Cherche un partenaire samedi matin, niveau intermédiaire."></textarea>
-        <div class="compose-foot">
-          <label class="compose-chip">📅 Date <input type="date" id="partnerDateInput"></label>
-          <label class="compose-chip">🕖 Heure <input type="time" id="partnerTimeInput"></label>
-          <button class="btn btn-primary compose-send" onclick="createPartnerPost()">Publier ➤</button>
-        </div>
+    <div class="compose-box pc">
+      <div class="pc-title">Nouvelle annonce</div>
+      <textarea id="partnerMessageInput" rows="3" maxlength="300" placeholder="Ex. : Cherche un partenaire samedi matin, niveau intermédiaire."></textarea>
+      <div class="pc-row">
+        <label class="pc-field"><span>📅 Date</span><input type="date" id="partnerDateInput" min="${today}"></label>
+        <label class="pc-field"><span>🕖 Heure</span><input type="time" id="partnerTimeInput"></label>
       </div>
-      <div id="partnerPostsList" style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">
-        ${partnerPostsListHTML()}
-      </div>
+      <button class="btn btn-primary pc-send" onclick="createPartnerPost(this)">Publier</button>
+      <div id="partnerStatus" class="pc-status${flash?' show ok':''}">${flash?'✅ Annonce publiée.':''}</div>
+    </div>
+    <div class="pc-sec">Annonces de la ligue</div>
+    <div id="partnerPostsList" class="pc-list">
+      ${partnerPostsListHTML()}
     </div>`;
 }
 // Isolée pour pouvoir rafraîchir SEULEMENT #partnerPostsList (via le temps
@@ -2184,24 +2233,28 @@ function sortedPartnerPosts(){
 // (et ses actions : partant(e), marquer comblée, supprimer) dans une modale.
 function partnerPostsListHTML(){
   const posts = sortedPartnerPosts();
-  if(!posts.length) return '<p class="empty">Aucune annonce pour l\'instant.</p>';
-  return `<div class="partner-pill-list">${posts.map(p=>{
+  if(!posts.length) return '<p class="empty">Aucune annonce pour l\'instant. Sois le premier à en publier une !</p>';
+  return posts.map(p=>{
     const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
     const closed = p.status !== 'open';
     const interested = Array.isArray(p.interested) ? p.interested : [];
-    const shortMsg = (p.message||'').length > 36 ? p.message.slice(0,36)+'…' : p.message;
-    return `<div class="partner-pill${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
-      <div class="partner-pill-avatar-wrap">
+    const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+    const when = p.play_date ? `<div class="pc-when">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : '';
+    const act = (!closed && !mine)
+      ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'} pc-join" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e)' : '🙋 Je suis partant(e)'}</button>`
+      : '';
+    const cnt = interested.length ? `<span class="pc-count">${interested.length} partant${interested.length>1?'s':''}</span>` : '';
+    return `<div class="pc-card${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
+      <div class="pc-head">
         ${avatarHTML('partner-pill-avatar', partnerInitials(p.author_name), p.avatar_url)}
-        ${p.play_date ? `<div class="partner-pill-date-badge">${partnerDayNum(p.play_date)}</div>` : ''}
+        <div class="pc-who"><div class="pc-name">${escapeHTML(p.author_name)}${mine?' <span class="small">(toi)</span>':''}</div><div class="small">${partnerRelTime(p.created_at)}</div></div>
+        <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
       </div>
-      <div class="partner-pill-text">
-        <span class="partner-pill-author">${escapeHTML(p.author_name)}</span>
-        <span class="partner-pill-msg">${escapeHTML(shortMsg)}</span>
-      </div>
-      ${interested.length ? `<span class="partner-pill-count">${interested.length}</span>` : ''}
+      ${when}
+      <div class="pc-msg">${escapeHTML(p.message)}</div>
+      ${(act||cnt) ? `<div class="pc-foot">${act}${cnt}</div>` : ''}
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
 }
 // Contenu détaillé d'une annonce (ouvert depuis une pastille), rendu dans une
 // modale générique. Isolé de sa div d'habillage pour pouvoir être repatché
