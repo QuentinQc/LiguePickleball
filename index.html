@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 206">
+<meta name="app-build" content="Version 207">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -1095,6 +1095,9 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .pc-msg{font-size:16px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
 .pc-foot{display:flex;align-items:center;gap:12px;margin-top:2px;}
 .pc-join{width:auto;min-height:44px;padding:8px 18px;font-size:15px;border-radius:14px;}
+.pc-card .event-pill-date{width:52px;height:52px;flex:none;}
+.pc-card .event-pill-date .d{font-size:20px;line-height:1;}
+.pc-card .event-pill-date .m{font-size:11px;}
 .pc-count{font-size:14px;color:var(--muted);}
 </style>
 <script>
@@ -2291,9 +2294,9 @@ function partnerPostDetailInnerHTML(id){
       <span class="small" style="color:var(--muted);">${interested.length} partant(e)${interested.length>1?'s':''}</span>
     </div>` : ''}
     <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-      ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
-      ${canManage ? `<button class="btn-ghost" style="padding:6px 10px;font-size:13px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
-      ${canManage ? `<button class="btn-ghost-danger" style="padding:6px 10px;font-size:13px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
+      ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
+      ${canManage ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
+      ${canManage ? `<button class="btn-ghost-danger" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
     </div>`;
 }
 // ---- Temps réel : toute création/modification/suppression d'annonce par
@@ -2367,29 +2370,17 @@ async function loadSocialEvents(){
 function socialEventFormHTML(e){
   e = e || {};
   return `
-    <div class="f-group">
-      <label class="f-label">🎉 Titre</label>
-      <input type="text" id="eventTitleInput" value="${escapeHTML(e.title||'')}" style="width:100%;" placeholder="Ex : BBQ de fin de saison">
-    </div>
-    <div class="f-group">
-      <label class="f-label">🗒️ Description <span style="text-transform:none;font-weight:500;">(optionnel)</span></label>
-      <textarea id="eventDescInput" rows="3" maxlength="500" placeholder="Détails, quoi apporter, comment s'inscrire…" style="width:100%;">${escapeHTML(e.description||'')}</textarea>
-    </div>
-    <div class="row" style="gap:10px;flex-wrap:wrap;">
-      <div class="f-group" style="flex:1;min-width:140px;">
-        <label class="f-label">📅 Date</label>
-        <input type="date" id="eventDateInput" value="${e.event_date||''}" style="width:100%;">
+    <div class="compose-box pc" style="border:0;padding:0;background:none;box-shadow:none;">
+      <label class="pc-field" style="margin-bottom:10px;"><span>🎉 Titre</span><input type="text" id="eventTitleInput" value="${escapeHTML(e.title||'')}" placeholder="Ex. : BBQ de fin de saison"></label>
+      <label class="pc-field"><span>🗒️ Description (optionnel)</span><textarea id="eventDescInput" rows="3" maxlength="500" placeholder="Détails, quoi apporter, comment s'inscrire…">${escapeHTML(e.description||'')}</textarea></label>
+      <div class="pc-row">
+        <label class="pc-field"><span>📅 Date</span><input type="date" id="eventDateInput" value="${e.event_date||''}"></label>
+        <label class="pc-field"><span>🕖 Heure</span><input type="time" id="eventTimeInput" value="${e.event_time||''}"></label>
       </div>
-      <div class="f-group" style="flex:1;min-width:120px;">
-        <label class="f-label">🕐 Heure</label>
-        <input type="time" id="eventTimeInput" value="${e.event_time||''}" style="width:100%;">
-      </div>
-    </div>
-    <div class="f-group">
-      <label class="f-label">📍 Lieu <span style="text-transform:none;font-weight:500;">(optionnel)</span></label>
-      <input type="text" id="eventLocationInput" value="${escapeHTML(e.location||'')}" style="width:100%;" placeholder="Ex : Parc central">
-    </div>
-    <button class="btn btn-primary" style="width:100%;border-radius:999px;padding:13px;font-weight:800;" onclick="saveSocialEvent(${e.id?`'${e.id}'`:'null'})">Enregistrer</button>`;
+      <label class="pc-field" style="margin-top:10px;"><span>📍 Lieu (optionnel)</span><input type="text" id="eventLocationInput" value="${escapeHTML(e.location||'')}" placeholder="Ex. : Parc central"></label>
+      <button class="btn btn-primary pc-send" onclick="saveSocialEvent(${e.id?`'${e.id}'`:'null'}, this)">Enregistrer</button>
+      <div id="eventStatus" class="pc-status"></div>
+    </div>`;
 }
 function openNewSocialEventModal(){ showContentModal('Nouvel événement', socialEventFormHTML()); }
 function openEditSocialEventModal(id){
@@ -2397,14 +2388,18 @@ function openEditSocialEventModal(id){
   if(!e) return;
   showContentModal("Modifier l'événement", socialEventFormHTML(e));
 }
-async function saveSocialEvent(id){
+async function saveSocialEvent(id, btn){
+  const fail = (m)=>{ const el=document.getElementById('eventStatus'); if(el){ el.textContent=m; el.className='pc-status show err'; } };
   const title = (document.getElementById('eventTitleInput')||{}).value;
   const description = (document.getElementById('eventDescInput')||{}).value;
   const date = (document.getElementById('eventDateInput')||{}).value;
   const time = (document.getElementById('eventTimeInput')||{}).value;
   const location = (document.getElementById('eventLocationInput')||{}).value;
   const orgId = currentLeagueOrgId();
-  if(!title || !title.trim() || !date || !CURRENT_PROFILE || !orgId) return;
+  if(!title || !title.trim()){ fail("Ajoute un titre à l'événement."); return; }
+  if(!date){ fail("Choisis la date de l'événement."); return; }
+  if(!CURRENT_PROFILE || !orgId){ fail("Organisation introuvable : reconnecte-toi."); return; }
+  if(btn){ btn.disabled = true; btn.textContent = 'Enregistrement…'; }
   const payload = { organization_id: orgId, title: title.trim(), description: (description||'').trim() || null, event_date: date, event_time: time || null, location: (location||'').trim() || null };
   let error;
   if(id){
@@ -2413,7 +2408,7 @@ async function saveSocialEvent(id){
     payload.created_by = CURRENT_PROFILE.id;
     ({ error } = await sb.from('social_events').insert(payload));
   }
-  if(error){ showAlert("L'événement n'a pas pu être enregistré."); return; }
+  if(error){ console.error('social_events', error); if(btn){ btn.disabled=false; btn.textContent='Enregistrer'; } fail("Impossible d'enregistrer : " + (error.message||'erreur inconnue') + '.'); return; }
   closeModal();
   await loadSocialEvents();
   render();
@@ -2439,39 +2434,38 @@ function eventMonthAbbr(s){ const d = new Date(s+'T00:00:00'); return d.toLocale
 function eventDateLabel(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); }
 function socialEventsHTML(){
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
-  return `<div class="card">
-    <h3 style="margin:0 0 4px;">🎉 Événements</h3>
-    <p class="small" style="margin:0 0 10px;color:var(--muted);">Soirées, tournois et rencontres sociales, visibles par tous les membres de l'organisation.</p>
-    ${isAdmin ? `<div class="compose-box" style="cursor:pointer;" onclick="openNewSocialEventModal()">
-        <div class="compose-launch">✏️ Organiser un événement…</div>
-        <div class="compose-foot">
-          <span class="compose-chip" style="pointer-events:none;">📅 Date · lieu · heure</span>
-          <button type="button" class="btn btn-primary compose-send" onclick="event.stopPropagation();openNewSocialEventModal()">Créer ➤</button>
-        </div>
-      </div>` : ''}
-    <div id="socialEventsList" style="margin-top:${isAdmin?14:0}px;">${socialEventsListHTML()}</div>
-  </div>`;
+  return `${isAdmin ? `<div class="compose-box pc">
+      <div class="pc-title">Nouvel événement</div>
+      <div style="font-size:15px;color:var(--muted);">Soirée, tournoi ou rencontre sociale, visible par tous les membres de l'organisation.</div>
+      <button class="btn btn-primary pc-send" onclick="openNewSocialEventModal()">Organiser un événement</button>
+    </div>` : ''}
+    <div class="pc-sec">Événements de l'organisation</div>
+    <div id="socialEventsList" class="pc-list">${socialEventsListHTML()}</div>`;
 }
-// Liste compacte : une pastille par événement, cliquer dessus ouvre le détail
-// (description, confirmations, boutons de présence) dans une modale.
 function socialEventsListHTML(){
   const todayStr = new Date().toISOString().slice(0,10);
   const events = (SOCIAL_EVENTS||[]).slice().sort((a,b)=> (a.event_date||'').localeCompare(b.event_date||''));
   if(!events.length) return '<p class="empty">Aucun événement prévu pour l\'instant.</p>';
-  return `<div class="event-pill-list">${events.map(e=>{
+  return events.map(e=>{
     const past = e.event_date < todayStr;
     const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
     const going = rsvps.filter(r=>r.status==='going');
-    const sub = e.location || (e.event_time ? `à ${e.event_time}` : '');
-    return `<div class="event-pill${past?' past':''}" onclick="openEventDetail('${e.id}')">
-      <div class="event-pill-date"><span class="d">${eventDayNum(e.event_date)}</span><span class="m">${escapeHTML(eventMonthAbbr(e.event_date))}</span></div>
-      <div class="event-pill-text">
-        <span class="event-pill-title">${escapeHTML(e.title)}</span>
-        ${sub ? `<span class="event-pill-sub">${escapeHTML(sub)}</span>` : ''}
+    const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
+    const iGo = mine && mine.status==='going';
+    const when = `${escapeHTML(eventDateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(fmtHM(e.event_time)):''}`;
+    const act = !past ? `<button class="btn ${iGo?'btn-secondary':'btn-primary'} pc-join" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${iGo?'✅ Je viens':'🙋 Je viens'}</button>` : '';
+    const cnt = going.length ? `<span class="pc-count">${going.length} confirmé${going.length>1?'s':''}</span>` : '';
+    return `<div class="pc-card${past?' closed':''}" onclick="openEventDetail('${e.id}')">
+      <div class="pc-head">
+        <div class="event-pill-date"><span class="d">${eventDayNum(e.event_date)}</span><span class="m">${escapeHTML(eventMonthAbbr(e.event_date))}</span></div>
+        <div class="pc-who"><div class="pc-name">${escapeHTML(e.title)}</div><div class="small">${e.location ? '📍 '+escapeHTML(e.location) : ''}</div></div>
+        <span class="pill ${past?'pill-gray':'pill-green'}">${past?'Terminé':'À venir'}</span>
       </div>
-      ${going.length ? `<span class="event-pill-count">✅ ${going.length}</span>` : ''}
+      <div class="pc-when">📅 ${when}</div>
+      ${e.description ? `<div class="pc-msg" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${escapeHTML(e.description)}</div>` : ''}
+      ${(act||cnt) ? `<div class="pc-foot">${act}${cnt}</div>` : ''}
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
 }
 function openEventDetail(id){ showContentModal('Événement', ()=>eventDetailInnerHTML(id)); }
 function eventDetailInnerHTML(id){
@@ -2488,15 +2482,15 @@ function eventDetailInnerHTML(id){
   return `
     <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
       <strong style="font-size:16px;">${escapeHTML(e.title)}</strong>
-      ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="padding:4px 8px;font-size:12px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="padding:4px 8px;font-size:12px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
+      ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="min-height:40px;padding:6px 12px;font-size:15px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="min-height:40px;padding:6px 12px;font-size:15px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
     </div>
     <div class="small" style="margin-top:6px;"><span class="tag">📅 ${escapeHTML(eventDateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${past?' <span class="tag">Terminé</span>':''}</div>
     ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:10px;">${escapeHTML(e.description)}</div>` : ''}
     ${(going.length||maybe.length) ? `<p class="small" style="margin-top:10px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
     ${!past ? `<div class="row" style="gap:6px;margin-top:14px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-      <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
-      <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
-      <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;padding:6px 12px;font-size:13px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
+      <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
+      <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
+      <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
     </div>` : ''}`;
 }
 // ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
