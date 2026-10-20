@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 189">
+<meta name="app-build" content="Version 190">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -754,6 +754,7 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .sess-chip.on{background:rgba(159,191,58,.2);color:var(--ball);}
 .sess-sub{font-size:16px;line-height:1.4;color:#C7D9D5;margin-top:-6px;}
 .sess-main{height:58px;border:0;border-radius:16px;background:var(--ball);color:#0C2622;font:700 18px var(--font-body);cursor:pointer;}
+.sess-main-end{background:transparent;color:var(--ball);border:1px solid var(--ball);}
 .sess-main-alt{background:transparent;color:var(--line);border:1px solid var(--line-soft-strong);}
 .sess-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .sess-tile{height:68px;border:0;border-radius:14px;background:#0C2622;color:var(--text);font:600 16px var(--font-body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;}
@@ -4684,9 +4685,12 @@ function adminSessionSectionHTML(){
       ${(()=>{
         let tot = 0, dn = 0;
         (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ tot++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') dn++; }));
-        if(!open.published) return `<button class="sess-main" onclick="onPublishSession()">Publier la session aux joueurs</button>`;
-        if(tot>0 && dn===tot) return `<button class="sess-main" onclick="onFinalize()">Terminer la session</button><div class="sess-note" style="text-align:center;">Applique les montées et descentes.</div>`;
-        return `<button class="sess-main" onclick="VIEW.sessionSubTab='resultats';render();">Entrer les scores</button>`;
+        const allIn = tot>0 && dn===tot;
+        const pub = open.published
+          ? `<button class="sess-main sess-main-alt" onclick="onUnpublishSession()">Retirer la publication</button>`
+          : `<button class="sess-main" onclick="onPublishSession()">Publier la session aux joueurs</button>`;
+        const fin = `<button class="sess-main ${(open.published && allIn) ? '' : 'sess-main-end'}" onclick="onFinalize()">Terminer la session</button><div class="sess-note" style="text-align:center;margin-top:-8px;">Applique les montées et descentes.</div>`;
+        return pub + fin;
       })()}
       <button class="sess-more" onclick="openSessionMenu()">Plus d'options</button>
       ${DATA.testMode ? `<div class="row" style="margin-top:10px;"><button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button></div>` : ''}
@@ -9034,8 +9038,6 @@ function openSessionMenu(){
   showContentModal('Options de la session', `<div style="display:flex;flex-direction:column;gap:10px;">
     <button class="smn-btn" onclick="closeModal();printMatchSheets('${open.id}')">${ic.print}Imprimer les feuilles de match</button>
     <button class="smn-btn" onclick="closeModal();emailAbsenceReminder()">${ic.mail}Envoyer un rappel d'absence</button>
-    ${open.published ? `<button class="smn-btn" onclick="closeModal();onUnpublishSession()">${ic.eye}Retirer la publication</button>` : ''}
-    <button class="smn-btn" onclick="closeModal();onFinalize()">${ic.flag}Terminer la session<span style="margin-left:auto;font-size:13px;font-weight:500;color:var(--muted);">montées et descentes</span></button>
     <button class="smn-btn danger" onclick="closeModal();onCancelSession()">${ic.x}Annuler la session</button>
   </div>`);
 }
