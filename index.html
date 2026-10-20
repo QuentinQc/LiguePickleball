@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 195">
+<meta name="app-build" content="Version 197">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -4704,9 +4704,17 @@ function adminSessionSectionHTML(){
   }
   const sub = VIEW.sessionSubTab || 'groupes';
   const subTabs = [['groupes','Groupes'],['resultats','Résultats']];
-  html += `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  html += `<div class="subtabs" id="sessSubtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
   return html;
+}
+// Raccourci des étapes : ouvre l'onglet voulu et fait défiler jusqu'à son contenu.
+function goSessionTab(t){
+  VIEW.sessionSubTab = t; render();
+  setTimeout(function(){
+    const el = document.getElementById('sessSubtabs');
+    if(el && el.scrollIntoView){ try{ el.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(e){ el.scrollIntoView(); } }
+  }, 60);
 }
 function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 // Onglet « Joueurs » unifié : sous-onglets Tous les joueurs et Remplaçants.
@@ -9012,8 +9020,8 @@ function launchSessionHTML(){
   const rows = [];
   rows.push(c.bad===0 && c.groups>0
     ? stepRow('ok', c.groups + ' groupe' + (c.groups>1?'s':'') + ' prêt' + (c.groups>1?'s':''), c.total + ' joueurs · de ' + c.min + ' à ' + c.max + ' par groupe')
-    : stepRow('warn', c.groups===0 ? 'Aucun groupe' : c.bad + ' groupe' + (c.bad>1?'s':'') + ' hors limites', 'Vérifie les groupes ci-dessous', c.groups===0 ? '' : `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Voir</button>`));
-  if(c.unassigned>0) rows.push(stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', "Ils ne joueront pas tant qu'ils n'en ont pas", `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Placer</button>`));
+    : stepRow('warn', c.groups===0 ? 'Aucun groupe' : c.bad + ' groupe' + (c.bad>1?'s':'') + ' hors limites', 'Vérifie les groupes ci-dessous', c.groups===0 ? '' : `<button class="btn-ghost" onclick="goSessionTab('groupes')">Voir</button>`));
+  if(c.unassigned>0) rows.push(stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', "Ils ne joueront pas tant qu'ils n'en ont pas", `<button class="btn-ghost" onclick="openPlaceModal()">Placer</button>`));
   else rows.push(stepRow('ok', 'Tous les joueurs ont un groupe', ''));
   let html = hero + `<div class="lnc-eyebrow" style="margin:0 0 8px;">Avant de démarrer</div><div class="stp-list" style="margin-bottom:16px;">${rows.join('')}</div>`;
   const last = (DATA.sessions||[]).filter(x=>x.status==='closed').slice(-1)[0];
@@ -9029,6 +9037,30 @@ function launchSessionHTML(){
   }
   return html;
 }
+// Fenêtre « Placer les joueurs » : chaque joueur sans groupe reçoit un groupe via une liste déroulante.
+function openPlaceModal(){
+  const list = (DATA.players||[]).filter(p=>!p.groupId && !p.injured);
+  if(!list.length){ closeModal(); return; }
+  const groups = (typeof groupsSorted==='function') ? groupsSorted() : (DATA.groups||[]);
+  const opts = groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)} (${playersInGroup(g.id).length} joueur${playersInGroup(g.id).length>1?'s':''})</option>`).join('');
+  const rows = list.map(p=>`<div style="display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid var(--line-soft);">
+    <div style="font-size:18px;font-weight:600;">${escapeHTML(p.name)}</div>
+    <select aria-label="Groupe pour ${escapeHTML(p.name)}" style="min-height:52px;font-size:17px;" onchange="placePlayerInGroup('${p.id}', this.value)">
+      <option value="">Choisir un groupe…</option>${opts}
+    </select>
+  </div>`).join('');
+  showContentModal('Placer les joueurs', `<p class="small" style="margin:0 0 4px;">Choisis un groupe pour chaque joueur.</p>${rows}`);
+}
+function placePlayerInGroup(pid, gid){
+  if(!gid) return;
+  const p = DATA.players.find(x=>x.id===pid); if(!p) return;
+  const others = DATA.players.filter(x=>x.id!==pid);
+  p.groupId = resolveGroupAssignment(gid, DATA.groups, others);
+  p.order = nextOrderInGroup(p.groupId);
+  saveData();
+  const left = (DATA.players||[]).filter(x=>!x.groupId && !x.injured).length;
+  if(left>0){ openPlaceModal(); } else { closeModal(); }
+}
 function openPickSessionDate(){
   showFormModal('Choisir une date', `<div class="field"><label>Date de la session</label><input id="pickSessDate" type="date" value="${nextSessionDate()}" style="min-height:52px;font-size:18px;"></div>`, ()=>{
     const el = document.getElementById('pickSessDate');
@@ -9042,9 +9074,9 @@ function sessionStepsHTML(open){
   let total = 0, done = 0;
   (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
   const rows = [
-    c.unassigned===0 ? stepRow('ok','Groupes prêts','') : stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', '', `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Placer</button>`),
+    c.unassigned===0 ? stepRow('ok','Groupes prêts','') : stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', '', `<button class="btn-ghost" onclick="openPlaceModal()">Placer</button>`),
     open.published ? stepRow('ok','Session publiée','') : stepRow('todo','Publier la session','Les joueurs verront leurs matchs'),
-    (total>0 && done===total) ? stepRow('ok','Tous les scores saisis', total + ' matchs') : stepRow('todo','Entrer les scores', done + ' sur ' + total + ' saisis')
+    (total>0 && done===total) ? stepRow('ok','Tous les scores saisis', total + ' matchs') : stepRow('todo','Entrer les scores', done + ' sur ' + total + ' saisis', total>0 ? `<button class="btn-ghost" onclick="goSessionTab('resultats')">Saisir</button>` : '')
   ];
   return `<div class="stp-list">${rows.join('')}</div>`;
 }
