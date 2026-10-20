@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 182">
+<meta name="app-build" content="Version 184">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -744,6 +744,34 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .dk.active span{max-width:96px;opacity:1;}
 .dk.raised{background:var(--paddle);color:#fff;}
 .dk .mt-emoji{font-size:21px;line-height:1;}
+
+/* ---------- v184 : présentation admin simplifiée ---------- */
+.sess-card{background:var(--court-light);border-radius:20px;padding:18px;margin-bottom:16px;border:1px solid var(--line-soft);display:flex;flex-direction:column;gap:14px;}
+.sess-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.sess-date{font-size:20px;font-weight:700;}
+.sess-chip{font-size:14px;font-weight:700;padding:6px 12px;border-radius:14px;white-space:nowrap;}
+.sess-chip.off{background:rgba(233,194,60,.18);color:#E9C23C;}
+.sess-chip.on{background:rgba(159,191,58,.2);color:var(--ball);}
+.sess-sub{font-size:16px;line-height:1.4;color:#C7D9D5;margin-top:-6px;}
+.sess-main{height:58px;border:0;border-radius:16px;background:var(--ball);color:#0C2622;font:700 18px var(--font-body);cursor:pointer;}
+.sess-main-alt{background:transparent;color:var(--line);border:1px solid var(--line-soft-strong);}
+.sess-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sess-tile{height:68px;border:0;border-radius:14px;background:#0C2622;color:var(--text);font:600 16px var(--font-body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;}
+.sess-tile svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.sess-sep{height:1px;background:var(--line-soft-strong);}
+.sess-end-row{display:flex;gap:10px;}
+.sess-end{flex:1;height:52px;border-radius:14px;border:1px solid var(--ball);background:transparent;color:var(--ball);font:700 16px var(--font-body);cursor:pointer;}
+.sess-cancel{height:52px;padding:0 16px;border:0;border-radius:14px;background:transparent;color:var(--danger);font:600 16px var(--font-body);cursor:pointer;}
+.sess-note{font-size:14px;color:var(--muted);margin-top:-6px;}
+.grp-more{width:44px;height:44px;border:0;border-radius:12px;background:#0C2622;color:#C7D9D5;font-size:22px;line-height:1;cursor:pointer;flex:none;}
+.drop-target td{padding-top:13px;padding-bottom:13px;font-size:17px;}
+.drop-target th{font-size:12px;letter-spacing:.08em;}
+.prog{display:flex;align-items:center;gap:10px;font-size:15px;margin:2px 0 6px;}
+.prog-bar{flex:1;height:8px;border-radius:4px;background:#184740;overflow:hidden;}
+.prog-bar i{display:block;height:8px;border-radius:4px;background:var(--ball);}
+.prog b{color:#C7D9D5;font-weight:600;}
+.match-row .pill-input{width:56px;height:52px;font-size:24px;font-family:var(--font-display);border-radius:12px;}
+.match-row .team{font-size:16px;font-weight:600;line-height:1.3;}
 
 /* ---------- Nouveau menu, étape 2 : feuilles, cartes, sections ---------- */
 .m-grab,.sec-picker{display:none;}
@@ -4611,22 +4639,26 @@ function adminSessionSectionHTML(){
       <button class="btn btn-primary" onclick="onStartSession()">Démarrer une nouvelle session</button>
     </div>`;
   } else {
-    html += `<div class="card">
-      <h2>Session du ${open.date}</h2>
-      <p class="small">${open.published ? '✅ Session publiée — visible par les joueurs.' : '🔒 Session non publiée — les joueurs ne voient pas encore leurs matchs.'}</p>
-      <div class="row">
-        ${open.published
-          ? `<button class="btn btn-secondary" onclick="onUnpublishSession()">Dépublier (masquer aux joueurs)</button>`
-          : `<button class="btn btn-primary" onclick="onPublishSession()">Publier la session aux joueurs</button>`}
-        <button class="btn btn-primary" onclick="onFinalize()">Terminer la session (appliquer montées/descentes)</button>
-        <button class="btn btn-secondary" onclick="onCancelSession()">Annuler la session</button>
+    html += `<div class="sess-card">
+      <div class="sess-head">
+        <div class="sess-date">Session du ${escapeHTML(String(open.date))}</div>
+        <span class="sess-chip ${open.published?'on':'off'}">${open.published ? 'Publiée' : 'Non publiée'}</span>
       </div>
-      <div class="row" style="margin-top:10px;">
-        <button class="btn btn-secondary" onclick="printMatchSheets('${open.id}')">🖨️ Imprimer les feuilles de match</button>
-        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="emailAbsenceReminder()">📧 Rappel d'absence par courriel</button>
+      <div class="sess-sub">${open.published ? 'Les joueurs voient leurs matchs.' : 'Les joueurs ne voient pas encore leurs matchs.'}</div>
+      ${open.published
+        ? `<button class="sess-main sess-main-alt" onclick="onUnpublishSession()">Retirer la publication</button>`
+        : `<button class="sess-main" onclick="onPublishSession()">Publier la session aux joueurs</button>`}
+      <div class="sess-tiles">
+        <button class="sess-tile" onclick="printMatchSheets('${open.id}')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-3M7 14h10v7H7z"/></svg>Imprimer</button>
+        <button class="sess-tile" onclick="emailAbsenceReminder()"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 8l9 6 9-6"/></svg>Rappel d'absence</button>
       </div>
+      <div class="sess-sep"></div>
+      <div class="sess-end-row">
+        <button class="sess-end" onclick="onFinalize()">Terminer la session</button>
+        <button class="sess-cancel" onclick="onCancelSession()">Annuler</button>
+      </div>
+      <div class="sess-note">« Terminer » applique les montées et descentes.</div>
       ${DATA.testMode ? `<div class="row" style="margin-top:10px;"><button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button></div>` : ''}
-      <p class="small" style="margin-top:10px;">Gère les absences/remplaçants dans « Groupes », entre les pointages dans « Résultats ».</p>
     </div>`;
   }
   const sub = VIEW.sessionSubTab || 'groupes';
@@ -4737,9 +4769,15 @@ function adminAllPeopleHTML(){
       tags: pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : '',
       sub:`🔄 Remplaçant${link?' · ✅ Compte':''}` });
   });
-  rows.sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr'));
+  const allSort = VIEW.allSortBy || 'name', allDir = VIEW.allSortDir || (allSort==='rating' ? 'desc' : 'asc');
+  rows.sort((a,b)=>{
+    const c = allSort==='rating' ? (a.rating - b.rating) : a.name.toLowerCase().localeCompare(b.name.toLowerCase(),'fr');
+    return allDir==='asc' ? c : -c;
+  });
+  const allArrow = k => allSort===k ? (allDir==='asc' ? ' ↑' : ' ↓') : '';
   return plListHTML({ id:'all', title:'Tous', hint:'Réguliers et remplaçants ensemble — touche une personne pour la gérer.', rows,
-    chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants'],['wait','⏳ En attente']] });
+    chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants'],['wait','⏳ En attente']],
+    sorts:[['name','Nom A–Z'],['rating','Cote']].map(([k,l])=>({ label:l, arrow:allArrow(k), active:allSort===k, onclick:`setAllSort('${k}')` })) });
 }
 // Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
 // ligue (échelle ou MLP), permet d'ajouter un régulier, un remplaçant ou un
@@ -7657,6 +7695,11 @@ function toggleMyInjured(pid){
   notifyAdminsPlayerInjured(p.name);
   saveAndRender();
 }
+function setAllSort(col){
+  if((VIEW.allSortBy||'name') === col){ VIEW.allSortDir = ((VIEW.allSortDir || (col==='rating' ? 'desc' : 'asc'))==='asc') ? 'desc' : 'asc'; }
+  else { VIEW.allSortBy = col; VIEW.allSortDir = col==='rating' ? 'desc' : 'asc'; }
+  render();
+}
 function setRegularsSort(col){
   if((VIEW.regularsSortBy||'name') === col){ VIEW.regularsSortDir = (VIEW.regularsSortDir||'asc')==='asc' ? 'desc' : 'asc'; }
   else { VIEW.regularsSortBy = col; VIEW.regularsSortDir = 'asc'; }
@@ -8580,8 +8623,7 @@ function adminGroupsHTML(){
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;">
         <h2>${escapeHTML(g.name)} <span class="small">(${displayCount} joueur${displayCount>1?'s':''})</span></h2>
-        <button class="btn-ghost" onclick="renameGroup('${g.id}')">renommer</button>
-        <button class="btn-ghost-danger" onclick="deleteGroup('${g.id}')">supprimer</button>
+        <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du groupe">⋯</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
@@ -8691,6 +8733,13 @@ function addGroup(){
   DATA.groups.push({ id: uid('g'), name: 'Groupe ' + (maxOrder+1), order: maxOrder+1 });
   saveAndRender();
 }
+function openGroupMenu(gid){
+  const g = groupById(gid); if(!g) return;
+  showContentModal(g.name, `<div style="display:flex;flex-direction:column;gap:10px;">
+    <button class="btn btn-secondary" style="height:56px;font-size:17px;" onclick="closeModal();renameGroup('${gid}')">Renommer le groupe</button>
+    <button class="btn-ghost-danger" style="height:56px;font-size:17px;border-radius:14px;" onclick="closeModal();deleteGroup('${gid}')">Supprimer le groupe</button>
+  </div>`);
+}
 function renameGroup(gid){
   const g = groupById(gid);
   showPrompt('Nouveau nom du groupe :', g.name, (name)=>{
@@ -8796,7 +8845,11 @@ function adminSessionHTML(){
     const activeCount = expectedRoster.size;
     const info = activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
     html += `<div class="card"><h3>${escapeHTML(g.name)}</h3>${info ? `<p class="small">${info}</p>` : ''}`;
-    if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « régénérer » ci-dessous.</p>`;
+    if(gd.matches.length){
+      const doneN = gd.matches.filter(m=>m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='').length;
+      html += `<div class="prog"><div class="prog-bar"><i style="width:${Math.round(100*doneN/gd.matches.length)}%"></i></div><b>${doneN} / ${gd.matches.length}</b></div>`;
+    }
+    if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « Refaire les matchs » ci-dessous.</p>`;
     if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucun modèle de rotation défini — configure-le dans Réglages → Paramètres de ligue.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
     gd.matches.forEach((m, mi)=>{
       const nameTag = (id)=>{
@@ -8820,7 +8873,7 @@ function adminSessionHTML(){
     if(!manual && m_hasSitOut(gd.matches)){
       html += `<p class="small">Repos par match : ${gd.matches.map(m=>m.sit?sitLabel(m):'—').join(', ')}</p>`;
     }
-    html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">régénérer les matchs de ce groupe</button>`;
+    html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">Refaire les matchs de ce groupe</button>`;
     if(DATA.testMode && gd.matches.length){
       html += ` <button class="btn-ghost" onclick="autoFillGroupScores('${g.id}')">🎲 générer des scores aléatoires (test)</button>`;
     }
@@ -9218,7 +9271,29 @@ async function selfAction(action, payload){
 function isPlayerActor(){ return !!(SESSION_USER && SESSION_USER.role!=='admin'); }
 // Quand un joueur se déclare absent, le serveur ne peut pas recalculer les matchs :
 // il marque les groupes concernés, et l'admin les recalcule à sa prochaine ouverture.
+// Si l'effectif actif d'un groupe a changé (ex. un 6e joueur ajouté après la génération), les matchs
+// d'une séance ouverte sans aucun score sont recalculés pour respecter la règle (5 joueurs = 10, 6 = rotation de 6).
+function syncOpenSessionMatchCounts(){
+  try{
+    const open = currentOpenSession();
+    if(!open || !SESSION_USER || SESSION_USER.role!=='admin' || OFFLINE_MODE || DATA.testMode) return;
+    let changed = false;
+    open.groupsData.forEach(gd=>{
+      if(!gd.matches || !gd.matches.length) return;
+      if(gd.matches.some(m=>m.scoreA!=null||m.scoreB!=null)) return;
+      const n = activeRosterForGroup(open, gd.groupId).length;
+      if(n !== 4 && n !== 5 && n !== 6) return;
+      if(DATA.matchupMode==='manual' && n !== 6) return;
+      const hasSit2 = gd.matches.some(m=>m.sit2);
+      if(gd.matches.length !== matchesCountFor(n) || (n===6) !== hasSit2){
+        regenerateGroupMatches(open, gd.groupId); changed = true;
+      }
+    });
+    if(changed) saveData();
+  }catch(e){ console.error(e); }
+}
 function processPendingRegen(){
+  syncOpenSessionMatchCounts();
   try{
     const open = currentOpenSession();
     if(!open || !Array.isArray(open.regenGroups) || !open.regenGroups.length) return;
@@ -9857,10 +9932,10 @@ function groupAbove(gid){
 // Onglet « Réglages » unifié : sous-onglets Ligue / Mode test / Partage / Sauvegarde.
 // ============ Réglages : écran principal (liste de cartes -> pop-ups) ============
 function settingsRow(icon, title, summary, onClickFn){
-  return `<div class="card clickable-row" onclick="${onClickFn}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;">
+  return `<div class="card clickable-row" onclick="${onClickFn}" style="display:flex;align-items:center;gap:14px;padding:16px 14px;min-height:64px;cursor:pointer;">
     <div class="icon-badge">${icon}</div>
     <div style="flex:1;min-width:0;">
-      <div style="font-weight:600;font-size:15px;">${escapeHTML(title)}</div>
+      <div style="font-weight:600;font-size:17px;">${escapeHTML(title)}</div>
       <div class="small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(summary)}</div>
     </div>
     <span class="small" style="font-size:18px;opacity:.6;flex-shrink:0;">›</span>
