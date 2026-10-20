@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 187">
+<meta name="app-build" content="Version 188">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
@@ -779,6 +779,33 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
 .match-row.mr2 .mr-score{flex:none;width:72px;height:56px;display:flex;align-items:center;justify-content:center;font-size:28px;font-family:var(--font-display);border-radius:12px;background:rgba(0,0,0,.25);}
 .match-row.mr2.me .mr-line{box-shadow:inset 0 0 0 1px rgba(207,234,92,.35);}
 .match-row.mr2 .sc-mark{position:absolute;left:auto;right:0;top:8px;transform:none;}
+
+.stp-list{display:flex;flex-direction:column;border-radius:16px;background:rgba(0,0,0,.18);}
+.stp{display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;border-bottom:1px solid var(--line-soft);}
+.stp:last-child{border-bottom:0;}
+.stp-ic{width:30px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex:none;}
+.stp-ic.ok{background:var(--ball-dark);color:#0C2622;}
+.stp-ic.warn{background:rgba(233,194,60,.22);color:#E9C23C;}
+.stp-ic.todo{border:2px solid var(--muted);color:var(--muted);}
+.stp-t{flex:1;min-width:0;}
+.stp-t b{display:block;font-size:17px;font-weight:600;}
+.stp-t span{display:block;font-size:14px;color:var(--muted);margin-top:1px;}
+.stp .btn-ghost{flex:none;}
+.lnc-card{background:var(--court-light);border-radius:22px;padding:22px 20px 20px;margin-bottom:16px;border:1px solid var(--line-soft-strong);display:flex;flex-direction:column;gap:6px;}
+.lnc-card.warn{border-color:rgba(233,194,60,.55);}
+.lnc-eyebrow{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.lnc-date{font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1.05;letter-spacing:.01em;text-transform:uppercase;color:var(--ball);}
+.lnc-sub{font-size:17px;color:#C7D9D5;margin-top:4px;}
+.lnc-warn{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:14px;border-radius:14px;background:rgba(233,194,60,.14);font-size:16px;line-height:1.4;}
+.lnc-main{margin-top:16px;height:62px;border:0;border-radius:18px;background:var(--ball);color:#0C2622;font:700 19px var(--font-body);cursor:pointer;}
+.lnc-alt{height:52px;border-radius:14px;border:0;background:transparent;color:#C7D9D5;font:600 16px var(--font-body);cursor:pointer;}
+.lnc-alt.line{border:1px solid var(--line-soft-strong);color:var(--text);}
+.lnc-choice{text-align:left;border-radius:22px;padding:20px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.05);color:var(--text);font-family:var(--font-body);display:flex;flex-direction:column;gap:6px;cursor:pointer;margin-top:10px;}
+.lnc-choice.first{border:2px solid var(--ball);background:var(--court-light);}
+.lnc-choice .lnc-eyebrow{font-weight:700;}
+.lnc-choice.first .lnc-eyebrow{color:var(--ball);}
+.lnc-choice .lnc-d{font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;text-transform:uppercase;}
+.lnc-last{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:#112F2B;cursor:pointer;margin-bottom:16px;}
 
 /* ---------- Nouveau menu, étape 2 : feuilles, cartes, sections ---------- */
 .m-grab,.sec-picker{display:none;}
@@ -4640,11 +4667,7 @@ function adminSessionSectionHTML(){
   const open = currentOpenSession();
   let html = '';
   if(!open){
-    html += `<div class="card">
-      <h2>Aucune session en cours</h2>
-      <p class="small">Démarre une nouvelle session pour générer automatiquement les matchs de double dans chaque groupe.</p>
-      <button class="btn btn-primary" onclick="onStartSession()">Démarrer une nouvelle session</button>
-    </div>`;
+    html += launchSessionHTML();
   } else {
     html += `<div class="sess-card">
       <div class="sess-head">
@@ -4652,6 +4675,7 @@ function adminSessionSectionHTML(){
         <span class="sess-chip ${open.published?'on':'off'}">${open.published ? 'Publiée' : 'Non publiée'}</span>
       </div>
       <div class="sess-sub">${open.published ? 'Les joueurs voient leurs matchs.' : 'Les joueurs ne voient pas encore leurs matchs.'}</div>
+      ${sessionStepsHTML(open)}
       ${open.published
         ? `<button class="sess-main sess-main-alt" onclick="onUnpublishSession()">Retirer la publication</button>`
         : `<button class="sess-main" onclick="onPublishSession()">Publier la session aux joueurs</button>`}
@@ -8910,6 +8934,112 @@ function checkAndStartSession(explicitDate){
   }
   startNewSession(date);
   saveAndRender();
+}
+// ---------- Lancement d'une session : présentation simplifiée ----------
+const FR_DAYS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+const FR_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+function frDateParts(str){
+  const d = new Date(String(str) + 'T00:00:00');
+  if(isNaN(d.getTime())) return { day:'', rest:String(str), d:null };
+  return { day: FR_DAYS[d.getDay()], rest: d.getDate() + (d.getDate()===1 ? 'er' : '') + ' ' + FR_MONTHS[d.getMonth()], d };
+}
+function frDateLong(str){
+  const p = frDateParts(str);
+  return p.d ? (p.day.charAt(0).toUpperCase() + p.day.slice(1) + ' ' + p.rest) : p.rest;
+}
+function daysFromToday(str){
+  const p = frDateParts(str); if(!p.d) return null;
+  const t = new Date(); const t0 = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  return Math.round((p.d.getTime() - t0.getTime()) / 86400000);
+}
+function launchChecks(){
+  const unassigned = (DATA.players||[]).filter(p=>!p.groupId && !p.injured).length;
+  const sizes = (DATA.groups||[]).map(g=>playersInGroup(g.id).length).filter(n=>n>0);
+  const bad = sizes.filter(n=>(n<GROUP_MIN_PLAYERS() || n>GROUP_MAX_PLAYERS()) && n!==6).length;
+  const total = sizes.reduce((a,b)=>a+b,0);
+  return { unassigned, bad, groups:sizes.length, total, min:sizes.length?Math.min.apply(null,sizes):0, max:sizes.length?Math.max.apply(null,sizes):0 };
+}
+function stepRow(state, title, sub, btn){
+  const ic = state==='ok' ? '✓' : (state==='warn' ? '!' : '');
+  return `<div class="stp"><div class="stp-ic ${state}">${ic}</div><div class="stp-t"><b>${title}</b>${sub?`<span>${sub}</span>`:''}</div>${btn||''}</div>`;
+}
+function launchSessionHTML(){
+  const c = launchChecks();
+  const now = new Date();
+  const isPlayDay = typeof DATA.playDayOfWeek === 'number' && now.getDay() === DATA.playDayOfWeek;
+  const baseDate = nextSessionDate();
+  const blocked = new Set(DATA.blockedDates || []);
+  const seasonEnd = DATA.seasonEndDate || null;
+  const dateBlocked = blocked.has(baseDate);
+  const dateAfterEnd = !!(seasonEnd && baseDate > seasonEnd);
+  const valid = nextValidSessionDate(baseDate).date;
+  const leagueMeta = (typeof LEAGUES !== 'undefined') ? LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) : null;
+  const when = (leagueMeta && leagueMeta.schedule_label) ? ' · ' + escapeHTML(leagueMeta.schedule_label) : '';
+  let hero = '';
+  if(isPlayDay && !dateBlocked){
+    const todayStr = fmtDate(now), nextStr = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()+7));
+    const dn = FR_DAYS[DATA.playDayOfWeek];
+    hero = `<div class="lnc-card">
+      <div style="font-size:20px;font-weight:700;line-height:1.3;">On est ${dn}. Pour quelle soirée prépares-tu la session ?</div>
+      <button class="lnc-choice first" onclick="checkAndStartSession('${todayStr}')"><span class="lnc-eyebrow">Ce soir</span><span class="lnc-d">${escapeHTML(frDateLong(todayStr))}</span></button>
+      <button class="lnc-choice" onclick="checkAndStartSession('${nextStr}')"><span class="lnc-eyebrow">${dn.charAt(0).toUpperCase()+dn.slice(1)} prochain</span><span class="lnc-d">${escapeHTML(frDateLong(nextStr))}</span><span class="lnc-sub">Pour préparer la semaine d'avance</span></button>
+      <button class="lnc-alt" onclick="openPickSessionDate()">Choisir une autre date</button>
+    </div>`;
+  } else {
+    const p = frDateParts(baseDate);
+    const dd = daysFromToday(baseDate);
+    const dleft = dd===null ? '' : (dd===0 ? "Aujourd'hui" : (dd===1 ? 'Demain' : 'Dans ' + dd + ' jours'));
+    const warn = dateBlocked ? 'Cette date est <b>bloquée</b> dans le calendrier de saison.' : (dateAfterEnd ? 'Cette date dépasse la <b>fin de saison</b> (' + escapeHTML(String(seasonEnd)) + ').' : '');
+    hero = `<div class="lnc-card${warn?' warn':''}">
+      <div class="lnc-eyebrow">Prochaine session</div>
+      <div class="lnc-date">${escapeHTML(p.day.charAt(0).toUpperCase()+p.day.slice(1))}<br>${escapeHTML(p.rest)}</div>
+      ${warn ? `<div class="lnc-warn"><div class="stp-ic warn" style="background:#E9C23C;color:#0C2622;">!</div><div>${warn}</div></div>` : `<div class="lnc-sub">${escapeHTML(dleft)}${when}</div>`}
+      ${warn && valid ? `<button class="lnc-main" onclick="checkAndStartSession('${valid}')">Prendre le ${escapeHTML(frDateLong(valid).toLowerCase())}</button><div style="text-align:center;font-size:14px;color:var(--muted);">Prochaine date libre</div><button class="lnc-alt line" onclick="checkAndStartSession('${baseDate}')">Démarrer quand même le ${escapeHTML(p.rest)}</button>`
+        : `<button class="lnc-main" onclick="checkAndStartSession('${baseDate}')">Démarrer la session</button>`}
+      <button class="lnc-alt" onclick="openPickSessionDate()">Choisir une autre date</button>
+    </div>`;
+  }
+  const rows = [];
+  rows.push(c.bad===0 && c.groups>0
+    ? stepRow('ok', c.groups + ' groupe' + (c.groups>1?'s':'') + ' prêt' + (c.groups>1?'s':''), c.total + ' joueurs · de ' + c.min + ' à ' + c.max + ' par groupe')
+    : stepRow('warn', c.groups===0 ? 'Aucun groupe' : c.bad + ' groupe' + (c.bad>1?'s':'') + ' hors limites', 'Vérifie les groupes ci-dessous', c.groups===0 ? '' : `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Voir</button>`));
+  rows.push((dateBlocked || dateAfterEnd)
+    ? stepRow('warn', 'Date à vérifier', dateBlocked ? 'Date bloquée ce jour-là' : 'Après la fin de saison')
+    : stepRow('ok', 'Date libre', 'Aucune date bloquée ce jour-là'));
+  if(c.unassigned>0) rows.push(stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', "Ils ne joueront pas tant qu'ils n'en ont pas", `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Placer</button>`));
+  else rows.push(stepRow('ok', 'Tous les joueurs ont un groupe', ''));
+  let html = hero + `<div class="lnc-eyebrow" style="margin:0 0 8px;">Avant de démarrer</div><div class="stp-list" style="margin-bottom:16px;">${rows.join('')}</div>`;
+  const last = (DATA.sessions||[]).filter(x=>x.status==='closed').slice(-1)[0];
+  if(last){
+    const nm = (last.groupsData||[]).reduce((a,gd)=>a+((gd.matches||[]).length),0);
+    let up = 0, down = 0;
+    (last.movements||[]).forEach(m=>{
+      const a = groupById(m.fromGroupId), b = groupById(m.toGroupId);
+      if(a && b){ if(b.order < a.order) up++; else if(b.order > a.order) down++; }
+    });
+    html += `<div class="lnc-eyebrow" style="margin:0 0 8px;">Dernière session</div>
+    <div class="lnc-last" onclick="setAdminTab('historique')"><div style="flex:1;"><div style="font-size:17px;font-weight:600;">${escapeHTML(frDateLong(last.date))}</div><div style="font-size:15px;color:var(--muted);">${nm} matchs joués${(up||down)?' · '+up+' montée'+(up>1?'s':'')+', '+down+' descente'+(down>1?'s':''):''}</div></div><span style="color:var(--muted);font-size:22px;">›</span></div>`;
+  }
+  return html;
+}
+function openPickSessionDate(){
+  showFormModal('Choisir une date', `<div class="field"><label>Date de la session</label><input id="pickSessDate" type="date" value="${nextSessionDate()}" style="min-height:52px;font-size:18px;"></div>`, ()=>{
+    const el = document.getElementById('pickSessDate');
+    const v = el && el.value;
+    if(v) checkAndStartSession(v);
+  });
+}
+// Étapes cochées d'une session ouverte : groupes prêts, session publiée, scores saisis.
+function sessionStepsHTML(open){
+  const c = launchChecks();
+  let total = 0, done = 0;
+  (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
+  const rows = [
+    c.unassigned===0 ? stepRow('ok','Groupes prêts','') : stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', '', `<button class="btn-ghost" onclick="VIEW.sessionSubTab='groupes';render();">Placer</button>`),
+    open.published ? stepRow('ok','Session publiée','') : stepRow('todo','Publier la session','Les joueurs verront leurs matchs'),
+    (total>0 && done===total) ? stepRow('ok','Tous les scores saisis', total + ' matchs') : stepRow('todo','Entrer les scores', done + ' sur ' + total + ' saisis')
+  ];
+  return `<div class="stp-list">${rows.join('')}</div>`;
 }
 function onStartSession(){
   const now = new Date();
