@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 217">
+<meta name="app-build" content="Version 218">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1148,6 +1148,11 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
   body.modern-nav .more-sheet{left:50%;right:auto;transform:translateX(-50%);width:min(560px,100%);animation:none;}
   body.modern-nav .chat-fab{bottom:calc(112px + env(safe-area-inset-bottom,0px));}
 }
+
+/* v218 : vue admin « compte d'abord » */
+.acc-lines{display:flex;flex-direction:column;gap:2px;font-size:15px;color:var(--text);}
+.acc-seg-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.acc-seg-scroll button{flex:none;padding:0 16px;white-space:nowrap;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -4348,6 +4353,7 @@ function openLeagueSwitcherPopover(switchContext){
 // (ex: "setPlayerTab('classement')"). raised:true affiche l'icône dans un
 // cercle surélevé (action principale mise en avant, comme le QR code dans
 // l'app de référence).
+let NAV_NO_MORE = false;
 function bottomNavHTML(items, activeKey){
   if(MODERN_NAV){
     const normal = items.filter(it=>!it.raised);
@@ -4360,7 +4366,7 @@ function bottomNavHTML(items, activeKey){
     }
     const rest = needMore ? normal.filter(it=>!mainSet.includes(it)) : [];
     const dockItems = items.filter(it=>it.raised || mainSet.includes(it));
-    const isAdmin = SESSION_USER && SESSION_USER.role==='admin' && !(typeof ADMIN_VIEWING_AS!=='undefined' && ADMIN_VIEWING_AS && ADMIN_VIEWING_AS!=='admin');
+    const isAdmin = !NAV_NO_MORE && SESSION_USER && SESSION_USER.role==='admin' && !(typeof ADMIN_VIEWING_AS!=='undefined' && ADMIN_VIEWING_AS && ADMIN_VIEWING_AS!=='admin');
     const restActive = rest.some(it=>it.key===activeKey);
     const dock = dockItems.map(it=> it.raised
       ? `<button class="dk raised" onclick="${it.onclick}" aria-label="${escapeHTML(it.label)}"><span class="mt-emoji">${it.icon}</span></button>`
@@ -4790,6 +4796,7 @@ function renderAdmin(){
       ${PUSH_SUPPORTED || isIOSDevice() ? `<button class="btn-ghost" style="width:100%;text-align:left;margin-top:6px;" onclick="openSendAnnouncementModal()">📣 Envoyer une annonce</button>` : ''}
       ${PUSH_SUPPORTED || isIOSDevice() ? `<div style="margin-top:6px;">${notificationDrawerButtonHTML()}</div>` : ''}
     </div>`;
+  if(!ADMIN_CLASSIC_VIEW){ renderAdminAccount(orgSwitcher + leagueSwitcher + drawerSettings, viewSlide, canViewAsPlayer, canViewAsSub); return; }
   app.innerHTML = `
     ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), orgSwitcher + leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'admin')}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
@@ -4808,6 +4815,196 @@ function renderAdmin(){
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
   if(VIEW.tab==='mur') scrollWallToBottom();
+}
+// ================== Vue admin « compte d'abord » (v218) ==================
+// Accueil · Organisations · Communauté · Moi. Mettre ADMIN_CLASSIC_VIEW à true pour revenir à l'ancienne vue.
+const ADMIN_CLASSIC_VIEW = false;
+let ADMIN_SUMMARY = {}, ADMIN_SUMMARY_AT = 0, ADMIN_SUMMARY_LOADING = false;
+function summarizeAdminLeague(data, lg){
+  const out = { leagueId: lg.id, name: lg.name, schedule: lg.schedule_label || '', mlp: !!(data && data.leagueFormat==='mlp'), players:0, unassigned:0, open:null };
+  if(!data) return out;
+  const players = data.players || [];
+  out.players = players.length;
+  out.unassigned = players.filter(p=>!p.groupId && !p.injured).length;
+  const open = (data.sessions||[]).find(x=>x.status==='open');
+  if(open){
+    let total=0, done=0;
+    (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
+    out.open = { date: open.date, published: !!open.published, total, done, absences: (open.absences||[]).length };
+  }
+  return out;
+}
+function adminSummaryFor(lg){
+  if(lg.id === CURRENT_LEAGUE_ID) return summarizeAdminLeague(DATA, lg);
+  return ADMIN_SUMMARY[lg.id] || null;
+}
+async function refreshAdminSummaries(force){
+  if(ADMIN_SUMMARY_LOADING) return;
+  if(!force && Date.now() - ADMIN_SUMMARY_AT < 45000) return;
+  const others = myOrgLeagues().filter(l=>l.id !== CURRENT_LEAGUE_ID);
+  if(!others.length){ ADMIN_SUMMARY_AT = Date.now(); return; }
+  ADMIN_SUMMARY_LOADING = true;
+  try{
+    await Promise.all(others.map(async lg=>{
+      try{
+        const { data, error } = await sb.from('league_data').select('data').eq('league_id', lg.id).single();
+        if(error) return;
+        ADMIN_SUMMARY[lg.id] = summarizeAdminLeague(data && data.data, lg);
+      }catch(e){}
+    }));
+    ADMIN_SUMMARY_AT = Date.now();
+  }finally{ ADMIN_SUMMARY_LOADING = false; }
+  if(SESSION_USER && SESSION_USER.role==='admin' && !MODAL && !ADMIN_VIEWING_AS && !ADMIN_SHOWING_ORG && (VIEW.atab===undefined || VIEW.atab==='accueil' || VIEW.atab==='orgs') && !VIEW.adet) render();
+}
+function setAAcc(t){ VIEW.atab = t; VIEW.adet = false; if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); } render(); }
+async function openAdminLeague(leagueId, tab){
+  if(leagueId !== CURRENT_LEAGUE_ID){ await switchToLeague(leagueId); }
+  ADMIN_SUMMARY_AT = 0;
+  VIEW = { atab:'orgs', adet:true, tab: tab || 'session', pcomm: VIEW.pcomm };
+  render();
+}
+function closeAdminLeague(){ VIEW.adet = false; render(); }
+async function pickAdminOrg(orgId){
+  if(orgId !== CURRENT_ORGANIZATION_ID){ await switchToOrganization(orgId); }
+  VIEW = { atab:'orgs', adet:false, pcomm: VIEW.pcomm };
+  render();
+}
+function adminLeagueState(sum){
+  if(!sum) return { chip:'…', cls:'tag-stay', hint:'' };
+  if(sum.mlp) return { chip:'MLP', cls:'tag-stay', hint:'' };
+  const o = sum.open;
+  if(!o) return { chip:'Aucune session', cls:'tag-stay', hint:'Lancer la prochaine session' };
+  if(!o.published) return { chip:'Non publiée', cls:'tag-yellow', hint:'Publier la session' };
+  if(o.total>0 && o.done===o.total) return { chip:'À terminer', cls:'tag-up', hint:'Tous les scores sont entrés' };
+  return { chip:'En cours', cls:'tag-up', hint:o.done + ' / ' + o.total + ' scores saisis' };
+}
+function adminLeagueCardHTML(lg){
+  const sum = adminSummaryFor(lg);
+  const st = adminLeagueState(sum);
+  const lines = [];
+  if(sum && sum.open) lines.push('📅 ' + escapeHTML(frDateLong(sum.open.date)));
+  if(sum && sum.open && sum.open.absences) lines.push('🚫 ' + sum.open.absences + ' absence' + (sum.open.absences>1?'s':''));
+  if(sum && sum.unassigned) lines.push('⚠️ ' + sum.unassigned + ' joueur' + (sum.unassigned>1?'s':'') + ' sans groupe');
+  return `<div class="acc-lg" onclick="openAdminLeague('${lg.id}','session')">
+    <div class="acc-lg-h"><b>${escapeHTML(lg.name)}</b><span class="tag ${st.cls}">${st.chip}</span></div>
+    <div class="small">${escapeHTML(lg.schedule_label || '')}${sum ? ' · ' + sum.players + ' joueur' + (sum.players>1?'s':'') : ''}</div>
+    ${lines.length ? `<div class="acc-lines">${lines.map(x=>`<div>${x}</div>`).join('')}</div>` : ''}
+    <div class="acc-open">${escapeHTML(st.hint || 'Ouvrir')} ›</div>
+  </div>`;
+}
+function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
+  const tabs = [['accueil','Accueil','🏠'],['orgs','Organisations','🏢'],['comm','Communauté','👥'],['moi','Moi','🙂']];
+  const active = tabs.some(t=>t[0]===VIEW.atab) ? VIEW.atab : 'accueil';
+  NAV_NO_MORE = true;
+  const bar = tabsBarHTML(tabs, active, 'setAAcc');
+  NAV_NO_MORE = false;
+  app.innerHTML = `
+    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), drawerHTML, '', viewSlide, null, null, 'admin')}
+    ${storageBannerHTML()}${pushPromoBannerHTML()}
+    ${bar}
+    <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>`;
+  const c = document.getElementById('tabContent');
+  if(active==='accueil') c.innerHTML = adminHomeHTML();
+  else if(active==='orgs') c.innerHTML = adminOrgsHTML();
+  else if(active==='comm') c.innerHTML = adminCommHTML();
+  else c.innerHTML = adminMeHTML(canViewAsPlayer, canViewAsSub);
+  if(active==='orgs' && VIEW.adet && VIEW.tab==='mur') scrollWallToBottom();
+}
+// ---- Accueil admin ----
+function adminHomeHTML(){
+  const leagues = myOrgLeagues();
+  const org = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  let html = '';
+  // À traiter
+  const todo = [];
+  let pending = 0;
+  try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
+  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrganizationPage('comptes')"><span class="acc-row-t"><b>${pending} compte${pending>1?'s':''} en attente</b><small>À approuver et lier à un joueur</small></span><span class="acc-chev">›</span></button>`);
+  leagues.forEach(lg=>{
+    const sum = adminSummaryFor(lg);
+    if(!sum || sum.mlp) return;
+    if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} sans groupe</b><small>${escapeHTML(lg.name)}</small></span><span class="acc-chev">›</span></button>`);
+    if(sum.open && sum.open.published && sum.open.total>0 && sum.open.done===sum.open.total) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>Session prête à terminer</b><small>${escapeHTML(lg.name)} · tous les scores sont entrés</small></span><span class="acc-chev">›</span></button>`);
+  });
+  if(todo.length) html += `<div class="pc-sec" style="margin-top:0;">À traiter</div><div class="acc-group" style="margin-bottom:6px;">${todo.join('')}</div>`;
+  html += `<div class="pc-sec">${escapeHTML(org ? org.name : 'Mes ligues')} · Mes ligues</div>
+    <div class="pc-list">${leagues.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>
+    <button class="btn btn-secondary acc-btn" style="margin-top:12px;" onclick="onCreateLeague()">+ Créer une ligue</button>`;
+  html += accUpcomingHTML();
+  setTimeout(()=>refreshAdminSummaries(false), 0);
+  return html;
+}
+// ---- Organisations admin ----
+function adminOrgsHTML(){
+  const isSuper = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
+  const orgs = (SUPER_ADMIN_MODE && isSuper) ? ALL_ORGANIZATIONS : MY_ORGANIZATIONS;
+  const org = orgs.find(o=>o.id===CURRENT_ORGANIZATION_ID) || orgs[0];
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  // Détail d'une ligue : les écrans habituels, en sous-sections
+  if(VIEW.adet && lg){
+    const sections = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
+    const cur = sections.some(x=>x[0]===VIEW.tab) ? VIEW.tab : 'session';
+    let body;
+    if(cur==='session') body = adminSessionSectionHTML();
+    else if(cur==='joueurs') body = adminPlayersSectionHTML();
+    else if(cur==='historique') body = adminHistoryHTML();
+    else if(cur==='rapports') body = adminReportsSectionHTML();
+    else body = adminSettingsSectionHTML();
+    return `<button type="button" class="acc-back" onclick="closeAdminLeague()">‹ ${escapeHTML(org ? org.name : 'Organisation')}</button>
+      <div class="acc-head2">${escapeHTML(lg.name)}${lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</div>
+      <div class="acc-seg acc-seg-scroll">${sections.map(([k,l])=>`<button type="button" class="${k===cur?'on':''}" onclick="setAdminTab('${k}')">${l}</button>`).join('')}</div>
+      <div style="margin-top:14px;">${body}</div>`;
+  }
+  const multi = orgs.length > 1;
+  if(multi && !VIEW.aorgOpen){
+    return `<div class="pc-list">${orgs.map(o=>`
+      <button type="button" class="acc-org" onclick="VIEW.aorgOpen=true;pickAdminOrg('${o.id}')">
+        <span class="acc-org-ico">🏢</span>
+        <span class="acc-row-t"><b>${escapeHTML(o.name)}</b><small>${o.id===CURRENT_ORGANIZATION_ID ? myOrgLeagues().length + ' ligue(s)' : 'Ouvrir'}</small></span>
+        <span class="acc-chev">›</span>
+      </button>`).join('')}</div>`;
+  }
+  const back = multi ? `<button type="button" class="acc-back" onclick="VIEW.aorgOpen=false;render()">‹ Mes organisations</button>` : '';
+  const leagues = myOrgLeagues();
+  setTimeout(()=>refreshAdminSummaries(false), 0);
+  return `${back}<div class="pc-sec" style="margin-top:4px;">${escapeHTML(org ? org.name : '')} · Mes ligues</div>
+    <div class="pc-list">${leagues.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>
+    <button class="btn btn-secondary acc-btn" style="margin-top:12px;" onclick="onCreateLeague()">+ Créer une ligue</button>
+    <div class="pc-sec">Organisation</div>
+    <div class="acc-group">
+      ${accRow('', 'Membres', 'Joueurs et invitations', `openOrganizationPage('membres')`)}
+      ${accRow('', 'Comptes et accès', 'Approbations, liens aux joueurs', `openOrganizationPage('comptes')`)}
+      ${accRow('', 'Rapport', 'Qui joue où', `openOrganizationPage('rapport')`)}
+      ${accRow('', 'Paramètres généraux', 'Nom, lien d\'invitation', `openOrganizationPage('general')`)}
+    </div>`;
+}
+// ---- Communauté admin ----
+function adminCommHTML(){
+  const ann = (PUSH_SUPPORTED || isIOSDevice()) ? `<button class="btn btn-secondary acc-btn" style="margin-bottom:12px;" onclick="openSendAnnouncementModal()">📣 Envoyer une annonce aux joueurs</button>` : '';
+  return ann + accountCommHTML(null);
+}
+// ---- Moi admin ----
+function adminMeHTML(canViewAsPlayer, canViewAsSub){
+  const name = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
+  const isSuper = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
+  return `<div class="acc-me">
+      ${avatarHTML('partner-pill-avatar', partnerInitials(name), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, 'width:72px;height:72px;font-size:26px;')}
+      <div><div style="font-size:22px;font-weight:700;">${escapeHTML(name)}</div><div class="small">Administrateur${isSuper ? ' · 🛡️ Super admin' : ''}</div></div>
+    </div>
+    <div class="pc-sec">Voir comme</div>
+    <div class="acc-group">
+      ${canViewAsPlayer ? accRow('', 'Joueur', 'Voir l\'app comme un joueur', `toggleAdminPlayerView()`) : ''}
+      ${canViewAsSub ? accRow('', 'Remplaçant', 'Voir l\'app comme un remplaçant', `toggleAdminSubView()`) : ''}
+      ${(!canViewAsPlayer && !canViewAsSub) ? '<p class="small" style="color:var(--muted);padding:0 4px;">Aucun profil joueur lié à ton compte dans cette ligue.</p>' : ''}
+    </div>
+    <div class="pc-sec">Compte</div>
+    <div class="acc-group">
+      ${accRow('', 'Mon profil', 'Photo et présentation', `openMyProfileModal()`)}
+      ${accRow('', 'Notifications', '', `openNotifSettings()`)}
+      ${isSuper ? accRow('', SUPER_ADMIN_MODE ? 'Revenir à mes organisations' : 'Voir toutes les organisations', 'Super admin', `toggleSuperAdminOrgView()`) : ''}
+      ${accRow('', 'Déconnexion', '', `logout()`)}
+    </div>`;
 }
 // ==================== ADMIN — LIGUE MLP (vue entièrement séparée) ====================
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
@@ -11917,6 +12114,32 @@ async function absenceFromHome(leagueId){
   VIEW.ptab = 'accueil'; render();
   openOneSessionAbsenceModal(link.player_id);
 }
+function accUpcomingHTML(){
+  const todayStr = fmtDate(new Date());
+  let html = '';
+  // À venir : événements + matchs amicaux où je suis partant(e)
+  const items = [];
+  (SOCIAL_EVENTS||[]).forEach(e=>{ if(e.event_date >= todayStr) items.push({ d:e.event_date, t:e.title, sub:(e.event_time?fmtHM(e.event_time)+' · ':'')+(e.location||'Événement'), tag:'Événement', on:`openEventDetail('${e.id}')` }); });
+  const meId = CURRENT_PROFILE && CURRENT_PROFILE.id;
+  (PARTNER_POSTS||[]).forEach(x=>{
+    if(!x.play_date || x.play_date < todayStr || x.status==='closed') return;
+    const mine = x.profile_id === meId;
+    const going = Array.isArray(x.interested) && x.interested.some(i=>i.profile_id===meId);
+    items.push({ d:x.play_date, t:'Match amical', sub:(x.play_time?fmtHM(x.play_time)+' · ':'')+(mine?'Mon annonce':going?'Je suis partant(e)':'Cherche un partenaire · '+(x.author_name||'')), tag:'Partenaire', on:`openPartnerPostDetail('${x.id}')` });
+  });
+  items.sort((a,b)=>a.d.localeCompare(b.d));
+  if(items.length){
+    html += `<div class="pc-sec">À venir</div><div class="pc-list">${items.slice(0,8).map(it=>`
+      <div class="acc-ev" onclick="${it.on}">
+        <div class="event-pill-date"><span class="d">${eventDayNum(it.d)}</span><span class="m">${escapeHTML(eventMonthAbbr(it.d))}</span></div>
+        <div class="acc-ev-t"><b>${escapeHTML(it.t)}</b><small>${escapeHTML(it.sub)}</small></div>
+        <span class="tag tag-stay">${it.tag}</span>
+      </div>`).join('')}</div>`;
+  } else {
+    html += `<div class="pc-sec">À venir</div><p class="empty">Rien d'autre de prévu pour le moment.</p>`;
+  }
+  return html;
+}
 // ---- Accueil ----
 function accountHomeHTML(me){
   const todayStr = fmtDate(new Date());
@@ -11947,27 +12170,7 @@ function accountHomeHTML(me){
     html += `<div class="acc-card"><div class="acc-eyebrow">Prochaine session</div><div class="acc-sub" style="font-size:16px;">${loadingSome ? 'Chargement de tes ligues…' : 'Aucune session annoncée pour le moment.'}</div></div>`;
   }
   setTimeout(()=>refreshMySummaries(false), 0);
-  // À venir : événements + matchs amicaux où je suis partant(e)
-  const items = [];
-  (SOCIAL_EVENTS||[]).forEach(e=>{ if(e.event_date >= todayStr) items.push({ d:e.event_date, t:e.title, sub:(e.event_time?fmtHM(e.event_time)+' · ':'')+(e.location||'Événement'), tag:'Événement', on:`openEventDetail('${e.id}')` }); });
-  const meId = CURRENT_PROFILE && CURRENT_PROFILE.id;
-  (PARTNER_POSTS||[]).forEach(x=>{
-    if(!x.play_date || x.play_date < todayStr || x.status==='closed') return;
-    const mine = x.profile_id === meId;
-    const going = Array.isArray(x.interested) && x.interested.some(i=>i.profile_id===meId);
-    items.push({ d:x.play_date, t:'Match amical', sub:(x.play_time?fmtHM(x.play_time)+' · ':'')+(mine?'Mon annonce':going?'Je suis partant(e)':'Cherche un partenaire · '+(x.author_name||'')), tag:'Partenaire', on:`openPartnerPostDetail('${x.id}')` });
-  });
-  items.sort((a,b)=>a.d.localeCompare(b.d));
-  if(items.length){
-    html += `<div class="pc-sec">À venir</div><div class="pc-list">${items.slice(0,8).map(it=>`
-      <div class="acc-ev" onclick="${it.on}">
-        <div class="event-pill-date"><span class="d">${eventDayNum(it.d)}</span><span class="m">${escapeHTML(eventMonthAbbr(it.d))}</span></div>
-        <div class="acc-ev-t"><b>${escapeHTML(it.t)}</b><small>${escapeHTML(it.sub)}</small></div>
-        <span class="tag tag-stay">${it.tag}</span>
-      </div>`).join('')}</div>`;
-  } else {
-    html += `<div class="pc-sec">À venir</div><p class="empty">Rien d'autre de prévu pour le moment.</p>`;
-  }
+  html += accUpcomingHTML();
   if(DATA.showRatingToPlayers && MY_LEAGUE_LINKS.length <= 1){
     const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
     html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
