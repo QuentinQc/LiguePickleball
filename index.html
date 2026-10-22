@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 223">
+<meta name="app-build" content="Version 224">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1947,6 +1947,7 @@ function filterDmList(q){
   document.querySelectorAll('#dmList .dm-row').forEach(r=>{ r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
 }
 async function openChat(key){
+  if(HIDDEN_FEATURES.includes('messagerie')) return;
   CHAT_MENU_OPEN = false; CHAT_UNREAD = 0;
   if(key) VIEW.wallChannel = key;
   try{ await loadWallChannel(VIEW.wallChannel || 'general'); }catch(e){}
@@ -1955,11 +1956,13 @@ async function openChat(key){
   scrollWallToBottom();
 }
 function openDmList(){
+  if(HIDDEN_FEATURES.includes('messagerie')) return;
   CHAT_MENU_OPEN = false;
   MODAL = { kind:'content', title:'✉️ Messages privés', htmlContent: ()=>'', chat:true, chatMode:'dm-list' };
   render();
 }
 async function openDmThread(otherId){
+  if(HIDDEN_FEATURES.includes('messagerie')) return;
   CHAT_MENU_OPEN = false;
   MODAL = { kind:'content', title:'✉️ Message privé', htmlContent: ()=>'', chat:true, chatMode:'dm-thread', dmWith: otherId };
   await markDmRead(otherId);
@@ -2053,6 +2056,7 @@ async function loadInboxPreviews(){
   }catch(e){}
 }
 function openInbox(){
+  if(HIDDEN_FEATURES.includes('messagerie')) return;
   CHAT_MENU_OPEN = false;
   MODAL = { kind:'content', title:'Messages', htmlContent: ()=>'', chat:true, chatMode:'inbox' };
   render();
@@ -2105,6 +2109,7 @@ function inboxRowsHTML(){
   return html;
 }
 function chatFabVisible(){
+  if(HIDDEN_FEATURES.includes('messagerie')) return false;
   return !!(SESSION_USER && CURRENT_PROFILE && CURRENT_LEAGUE_ID && DATA && currentLeagueOrgId());
 }
 function updateChatFab(){
@@ -11798,7 +11803,7 @@ function subTabDefs(){
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
 // Fonctions masquées temporairement (remettre à [] pour les réactiver).
-const HIDDEN_FEATURES = ['gamification','videos','tournois'];
+const HIDDEN_FEATURES = ['gamification','videos','tournois','messagerie'];
 function filterTabs(tabs, hiddenKeys){
   const hidden = (hiddenKeys || []).concat(HIDDEN_FEATURES);
   const visible = tabs.filter(t => !hidden.includes(t[0]));
