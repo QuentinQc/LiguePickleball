@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 210">
+<meta name="app-build" content="Version 211">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1100,6 +1100,42 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .pc-card .event-pill-date .d{font-size:20px;line-height:1;}
 .pc-card .event-pill-date .m{font-size:11px;}
 .pc-count{font-size:14px;color:var(--muted);}
+
+/* v211 : vue joueur « compte d'abord » */
+.acc-card{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:10px;}
+.acc-eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ball);font-weight:700;}
+.acc-big{font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;text-transform:uppercase;}
+.acc-sub{font-size:16px;color:var(--muted);}
+.acc-btn{width:100%;min-height:54px;font-size:17px;border-radius:16px;}
+.acc-link{background:none;border:0;color:var(--muted);font:600 15px var(--font-body);padding:6px;cursor:pointer;text-align:center;}
+.acc-ev{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:18px;background:var(--court-elevated-2);border:1px solid var(--line-soft);cursor:pointer;}
+.acc-ev .event-pill-date{width:52px;height:52px;flex:none;}
+.acc-ev .event-pill-date .d{font-size:20px;line-height:1;}
+.acc-ev .event-pill-date .m{font-size:11px;}
+.acc-ev-t{flex:1;min-width:0;display:flex;flex-direction:column;}
+.acc-ev-t b{font-size:17px;font-weight:600;}
+.acc-ev-t small{font-size:15px;color:var(--muted);}
+.acc-row{width:100%;display:flex;align-items:center;gap:14px;min-height:64px;padding:10px 16px;border:0;background:var(--court-elevated-2);color:var(--text);text-align:left;cursor:pointer;font-family:var(--font-body);border-radius:18px;}
+.acc-group{display:flex;flex-direction:column;gap:6px;}
+.acc-row-t{flex:1;min-width:0;display:flex;flex-direction:column;}
+.acc-row-t b{font-size:17px;font-weight:600;}
+.acc-row-t small{font-size:15px;color:var(--muted);}
+.acc-chev{color:var(--muted);font-size:22px;}
+.acc-org{width:100%;display:flex;align-items:center;gap:14px;padding:16px;border-radius:20px;border:1px solid var(--line-soft);background:var(--court-elevated-2);color:var(--text);text-align:left;cursor:pointer;font-family:var(--font-body);}
+.acc-org-ico{width:52px;height:52px;border-radius:16px;background:var(--court);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;}
+.acc-back{background:none;border:0;color:var(--muted);font:600 16px var(--font-body);padding:4px 0 10px;cursor:pointer;}
+.acc-head2{font-family:var(--font-display);font-weight:600;font-size:24px;text-transform:uppercase;margin:0 0 12px;}
+.acc-lg{border-radius:22px;background:var(--court-elevated-2);border:1px solid var(--line-soft);padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;}
+.acc-lg-h{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:20px;}
+.acc-stats{display:flex;gap:10px;}
+.acc-stats>div{flex:1;background:var(--court);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;}
+.acc-stats small{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.acc-stats b{font-family:var(--font-display);font-weight:600;font-size:22px;}
+.acc-open{color:var(--ball);font-weight:700;font-size:15px;}
+.acc-seg{display:flex;padding:4px;border-radius:999px;background:var(--court-elevated-2);gap:4px;margin-bottom:4px;}
+.acc-seg button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted);font:600 15px var(--font-body);cursor:pointer;}
+.acc-seg button.on{background:var(--ball);color:var(--court);font-weight:700;}
+.acc-me{display:flex;align-items:center;gap:16px;padding:6px 2px 4px;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -1258,6 +1294,10 @@ const NAV_SVG = {
   reglages:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   equipes:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
   org:'<path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/>',
+  accueil:'<path d="M3.5 11 12 4l8.5 7M6 9.5V20h12V9.5"/>',
+  orgs:'<path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/>',
+  comm:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
+  moi:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20c.8-4 3.8-6 7.5-6s6.7 2 7.5 6"/>',
   stats:'<path d="M4 19h16M7 16v-5M12 16V6M17 16v-8"/>',
   equipe:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
   videos:'<rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M10.5 9.5v5l4-2.5z"/>',
@@ -11742,6 +11782,7 @@ function renderPlayer(playerId){
       <button class="btn-ghost" style="width:100%;text-align:left;" onclick="showLeagueRulesModal()">📋 Règles de la ligue</button>
       ${notificationDrawerButtonHTML()}
     </div>`;
+  if(!PLAYER_CLASSIC_VIEW){ renderPlayerAccount(me, leagueSwitcher + drawerSettings, viewSlide); return; }
   app.innerHTML = `
     ${topbarHTML('Bonjour ' + escapeHTML(me.name), leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
@@ -11752,6 +11793,176 @@ function renderPlayer(playerId){
   const c = document.getElementById('tabContent');
   c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : playerGroupHTML(me)))))));
   if(activeTab==='mur') scrollWallToBottom();
+}
+// ================== Vue joueur « compte d'abord » (v211) ==================
+// Accueil · Organisations · Communauté · Moi. Mettre PLAYER_CLASSIC_VIEW à true pour revenir à l'ancienne vue.
+const PLAYER_CLASSIC_VIEW = false;
+function setPAcc(t){
+  VIEW.ptab = t; VIEW.pdet = null;
+  if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); }
+  render();
+}
+function setPComm(k){
+  VIEW.pcomm = k;
+  if(k==='calendrier'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); }
+  else markQuickSeen(k==='partenaire' ? 'partenaire' : 'evenements');
+  render();
+}
+function setPOrg(id){ VIEW.porg = id; VIEW.pdet = null; render(); }
+function setPDet(d){ VIEW.pdet = d; render(); }
+async function openMyLeague(leagueId){
+  const org = (LEAGUES.find(l=>l.id===leagueId)||{}).organization_id || null;
+  if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); }
+  VIEW.ptab = 'orgs'; VIEW.porg = org; VIEW.pdet = 'group';
+  render();
+}
+function myOrgsList(){
+  const map = {};
+  MY_LEAGUE_LINKS.forEach(l=>{
+    const lg = LEAGUES.find(x=>x.id===l.league_id);
+    if(!lg) return;
+    const oid = lg.organization_id || 'none';
+    if(!map[oid]) map[oid] = { id: oid, name: (lg.organizations && lg.organizations.name) || 'Mon organisation', leagues: [] };
+    map[oid].leagues.push({ lg, link: l });
+  });
+  return Object.keys(map).map(k=>map[k]);
+}
+function accRow(ico, title, sub, onclick){
+  return `<button type="button" class="acc-row" onclick="${onclick}"><span class="acc-row-t"><b>${title}</b>${sub?`<small>${sub}</small>`:''}</span><span class="acc-chev">›</span></button>`;
+}
+function accSeg(items, active, fn){
+  return `<div class="acc-seg">${items.map(([k,l])=>`<button type="button" class="${k===active?'on':''}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
+}
+function renderPlayerAccount(me, drawerHTML, viewSlide){
+  const tabs = [['accueil','Accueil','🏠'],['orgs','Organisations','🏢'],['comm','Communauté','👥'],['moi','Moi','🙂']];
+  const active = tabs.some(t=>t[0]===VIEW.ptab) ? VIEW.ptab : 'accueil';
+  app.innerHTML = `
+    ${topbarHTML('Bonjour ' + escapeHTML(me.name), drawerHTML, '', viewSlide, null, null, 'member')}
+    ${storageBannerHTML()}${pushPromoBannerHTML()}
+    ${tabsBarHTML(tabs, active, 'setPAcc')}
+    <div id="tabContent"></div>
+    <div class="bottom-nav-spacer"></div>`;
+  const c = document.getElementById('tabContent');
+  c.innerHTML = active==='accueil' ? accountHomeHTML(me)
+    : active==='orgs' ? accountOrgsHTML(me)
+    : active==='comm' ? accountCommHTML(me)
+    : accountMeHTML(me);
+}
+// ---- Accueil ----
+function accountHomeHTML(me){
+  const open = currentOpenSession();
+  const g = groupById(me.groupId);
+  const visible = !!(open && (open.published || DATA.showGroupBeforePublish));
+  const absent = !!(open && isAbsent(open, me.id));
+  const todayStr = fmtDate(new Date());
+  let html = '';
+  if(me.injured){
+    html += `<div class="acc-card"><div class="acc-eyebrow">Statut</div><div class="acc-big">🤕 Blessé(e)</div><button class="btn btn-secondary acc-btn" onclick="openAbsenceHub('${me.id}')">Gérer mon statut</button></div>`;
+  } else if(visible){
+    html += `<div class="acc-card">
+      <div class="acc-eyebrow">Prochaine session</div>
+      <div class="acc-big">${escapeHTML(frDateLong(open.date))}</div>
+      <div class="acc-sub">${escapeHTML(currentLeagueLabel())}${g && !absent ? ' · '+escapeHTML(g.name) : ''}</div>
+      ${absent ? `<div class="modal-badges"><span class="tag tag-orange">🚫 Absence signalée</span></div>` : ''}
+      <button class="btn btn-secondary acc-btn" onclick="${absent ? `openAbsenceHub('${me.id}')` : `openOneSessionAbsenceModal('${me.id}')`}">${absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
+      <button class="acc-link" onclick="openAbsenceHub('${me.id}')">Absences prévues, blessure…</button>
+    </div>`;
+  } else {
+    html += `<div class="acc-card"><div class="acc-eyebrow">Prochaine session</div><div class="acc-sub" style="font-size:16px;">${open ? 'Ta session sera visible dès sa publication.' : 'Aucune session annoncée pour le moment.'}</div><button class="acc-link" onclick="openAbsenceHub('${me.id}')">Absences prévues, blessure…</button></div>`;
+  }
+  // À venir : événements + matchs amicaux où je suis partant(e)
+  const items = [];
+  (SOCIAL_EVENTS||[]).forEach(e=>{ if(e.event_date >= todayStr) items.push({ d:e.event_date, t:e.title, sub:(e.event_time?fmtHM(e.event_time)+' · ':'')+(e.location||'Événement'), tag:'Événement', on:`openEventDetail('${e.id}')` }); });
+  const meId = CURRENT_PROFILE && CURRENT_PROFILE.id;
+  (PARTNER_POSTS||[]).forEach(x=>{
+    if(!x.play_date || x.play_date < todayStr || x.status==='closed') return;
+    const mine = x.profile_id === meId;
+    const going = Array.isArray(x.interested) && x.interested.some(i=>i.profile_id===meId);
+    if(mine || going) items.push({ d:x.play_date, t:'Match amical', sub:(x.play_time?fmtHM(x.play_time)+' · ':'')+(mine?'Mon annonce':'Je suis partant(e)'), tag:'Partenaire', on:`openPartnerPostDetail('${x.id}')` });
+  });
+  items.sort((a,b)=>a.d.localeCompare(b.d));
+  if(items.length){
+    html += `<div class="pc-sec">À venir</div><div class="pc-list">${items.slice(0,6).map(it=>`
+      <div class="acc-ev" onclick="${it.on}">
+        <div class="event-pill-date"><span class="d">${eventDayNum(it.d)}</span><span class="m">${escapeHTML(eventMonthAbbr(it.d))}</span></div>
+        <div class="acc-ev-t"><b>${escapeHTML(it.t)}</b><small>${escapeHTML(it.sub)}</small></div>
+        <span class="tag tag-stay">${it.tag}</span>
+      </div>`).join('')}</div>`;
+  }
+  if(DATA.showRatingToPlayers){
+    const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+    html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
+  }
+  return html;
+}
+// ---- Organisations ----
+function accountOrgsHTML(me){
+  const orgs = myOrgsList();
+  let porg = VIEW.porg;
+  if(orgs.length===1) porg = orgs[0].id;
+  const org = orgs.find(o=>o.id===porg);
+  const multi = orgs.length > 1;
+  if(!org){
+    return `<div class="pc-list">${orgs.map(o=>`
+      <button type="button" class="acc-org" onclick="setPOrg('${o.id}')">
+        <span class="acc-org-ico">🏢</span>
+        <span class="acc-row-t"><b>${escapeHTML(o.name)}</b><small>${o.leagues.length} ligue${o.leagues.length>1?'s':''}</small></span>
+        <span class="acc-chev">›</span>
+      </button>`).join('') || '<p class="empty">Tu n\'es dans aucune ligue pour l\'instant.</p>'}</div>`;
+  }
+  // Détail d'une ligue
+  if(VIEW.pdet){
+    const cur = org.leagues.find(x=>x.lg.id===CURRENT_LEAGUE_ID);
+    const hidden = DATA.hiddenPlayerTabs || [];
+    const segs = [['group','Mon groupe']];
+    if(!hidden.includes('stats')) segs.push(['stats','Statistiques']);
+    if(!hidden.includes('historique')) segs.push(['hist','Historique']);
+    const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
+    return `<button type="button" class="acc-back" onclick="setPDet(null)">‹ ${escapeHTML(org.name)}</button>
+      <div class="acc-head2">${escapeHTML(cur ? (cur.lg.name + (cur.lg.schedule_label ? ' — '+cur.lg.schedule_label : '')) : '')}</div>
+      ${segs.length>1 ? accSeg(segs, det, 'setPDet') : ''}
+      ${det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me)}`;
+  }
+  const back = multi ? `<button type="button" class="acc-back" onclick="setPOrg(null)">‹ Mes organisations</button>` : '';
+  const g = groupById(me.groupId);
+  return `${back}<div class="pc-sec" style="margin-top:4px;">${escapeHTML(org.name)} · Mes ligues</div>
+    <div class="pc-list">${org.leagues.map(({lg, link})=>{
+      const isCur = lg.id === CURRENT_LEAGUE_ID;
+      const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+      return `<div class="acc-lg" onclick="openMyLeague('${lg.id}')">
+        <div class="acc-lg-h"><b>${escapeHTML(lg.name)}</b>${link.substitute_id ? '<span class="tag tag-stay">🔄 Remplaçant</span>' : ''}</div>
+        <div class="small">${escapeHTML(lg.schedule_label || '')}</div>
+        ${isCur && !link.substitute_id ? `<div class="acc-stats"><div><small>Groupe</small><b>${escapeHTML(g ? g.name : '—')}</b></div>${DATA.showRatingToPlayers ? `<div><small>Cote</small><b>${r.toFixed(2)}</b></div>` : ''}</div>` : ''}
+        <div class="acc-open">Ouvrir ›</div>
+      </div>`;
+    }).join('')}</div>`;
+}
+// ---- Communauté ----
+function accountCommHTML(me){
+  const segs = [['evenements','Événements'],['partenaire','Partenaire'],['calendrier','Calendrier']];
+  const k = segs.some(x=>x[0]===VIEW.pcomm) ? VIEW.pcomm : 'evenements';
+  return `${accSeg(segs, k, 'setPComm')}<div style="margin-top:14px;">${k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML()}</div>`;
+}
+// ---- Moi ----
+function accountMeHTML(me){
+  const nLeagues = MY_LEAGUE_LINKS.length, nOrgs = myOrgsList().length;
+  return `<div class="acc-me">
+      ${avatarHTML('partner-pill-avatar', partnerInitials(me.name), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, 'width:72px;height:72px;font-size:26px;')}
+      <div><div style="font-size:22px;font-weight:700;">${escapeHTML(me.name)}</div><div class="small">${nOrgs} organisation${nOrgs>1?'s':''} · ${nLeagues} ligue${nLeagues>1?'s':''}</div></div>
+    </div>
+    <div class="pc-sec">Mon jeu</div>
+    <div class="acc-group">
+      ${accRow('', 'Mes absences', 'Une session, plusieurs sessions, blessure', `openAbsenceHub('${me.id}')`)}
+      ${accRow('', 'Mon agenda', 'Ajouter les sessions à mon calendrier', `openCalSubscribe()`)}
+      ${DATA.showRatingToPlayers ? accRow('', 'Comment fonctionne la cote ?', '', `showRatingExplanationModal()`) : ''}
+    </div>
+    <div class="pc-sec">Compte</div>
+    <div class="acc-group">
+      ${accRow('', 'Mon profil', 'Nom, photo, courriel', `openMyProfileModal()`)}
+      ${accRow('', 'Notifications', '', `openNotifSettings()`)}
+      ${accRow('', 'Guide', '', `showPlayerGuideModal()`)}
+      ${accRow('', 'Règles de la ligue', '', `showLeagueRulesModal()`)}
+    </div>`;
 }
 function renderMlpPlayer(me){
   const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
