@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 221">
+<meta name="app-build" content="Version 222">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1167,6 +1167,7 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
 
 /* v221 : boîte de réception */
+.ix-orgtabs{border-bottom:1px solid var(--line-soft);padding-bottom:10px;}
 .ix-list{padding:0 0 12px;}
 .ix-sec{display:flex;align-items:baseline;gap:8px;padding:14px 20px 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;}
 .ix-sec small{font-size:13px;letter-spacing:0;text-transform:none;font-weight:500;opacity:.8;}
@@ -2012,6 +2013,12 @@ function chatOtherOrgs(){
   });
   return out;
 }
+function chatAllOrgs(){
+  const cur = currentLeagueOrgId();
+  const curOrg = { id: cur, name: chatOrgName() };
+  const all = [curOrg].concat(chatOtherOrgs().map(o=>({ id:o.id, name:o.name })));
+  return all.sort((a,b)=>String(a.name).localeCompare(String(b.name), 'fr'));
+}
 async function switchChatOrg(orgId){
   CHAT_MENU_OPEN = false;
   const o = chatOtherOrgs().find(x=>x.id===orgId);
@@ -2019,7 +2026,8 @@ async function switchChatOrg(orgId){
   if(SESSION_USER && SESSION_USER.role==='admin'){ await switchToOrganization(orgId); }
   else if(o.leagueId){ await switchMyLeague(o.leagueId); }
   VIEW.wallChannel = 'general';
-  await openChat('general');
+  INBOX_LAST = {};
+  openInbox();
 }
 // ---- Boîte de réception (v221) : liste de conversations qui suit la structure organisation → ligues ----
 let INBOX_LAST = {};
@@ -2085,10 +2093,6 @@ function inboxRowsHTML(){
     } else if(f==='dm' || f==='unread'){
       html += `<div class="chat-empty"><div style="font-size:42px;">${f==='unread'?'✅':'✉️'}</div><div>${f==='unread'?'Aucun message non lu':'Aucun message privé'}</div></div>`;
     }
-  }
-  if(f==='all' || f==='leagues'){
-    const others = chatOtherOrgs();
-    others.forEach(o=>{ html += ixSec(o.name); html += ixRow(`switchChatOrg('${o.id}')`, icon('🏢'), 'Ouvrir cette organisation', 'Ses salons et ses ligues', '', 0, o.name); });
   }
   return html;
 }
@@ -2158,7 +2162,9 @@ function chatModalHTML(){
     const chip = (k,l)=>`<button type="button" class="chat-chan ${f===k?'active':''}" onclick="setInboxFilter('${k}')">${l}</button>`;
     head = `<div class="chat-head-txt" style="padding-left:6px;"><div class="chat-head-title" style="font-size:22px;">Messages</div></div>
         ${DM_AVAILABLE ? `<button type="button" class="chat-head-btn" onclick="openDmList()" aria-label="Nouveau message">✏️</button>` : ''}`;
-    body = `<div style="padding:10px 14px 0;"><input class="orgpick-search" style="width:100%;" placeholder="🔍 Rechercher une conversation ou une personne" oninput="filterInbox(this.value)"></div>
+    const allOrgs = chatAllOrgs();
+    const orgTabs = allOrgs.length > 1 ? `<div class="chat-chans ix-orgtabs">${allOrgs.map(o=>`<button type="button" class="chat-chan ${o.id===currentLeagueOrgId()?'active':''}" onclick="${o.id===currentLeagueOrgId() ? '' : `switchChatOrg('${o.id}')`}">🏢 ${escapeHTML(o.name)}</button>`).join('')}</div>` : '';
+    body = `${orgTabs}<div style="padding:10px 14px 0;"><input class="orgpick-search" style="width:100%;" placeholder="🔍 Rechercher une conversation ou une personne" oninput="filterInbox(this.value)"></div>
       <div class="chat-chans" style="border-bottom:0;">${chip('all','Tout')}${chip('leagues','Ligues')}${chip('dm','Privés')}${chip('unread','Non lus'+(unreadN?' · '+unreadN:''))}</div>
       <div id="inboxList" class="chat-messages ix-list">${inboxRowsHTML()}</div>`;
   } else if(mode==='channel'){
