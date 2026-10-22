@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 211">
+<meta name="app-build" content="Version 212">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2863,6 +2863,7 @@ async function switchMyLeague(leagueId){
     SESSION_USER = { role:'player', playerId: link.player_id };
   }
   VIEW = { tab: isSub ? 'dispo' : 'classement' };
+  MY_SUMMARY_AT = 0;
   render();
 }
 // Recharge à la fois le lien joueur de l'admin dans la ligue affichée et la
@@ -11848,28 +11849,88 @@ function renderPlayerAccount(me, drawerHTML, viewSlide){
     : active==='comm' ? accountCommHTML(me)
     : accountMeHTML(me);
 }
+
+// ---- Résumé de TOUTES les ligues du joueur (chargé en arrière-plan) ----
+let MY_LEAGUE_SUMMARY = {}, MY_SUMMARY_AT = 0, MY_SUMMARY_LOADING = false;
+function summarizeLeagueData(data, link, leagueId){
+  const lg = LEAGUES.find(x=>x.id===leagueId) || {};
+  const out = { leagueId, name: lg.name || 'Ligue', schedule: lg.schedule_label || '', orgId: lg.organization_id || null, isSub: !!link.substitute_id, showRating: !!(data && data.showRatingToPlayers), open: null, groupName: null, rating: null, injured: false, playerId: link.player_id || null };
+  if(!data || out.isSub) return out;
+  const me = (data.players||[]).find(x=>x.id===link.player_id);
+  if(!me) return out;
+  const g = (data.groups||[]).find(x=>x.id===me.groupId);
+  out.groupName = g ? g.name : null;
+  out.rating = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+  out.injured = !!me.injured;
+  const open = (data.sessions||[]).find(x=>x.status==='open');
+  if(open){
+    out.open = { date: open.date, visible: !!(open.published || data.showGroupBeforePublish), absent: !!(open.absences && open.absences.includes(me.id)) };
+  }
+  return out;
+}
+function leagueSummaryFor(leagueId){
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
+  if(!link) return null;
+  if(leagueId === CURRENT_LEAGUE_ID) return summarizeLeagueData(DATA, link, leagueId);
+  return MY_LEAGUE_SUMMARY[leagueId] || null;
+}
+async function refreshMySummaries(force){
+  if(MY_SUMMARY_LOADING) return;
+  if(!force && Date.now() - MY_SUMMARY_AT < 45000) return;
+  const others = MY_LEAGUE_LINKS.filter(l=>l.league_id !== CURRENT_LEAGUE_ID && !l.substitute_id);
+  if(!others.length){ MY_SUMMARY_AT = Date.now(); return; }
+  MY_SUMMARY_LOADING = true;
+  try{
+    await Promise.all(others.map(async l=>{
+      try{
+        const { data, error } = await sb.from('league_data').select('data').eq('league_id', l.league_id).single();
+        if(error) return;
+        MY_LEAGUE_SUMMARY[l.league_id] = summarizeLeagueData(data && data.data, l, l.league_id);
+      }catch(e){}
+    }));
+    MY_SUMMARY_AT = Date.now();
+  }finally{ MY_SUMMARY_LOADING = false; }
+  // Rafraîchit l'écran seulement si le joueur est toujours sur Accueil / Organisations
+  if(SESSION_USER && !MODAL && (VIEW.ptab===undefined || VIEW.ptab==='accueil' || VIEW.ptab==='orgs') && !VIEW.pdet) render();
+}
+async function absenceFromHome(leagueId){
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId);
+  if(!link) return;
+  if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); }
+  MY_SUMMARY_AT = 0;
+  VIEW.ptab = 'accueil'; render();
+  openOneSessionAbsenceModal(link.player_id);
+}
 // ---- Accueil ----
 function accountHomeHTML(me){
-  const open = currentOpenSession();
-  const g = groupById(me.groupId);
-  const visible = !!(open && (open.published || DATA.showGroupBeforePublish));
-  const absent = !!(open && isAbsent(open, me.id));
   const todayStr = fmtDate(new Date());
+  const orgsN = myOrgsList().length;
   let html = '';
   if(me.injured){
     html += `<div class="acc-card"><div class="acc-eyebrow">Statut</div><div class="acc-big">🤕 Blessé(e)</div><button class="btn btn-secondary acc-btn" onclick="openAbsenceHub('${me.id}')">Gérer mon statut</button></div>`;
-  } else if(visible){
-    html += `<div class="acc-card">
-      <div class="acc-eyebrow">Prochaine session</div>
-      <div class="acc-big">${escapeHTML(frDateLong(open.date))}</div>
-      <div class="acc-sub">${escapeHTML(currentLeagueLabel())}${g && !absent ? ' · '+escapeHTML(g.name) : ''}</div>
-      ${absent ? `<div class="modal-badges"><span class="tag tag-orange">🚫 Absence signalée</span></div>` : ''}
-      <button class="btn btn-secondary acc-btn" onclick="${absent ? `openAbsenceHub('${me.id}')` : `openOneSessionAbsenceModal('${me.id}')`}">${absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
-      <button class="acc-link" onclick="openAbsenceHub('${me.id}')">Absences prévues, blessure…</button>
-    </div>`;
-  } else {
-    html += `<div class="acc-card"><div class="acc-eyebrow">Prochaine session</div><div class="acc-sub" style="font-size:16px;">${open ? 'Ta session sera visible dès sa publication.' : 'Aucune session annoncée pour le moment.'}</div><button class="acc-link" onclick="openAbsenceHub('${me.id}')">Absences prévues, blessure…</button></div>`;
   }
+  // Une carte par ligue où je suis joueur(se), la plus proche en premier.
+  const cards = MY_LEAGUE_LINKS.filter(l=>!l.substitute_id).map(l=>({ link:l, sum:leagueSummaryFor(l.league_id) }));
+  const loadingSome = cards.some(c=>!c.sum);
+  const withSession = cards.filter(c=>c.sum && c.sum.open && c.sum.open.visible && !c.sum.injured)
+    .sort((a,b)=>a.sum.open.date.localeCompare(b.sum.open.date));
+  withSession.forEach(({link, sum})=>{
+    const o = sum.open;
+    const lgMeta = LEAGUES.find(x=>x.id===link.league_id) || {};
+    const orgName = (orgsN>1 && lgMeta.organizations) ? ' · '+lgMeta.organizations.name : '';
+    html += `<div class="acc-card" style="margin-bottom:12px;">
+      <div class="acc-eyebrow">Prochaine session</div>
+      <div class="acc-big">${escapeHTML(frDateLong(o.date))}</div>
+      <div class="acc-sub">${escapeHTML(sum.schedule || sum.name)}${orgName ? escapeHTML(orgName) : ''}${sum.groupName && !o.absent ? ' · '+escapeHTML(sum.groupName) : ''}</div>
+      ${o.absent ? `<div class="modal-badges"><span class="tag tag-orange">🚫 Absence signalée</span></div>` : ''}
+      <button class="btn btn-secondary acc-btn" onclick="absenceFromHome('${link.league_id}')">${o.absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
+    </div>`;
+  });
+  if(!withSession.length && !me.injured){
+    html += `<div class="acc-card"><div class="acc-eyebrow">Prochaine session</div><div class="acc-sub" style="font-size:16px;">${loadingSome ? 'Chargement de tes ligues…' : 'Aucune session annoncée pour le moment.'}</div></div>`;
+  }
+  html += `<button class="acc-link" style="width:100%;" onclick="openAbsenceHub('${me.id}')">Absences prévues, blessure…</button>`;
+  setTimeout(()=>refreshMySummaries(false), 0);
   // À venir : événements + matchs amicaux où je suis partant(e)
   const items = [];
   (SOCIAL_EVENTS||[]).forEach(e=>{ if(e.event_date >= todayStr) items.push({ d:e.event_date, t:e.title, sub:(e.event_time?fmtHM(e.event_time)+' · ':'')+(e.location||'Événement'), tag:'Événement', on:`openEventDetail('${e.id}')` }); });
@@ -11889,7 +11950,7 @@ function accountHomeHTML(me){
         <span class="tag tag-stay">${it.tag}</span>
       </div>`).join('')}</div>`;
   }
-  if(DATA.showRatingToPlayers){
+  if(DATA.showRatingToPlayers && MY_LEAGUE_LINKS.length <= 1){
     const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
     html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
   }
@@ -11924,15 +11985,16 @@ function accountOrgsHTML(me){
       ${det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me)}`;
   }
   const back = multi ? `<button type="button" class="acc-back" onclick="setPOrg(null)">‹ Mes organisations</button>` : '';
-  const g = groupById(me.groupId);
+  setTimeout(()=>refreshMySummaries(false), 0);
   return `${back}<div class="pc-sec" style="margin-top:4px;">${escapeHTML(org.name)} · Mes ligues</div>
     <div class="pc-list">${org.leagues.map(({lg, link})=>{
-      const isCur = lg.id === CURRENT_LEAGUE_ID;
-      const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+      const sum = leagueSummaryFor(lg.id);
+      const showR = sum && sum.showRating && sum.rating !== null;
       return `<div class="acc-lg" onclick="openMyLeague('${lg.id}')">
         <div class="acc-lg-h"><b>${escapeHTML(lg.name)}</b>${link.substitute_id ? '<span class="tag tag-stay">🔄 Remplaçant</span>' : ''}</div>
         <div class="small">${escapeHTML(lg.schedule_label || '')}</div>
-        ${isCur && !link.substitute_id ? `<div class="acc-stats"><div><small>Groupe</small><b>${escapeHTML(g ? g.name : '—')}</b></div>${DATA.showRatingToPlayers ? `<div><small>Cote</small><b>${r.toFixed(2)}</b></div>` : ''}</div>` : ''}
+        ${sum && !link.substitute_id && sum.groupName ? `<div class="acc-stats"><div><small>Groupe</small><b>${escapeHTML(sum.groupName)}</b></div>${showR ? `<div><small>Cote</small><b>${sum.rating.toFixed(2)}</b></div>` : ''}</div>` : ''}
+        ${sum && sum.open && sum.open.visible ? `<div class="small" style="color:var(--ball);font-weight:600;">Prochaine session : ${escapeHTML(frDateLong(sum.open.date))}${sum.open.absent ? ' · 🚫 absent(e)' : ''}</div>` : ''}
         <div class="acc-open">Ouvrir ›</div>
       </div>`;
     }).join('')}</div>`;
