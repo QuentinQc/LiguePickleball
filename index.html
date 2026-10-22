@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 215">
+<meta name="app-build" content="Version 216">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1106,6 +1106,9 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .acc-eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ball);font-weight:700;}
 .acc-big{font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;text-transform:uppercase;}
 .acc-sub{font-size:16px;color:var(--muted);}
+.acc-tap{cursor:pointer;}
+.acc-tap:active{transform:scale(.99);}
+.acc-hint{font-size:15px;color:var(--ball);font-weight:600;}
 .acc-btn{width:100%;min-height:54px;font-size:17px;border-radius:16px;}
 .acc-link{background:none;border:0;color:var(--muted);font:600 15px var(--font-body);padding:6px;cursor:pointer;text-align:center;}
 .acc-ev{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:18px;background:var(--court-elevated-2);border:1px solid var(--line-soft);cursor:pointer;}
@@ -11922,13 +11925,13 @@ function accountHomeHTML(me){
     const o = sum.open;
     const lgMeta = LEAGUES.find(x=>x.id===link.league_id) || {};
     const orgName = (orgsN>1 && lgMeta.organizations) ? ' · '+lgMeta.organizations.name : '';
-    html += `<div class="acc-card" style="margin-bottom:12px;">
-      <div class="acc-eyebrow">Prochaine session</div>
+    html += `<div class="acc-card acc-tap" style="margin-bottom:12px;" onclick="goScores('${link.league_id}')">
+      <div class="acc-eyebrow">Prochaine session<span class="acc-chev" style="float:right;">›</span></div>
       <div class="acc-big">${escapeHTML(frDateLong(o.date))}</div>
       <div class="acc-sub">${escapeHTML(sum.schedule || sum.name)}${orgName ? escapeHTML(orgName) : ''}${sum.groupName && !o.absent ? ' · '+escapeHTML(sum.groupName) : ''}</div>
       ${o.absent ? `<div class="modal-badges"><span class="tag tag-orange">🚫 Absence signalée</span></div>` : ''}
-      ${(o.published && o.canScore && !o.absent) ? `<button class="btn btn-primary acc-btn" onclick="goScores('${link.league_id}')">Saisir les scores</button>` : ''}
-      <button class="btn btn-secondary acc-btn" onclick="absenceFromHome('${link.league_id}')">${o.absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
+      ${(o.published && !o.absent) ? `<div class="acc-hint">${o.canScore ? 'Touche pour voir ton groupe et saisir les scores' : 'Touche pour voir ton groupe et tes matchs'}</div>` : ''}
+      <button class="btn btn-secondary acc-btn" onclick="event.stopPropagation();absenceFromHome('${link.league_id}')">${o.absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
     </div>`;
   });
   if(!withSession.length && !me.injured){
