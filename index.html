@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 219">
+<meta name="app-build" content="Version 220">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -328,6 +328,7 @@ tr.me{background:rgba(207,234,92,0.1);}
 .chat-menu-item{display:flex;align-items:center;gap:8px;background:var(--court-elevated-2);color:var(--text);border:1px solid var(--line-soft-strong);border-radius:999px;padding:11px 18px;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.4);animation:chatPop .16s ease-out;}
 .chat-menu{max-height:calc(100vh - 230px);overflow-y:auto;scrollbar-width:none;}
 .chat-menu-av{width:26px;height:26px;border-radius:50%;flex:0 0 auto;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-left:-8px;}
+.chat-menu-sec{align-self:flex-end;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#fff;background:rgba(0,0,0,.45);border-radius:999px;padding:3px 10px;margin-top:4px;}
 .chat-menu-more{font-size:20px;line-height:1;padding:8px 16px;letter-spacing:2px;}
 .chat-menu-item:active{transform:scale(.96);}
 .chat-menu-badge,.dm-dot{background:var(--paddle);color:#fff;border-radius:11px;min-width:22px;height:22px;padding:0 6px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}
@@ -1975,6 +1976,34 @@ function toggleChatMenu(force){
   CHAT_MENU_OPEN = typeof force==='boolean' ? force : !CHAT_MENU_OPEN;
   updateChatFab();
 }
+function chatOrgName(){
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  return (lg && lg.organizations && lg.organizations.name) || ((MY_ORGANIZATIONS||[]).find(o=>o.id===currentLeagueOrgId())||{}).name || 'Organisation';
+}
+function chatOtherOrgs(){
+  const cur = currentLeagueOrgId();
+  if(SESSION_USER && SESSION_USER.role==='admin'){
+    const list = (SUPER_ADMIN_MODE && CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) ? ALL_ORGANIZATIONS : MY_ORGANIZATIONS;
+    return (list||[]).filter(o=>o.id!==cur);
+  }
+  const seen = {}, out = [];
+  (MY_LEAGUE_LINKS||[]).forEach(l=>{
+    const lg = LEAGUES.find(x=>x.id===l.league_id);
+    if(!lg || !lg.organization_id || lg.organization_id===cur || seen[lg.organization_id]) return;
+    seen[lg.organization_id] = true;
+    out.push({ id: lg.organization_id, name: (lg.organizations && lg.organizations.name) || 'Organisation', leagueId: lg.id });
+  });
+  return out;
+}
+async function switchChatOrg(orgId){
+  CHAT_MENU_OPEN = false;
+  const o = chatOtherOrgs().find(x=>x.id===orgId);
+  if(!o) return;
+  if(SESSION_USER && SESSION_USER.role==='admin'){ await switchToOrganization(orgId); }
+  else if(o.leagueId){ await switchMyLeague(o.leagueId); }
+  VIEW.wallChannel = 'general';
+  await openChat('general');
+}
 function chatFabVisible(){
   return !!(SESSION_USER && CURRENT_PROFILE && CURRENT_LEAGUE_ID && DATA && currentLeagueOrgId());
 }
@@ -1999,10 +2028,18 @@ function updateChatFab(){
   const active = VIEW.wallChannel || 'general';
   const convos = DM_AVAILABLE ? DM_CONTACTS.map(c=>{ const p = dmPair(c.id); return { c, last: p[p.length-1]||null, unread: dmUnreadFrom(c.id) }; })
     .filter(x=>x.last).sort((x,y)=>new Date(y.last.created_at)-new Date(x.last.created_at)).slice(0,5) : [];
-  menu.innerHTML = `<button type="button" class="chat-menu-item" onclick="openChat('general')">🌐 Général</button>`
-    + wallChannels().map(l=>`<button type="button" class="chat-menu-item" onclick="openChat('${l.id}')">${pbIcon()} ${escapeHTML(l.name)}</button>`).join('')
+  const sec = (t)=>`<div class="chat-menu-sec">${escapeHTML(t)}</div>`;
+  const chans = wallChannels().slice().sort((x,y)=> (x.id===CURRENT_LEAGUE_ID ? -1 : 0) - (y.id===CURRENT_LEAGUE_ID ? -1 : 0));
+  const others = chatOtherOrgs();
+  menu.innerHTML = sec(chatOrgName())
+    + `<button type="button" class="chat-menu-item" onclick="openChat('general')">🌐 Général</button>`
+    + (chans.length ? sec('Ligues') : '')
+    + chans.map(l=>`<button type="button" class="chat-menu-item" onclick="openChat('${l.id}')">${pbIcon()} ${escapeHTML(l.name)}</button>`).join('')
+    + (convos.length ? sec('Messages privés') : '')
     + convos.map(x=>`<button type="button" class="chat-menu-item" onclick="openDmThread('${x.c.id}')">${avatarHTML('chat-menu-av', partnerInitials(x.c.display_name), x.c.avatar_url)}${escapeHTML(x.c.display_name||'Joueur')}${x.unread ? `<span class="chat-menu-badge">${x.unread}</span>` : ''}</button>`).join('')
-    + (DM_AVAILABLE ? `<button type="button" class="chat-menu-item chat-menu-more" onclick="openDmList()" aria-label="Toutes les conversations">⋯${dmCount ? `<span class="chat-menu-badge">${dmCount}</span>` : ''}</button>` : '');
+    + (DM_AVAILABLE ? `<button type="button" class="chat-menu-item chat-menu-more" onclick="openDmList()" aria-label="Toutes les conversations">⋯${dmCount ? `<span class="chat-menu-badge">${dmCount}</span>` : ''}</button>` : '')
+    + (others.length ? sec('Autres organisations') : '')
+    + others.map(o=>`<button type="button" class="chat-menu-item" onclick="switchChatOrg('${o.id}')">🏢 ${escapeHTML(o.name)}</button>`).join('');
 }
 function sheetModalHTML(){
   const k = MODAL.sheet;
@@ -2029,7 +2066,7 @@ function chatModalHTML(){
   let head, body;
   if(mode==='channel'){
     head = `<div class="chat-head-ico">💬</div>
-        <div class="chat-head-txt"><div class="chat-head-title">Discussion</div><div class="chat-head-sub">${active==='general' ? "Toute l'organisation" : 'Membres de cette ligue'}</div></div>
+        <div class="chat-head-txt"><div class="chat-head-title">Discussion</div><div class="chat-head-sub">${escapeHTML(chatOrgName())} · ${active==='general' ? "tous les membres" : escapeHTML(((channels.find(l=>l.id===active)||{}).name) || 'ligue')}</div></div>
         <button type="button" class="chat-head-btn" onclick="refreshLeagueWall()" aria-label="Rafraîchir">↻</button>`;
     body = `<div class="chat-chans">${pill('general','🌐 Général')}${channels.map(l=>pill(l.id, escapeHTML(l.name))).join('')}</div>
       <div id="wallMessages" class="chat-messages">${wallMessagesListHTML()}</div>`;
