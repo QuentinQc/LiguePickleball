@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 218">
+<meta name="app-build" content="Version 219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1153,6 +1153,17 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .acc-lines{display:flex;flex-direction:column;gap:2px;font-size:15px;color:var(--text);}
 .acc-seg-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .acc-seg-scroll button{flex:none;padding:0 16px;white-space:nowrap;}
+
+/* v219 : navigation « compte » plus claire */
+.shell-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 2px 12px;}
+.shell-title{font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1.1;letter-spacing:.02em;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.shell-right{display:flex;align-items:center;gap:8px;flex:none;}
+.shell-right .topbar-icos{position:relative;display:flex;align-items:center;gap:6px;}
+.bottom-nav.acc .dk{flex:1;flex-direction:column;gap:2px;height:58px;min-width:0;padding:0 4px;border-radius:30px;font-size:11px;letter-spacing:.01em;}
+.bottom-nav.acc .dk span{max-width:none;opacity:1;font-size:11px;font-weight:600;}
+.bottom-nav.acc .dk svg{width:24px;height:24px;}
+.bottom-nav.acc .dk .mt-emoji{font-size:20px;}
+.bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -4375,7 +4386,7 @@ function bottomNavHTML(items, activeKey){
     const tiles = rest.map(it=>`<button class="more-tile ${it.key===activeKey?'active':''}" onclick="MORE_SHEET_OPEN=false;${it.onclick}">${navIconHTML(it.key,it.icon)}<span>${escapeHTML(it.label)}</span></button>`).join('')
       + (isAdmin ? `<button class="more-tile" onclick="MORE_SHEET_OPEN=false;openOrganizationPage()">${navIconHTML('org')}<span>Organisation</span></button>` : '');
     const sheet = (MORE_SHEET_OPEN && tiles) ? `<div class="more-bg" onclick="toggleMoreSheet(false)"></div><div class="more-sheet"><div class="more-grab"></div><div class="more-grid">${tiles}</div></div>` : '';
-    return `${sheet}<div class="bottom-nav">${dock}${moreBtn}</div>`;
+    return `${sheet}<div class="bottom-nav${NAV_NO_MORE?' acc':''}">${dock}${moreBtn}</div>`;
   }
   return `<div class="bottom-nav">
     ${items.map(it=>it.raised ? `
@@ -4898,8 +4909,9 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
   NAV_NO_MORE = true;
   const bar = tabsBarHTML(tabs, active, 'setAAcc');
   NAV_NO_MORE = false;
+  const aTitles = { accueil: 'Accueil', orgs: 'Organisations', comm: 'Communauté', moi: 'Moi' };
   app.innerHTML = `
-    ${topbarHTML('Espace administrateur' + (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin ? ' · 🛡️ Super admin' : ''), drawerHTML, '', viewSlide, null, null, 'admin')}
+    ${shellTopbarHTML(aTitles[active], viewSlide)}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
     ${bar}
     <div id="tabContent"></div>
@@ -12043,13 +12055,24 @@ function accRow(ico, title, sub, onclick){
 function accSeg(items, active, fn){
   return `<div class="acc-seg">${items.map(([k,l])=>`<button type="button" class="${k===active?'on':''}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
 }
+function shellTopbarHTML(title, viewSlide, quick){
+  return `<div class="topbar shell-top">
+    <div class="shell-title">${escapeHTML(title)}</div>
+    <div class="shell-right">${quick===false ? '' : quickIconsHTML()}${viewSlide||''}</div>
+  </div>`;
+}
 function renderPlayerAccount(me, drawerHTML, viewSlide){
   const tabs = [['accueil','Accueil','🏠'],['orgs','Organisations','🏢'],['comm','Communauté','👥'],['moi','Moi','🙂']];
   const active = tabs.some(t=>t[0]===VIEW.ptab) ? VIEW.ptab : 'accueil';
+  const firstName = String(me.name||'').split(' ')[0];
+  const titles = { accueil: 'Bonjour ' + firstName, orgs: 'Organisations', comm: 'Communauté', moi: 'Moi' };
+  NAV_NO_MORE = true;
+  const bar = tabsBarHTML(tabs, active, 'setPAcc');
+  NAV_NO_MORE = false;
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(me.name), drawerHTML, '', viewSlide, null, null, 'member')}
+    ${shellTopbarHTML(titles[active], viewSlide)}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
-    ${tabsBarHTML(tabs, active, 'setPAcc')}
+    ${bar}
     <div id="tabContent"></div>
     <div class="bottom-nav-spacer"></div>`;
   const c = document.getElementById('tabContent');
