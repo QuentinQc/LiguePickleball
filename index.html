@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 220">
+<meta name="app-build" content="Version 221">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1165,6 +1165,23 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .bottom-nav.acc .dk svg{width:24px;height:24px;}
 .bottom-nav.acc .dk .mt-emoji{font-size:20px;}
 .bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
+
+/* v221 : boîte de réception */
+.ix-list{padding:0 0 12px;}
+.ix-sec{display:flex;align-items:baseline;gap:8px;padding:14px 20px 6px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.ix-sec small{font-size:13px;letter-spacing:0;text-transform:none;font-weight:500;opacity:.8;}
+.ix-row{width:100%;display:flex;align-items:center;gap:14px;padding:10px 20px;min-height:68px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer;font-family:var(--font-body);box-sizing:border-box;}
+.ix-row:active{background:rgba(255,255,255,.05);}
+.ix-ico,.ix-av{width:48px;height:48px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.ix-ico{background:var(--court-elevated-2);color:var(--ball);}
+.ix-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.ix-top,.ix-bot{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.ix-title{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ix-time{font-size:13px;color:var(--muted);flex:none;}
+.ix-time.hot{color:var(--ball);}
+.ix-prev{font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ix-prev.bold{color:var(--text);font-weight:600;}
+.ix-badge{min-width:22px;height:22px;border-radius:11px;background:var(--paddle);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;box-sizing:border-box;flex:none;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -1940,7 +1957,7 @@ async function openDmThread(otherId){
   render();
   scrollWallToBottom();
 }
-function chatBack(){ openDmList(); }
+function chatBack(){ openInbox(); }
 function chatSend(){
   if(MODAL && MODAL.chatMode==='dm-thread') return postDirectMessage();
   return postLeagueMessage();
@@ -2004,6 +2021,77 @@ async function switchChatOrg(orgId){
   VIEW.wallChannel = 'general';
   await openChat('general');
 }
+// ---- Boîte de réception (v221) : liste de conversations qui suit la structure organisation → ligues ----
+let INBOX_LAST = {};
+async function loadInboxPreviews(){
+  const orgId = currentLeagueOrgId();
+  if(!orgId) return;
+  try{
+    const { data, error } = await sb.from('org_messages').select('league_id,content,author_name,created_at,profile_id').eq('organization_id', orgId).order('created_at', { ascending:false }).limit(300);
+    if(error) return;
+    const last = {};
+    (data||[]).forEach(m=>{ const k = m.league_id || 'general'; if(!last[k]) last[k] = m; });
+    INBOX_LAST = last;
+    const el = document.getElementById('inboxList');
+    if(el && MODAL && MODAL.chat && MODAL.chatMode==='inbox') el.innerHTML = inboxRowsHTML();
+  }catch(e){}
+}
+function openInbox(){
+  CHAT_MENU_OPEN = false;
+  MODAL = { kind:'content', title:'Messages', htmlContent: ()=>'', chat:true, chatMode:'inbox' };
+  render();
+  loadInboxPreviews();
+}
+function setInboxFilter(k){ VIEW.inboxFilter = k; render(); }
+function filterInbox(q){
+  q = normSearch(q);
+  document.querySelectorAll('#inboxList .ix-row').forEach(r=>{ r.style.display = (!q || (r.dataset.name||'').includes(q)) ? '' : 'none'; });
+}
+function ixTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso), t = new Date(), y = new Date(t); y.setDate(y.getDate()-1);
+  if(d.toDateString()===t.toDateString()) return d.toLocaleTimeString('fr-CA', { hour:'2-digit', minute:'2-digit' });
+  if(d.toDateString()===y.toDateString()) return 'Hier';
+  return d.toLocaleDateString('fr-CA', { day:'numeric', month:'short' });
+}
+function ixRow(onclick, left, title, prev, time, unread, name, bold){
+  return `<button type="button" class="ix-row" data-name="${escapeHTML(normSearch(name||title))}" onclick="${onclick}">
+    ${left}
+    <span class="ix-main">
+      <span class="ix-top"><span class="ix-title">${escapeHTML(title)}</span><span class="ix-time${unread?' hot':''}">${escapeHTML(time||'')}</span></span>
+      <span class="ix-bot"><span class="ix-prev${(unread||bold)?' bold':''}">${escapeHTML(prev||'')}</span>${unread ? `<span class="ix-badge">${unread}</span>` : ''}</span>
+    </span>
+  </button>`;
+}
+function ixSec(t, sub){ return `<div class="ix-sec"><span>${escapeHTML(t)}</span>${sub?`<small>${escapeHTML(sub)}</small>`:''}</div>`; }
+function inboxRowsHTML(){
+  const f = VIEW.inboxFilter || 'all';
+  const chans = wallChannels().slice().sort((x,y)=> (x.id===CURRENT_LEAGUE_ID ? -1 : 0) - (y.id===CURRENT_LEAGUE_ID ? -1 : 0));
+  const prevOf = (key)=>{ const m = INBOX_LAST[key]; if(!m) return { prev:'Aucun message', time:'' }; const first = String(m.author_name||'').split(' ')[0]; return { prev:(m.profile_id===(CURRENT_PROFILE&&CURRENT_PROFILE.id)?'Toi':first)+' : '+m.content, time: ixTime(m.created_at) }; };
+  const icon = (e)=>`<span class="ix-ico">${e}</span>`;
+  let html = '';
+  if(f==='all' || f==='leagues'){
+    html += ixSec(chatOrgName(), chans.length ? chans.length+' ligue'+(chans.length>1?'s':'') : '');
+    const g = prevOf('general');
+    html += ixRow("openChat('general')", icon('🌐'), 'Général', g.prev, g.time, 0, 'general');
+    chans.forEach(l=>{ const o = prevOf(l.id); html += ixRow(`openChat('${l.id}')`, icon('🏓'), l.name, o.prev, o.time, 0, l.name); });
+  }
+  if(f==='all' || f==='dm' || f==='unread'){
+    const convos = DM_AVAILABLE ? DM_CONTACTS.map(c=>{ const pr = dmPair(c.id); return { c, last: pr[pr.length-1]||null, unread: dmUnreadFrom(c.id) }; })
+      .filter(x=>x.last && (f!=='unread' || x.unread>0)).sort((a,b)=>new Date(b.last.created_at)-new Date(a.last.created_at)) : [];
+    if(convos.length){
+      html += ixSec('Messages privés');
+      html += convos.map(x=>ixRow(`openDmThread('${x.c.id}')`, avatarHTML('ix-av', partnerInitials(x.c.display_name), x.c.avatar_url), x.c.display_name||'Joueur', (x.last.sender_id===CURRENT_PROFILE.id?'Toi : ':'')+x.last.content, ixTime(x.last.created_at), x.unread, x.c.display_name)).join('');
+    } else if(f==='dm' || f==='unread'){
+      html += `<div class="chat-empty"><div style="font-size:42px;">${f==='unread'?'✅':'✉️'}</div><div>${f==='unread'?'Aucun message non lu':'Aucun message privé'}</div></div>`;
+    }
+  }
+  if(f==='all' || f==='leagues'){
+    const others = chatOtherOrgs();
+    others.forEach(o=>{ html += ixSec(o.name); html += ixRow(`switchChatOrg('${o.id}')`, icon('🏢'), 'Ouvrir cette organisation', 'Ses salons et ses ligues', '', 0, o.name); });
+  }
+  return html;
+}
 function chatFabVisible(){
   return !!(SESSION_USER && CURRENT_PROFILE && CURRENT_LEAGUE_ID && DATA && currentLeagueOrgId());
 }
@@ -2016,7 +2104,7 @@ function updateChatFab(){
   if(!fab){
     fab = document.createElement('button');
     fab.id = 'chatFab'; fab.className = 'chat-fab'; fab.setAttribute('aria-label','Discussion');
-    fab.onclick = ()=>toggleChatMenu();
+    fab.onclick = ()=>openInbox();
     document.body.appendChild(fab);
   }
   const total = CHAT_UNREAD + (DM_AVAILABLE ? dmUnreadCount() : 0);
@@ -2064,15 +2152,24 @@ function chatModalHTML(){
   const active = VIEW.wallChannel || 'general';
   const pill = (key,label)=>`<button type="button" class="chat-chan ${active===key?'active':''}" onclick="switchWallChannel('${key}')">${label}</button>`;
   let head, body;
-  if(mode==='channel'){
-    head = `<div class="chat-head-ico">💬</div>
-        <div class="chat-head-txt"><div class="chat-head-title">Discussion</div><div class="chat-head-sub">${escapeHTML(chatOrgName())} · ${active==='general' ? "tous les membres" : escapeHTML(((channels.find(l=>l.id===active)||{}).name) || 'ligue')}</div></div>
+  if(mode==='inbox'){
+    const f = VIEW.inboxFilter || 'all';
+    const unreadN = (DM_AVAILABLE ? dmUnreadCount() : 0);
+    const chip = (k,l)=>`<button type="button" class="chat-chan ${f===k?'active':''}" onclick="setInboxFilter('${k}')">${l}</button>`;
+    head = `<div class="chat-head-txt" style="padding-left:6px;"><div class="chat-head-title" style="font-size:22px;">Messages</div></div>
+        ${DM_AVAILABLE ? `<button type="button" class="chat-head-btn" onclick="openDmList()" aria-label="Nouveau message">✏️</button>` : ''}`;
+    body = `<div style="padding:10px 14px 0;"><input class="orgpick-search" style="width:100%;" placeholder="🔍 Rechercher une conversation ou une personne" oninput="filterInbox(this.value)"></div>
+      <div class="chat-chans" style="border-bottom:0;">${chip('all','Tout')}${chip('leagues','Ligues')}${chip('dm','Privés')}${chip('unread','Non lus'+(unreadN?' · '+unreadN:''))}</div>
+      <div id="inboxList" class="chat-messages ix-list">${inboxRowsHTML()}</div>`;
+  } else if(mode==='channel'){
+    head = `<button type="button" class="chat-head-btn" onclick="openInbox()" aria-label="Retour">←</button>
+        <div class="chat-head-ico">${active==='general' ? '🌐' : '🏓'}</div>
+        <div class="chat-head-txt"><div class="chat-head-title">${active==='general' ? 'Général' : escapeHTML(((channels.find(l=>l.id===active)||{}).name) || 'Ligue')}</div><div class="chat-head-sub">${escapeHTML(chatOrgName())} · ${active==='general' ? "tous les membres" : "membres de la ligue"}</div></div>
         <button type="button" class="chat-head-btn" onclick="refreshLeagueWall()" aria-label="Rafraîchir">↻</button>`;
-    body = `<div class="chat-chans">${pill('general','🌐 Général')}${channels.map(l=>pill(l.id, escapeHTML(l.name))).join('')}</div>
-      <div id="wallMessages" class="chat-messages">${wallMessagesListHTML()}</div>`;
+    body = `<div id="wallMessages" class="chat-messages">${wallMessagesListHTML()}</div>`;
   } else if(mode==='dm-list'){
-    head = `<div class="chat-head-ico">✉️</div>
-        <div class="chat-head-txt"><div class="chat-head-title">Messages privés</div><div class="chat-head-sub">Conversations 1 à 1</div></div>`;
+    head = `<button type="button" class="chat-head-btn" onclick="openInbox()" aria-label="Retour">←</button>
+        <div class="chat-head-txt"><div class="chat-head-title">Nouveau message</div><div class="chat-head-sub">Choisis une personne</div></div>`;
     body = `<div class="chat-chans" style="padding:10px 14px;"><input class="orgpick-search" style="width:100%;" placeholder="🔍 Rechercher une personne…" oninput="filterDmList(this.value)"></div>
       <div id="dmList" class="chat-messages dm-list">${dmListRowsHTML()}</div>`;
   } else {
@@ -2082,7 +2179,7 @@ function chatModalHTML(){
         <div class="chat-head-txt"><div class="chat-head-title">${escapeHTML(o.display_name||'Joueur')}</div><div class="chat-head-sub">Message privé</div></div>`;
     body = `<div id="wallMessages" class="chat-messages">${dmThreadListHTML(MODAL.dmWith)}</div>`;
   }
-  const composer = mode==='dm-list' ? '' : `<div class="chat-composer">
+  const composer = (mode==='dm-list' || mode==='inbox') ? '' : `<div class="chat-composer">
         <textarea id="wallMessageInput" rows="1" maxlength="500" placeholder="Écrire un message…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();chatSend();}"></textarea>
         <button type="button" class="chat-send" onclick="chatSend()" aria-label="Envoyer">➤</button>
       </div>`;
