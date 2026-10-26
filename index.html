@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 233">
+<meta name="app-build" content="Version 234">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1158,6 +1158,25 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .acc-back{background:none;border:0;color:var(--muted);font:600 16px var(--font-body);padding:4px 0 10px;cursor:pointer;}
 .acc-head2{font-family:var(--font-display);font-weight:600;font-size:24px;text-transform:uppercase;margin:0 0 12px;}
 .acc-lg{border-radius:22px;background:var(--court-elevated-2);border:1px solid var(--line-soft);padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;}
+.org-hero{display:flex;align-items:center;gap:16px;padding:18px;border-radius:26px;background:linear-gradient(135deg,rgba(217,242,58,.16),rgba(217,242,58,.03) 60%),var(--court-elevated-2);border:1px solid var(--line-soft);box-shadow:0 8px 22px rgba(0,0,0,.25);}
+.org-mono{width:58px;height:58px;border-radius:18px;background:var(--ball);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:.03em;flex:none;}
+.org-hero-b{min-width:0;display:flex;flex-direction:column;gap:8px;}
+.org-hero-t{font-family:var(--font-display);font-weight:600;font-size:26px;line-height:1.05;letter-spacing:.03em;text-transform:uppercase;overflow-wrap:anywhere;}
+.org-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.org-chips span{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--text);}
+.org-chip-warn{color:var(--ball);}
+.org-card{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;border:1px solid var(--line-soft);background:var(--court-elevated-2);color:var(--text);text-align:left;cursor:pointer;font-family:var(--font-body);box-shadow:0 6px 16px rgba(0,0,0,.2);}
+.org-card .acc-row-t b{font-family:var(--font-display);font-size:18px;letter-spacing:.03em;text-transform:uppercase;font-weight:600;}
+.org-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.org-act{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:16px;border-radius:22px;border:1px solid var(--line-soft);background:var(--court-elevated-2);color:var(--text);text-align:left;cursor:pointer;font-family:var(--font-body);}
+.org-act:active{transform:scale(.97);}
+.org-act-ico{width:42px;height:42px;border-radius:14px;background:rgba(217,242,58,.12);display:flex;align-items:center;justify-content:center;margin-bottom:6px;}
+.org-act-ico svg{width:24px;height:24px;fill:none;stroke:var(--ball);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.org-act b{font-size:16px;font-weight:700;}
+.org-act small{font-size:12px;color:var(--muted);}
+.org-act-badge{position:absolute;top:12px;right:12px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--ball);color:var(--court);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.lg-tile-add{background:transparent !important;border:2px dashed var(--line-soft) !important;box-shadow:none !important;}
+.lg-tile-add .lg-tile-ico{background:transparent;font-size:28px;color:var(--ball);box-shadow:none;}
 .lg-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;}
 .lg-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;text-align:center;padding:12px 6px 10px;border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);color:inherit;cursor:pointer;min-width:0;font:inherit;}
 .lg-tile:active{transform:scale(.96);}
@@ -1404,6 +1423,7 @@ const NAV_SVG = {
   equipe:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
   videos:'<rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M10.5 9.5v5l4-2.5z"/>',
   more:'<circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   cal:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
   bell:'<path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/>'
 };
@@ -5107,6 +5127,16 @@ function adminLeagueState(sum){
   if(o.total>0 && o.done===o.total) return { chip:'À terminer', cls:'tag-up', hint:'Tous les scores sont entrés' };
   return { chip:'En cours', cls:'tag-up', hint:o.done + ' / ' + o.total + ' scores saisis' };
 }
+function orgMono(name){ return escapeHTML((String(name||'?').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2) || '?').toUpperCase()); }
+function orgHeroHTML(name, chips){
+  return `<div class="org-hero"><div class="org-mono">${orgMono(name)}</div><div class="org-hero-b"><div class="org-hero-t">${escapeHTML(name||'')}</div><div class="org-chips">${chips.filter(Boolean).map(c=>`<span>${c}</span>`).join('')}</div></div></div>`;
+}
+function orgCardHTML(name, sub, onclick){
+  return `<button type="button" class="org-card" onclick="${onclick}"><div class="org-mono">${orgMono(name)}</div><span class="acc-row-t"><b>${escapeHTML(name)}</b>${sub?`<small>${sub}</small>`:''}</span><span class="acc-chev">›</span></button>`;
+}
+function orgActionHTML(icon, label, sub, onclick, badge){
+  return `<button type="button" class="org-act" onclick="${onclick}">${badge?`<span class="org-act-badge">${badge}</span>`:''}<span class="org-act-ico">${navIconHTML(icon)}</span><b>${label}</b><small>${sub}</small></button>`;
+}
 function leagueTileHTML(name, sub, onclick, dot){
   return `<button type="button" class="lg-tile" onclick="${onclick}">${dot?'<span class="lg-tile-dot"></span>':''}<span class="lg-tile-ico">${pbIcon()}</span><b>${escapeHTML(name)}</b>${sub?`<small>${escapeHTML(sub)}</small>`:''}</button>`;
 }
@@ -5192,25 +5222,26 @@ function adminOrgsHTML(){
   }
   const multi = orgs.length > 1;
   if(multi && !VIEW.aorgOpen){
-    return `<div class="pc-list">${orgs.map(o=>`
-      <button type="button" class="acc-org" onclick="VIEW.aorgOpen=true;pickAdminOrg('${o.id}')">
-        <span class="acc-org-ico">🏢</span>
-        <span class="acc-row-t"><b>${escapeHTML(o.name)}</b><small>${o.id===CURRENT_ORGANIZATION_ID ? myOrgLeagues().length + ' ligue(s)' : 'Ouvrir'}</small></span>
-        <span class="acc-chev">›</span>
-      </button>`).join('')}</div>`;
+    return `<div class="pc-list">${orgs.map(o=>orgCardHTML(o.name, o.id===CURRENT_ORGANIZATION_ID ? myOrgLeagues().length + ' ligue(s)' : 'Ouvrir', `VIEW.aorgOpen=true;pickAdminOrg('${o.id}')`)).join('')}</div>`;
   }
   const back = multi ? `<button type="button" class="acc-back" onclick="VIEW.aorgOpen=false;render()">‹ Mes organisations</button>` : '';
   const leagues = myOrgLeagues();
   setTimeout(()=>refreshAdminSummaries(false), 0);
-  return `${back}<div class="pc-sec" style="margin-top:4px;">${escapeHTML(org ? org.name : '')} · Mes ligues</div>
-    ${leagues.length ? `<div class="lg-tiles">${leagues.map(lg=>{ const sm = adminSummaryFor(lg); return leagueTileHTML(lg.name, lg.schedule_label||'', `openAdminLeague('${lg.id}','session')`, !!(sm && (sm.unassigned || (sm.open && sm.open.published && sm.open.total>0 && sm.open.done===sm.open.total)))); }).join('')}</div>` : '<p class="empty">Aucune ligue pour l\'instant.</p>'}
-    <button class="btn btn-secondary acc-btn" style="margin-top:12px;" onclick="onCreateLeague()">+ Créer une ligue</button>
-    <div class="pc-sec">Organisation</div>
-    <div class="acc-group">
-      ${accRow('', 'Membres', 'Joueurs et invitations', `openOrganizationPage('membres')`)}
-      ${accRow('', 'Comptes et accès', 'Approbations, liens aux joueurs', `openOrganizationPage('comptes')`)}
-      ${accRow('', 'Rapport', 'Qui joue où', `openOrganizationPage('rapport')`)}
-      ${accRow('', 'Paramètres généraux', 'Nom, lien d\'invitation', `openOrganizationPage('general')`)}
+  let nPlayers = 0, known = 0;
+  leagues.forEach(lg=>{ const sm = adminSummaryFor(lg); if(sm && typeof sm.players==='number'){ nPlayers += sm.players; known++; } });
+  let pending = 0;
+  try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
+  const chips = [leagues.length + ' ligue' + (leagues.length>1?'s':''), known ? nPlayers + ' joueur' + (nPlayers>1?'s':'') : '', pending ? '<b class="org-chip-warn">' + pending + ' en attente</b>' : ''];
+  const tiles = leagues.map(lg=>{ const sm = adminSummaryFor(lg); return leagueTileHTML(lg.name, lg.schedule_label||'', `openAdminLeague('${lg.id}','session')`, !!(sm && (sm.unassigned || (sm.open && sm.open.published && sm.open.total>0 && sm.open.done===sm.open.total)))); }).join('');
+  return `${back}${orgHeroHTML(org ? org.name : '', chips)}
+    <div class="pc-sec">Mes ligues</div>
+    <div class="lg-tiles">${tiles}<button type="button" class="lg-tile lg-tile-add" onclick="onCreateLeague()"><span class="lg-tile-ico">＋</span><b>Nouvelle ligue</b></button></div>
+    <div class="pc-sec">Gérer l'organisation</div>
+    <div class="org-acts">
+      ${orgActionHTML('joueurs','Membres','Joueurs et invitations',`openOrganizationPage('membres')`)}
+      ${orgActionHTML('lock','Comptes','Approbations et accès',`openOrganizationPage('comptes')`, pending||'')}
+      ${orgActionHTML('rapports','Rapport','Qui joue où',`openOrganizationPage('rapport')`)}
+      ${orgActionHTML('reglages','Paramètres','Nom, lien d\'invitation',`openOrganizationPage('general')`)}
     </div>`;
 }
 // ---- Communauté admin ----
@@ -12508,12 +12539,7 @@ function accountOrgsHTML(me){
   const org = orgs.find(o=>o.id===porg);
   const multi = orgs.length > 1;
   if(!org){
-    return `<div class="pc-list">${orgs.map(o=>`
-      <button type="button" class="acc-org" onclick="setPOrg('${o.id}')">
-        <span class="acc-org-ico">🏢</span>
-        <span class="acc-row-t"><b>${escapeHTML(o.name)}</b><small>${o.leagues.length} ligue${o.leagues.length>1?'s':''}</small></span>
-        <span class="acc-chev">›</span>
-      </button>`).join('') || '<p class="empty">Tu n\'es dans aucune ligue pour l\'instant.</p>'}</div>`;
+    return `<div class="pc-list">${orgs.map(o=>orgCardHTML(o.name, o.leagues.length+' ligue'+(o.leagues.length>1?'s':''), `setPOrg('${o.id}')`)).join('') || '<p class="empty">Tu n\'es dans aucune ligue pour l\'instant.</p>'}</div>`;
   }
   // Détail d'une ligue
   if(VIEW.pdet){
@@ -12530,7 +12556,8 @@ function accountOrgsHTML(me){
   }
   const back = multi ? `<button type="button" class="acc-back" onclick="setPOrg(null)">‹ Mes organisations</button>` : '';
   setTimeout(()=>refreshMySummaries(false), 0);
-  return `${back}<div class="pc-sec" style="margin-top:4px;">${escapeHTML(org.name)} · Mes ligues</div>
+  return `${back}${orgHeroHTML(org.name, [org.leagues.length + ' ligue' + (org.leagues.length>1?'s':'')])}
+    <div class="pc-sec">Mes ligues</div>
     <div class="lg-tiles">${org.leagues.map(({lg, link})=>{
       const sum = leagueSummaryFor(lg.id);
       return leagueTileHTML(lg.name, link.substitute_id ? 'Remplaçant' : (lg.schedule_label || ''), `openMyLeague('${lg.id}')`, !!(sum && sum.open && sum.open.visible && !link.substitute_id));
