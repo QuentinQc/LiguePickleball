@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 235">
+<meta name="app-build" content="Version 236">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -342,6 +342,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .msg-actions-preview{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:16px;padding:12px 16px;font-size:14px;color:var(--muted);text-align:center;}
 .msg-actions-btn{background:var(--court-light);border:1px solid var(--line-soft-strong);color:var(--text);border-radius:16px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;}
 .msg-actions-btn.danger{color:#fff;background:var(--paddle);border-color:var(--paddle);}
+.chat-sheet-lg{max-width:900px;height:min(94vh,1000px);}
+@media (max-width:640px){.chat-sheet-lg{height:96vh;height:96dvh;}}
 .sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;}
 .sheet-body > .card:last-child{margin-bottom:0;}
 .chat-fab:active{transform:scale(.94);}
@@ -2232,7 +2234,7 @@ function sheetModalHTML(){
   const sub = og ? og[2] : k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
   const body = k==='org-membres' ? organizationMembersCardHTML() : k==='org-comptes' ? organizationAccountsHTML() : k==='org-rapport' ? organizationReportHTML() : k==='org-general' ? organizationGeneralHTML() : k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
-    <div class="chat-sheet">
+    <div class="chat-sheet${og?' chat-sheet-lg':''}">
       <div class="chat-head">
         <div class="chat-head-ico">${ico}</div>
         <div class="chat-head-txt"><div class="chat-head-title">${title}</div><div class="chat-head-sub">${sub}</div></div>
