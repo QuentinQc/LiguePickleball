@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 231">
+<meta name="app-build" content="Version 232">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10338,7 +10338,7 @@ function reportsListHTML(){
   const pool = DATA.substitutePool || [];
   return `
     <div class="card">
-      <button class="btn-ghost" onclick="printReportsList()">📄 Exporter en PDF</button>
+      <button class="btn-ghost" onclick="printReportsList()">🖨️ Imprimer…</button>
     </div>
     <div class="card">
       <h2>Liste des joueurs et leur cote <span class="small">(${ratingList.length})</span></h2>
@@ -10401,7 +10401,7 @@ function reportsSessionHTML(){
   const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
 
   let html = `<div class="card">
-    <button class="btn-ghost" onclick="printReportsSession()">📄 Exporter en PDF</button>
+    <button class="btn-ghost" onclick="printReportsSession()">🖨️ Imprimer…</button>
   </div>
   <div class="card">
     <h2>Vue d'ensemble</h2>
@@ -10473,25 +10473,111 @@ function reportsListPrintableHTML(){
   return `<div class="print-page">
     <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
     <p class="print-sub">${ratingList.length} joueur${ratingList.length>1?'s':''}, ${pool.length} remplaçant${pool.length>1?'s':''}</p>
-    <table class="print-table">
-      <tr><th>Nom</th><th>Groupe</th><th>Cote</th><th>Statut</th></tr>
-      ${ratingList.map(p=>{
-        const g = groupById(p.groupId);
-        const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-        return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? 'Nouveau' : 'Confirmé'}</td></tr>`;
-      }).join('')}
-    </table>
-    <p class="print-sub" style="margin-top:16px;">Remplaçants</p>
-    <table class="print-table">
-      <tr><th>Nom</th><th>Cote</th><th>Courriel</th><th>Notes</th></tr>
-      ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
-      ${pool.length===0 ? `<tr><td colspan="4">Aucun</td></tr>` : ''}
-    </table>
+    ${printTableHTML(printSelCols('liste'), ratingList)}
+    ${printSelCols('remp').length ? `<p class="print-sub" style="margin-top:16px;">Remplaçants</p>
+    ${printTableHTML(printSelCols('remp'), pool)}` : ''}
   </div>`;
 }
-function printReportsList(){
-  openPrintWindow('Liste des joueurs', reportsListPrintableHTML());
+// ---- Choix des colonnes à imprimer ----
+const _pcPct = x=> x===null ? '—' : Math.round(x*100)+'%';
+const PRINT_COLS = {
+  liste: [
+    ['nom','Nom',p=>escapeHTML(p.name)],
+    ['groupe','Groupe',p=>{ const g=groupById(p.groupId); return escapeHTML(g?g.name:'—'); }],
+    ['cote','Cote',p=>(typeof p.rating==='number'?p.rating:RATING_DEFAULT).toFixed(2)],
+    ['statut','Statut',p=>p.status==='new'?'Nouveau':'Confirmé']
+  ],
+  remp: [
+    ['nom','Nom',p=>escapeHTML(p.name)],
+    ['cote','Cote',p=>(typeof p.rating==='number'?p.rating:RATING_DEFAULT).toFixed(2)],
+    ['courriel','Courriel',p=>escapeHTML(p.email||'—')],
+    ['notes','Notes',p=>escapeHTML(p.notes||'—')]
+  ],
+  session: [
+    ['nom','Nom',r=>escapeHTML(r.player.name)],
+    ['statut','Statut',r=>r.player.status==='new'?'Nouveau':'Confirmé'],
+    ['v','V',r=>r.wins],
+    ['d','D',r=>r.losses],
+    ['pv','% V',r=>_pcPct(r.winRate)],
+    ['abs','Taux absence',r=>_pcPct(r.absenceRate)],
+    ['mont','Montées',r=>r.promotions],
+    ['desc','Descentes',r=>r.relegations],
+    ['dcote','Δ Cote',r=>(r.ratingChange>=0?'+':'')+r.ratingChange.toFixed(3)],
+    ['remp','Remplacements',r=>r.subCount]
+  ]
+};
+let PRINT_SEL = {};
+function printSelCols(kind){
+  const all = PRINT_COLS[kind];
+  const sel = PRINT_SEL[kind];
+  return sel ? all.filter(c=>sel.includes(c[0])) : (kind==='remp' ? all : all);
 }
+function printTableHTML(cols, rows){
+  if(!cols.length) return '';
+  return `<table class="print-table"><tr>${cols.map(c=>`<th>${c[1]}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${c[2](r)}</td>`).join('')}</tr>`).join('')}${rows.length===0 ? `<tr><td colspan="${cols.length}">Aucun</td></tr>` : ''}</table>`;
+}
+function printColsPickerHTML(kind, label){
+  const sel = PRINT_SEL[kind];
+  return `<p class="small" style="margin:0 0 6px;">${label}</p><div class="acc-group" style="padding:4px 12px;">${PRINT_COLS[kind].map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;font-size:16px;"><input type="checkbox" class="pc-col-${kind}" value="${c[0]}" ${(!sel || sel.includes(c[0]))?'checked':''} style="width:20px;height:20px;"> ${c[1]}</label>`).join('')}</div>`;
+}
+function openPrintPicker(report){
+  let body;
+  if(report==='liste'){
+    const remp = PRINT_SEL.remp;
+    body = printColsPickerHTML('liste','Colonnes — joueurs')
+      + `<label style="display:flex;align-items:center;gap:10px;padding:14px 2px 4px;font-size:16px;"><input type="checkbox" id="pcRempOn" ${(remp===undefined || remp.length)?'checked':''} style="width:20px;height:20px;"> Inclure la liste des remplaçants</label>`
+      + `<div id="pcRempCols" style="margin-top:8px;">${printColsPickerHTML('remp','Colonnes — remplaçants')}</div>`;
+  } else body = printColsPickerHTML('session','Colonnes à imprimer');
+  body += `<div id="pcErr" class="small" style="color:var(--danger);margin-top:10px;min-height:1em;"></div><button class="btn btn-primary" style="width:100%;margin-top:6px;" onclick="doPrintReport('${report}')">🖨️ Imprimer</button>`;
+  showContentModal(report==='liste' ? 'Imprimer la liste des joueurs' : 'Imprimer le rapport de session', body);
+}
+function _pcChecked(kind){ return Array.from(document.querySelectorAll('.pc-col-'+kind)).filter(x=>x.checked).map(x=>x.value); }
+function doPrintReport(report){
+  const main = _pcChecked(report);
+  if(!main.length){ const e=document.getElementById('pcErr'); if(e) e.textContent='Choisis au moins une colonne.'; return; }
+  PRINT_SEL[report] = main;
+  if(report==='liste'){
+    const on = document.getElementById('pcRempOn');
+    const rc = _pcChecked('remp');
+    PRINT_SEL.remp = (on && on.checked && rc.length) ? rc : [];
+  }
+  closeModal();
+  setTimeout(()=>{ openPrintOverlay(report==='liste' ? 'Liste des joueurs' : 'Rapport de session', report==='liste' ? reportsListPrintableHTML() : reportsSessionPrintableHTML(), report==='session'); }, 60);
+}
+// Aperçu d'impression DANS l'app (sans fenêtre pop-up, qui est souvent bloquée
+// ou refusée dans l'app installée) : une page blanche plein écran avec les
+// boutons Imprimer / Fermer. À l'impression, tout le reste de l'app est masqué.
+function closePrintOverlay(){
+  const o = document.getElementById('printOverlay'); if(o) o.remove();
+  const st = document.getElementById('printOverlayCss'); if(st) st.remove();
+}
+function openPrintOverlay(title, bodyHtml, landscape){
+  closePrintOverlay();
+  const st = document.createElement('style'); st.id = 'printOverlayCss';
+  st.textContent = `
+    @page{size:${landscape ? 'landscape' : 'portrait'};margin:12mm;}
+    #printOverlay{position:fixed;inset:0;z-index:100000;background:#fff;color:#000;overflow:auto;-webkit-overflow-scrolling:touch;font-family:Arial,Helvetica,sans-serif;}
+    #printOverlay .print-page{padding:6mm 4mm;}
+    #printOverlay .print-title{font-size:22px;font-weight:800;margin:0 0 2px;color:#000;}
+    #printOverlay .print-sub{font-size:13px;color:#333;margin:0 0 14px;}
+    #printOverlay .print-table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+    #printOverlay .print-table th,#printOverlay .print-table td{border:1px solid #000;padding:8px 10px;font-size:13px;text-align:left;color:#000;background:#fff;}
+    #printOverlay .print-table th{text-transform:uppercase;font-size:11px;letter-spacing:.04em;font-weight:700;}
+    #printOverlay .print-toolbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:flex-end;background:#f2f2f2;border-bottom:1px solid #ccc;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;}
+    #printOverlay .print-toolbar button{font-size:15px;font-weight:600;padding:10px 16px;border-radius:8px;border:1px solid #999;background:#fff;color:#000;cursor:pointer;}
+    #printOverlay .print-toolbar button.primary{background:#111;color:#fff;border-color:#111;}
+    @media print{
+      body > *:not(#printOverlay){display:none !important;}
+      #printOverlay{position:static;overflow:visible;}
+      #printOverlay .print-toolbar{display:none !important;}
+    }`;
+  document.head.appendChild(st);
+  const o = document.createElement('div'); o.id = 'printOverlay';
+  o.innerHTML = `<div class="print-toolbar"><button type="button" onclick="window.print()">🖨️ Imprimer</button><button type="button" class="primary" onclick="closePrintOverlay()">✕ Fermer</button></div>${bodyHtml}`;
+  document.body.appendChild(o);
+  o.scrollTop = 0;
+}
+function printReportsList(){ openPrintPicker('liste'); }
 function reportsSessionPrintableHTML(){
   const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
   const reports = computePlayerReports();
@@ -10516,25 +10602,10 @@ function reportsSessionPrintableHTML(){
   return `<div class="print-page">
     <p class="print-title">${escapeHTML(DATA.leagueName)}</p>
     <p class="print-sub">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} · ${DATA.players.length} joueur${DATA.players.length>1?'s':''} · ${(DATA.substitutePool||[]).length} remplaçant${(DATA.substitutePool||[]).length>1?'s':''}</p>
-    <table class="print-table">
-      <tr><th>Nom</th><th>Statut</th><th>V</th><th>D</th><th>% V</th><th>Taux absence</th><th>Montées</th><th>Descentes</th><th>Δ Cote</th></tr>
-      ${sorted.map(r=>`<tr>
-        <td>${escapeHTML(r.player.name)}</td>
-        <td>${r.player.status==='new' ? 'Nouveau' : 'Confirmé'}</td>
-        <td>${r.wins}</td>
-        <td>${r.losses}</td>
-        <td>${pct(r.winRate)}</td>
-        <td>${pct(r.absenceRate)}</td>
-        <td>${r.promotions}</td>
-        <td>${r.relegations}</td>
-        <td>${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
-      </tr>`).join('')}
-    </table>
+    ${printTableHTML(printSelCols('session'), sorted)}
   </div>`;
 }
-function printReportsSession(){
-  openPrintWindow('Rapport de session', reportsSessionPrintableHTML());
-}
+function printReportsSession(){ openPrintPicker('session'); }
 function setReportsListSort(col){
   if((VIEW.reportsListSortBy||'rating') === col){ VIEW.reportsListSortDir = (VIEW.reportsListSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
   else { VIEW.reportsListSortBy = col; VIEW.reportsListSortDir = col==='rating' ? 'desc' : 'asc'; }
