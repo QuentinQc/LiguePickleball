@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 234">
+<meta name="app-build" content="Version 235">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2225,10 +2225,12 @@ function updateChatFab(){
 }
 function sheetModalHTML(){
   const k = MODAL.sheet;
-  const ico = k==='partenaire' ? '🤝' : k==='calendrier' ? '📅' : '🎉';
-  const title = k==='partenaire' ? 'Partenaire' : k==='calendrier' ? 'Calendrier' : 'Événements';
-  const sub = k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
-  const body = k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
+  const ORGS = { 'org-membres':['👥','Membres','Joueurs et invitations'], 'org-comptes':['🔑','Comptes','Approbations et accès'], 'org-rapport':['📊','Rapport','Qui joue où'], 'org-general':['⚙️','Paramètres','Nom et lien d\'invitation'] };
+  const og = ORGS[k];
+  const ico = og ? og[0] : k==='partenaire' ? '🤝' : k==='calendrier' ? '📅' : '🎉';
+  const title = og ? og[1] : k==='partenaire' ? 'Partenaire' : k==='calendrier' ? 'Calendrier' : 'Événements';
+  const sub = og ? og[2] : k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
+  const body = k==='org-membres' ? organizationMembersCardHTML() : k==='org-comptes' ? organizationAccountsHTML() : k==='org-rapport' ? organizationReportHTML() : k==='org-general' ? organizationGeneralHTML() : k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet">
       <div class="chat-head">
@@ -5185,7 +5187,7 @@ function adminHomeHTML(){
   const todo = [];
   let pending = 0;
   try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
-  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrganizationPage('comptes')"><span class="acc-row-t"><b>${pending} compte${pending>1?'s':''} en attente</b><small>À approuver et lier à un joueur</small></span><span class="acc-chev">›</span></button>`);
+  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheet('comptes')"><span class="acc-row-t"><b>${pending} compte${pending>1?'s':''} en attente</b><small>À approuver et lier à un joueur</small></span><span class="acc-chev">›</span></button>`);
   leagues.forEach(lg=>{
     const sum = adminSummaryFor(lg);
     if(!sum || sum.mlp) return;
@@ -5238,10 +5240,10 @@ function adminOrgsHTML(){
     <div class="lg-tiles">${tiles}<button type="button" class="lg-tile lg-tile-add" onclick="onCreateLeague()"><span class="lg-tile-ico">＋</span><b>Nouvelle ligue</b></button></div>
     <div class="pc-sec">Gérer l'organisation</div>
     <div class="org-acts">
-      ${orgActionHTML('joueurs','Membres','Joueurs et invitations',`openOrganizationPage('membres')`)}
-      ${orgActionHTML('lock','Comptes','Approbations et accès',`openOrganizationPage('comptes')`, pending||'')}
-      ${orgActionHTML('rapports','Rapport','Qui joue où',`openOrganizationPage('rapport')`)}
-      ${orgActionHTML('reglages','Paramètres','Nom, lien d\'invitation',`openOrganizationPage('general')`)}
+      ${orgActionHTML('joueurs','Membres','Joueurs et invitations',`openOrgSheet('membres')`)}
+      ${orgActionHTML('lock','Comptes','Approbations et accès',`openOrgSheet('comptes')`, pending||'')}
+      ${orgActionHTML('rapports','Rapport','Qui joue où',`openOrgSheet('rapport')`)}
+      ${orgActionHTML('reglages','Paramètres','Nom, lien d\'invitation',`openOrgSheet('general')`)}
     </div>`;
 }
 // ---- Communauté admin ----
@@ -10952,6 +10954,16 @@ function openOrganizationPage(tab){
     ADMIN_SHOWING_ORG = true;
     if(tab){ VIEW.orgSubTab = tab; VIEW.orgHub = false; } // accès direct à une section
     else VIEW.orgHub = true; // accueil en tuiles (mobile, nouveau menu)
+    render();
+  });
+}
+function openOrgSheet(tab){
+  Promise.all([
+    loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()
+  ]).then(()=>{
+    VIEW.orgSubTab = tab; VIEW.orgHub = false;
+    MODAL_UNDER = null;
+    MODAL = { kind:'content', sheet:'org-'+tab, title:tab };
     render();
   });
 }
