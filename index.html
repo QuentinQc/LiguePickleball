@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 232">
+<meta name="app-build" content="Version 233">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9893,7 +9893,7 @@ function matchSheetRowStyleVars(n){
 function printMatchSheets(sessionId){
   const session = DATA.sessions.find(s=>s.id===sessionId) || currentOpenSession();
   if(!session){ showAlert("Aucune session trouvée à imprimer."); return; }
-  openPrintWindow('Feuilles de match', printableMatchSheetsHTML(session), false);
+  openPrintOverlay('Feuilles de match', printableMatchSheetsHTML(session), false);
 }
 
 // Ouvre l'app Mail avec un courriel pré-rempli rappelant aux joueurs de
@@ -10570,7 +10570,9 @@ function openPrintOverlay(title, bodyHtml, landscape){
       body > *:not(#printOverlay){display:none !important;}
       #printOverlay{position:static;overflow:visible;}
       #printOverlay .print-toolbar{display:none !important;}
-    }`;
+    }
+    ${typeof MATCH_SHEET_CSS !== 'undefined' ? MATCH_SHEET_CSS : ''}
+    #printOverlay .ms-page{background:#fff;color:#000;}`;
   document.head.appendChild(st);
   const o = document.createElement('div'); o.id = 'printOverlay';
   o.innerHTML = `<div class="print-toolbar"><button type="button" onclick="window.print()">🖨️ Imprimer</button><button type="button" class="primary" onclick="closePrintOverlay()">✕ Fermer</button></div>${bodyHtml}`;
