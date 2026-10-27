@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 261">
+<meta name="app-build" content="Version 262">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5655,12 +5655,13 @@ function renderAdmin(){
 const ADMIN_CLASSIC_VIEW = false;
 let ADMIN_SUMMARY = {}, ADMIN_SUMMARY_AT = 0, ADMIN_SUMMARY_LOADING = false;
 function summarizeAdminLeague(data, lg){
-  const out = { leagueId: lg.id, name: lg.name, schedule: lg.schedule_label || '', mlp: !!(data && data.leagueFormat==='mlp'), players:0, unassigned:0, open:null };
+  const out = { leagueId: lg.id, name: lg.name, schedule: lg.schedule_label || '', mlp: !!(data && data.leagueFormat==='mlp'), rec: !!(data && isRecLeague(data)), players:0, unassigned:0, open:null };
   if(!data) return out;
   const players = data.players || [];
   out.players = players.length;
-  out.unassigned = players.filter(p=>!p.groupId && !p.injured).length;
   const open = (data.sessions||[]).find(x=>x.status==='open');
+  // Récréatif : les terrains sont tirés au démarrage, et un absent n'a pas de terrain — ce n'est pas un oubli.
+  out.unassigned = (out.rec && !open) ? 0 : players.filter(p=>!p.groupId && !p.injured && !(out.rec && open.absences && open.absences.includes(p.id))).length;
   if(open){
     let total=0, done=0;
     (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
@@ -5707,6 +5708,12 @@ function adminLeagueState(sum){
   if(!sum) return { chip:'…', cls:'tag-stay', hint:'' };
   if(sum.mlp) return { chip:'MLP', cls:'tag-stay', hint:'' };
   const o = sum.open;
+  if(sum.rec){
+    // Récréatif : aucun score à suivre.
+    if(!o) return { chip:'Aucune soirée', cls:'tag-stay', hint:'Lancer la prochaine soirée' };
+    if(!o.published) return { chip:'Non publiée', cls:'tag-yellow', hint:'Publier la soirée' };
+    return { chip:'Publiée', cls:'tag-up', hint:'Voir les terrains' };
+  }
   if(!o) return { chip:'Aucune session', cls:'tag-stay', hint:'Lancer la prochaine session' };
   if(!o.published) return { chip:'Non publiée', cls:'tag-yellow', hint:'Publier la session' };
   if(o.total>0 && o.done===o.total) return { chip:'À terminer', cls:'tag-up', hint:'Tous les scores sont entrés' };
@@ -5731,7 +5738,7 @@ function adminLeagueCardHTML(lg){
   const lines = [];
   if(sum && sum.open) lines.push('📅 ' + escapeHTML(frDateLong(sum.open.date)));
   if(sum && sum.open && sum.open.absences) lines.push('🚫 ' + sum.open.absences + ' absence' + (sum.open.absences>1?'s':''));
-  if(sum && sum.unassigned) lines.push('⚠️ ' + sum.unassigned + ' joueur' + (sum.unassigned>1?'s':'') + ' sans groupe');
+  if(sum && sum.unassigned) lines.push('⚠️ ' + sum.unassigned + ' joueur' + (sum.unassigned>1?'s':'') + (sum.rec ? ' sans terrain' : ' sans groupe'));
   return `<div class="acc-lg" onclick="openAdminLeague('${lg.id}','session')">
     <div class="acc-lg-h"><b>${escapeHTML(lg.name)}</b><span class="tag ${st.cls}">${st.chip}</span></div>
     <div class="small">${escapeHTML(lg.schedule_label || '')}${sum ? ' · ' + sum.players + ' joueur' + (sum.players>1?'s':'') : ''}</div>
@@ -5774,7 +5781,7 @@ function adminHomeHTML(){
   leagues.forEach(lg=>{
     const sum = adminSummaryFor(lg);
     if(!sum || sum.mlp) return;
-    if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} sans groupe</b><small>${escapeHTML(lg.name)}</small></span><span class="acc-chev">›</span></button>`);
+    if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} ${sum.rec ? 'sans terrain' : 'sans groupe'}</b><small>${escapeHTML(lg.name)}</small></span><span class="acc-chev">›</span></button>`);
     if(sum.open && sum.open.published && sum.open.total>0 && sum.open.done===sum.open.total) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>Session prête à terminer</b><small>${escapeHTML(lg.name)} · tous les scores sont entrés</small></span><span class="acc-chev">›</span></button>`);
   });
   if(todo.length) html += `<div class="pc-sec" style="margin-top:0;">À traiter</div><div class="acc-group" style="margin-bottom:6px;">${todo.join('')}</div>`;
