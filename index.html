@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 251">
+<meta name="app-build" content="Version 252">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3097,46 +3097,79 @@ const LEAGUE_FORMAT_HINTS = {
   mlp: "Équipes mixtes fixes (2H+2F ou 2H+1F) qui s'affrontent en joutes genrées (double féminin, double masculin, mixtes) + DreamBreaker — classement par points cumulés sur la saison, comme le vrai MLP."
 };
 let NEW_LEAGUE_MEMBER_CANDIDATES = [];
-// ---- Assistant de création de ligue : compétitive ou récréative ----
+// ---- Assistant de création de ligue : questions adaptées au type et au format ----
 let WIZ = null;
+const WIZ_GSIZE = { '4':[4,4,'Groupes de 4 (6 matchs à 11 points)'], '5':[5,5,'Groupes de 5 (10 matchs à 9 points)'], both:[4,5,'Groupes de 4 ou 5 (le plus courant)'], six:[4,6,'Groupes de 4 à 6 (6 en exception)'] };
 async function onCreateLeague(){
   await Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()]);
   NEW_LEAGUE_MEMBER_CANDIDATES = organizationRosterEntries();
-  WIZ = { si:0, steps:['type'], type:null, format:'ladder', mlpSize:4,
+  WIZ = { si:0, steps:['type'], type:null, format:'ladder', mlpSize:4, players:16,
     day:'', time:'', duration:120, seasonStart:'', seasonEnd:'', autoStart:false, autoPublish:false,
-    groupMin:4, groupMax:5, swap:1,
+    gsize:'both', swap:1,
     rating:true, ratingSubs:false, showGroup:false, scores:true, standings:true,
-    name:'', invite:true, members:{} };
+    name:'', nameTouched:false, invite:true, members:{} };
   showContentModal('Créer une nouvelle ligue', wizHTML);
 }
+// Ce qui a du sens selon le type et le format choisis.
+function wizHasRatings(){ return WIZ.type === 'competitive' && WIZ.format !== 'mlp'; }
+function wizHasGroups(){ return WIZ.format === 'ladder' || WIZ.format === 'pools' || WIZ.format === 'single'; }
+function wizCanAutoStart(){ return WIZ.format !== 'mlp'; }
 function wizBuildSteps(){
-  const st = ['type'];
+  const st = ['type', 'effectif'];
   if(WIZ.type === 'competitive') st.push('format');
   st.push('calendrier');
-  if(WIZ.format === 'ladder' || WIZ.format === 'pools' || WIZ.format === 'single') st.push('groupes');
+  if(wizHasGroups()) st.push('groupes');
   st.push('joueurs', 'details');
   WIZ.steps = st;
 }
+function wizApplyDefaults(){
+  const comp = WIZ.type === 'competitive';
+  WIZ.rating = comp && WIZ.format !== 'mlp';       // pas de cote en récréatif ni en MLP (classement par points)
+  WIZ.ratingSubs = false;
+  WIZ.standings = comp && WIZ.format !== 'mlp';
+  WIZ.showGroup = !comp;                            // récréatif : les terrains sont annoncés d'avance
+  WIZ.scores = true;
+  WIZ.autoStart = !comp && WIZ.format !== 'mlp';
+  WIZ.autoPublish = WIZ.autoStart;
+  WIZ.swap = 1;
+}
 function wizPickType(t){
   WIZ.type = t;
-  if(t==='competitive'){ WIZ.format='ladder'; WIZ.rating=true; WIZ.ratingSubs=false; WIZ.standings=true; WIZ.autoStart=false; WIZ.autoPublish=false; WIZ.showGroup=false; }
-  else { WIZ.format='social'; WIZ.rating=false; WIZ.ratingSubs=false; WIZ.standings=false; WIZ.autoStart=true; WIZ.autoPublish=true; WIZ.showGroup=true; }
-  WIZ.scores = true;
-  wizBuildSteps();
+  WIZ.format = t === 'competitive' ? 'ladder' : 'social';
+  WIZ.players = t === 'competitive' ? 20 : 12;
+  wizApplyDefaults(); wizBuildSteps();
   WIZ.si = 1;
   render();
 }
-function wizPickFormat(f){ WIZ.format = f; wizBuildSteps(); render(); }
+function wizRecommendedFormat(){ return WIZ.players < 8 ? 'single' : 'ladder'; }
+function wizPickFormat(f){ WIZ.format = f; wizApplyDefaults(); wizBuildSteps(); render(); }
 function wizSet(k, v){ WIZ[k] = v; }
 function wizNum(k, v, min, max){ let n = parseInt(v,10); if(isNaN(n)) n = min; WIZ[k] = Math.min(max, Math.max(min, n)); }
+function wizSetPlayers(v){ wizNum('players', v, 2, 200); render(); }
+function wizSetDay(v){
+  WIZ.day = v;
+  if(v === ''){ WIZ.autoStart = false; WIZ.autoPublish = false; }
+  else if(wizCanAutoStart() && WIZ.type === 'recreational' && !WIZ.autoStartTouched){ WIZ.autoStart = true; WIZ.autoPublish = true; }
+  render();
+}
 function wizToggleMember(i, on){ if(on) WIZ.members[i] = true; else delete WIZ.members[i]; }
 function wizBack(){ WIZ.si = Math.max(0, WIZ.si - 1); render(); }
+function wizDayName(){
+  if(WIZ.day === '') return '';
+  const d = FR_DAYS[parseInt(WIZ.day,10)] || '';
+  return d;
+}
+function wizSuggestedName(){
+  const d = wizDayName();
+  if(WIZ.type === 'recreational') return d ? 'Rotation du ' + d : 'Ligue récréative';
+  return d ? 'Ligue du ' + d : 'Ma ligue';
+}
 function wizNext(){
   const key = WIZ.steps[WIZ.si];
   if(key === 'calendrier' && WIZ.seasonStart && WIZ.seasonEnd && WIZ.seasonEnd < WIZ.seasonStart){ showAlert("La fin de saison doit être après le début."); return; }
-  if(key === 'calendrier' && WIZ.autoStart && WIZ.day === ''){ showAlert("Choisis un jour de jeu pour démarrer les sessions automatiquement."); return; }
-  if(key === 'groupes' && WIZ.groupMin > WIZ.groupMax){ showAlert("Le minimum de joueurs par groupe ne peut pas dépasser le maximum."); return; }
-  WIZ.si += 1; render();
+  WIZ.si += 1;
+  if(WIZ.steps[WIZ.si] === 'details' && !WIZ.nameTouched) WIZ.name = wizSuggestedName();
+  render();
 }
 function wizNavHTML(nextLabel, nextFn){
   return `<div class="row" style="justify-content:space-between;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
@@ -3144,10 +3177,25 @@ function wizNavHTML(nextLabel, nextFn){
     <button class="btn btn-primary" onclick="${nextFn}">${nextLabel}</button></div>`;
 }
 function wizScheduleLabel(){
-  if(WIZ.day === '') return '';
-  const d = FR_DAYS[parseInt(WIZ.day,10)] || '';
-  const t = WIZ.time ? ' ' + fmtHM(WIZ.time) : '';
-  return d ? d.charAt(0).toUpperCase() + d.slice(1) + t : '';
+  const d = wizDayName();
+  return d ? d.charAt(0).toUpperCase() + d.slice(1) + (WIZ.time ? ' ' + fmtHM(WIZ.time) : '') : '';
+}
+function wizPlanText(plan){
+  if(!plan.sizes.length) return "pas assez de joueurs pour former un groupe";
+  const cnt = {}; plan.sizes.forEach(function(x){ cnt[x] = (cnt[x]||0) + 1; });
+  const parts = Object.keys(cnt).sort(function(a,b){ return b - a; }).map(function(k){ return cnt[k] + ' de ' + k; });
+  return plan.sizes.length + ' groupe' + (plan.sizes.length>1?'s':'') + ' (' + parts.join(', ') + ')' + (plan.left ? ' · ' + plan.left + ' en attente' : '');
+}
+function wizGroupPlan(){ const l = WIZ_GSIZE[WIZ.gsize]; return socialSizes(WIZ.players, l[0], l[1]); }
+function wizFormatNote(f){
+  const n = WIZ.players;
+  if(f === 'ladder' || f === 'pools'){
+    if(n < 8) return `⚠️ Avec environ ${n} joueurs, il n'y aurait qu'un groupe : ${f==='ladder'?'les montées et descentes ne serviraient à rien':'les poules seraient inutiles'}.`;
+    return `✓ Environ ${wizPlanText(socialSizes(n, 4, 5))}.`;
+  }
+  if(f === 'single') return n < 4 ? '⚠️ Il faut au moins 4 joueurs.' : '✓ Convient à toute taille de ligue.';
+  if(f === 'mlp') return n < 8 ? '⚠️ Il faut au moins 8 joueurs pour former 2 équipes.' : `✓ Environ ${Math.floor(n/4)} équipes de 4.`;
+  return '';
 }
 function wizHTML(){
   if(!WIZ) return '';
@@ -3157,14 +3205,26 @@ function wizHTML(){
     html += `<p style="margin:0 0 12px;"><strong>Quel genre de ligue veux-tu créer ?</strong></p>
       <div class="action-grid" style="grid-template-columns:1fr;">
         <button class="action-btn" style="flex-direction:column;align-items:flex-start;" onclick="wizPickType('competitive')"><b>🏆 Ligue compétitive</b><span class="small">Classement, cotes, résultats qui comptent. Échelle avec montées et descentes, poules, division unique ou équipes (MLP).</span></button>
-        <button class="action-btn" style="flex-direction:column;align-items:flex-start;" onclick="wizPickType('recreational')"><b>🎉 Ligue récréative</b><span class="small">Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains. Partenaires et adversaires changent, sans pression.</span></button>
+        <button class="action-btn" style="flex-direction:column;align-items:flex-start;" onclick="wizPickType('recreational')"><b>🎉 Ligue récréative</b><span class="small">Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains. Partenaires et adversaires changent. Ni cote, ni classement, ni pression.</span></button>
       </div>`;
     return html;
   }
+  if(key === 'effectif'){
+    html += `<p style="margin:0 0 4px;"><strong>Combien de joueurs prévois-tu ?</strong></p><p class="small" style="margin:0 0 10px;">Une estimation suffit : elle sert à te conseiller le bon format et à prévoir les groupes.</p>
+      <div class="field"><input type="number" min="2" max="200" value="${WIZ.players}" onchange="wizSetPlayers(this.value)"></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;">${[8,12,16,24,32].map(n=>`<button class="btn-ghost" ${WIZ.players===n?'style="border-color:var(--ball);"':''} onclick="wizSetPlayers(${n})">${n}</button>`).join('')}</div>`;
+    if(WIZ.type === 'recreational'){
+      const p = socialSizes(WIZ.players);
+      html += `<p class="small" style="margin-top:12px;">${WIZ.players < 4 ? '⚠️ Il faut au moins 4 joueurs présents pour jouer.' : '🎾 Avec tout le monde présent : ' + wizPlanText(p) + ', tirés au hasard chaque soir.'}</p>`;
+    }
+    html += wizNavHTML('Suivant →', 'wizNext()');
+    return html;
+  }
   if(key === 'format'){
+    const rec = wizRecommendedFormat();
     const opts = [['ladder','Échelle','Les groupes montent et descendent selon les résultats de chaque session.'],['pools','Poules fixes','Groupes fixes qui ne bougent jamais.'],['single','Division unique','Un seul groupe avec un classement cumulatif sur la saison.'],['mlp','MLP — équipes','Équipes mixtes fixes, classement par points.']];
     html += `<p style="margin:0 0 12px;"><strong>Quel format de compétition ?</strong></p><div class="action-grid" style="grid-template-columns:1fr;">
-      ${opts.map(o=>`<button class="action-btn" style="flex-direction:column;align-items:flex-start;${WIZ.format===o[0]?'border-color:var(--ball);background:rgba(255,255,255,0.08);':''}" onclick="wizPickFormat('${o[0]}')"><b>${WIZ.format===o[0]?'✓ ':''}${o[1]}</b><span class="small">${o[2]}</span></button>`).join('')}
+      ${opts.map(o=>`<button class="action-btn" style="flex-direction:column;align-items:flex-start;${WIZ.format===o[0]?'border-color:var(--ball);background:rgba(255,255,255,0.08);':''}" onclick="wizPickFormat('${o[0]}')"><b>${WIZ.format===o[0]?'✓ ':''}${o[1]}${o[0]===rec?' <span class="tag tag-up">Recommandé</span>':''}</b><span class="small">${o[2]}</span><span class="small" style="color:var(--muted);">${wizFormatNote(o[0])}</span></button>`).join('')}
     </div>`;
     if(WIZ.format === 'mlp') html += `<div class="field" style="margin-top:12px;"><label>Composition des équipes</label>
       <select onchange="wizSet('mlpSize', parseInt(this.value,10))"><option value="4" ${WIZ.mlpSize===4?'selected':''}>2 hommes + 2 femmes (4 joutes)</option><option value="3" ${WIZ.mlpSize===3?'selected':''}>2 hommes + 1 femme (3 joutes)</option></select></div>`;
@@ -3175,46 +3235,55 @@ function wizHTML(){
   if(key === 'calendrier'){
     html += `<p style="margin:0 0 4px;"><strong>Quand joue-t-on ?</strong></p><p class="small" style="margin:0 0 8px;">Tout est facultatif et modifiable plus tard dans le calendrier de saison.</p>
       <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Jour de jeu</label><select onchange="wizSet('day',this.value)"><option value="">— à choisir plus tard —</option>${[1,2,3,4,5,6,0].map(d=>`<option value="${d}" ${String(WIZ.day)===String(d)?'selected':''}>${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1)}</option>`).join('')}</select></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Jour de jeu</label><select onchange="wizSetDay(this.value)"><option value="">— à choisir plus tard —</option>${[1,2,3,4,5,6,0].map(d=>`<option value="${d}" ${String(WIZ.day)===String(d)?'selected':''}>${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1)}</option>`).join('')}</select></div>
         <div class="field" style="flex:1;min-width:120px;"><label>Heure</label><input type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)"></div>
         <div class="field" style="flex:1;min-width:120px;"><label>Durée (minutes)</label><input type="number" min="15" step="15" value="${WIZ.duration}" onchange="wizNum('duration',this.value,15,600)"></div>
       </div>
       <div class="row">
         <div class="field" style="flex:1;min-width:150px;"><label>Début de saison</label><input type="date" value="${escapeHTML(WIZ.seasonStart)}" onchange="wizSet('seasonStart',this.value)"></div>
         <div class="field" style="flex:1;min-width:150px;"><label>Fin de saison</label><input type="date" value="${escapeHTML(WIZ.seasonEnd)}" onchange="wizSet('seasonEnd',this.value)"></div>
-      </div>
-      <div class="card">
-        ${visSwitch('Démarrer la prochaine session automatiquement', 'Dès que tu termines une session, la suivante est créée pour la prochaine date de jeu.', WIZ.autoStart, `wizSet('autoStart',this.checked);render();`)}
+      </div>`;
+    if(wizCanAutoStart()){
+      if(WIZ.day === '') html += `<p class="small" style="color:var(--muted);">Choisis un jour de jeu pour pouvoir démarrer les sessions automatiquement.</p>`;
+      else html += `<div class="card">
+        ${visSwitch('Démarrer la prochaine session automatiquement', 'Dès que tu termines une session, la suivante est créée pour la prochaine date de jeu.', WIZ.autoStart, `WIZ.autoStartTouched=true;wizSet('autoStart',this.checked);if(!this.checked)wizSet('autoPublish',false);render();`)}
         ${WIZ.autoStart ? visSwitch('Publier automatiquement aux joueurs', 'Sinon la session reste en préparation jusqu\'à ce que tu la publies.', WIZ.autoPublish, `wizSet('autoPublish',this.checked)`) : ''}
       </div>`;
+    }
     html += wizNavHTML('Suivant →', 'wizNext()');
     return html;
   }
   if(key === 'groupes'){
-    html += `<p style="margin:0 0 4px;"><strong>Groupes</strong></p><p class="small" style="margin:0 0 8px;">${WIZ.format==='ladder' ? 'Taille des groupes et nombre de joueurs qui changent de groupe à chaque session.' : 'Taille des groupes.'}</p>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Minimum de joueurs par groupe</label><input type="number" min="1" max="6" value="${WIZ.groupMin}" onchange="wizNum('groupMin',this.value,1,6)"></div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Maximum de joueurs par groupe</label><input type="number" min="1" max="6" value="${WIZ.groupMax}" onchange="wizNum('groupMax',this.value,1,6)"></div>
-      </div>`;
-    if(WIZ.format === 'ladder') html += `<div class="field"><label>Joueurs qui montent / descendent entre groupes voisins</label><input type="number" min="1" max="3" value="${WIZ.swap}" onchange="wizNum('swap',this.value,1,3)"></div>`;
+    const l = WIZ_GSIZE[WIZ.gsize];
+    const maxSwap = Math.max(1, Math.floor(l[0]/2));
+    if(WIZ.swap > maxSwap) WIZ.swap = maxSwap;
+    html += `<p style="margin:0 0 8px;"><strong>Taille des groupes</strong></p><div class="action-grid" style="grid-template-columns:1fr;">
+      ${Object.keys(WIZ_GSIZE).map(k=>`<button class="action-btn" style="${WIZ.gsize===k?'border-color:var(--ball);background:rgba(255,255,255,0.08);':''}" onclick="wizSet('gsize','${k}');render();">${WIZ.gsize===k?'✓ ':''}${WIZ_GSIZE[k][2]}</button>`).join('')}
+    </div>
+    <p class="small" style="margin-top:10px;">👥 Avec environ ${WIZ.players} joueurs : ${wizPlanText(wizGroupPlan())}.</p>`;
+    if(WIZ.format === 'ladder') html += `<div class="field" style="margin-top:10px;"><label>Joueurs qui montent / descendent entre groupes voisins</label>
+      <select onchange="wizSet('swap', parseInt(this.value,10))">${Array.from({length:maxSwap},(_,i)=>i+1).map(n=>`<option value="${n}" ${WIZ.swap===n?'selected':''}>${n}${n===1?' (le plus courant)':''}</option>`).join('')}</select></div>`;
     html += wizNavHTML('Suivant →', 'wizNext()');
     return html;
   }
   if(key === 'joueurs'){
-    html += `<p style="margin:0 0 4px;"><strong>Ce que voient les joueurs</strong></p><p class="small" style="margin:0 0 8px;">Tu pourras tout modifier plus tard dans les Réglages de la ligue.</p><div class="card">`;
-    html += visSwitch('Cotes visibles par les joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', WIZ.rating, `wizSet('rating',this.checked)`);
-    html += visSwitch('Cotes visibles par les remplaçants', 'Un remplaçant voit sa propre cote.', WIZ.ratingSubs, `wizSet('ratingSubs',this.checked)`);
-    if(WIZ.format !== 'mlp') html += visSwitch('Groupe visible avant la publication', 'Les joueurs voient leur groupe dès la création de la session. Sinon, seulement une fois publiée.', WIZ.showGroup, `wizSet('showGroup',this.checked)`);
-    if(WIZ.format !== 'mlp') html += visSwitch('Statistiques visibles', 'Désactivé : l\'onglet Statistiques est caché aux joueurs.', WIZ.standings, `wizSet('standings',this.checked)`);
+    html += `<p style="margin:0 0 4px;"><strong>Ce que voient les joueurs</strong></p><p class="small" style="margin:0 0 8px;">Seuls les réglages qui s'appliquent à ta ligue sont affichés. Tu pourras tout modifier plus tard.</p><div class="card">`;
+    if(wizHasRatings()){
+      html += visSwitch('Cotes visibles par les joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', WIZ.rating, `wizSet('rating',this.checked);if(!this.checked)wizSet('ratingSubs',false);render();`);
+      if(WIZ.rating) html += visSwitch('Cotes visibles par les remplaçants', 'Un remplaçant voit sa propre cote.', WIZ.ratingSubs, `wizSet('ratingSubs',this.checked)`);
+    }
+    if(WIZ.format !== 'mlp') html += visSwitch(WIZ.type==='recreational' ? 'Terrains annoncés avant la publication' : 'Groupe visible avant la publication', 'Les joueurs voient leur groupe dès la création de la session. Sinon, seulement une fois publiée.', WIZ.showGroup, `wizSet('showGroup',this.checked)`);
+    if(wizHasRatings()) html += visSwitch('Statistiques visibles', 'Désactivé : l\'onglet Statistiques est caché aux joueurs.', WIZ.standings, `wizSet('standings',this.checked)`);
     html += visSwitch('Les joueurs saisissent leurs scores', 'Désactivé : seulement toi (admin) entres les scores.', WIZ.scores, `wizSet('scores',this.checked)`);
     html += '</div>';
+    if(WIZ.type === 'recreational') html += `<p class="small" style="color:var(--muted);">Ligue récréative : aucune cote ni statistique n'est montrée aux joueurs.</p>`;
     html += wizNavHTML('Suivant →', 'wizNext()');
     return html;
   }
   // Étape finale : nom, membres, invitation, résumé
   const fmtName = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Rotation sociale' }[WIZ.format];
   const members = NEW_LEAGUE_MEMBER_CANDIDATES || [];
-  html += `<div class="field"><label>Nom de la ligue</label><input id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value)" placeholder="ex: Ligue du mardi"></div>`;
+  html += `<div class="field"><label>Nom de la ligue</label><input id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value);WIZ.nameTouched=true;" placeholder="ex: Ligue du mardi"></div>`;
   if(members.length){
     html += `<div class="field"><label>Membres de l'organisation à ajouter comme joueurs (optionnel)</label>
       <div class="card" style="max-height:200px;overflow-y:auto;padding:10px 12px;">
@@ -3223,13 +3292,17 @@ function wizHTML(){
   }
   html += '<div class="card">' + visSwitch("Activer le lien d'invitation", "Crée tout de suite un lien à partager pour que de nouveaux membres demandent à rejoindre (tu approuves chaque demande).", WIZ.invite, `wizSet('invite',this.checked)`) + '</div>';
   const sched = wizScheduleLabel();
-  html += `<div class="card" style="margin-top:12px;"><div class="small"><strong>Résumé</strong><br>
-    ${WIZ.type==='recreational'?'🎉 Récréative':'🏆 Compétitive'} · ${fmtName}<br>
-    ${sched ? '📅 ' + escapeHTML(sched) + ' · ' + WIZ.duration + ' min<br>' : ''}
-    ${WIZ.seasonStart || WIZ.seasonEnd ? '🗓️ Saison ' + escapeHTML(WIZ.seasonStart || '…') + ' → ' + escapeHTML(WIZ.seasonEnd || 'sans fin') + '<br>' : ''}
-    ${WIZ.autoStart ? '⏩ Sessions démarrées automatiquement' + (WIZ.autoPublish ? ' et publiées' : '') + '<br>' : ''}
-    ${WIZ.format==='ladder' ? '👥 Groupes de ' + WIZ.groupMin + ' à ' + WIZ.groupMax + ' · ' + WIZ.swap + ' joueur(s) échangé(s)<br>' : ((WIZ.format==='pools'||WIZ.format==='single') ? '👥 Groupes de ' + WIZ.groupMin + ' à ' + WIZ.groupMax + '<br>' : '')}
-    Cotes ${WIZ.rating?'visibles':'cachées'} · scores saisis par ${WIZ.scores?'les joueurs':"l'admin"}</div></div>`;
+  const lines = [];
+  lines.push((WIZ.type==='recreational'?'🎉 Récréative':'🏆 Compétitive') + ' · ' + fmtName + ' · ~' + WIZ.players + ' joueurs');
+  if(sched) lines.push('📅 ' + escapeHTML(sched) + ' · ' + WIZ.duration + ' min');
+  if(WIZ.seasonStart || WIZ.seasonEnd) lines.push('🗓️ Saison ' + escapeHTML(WIZ.seasonStart || '…') + ' → ' + escapeHTML(WIZ.seasonEnd || 'sans fin'));
+  if(WIZ.autoStart) lines.push('⏩ Sessions démarrées automatiquement' + (WIZ.autoPublish ? ' et publiées' : ''));
+  if(wizHasGroups()) lines.push('👥 ' + WIZ_GSIZE[WIZ.gsize][2] + (WIZ.format==='ladder' ? ' · ' + WIZ.swap + ' joueur(s) échangé(s)' : ''));
+  if(WIZ.format === 'social') lines.push('🎲 Terrains tirés au hasard à chaque session');
+  if(wizHasRatings()) lines.push('Cotes ' + (WIZ.rating ? 'visibles' : 'cachées'));
+  else lines.push('Aucune cote affichée');
+  lines.push('Scores saisis par ' + (WIZ.scores ? 'les joueurs' : "l'admin"));
+  html += `<div class="card" style="margin-top:12px;"><div class="small"><strong>Résumé</strong><br>${lines.join('<br>')}</div></div>`;
   html += wizNavHTML('Créer la ligue', 'wizCreate()');
   return html;
 }
@@ -3239,13 +3312,15 @@ function wizCreate(){
   const w = WIZ; WIZ = null;
   const selected = Object.keys(w.members).map(i=>NEW_LEAGUE_MEMBER_CANDIDATES[parseInt(i,10)]).filter(Boolean);
   const day = w.day === '' ? undefined : parseInt(w.day,10);
-  const label = (function(){ if(w.day===''||isNaN(day)) return ''; const d = FR_DAYS[day]||''; return d ? d.charAt(0).toUpperCase()+d.slice(1) + (w.time ? ' ' + fmtHM(w.time) : '') : ''; })();
+  const dn = (day === undefined) ? '' : (FR_DAYS[day] || '');
+  const label = dn ? dn.charAt(0).toUpperCase() + dn.slice(1) + (w.time ? ' ' + fmtHM(w.time) : '') : '';
+  const lim = WIZ_GSIZE[w.gsize] || WIZ_GSIZE.both;
   closeModal();
   (async ()=>{
     const id = await createLeague(name, label, w.format, w.format==='mlp' ? w.mlpSize : undefined, {
-      type:w.type, rating:w.rating, ratingSubs:w.ratingSubs, showGroup:w.showGroup, scores:w.scores, standings:w.standings,
+      type:w.type, rating:w.rating, ratingSubs:w.rating && w.ratingSubs, showGroup:w.showGroup, scores:w.scores, standings:w.standings,
       playDay:day, playTime:w.time || undefined, duration:w.duration, seasonStart:w.seasonStart, seasonEnd:w.seasonEnd,
-      autoStart:w.autoStart, autoPublish:w.autoPublish, groupMin:w.groupMin, groupMax:w.groupMax, swap:w.swap });
+      autoStart:w.autoStart && w.format!=='mlp' && day!==undefined, autoPublish:w.autoPublish, groupMin:lim[0], groupMax:lim[1], swap:w.swap });
     if(!id) return;
     // Ajoutés un à la fois : chaque ajout relit puis réécrit tout le league_data de la ligue.
     for(const m of selected){
@@ -3768,13 +3843,14 @@ function matchesForGroup(session, gid){
 }
 // ---- Rotation sociale : à chaque session, les joueurs présents sont répartis
 // au hasard en groupes (terrains) de 4 à 6, en privilégiant les groupes de 4.
-function socialSizes(n){
+function socialSizes(n, min, max){
+  min = min || 4; max = max || 6;
   for(let left=0; left<=3; left++){
-    const m = n - left; if(m < 4) break;
-    for(let g=Math.floor(m/4); g>=Math.ceil(m/6); g--){
-      const extra = m - 4*g; if(extra < 0 || extra > 2*g) continue;
-      const sizes = []; for(let i=0;i<g;i++) sizes.push(4);
-      for(let i=0, e=extra; e>0; i=(i+1)%g){ if(sizes[i] < 6){ sizes[i]++; e--; } }
+    const m = n - left; if(m < min) break;
+    for(let g=Math.floor(m/min); g>=Math.ceil(m/max); g--){
+      const extra = m - min*g; if(g < 1 || extra < 0 || extra > (max-min)*g) continue;
+      const sizes = []; for(let i=0;i<g;i++) sizes.push(min);
+      for(let i=0, e=extra; e>0; i=(i+1)%g){ if(sizes[i] < max){ sizes[i]++; e--; } }
       return { sizes: sizes, left: left };
     }
   }
