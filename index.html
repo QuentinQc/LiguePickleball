@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 236">
+<meta name="app-build" content="Version 237">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13539,6 +13539,22 @@ function playerGroupHTML(me){
   }
   return html;
 }
+function absenceHistoryHTML(playerId){
+  const sess = (DATA.sessions||[]).filter(x=>x.date).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const abs = sess.filter(x=>isAbsent(x, playerId));
+  const closedN = sess.filter(x=>x.status==='closed').length;
+  const closedAbs = abs.filter(x=>x.status==='closed').length;
+  const planned = plannedAbsencesForPlayer(playerId);
+  let html = `<div class="pc-sec" style="margin-top:20px;">Historique</div>`;
+  if(closedN) html += `<p class="small" style="margin:0 2px 8px;color:var(--muted);">${closedAbs} absence${closedAbs>1?'s':''} sur ${closedN} session${closedN>1?'s':''} terminée${closedN>1?'s':''}</p>`;
+  if(abs.length){
+    html += `<div class="acc-group">${abs.map(x=>`<div class="acc-row" style="cursor:default;min-height:52px;"><span class="acc-row-t"><b>${escapeHTML(frDateLong ? frDateLong(x.date) : x.date)}</b><small>${x.status==='closed' ? 'Session terminée' : 'Session à venir'}</small></span><span class="tag tag-orange">Absent(e)</span></div>`).join('')}</div>`;
+  } else html += `<p class="small" style="color:var(--muted);margin:0 2px;">Aucune absence enregistrée.</p>`;
+  if(planned.length){
+    html += `<div class="pc-sec">Plages d'absence déclarées</div><div class="acc-group">${planned.map(a=>`<div class="acc-row" style="cursor:default;min-height:48px;"><span class="acc-row-t"><b>${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</b></span></div>`).join('')}</div>`;
+  }
+  return html;
+}
 function absenceHubContentHTML(playerId){
   const p = DATA.players.find(x=>x.id===playerId);
   if(!p) return `<p class="small">Introuvable.</p>`;
@@ -13546,16 +13562,17 @@ function absenceHubContentHTML(playerId){
   const absentToday = open && isAbsent(open, playerId);
   const planned = plannedAbsencesForPlayer(playerId);
   const badges = [];
-  if(absentToday) badges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
-  if(planned.length) badges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''} d'absence</span>`);
-  if(p.injured) badges.push('<span class="tag tag-down">🤕 Blessé(e)</span>');
+  if(absentToday) badges.push('<span class="tag tag-orange">Absent(e) cette session</span>');
+  if(planned.length) badges.push(`<span class="tag tag-yellow">${planned.length} plage${planned.length>1?'s':''} d'absence</span>`);
+  if(p.injured) badges.push('<span class="tag tag-down">Blessé(e)</span>');
   return `
     <div class="modal-badges" style="margin-bottom:14px;">${badges.length ? badges.join('') : '<span class="small" style="color:var(--muted);">Aucune absence déclarée</span>'}</div>
     <div class="action-grid">
-      <button class="action-btn" ${!open?'disabled title="Aucune session en cours"':''} onclick="openOneSessionAbsenceModal('${playerId}')"><span class="icon">🚫</span> Une session</button>
-      <button class="action-btn" onclick="openPlannedAbsenceModal('${playerId}')"><span class="icon">🌴</span> Plusieurs sessions</button>
-      <button class="action-btn" onclick="openInjuredModal('${playerId}')"><span class="icon">🤕</span> Blessure</button>
-    </div>`;
+      <button class="action-btn" ${!open?'disabled title="Aucune session en cours"':''} onclick="openOneSessionAbsenceModal('${playerId}')">Une session</button>
+      <button class="action-btn" onclick="openPlannedAbsenceModal('${playerId}')">Plusieurs sessions</button>
+      <button class="action-btn" onclick="openInjuredModal('${playerId}')">Blessure</button>
+    </div>
+    ${absenceHistoryHTML(playerId)}`;
 }
 function openAbsenceHub(playerId){
   showContentModal('Absence', ()=>absenceHubContentHTML(playerId));
