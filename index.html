@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 257">
+<meta name="app-build" content="Version 259">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4014,6 +4014,14 @@ function socialShuffleGroups(session){
   DATA.players.forEach(function(p){
     if(p.injured) return;
     p.groupId = placed[p.id] || null;
+  });
+}
+function socialRedraw(){
+  const open = currentOpenSession(); if(!open) return;
+  showConfirm('Refaire le tirage au sort des terrains avec les joueurs présents ?', ()=>{
+    socialShuffleGroups(open);
+    open.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
+    saveAndRender();
   });
 }
 function startNewSession(explicitDate){
@@ -10192,12 +10200,15 @@ function adminSessionHTML(){
     const expectedRoster = new Set(activeRosterForGroup(open, g.id));
     const inMatches = new Set();
     gd.matches.forEach(m=>{ m.teamA.forEach(id=>inMatches.add(id)); m.teamB.forEach(id=>inMatches.add(id)); });
-    const stale = !manual && (expectedRoster.size !== inMatches.size || [...expectedRoster].some(id=>!inMatches.has(id)));
+    const stale = !manual && DATA.leagueFormat !== 'social' && (expectedRoster.size !== inMatches.size || [...expectedRoster].some(id=>!inMatches.has(id)));
     const activeCount = expectedRoster.size;
-    const info = activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
+    const info = DATA.leagueFormat==='social' ? (activeCount+' joueur'+(activeCount>1?'s':'')) : activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
     html += `<div class="card"><h3>${escapeHTML(g.name)}</h3>${info ? `<p class="small">${info}</p>` : ''}`;
     if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « Refaire les matchs » ci-dessous.</p>`;
-    if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucun modèle de rotation défini — configure-le dans Réglages → Paramètres de ligue.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
+    if(DATA.leagueFormat==='social'){
+      const names = activeRosterForGroup(open, g.id).map(playerName).map(escapeHTML);
+      html += names.length ? `<p style="margin:6px 0 0;font-size:16px;line-height:1.6;">${names.join(' · ')}</p>` : `<p class="empty">Aucun joueur sur ce terrain.</p>`;
+    } else if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucun modèle de rotation défini — configure-le dans Réglages → Paramètres de ligue.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
     gd.matches.forEach((m, mi)=>{
       const nameTag = (id)=>{
         if(!id) return '<span class="small">— (position vide)</span>';
@@ -10223,7 +10234,7 @@ function adminSessionHTML(){
           ${scoreMarkHTML('ladder', g.id, mi, m, false)}
         </div>`;
     });
-    html += `<button class="btn-ghost" onclick="regenerate('${g.id}')">Refaire les matchs de ce groupe</button>`;
+    html += DATA.leagueFormat==='social' ? `<button class="btn-ghost" onclick="socialRedraw()">🎲 Refaire le tirage des terrains</button>` : `<button class="btn-ghost" onclick="regenerate('${g.id}')">Refaire les matchs de ce groupe</button>`;
     if(DATA.testMode && gd.matches.length){
       html += ` <button class="btn-ghost" onclick="autoFillGroupScores('${g.id}')">🎲 générer des scores aléatoires (test)</button>`;
     }
@@ -10600,6 +10611,7 @@ function sessionCompletionIssues(session){
     }
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
+    if(DATA.leagueFormat === 'social') return; // rotation sociale : pas de matchs à vérifier
     if(gd.matches.length===0){
       issues.push(`${g.name} : pas assez de joueurs pour générer des matchs`);
       return;
