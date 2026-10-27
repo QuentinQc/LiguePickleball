@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 252">
+<meta name="app-build" content="Version 254">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -343,6 +343,57 @@ tr.me{background:rgba(207,234,92,0.1);}
 .msg-actions-btn{background:var(--court-light);border:1px solid var(--line-soft-strong);color:var(--text);border-radius:16px;padding:15px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;}
 .msg-actions-btn.danger{color:#fff;background:var(--paddle);border-color:var(--paddle);}
 .chat-sheet-lg{max-width:900px;height:min(94vh,1000px);}
+.wz-sheet{max-width:640px;height:min(92vh,860px);background:linear-gradient(180deg,#0F322D 0%,#0C2622 100%);}
+@media (max-width:640px){.wz-sheet{height:96vh;height:96dvh;}}
+.wz-top{display:flex;align-items:center;gap:12px;padding:14px 16px 6px;}
+.wz-prog{flex:1;display:flex;gap:5px;}
+.wz-seg{flex:1;height:5px;border-radius:5px;background:var(--line-soft-strong);}
+.wz-seg.on{background:linear-gradient(90deg,var(--ball),#8FBF3F);}
+.wz-iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.04);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;font-family:inherit;}
+.wz-iconbtn[disabled]{opacity:0;pointer-events:none;}
+.wz-body{flex:1;min-height:0;overflow-y:auto;padding:8px 20px 24px;}
+.wz-anim{animation:wzIn .28s ease-out;}
+@keyframes wzIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:none;}}
+.wz-kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--ball);margin:10px 0 6px;}
+.wz-h{font-family:var(--font-display);font-size:32px;line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:.01em;}
+.wz-sub{color:var(--muted);font-size:16px;margin:0 0 20px;line-height:1.4;}
+.wz-foot{padding:12px 20px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line-soft);display:flex;gap:10px;background:rgba(12,38,34,.6);}
+.wz-cta{flex:1;min-height:54px;border-radius:16px;border:0;background:linear-gradient(135deg,var(--ball),#A9D13F);color:#0C2622;font-weight:800;font-size:17px;font-family:inherit;cursor:pointer;box-shadow:0 8px 24px rgba(207,234,92,.22);}
+.wz-cta:active{transform:scale(.98);}
+.wz-choices{display:flex;flex-direction:column;gap:12px;}
+.wz-choice{position:relative;display:flex;gap:14px;align-items:flex-start;text-align:left;width:100%;padding:16px;border-radius:20px;border:1.5px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);font-family:inherit;cursor:pointer;transition:border-color .15s,background .15s,transform .1s;}
+.wz-choice:active{transform:scale(.985);}
+.wz-choice.sel{border-color:var(--ball);background:rgba(207,234,92,.08);}
+.wz-ico{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;flex:0 0 auto;background:rgba(255,255,255,.07);}
+.wz-ico.lime{background:linear-gradient(135deg,rgba(207,234,92,.35),rgba(159,191,58,.18));}
+.wz-ico.orange{background:linear-gradient(135deg,rgba(233,106,60,.4),rgba(233,106,60,.15));}
+.wz-ct{flex:1;min-width:0;}
+.wz-ct b{display:block;font-size:18px;margin-bottom:3px;}
+.wz-ct span{display:block;font-size:14px;color:var(--muted);line-height:1.4;}
+.wz-tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0C2622;background:var(--ball);border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:middle;}
+.wz-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--line-soft-strong);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:14px;color:transparent;}
+.wz-choice.sel .wz-check{background:var(--ball);border-color:var(--ball);color:#0C2622;}
+.wz-note{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.35;background:rgba(255,255,255,.05);color:var(--muted);}
+.wz-note.ok{background:rgba(207,234,92,.1);color:#DDEFA0;}
+.wz-note.warn{background:rgba(233,106,60,.14);color:#F5B49B;}
+.wz-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.wz-chip{padding:11px 16px;border-radius:999px;border:1.5px solid var(--line-soft-strong);background:transparent;color:var(--text);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;}
+.wz-chip.sel{background:var(--ball);border-color:var(--ball);color:#0C2622;}
+.wz-lab{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--muted);margin:20px 0 8px;display:block;}
+.wz-in{width:100%;min-height:52px;border-radius:14px;border:1.5px solid var(--line-soft-strong);background:rgba(255,255,255,.05);color:var(--text);padding:0 14px;font-size:17px;font-family:inherit;}
+.wz-in:focus{outline:none;border-color:var(--ball);}
+.wz-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.wz-card{border-radius:20px;border:1px solid var(--line-soft);background:var(--court-elevated-2);padding:4px 16px;margin-top:6px;}
+.wz-stepper{display:flex;align-items:center;justify-content:center;gap:22px;padding:14px 0;}
+.wz-stepper button{width:56px;height:56px;border-radius:50%;border:1.5px solid var(--line-soft-strong);background:rgba(255,255,255,.05);color:var(--text);font-size:28px;cursor:pointer;font-family:inherit;}
+.wz-stepper b{font-family:var(--font-display);font-size:64px;line-height:1;min-width:110px;text-align:center;color:var(--ball);}
+.wz-sum{border-radius:20px;border:1px solid var(--line-soft-strong);background:linear-gradient(160deg,rgba(207,234,92,.09),rgba(255,255,255,.03));padding:12px 16px;margin-top:18px;}
+.wz-sum-row{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:15px;line-height:1.35;}
+.wz-sum-row i{font-style:normal;width:24px;text-align:center;flex:0 0 auto;}
+.wz-member{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:15px;}
+.wz-member:last-child{border-bottom:0;}
+.wz-member input{width:20px;height:20px;flex:0 0 auto;}
+
 @media (max-width:640px){.chat-sheet-lg{height:96vh;height:96dvh;}}
 .sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;}
 .sheet-body > .card:last-child{margin-bottom:0;}
@@ -2292,6 +2343,7 @@ function updateChatFab(){
     + others.map(o=>`<button type="button" class="chat-menu-item" onclick="switchChatOrg('${o.id}')">🏢 ${escapeHTML(o.name)}</button>`).join('');
 }
 function sheetModalHTML(){
+  if(MODAL.sheet === 'wizard') return wizardSheetHTML();
   const k = MODAL.sheet;
   const ORGS = { 'org-membres':['👥','Membres','Joueurs et invitations'], 'org-comptes':['🔑','Comptes','Approbations et accès'], 'org-rapport':['📊','Rapport','Qui joue où'], 'org-general':['⚙️','Paramètres','Nom et lien d\'invitation'] };
   const og = ORGS[k];
@@ -3093,7 +3145,7 @@ const LEAGUE_FORMAT_HINTS = {
   ladder: "Les groupes montent/descendent automatiquement selon les résultats de chaque session — l'échelle classique.",
   pools: "Plusieurs groupes fixes qui ne bougent jamais, peu importe les résultats — utile pour des poules de niveau stable.",
   single: "Un seul groupe pour tous les joueurs, avec un classement cumulatif sur toute la saison plutôt que des montées/descentes.",
-  social: "Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains. Partenaires et adversaires changent, aucune montée ni descente.",
+  social: "Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains, en évitant autant que possible de rejouer avec les mêmes personnes. Aucune montée ni descente.",
   mlp: "Équipes mixtes fixes (2H+2F ou 2H+1F) qui s'affrontent en joutes genrées (double féminin, double masculin, mixtes) + DreamBreaker — classement par points cumulés sur la saison, comme le vrai MLP."
 };
 let NEW_LEAGUE_MEMBER_CANDIDATES = [];
@@ -3108,7 +3160,9 @@ async function onCreateLeague(){
     gsize:'both', swap:1,
     rating:true, ratingSubs:false, showGroup:false, scores:true, standings:true,
     name:'', nameTouched:false, invite:true, members:{} };
-  showContentModal('Créer une nouvelle ligue', wizHTML);
+  setModal({ kind:'content', sheet:'wizard', title:'Créer une nouvelle ligue', htmlContent:'' });
+  WIZ.anim = true;
+  render();
 }
 // Ce qui a du sens selon le type et le format choisis.
 function wizHasRatings(){ return WIZ.type === 'competitive' && WIZ.format !== 'mlp'; }
@@ -3138,7 +3192,7 @@ function wizPickType(t){
   WIZ.format = t === 'competitive' ? 'ladder' : 'social';
   WIZ.players = t === 'competitive' ? 20 : 12;
   wizApplyDefaults(); wizBuildSteps();
-  WIZ.si = 1;
+  WIZ.si = 1; WIZ.anim = true;
   render();
 }
 function wizRecommendedFormat(){ return WIZ.players < 8 ? 'single' : 'ladder'; }
@@ -3153,7 +3207,7 @@ function wizSetDay(v){
   render();
 }
 function wizToggleMember(i, on){ if(on) WIZ.members[i] = true; else delete WIZ.members[i]; }
-function wizBack(){ WIZ.si = Math.max(0, WIZ.si - 1); render(); }
+function wizBack(){ WIZ.si = Math.max(0, WIZ.si - 1); WIZ.anim = true; render(); }
 function wizDayName(){
   if(WIZ.day === '') return '';
   const d = FR_DAYS[parseInt(WIZ.day,10)] || '';
@@ -3167,7 +3221,7 @@ function wizSuggestedName(){
 function wizNext(){
   const key = WIZ.steps[WIZ.si];
   if(key === 'calendrier' && WIZ.seasonStart && WIZ.seasonEnd && WIZ.seasonEnd < WIZ.seasonStart){ showAlert("La fin de saison doit être après le début."); return; }
-  WIZ.si += 1;
+  WIZ.si += 1; WIZ.anim = true;
   if(WIZ.steps[WIZ.si] === 'details' && !WIZ.nameTouched) WIZ.name = wizSuggestedName();
   render();
 }
@@ -3197,114 +3251,132 @@ function wizFormatNote(f){
   if(f === 'mlp') return n < 8 ? '⚠️ Il faut au moins 8 joueurs pour former 2 équipes.' : `✓ Environ ${Math.floor(n/4)} équipes de 4.`;
   return '';
 }
-function wizHTML(){
-  if(!WIZ) return '';
-  const key = WIZ.steps[WIZ.si];
-  let html = WIZ.si > 0 ? `<p class="small" style="margin:0 0 10px;color:var(--muted);">Étape ${WIZ.si + 1} sur ${WIZ.steps.length}</p>` : '';
+function wizChoice(icon, tone, title, desc, sel, onclick, note, tag){
+  return `<button type="button" class="wz-choice${sel?' sel':''}" onclick="${onclick}">
+    <div class="wz-ico ${tone||''}">${icon}</div>
+    <div class="wz-ct"><b>${title}${tag?`<em class="wz-tag" style="font-style:normal;">${tag}</em>`:''}</b><span>${desc}</span>${note||''}</div>
+    <div class="wz-check">✓</div></button>`;
+}
+function wizNote(kind, html){ return `<div class="wz-note ${kind}"><span>${kind==='warn'?'⚠️':(kind==='ok'?'✓':'ℹ️')}</span><span>${html}</span></div>`; }
+function wizStep(k, d, min, max, stepSize){ WIZ[k] = Math.min(max, Math.max(min, (parseInt(WIZ[k],10) || min) + d * (stepSize||1))); render(); }
+function wizStepper(k, min, max, stepSize){
+  return `<div class="wz-stepper"><button type="button" onclick="wizStep('${k}',-1,${min},${max},${stepSize||1})" aria-label="Moins">−</button><b>${WIZ[k]}</b><button type="button" onclick="wizStep('${k}',1,${min},${max},${stepSize||1})" aria-label="Plus">+</button></div>`;
+}
+function wizMeta(key){
+  return {
+    type:['Quel genre de ligue ?', "Choisis l'ambiance : tout le reste s'adapte."],
+    effectif:['Combien de joueurs ?', 'Une estimation suffit : elle sert à te conseiller et à prévoir les groupes.'],
+    format:['Quel format ?', 'Choisis comment les résultats font bouger la ligue.'],
+    calendrier:['Quand joue-t-on ?', 'Tout est facultatif et modifiable plus tard.'],
+    groupes:['Taille des groupes', 'Combien de joueurs par groupe sur le terrain.'],
+    joueurs:['Ce que voient les joueurs', "Seuls les réglages qui s'appliquent à ta ligue sont affichés."],
+    details:['Dernière étape', 'Un nom, des membres, et c\'est parti.']
+  }[key] || ['', ''];
+}
+function wizBodyHTML(key){
+  let h = '';
   if(key === 'type'){
-    html += `<p style="margin:0 0 12px;"><strong>Quel genre de ligue veux-tu créer ?</strong></p>
-      <div class="action-grid" style="grid-template-columns:1fr;">
-        <button class="action-btn" style="flex-direction:column;align-items:flex-start;" onclick="wizPickType('competitive')"><b>🏆 Ligue compétitive</b><span class="small">Classement, cotes, résultats qui comptent. Échelle avec montées et descentes, poules, division unique ou équipes (MLP).</span></button>
-        <button class="action-btn" style="flex-direction:column;align-items:flex-start;" onclick="wizPickType('recreational')"><b>🎉 Ligue récréative</b><span class="small">Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains. Partenaires et adversaires changent. Ni cote, ni classement, ni pression.</span></button>
-      </div>`;
-    return html;
-  }
-  if(key === 'effectif'){
-    html += `<p style="margin:0 0 4px;"><strong>Combien de joueurs prévois-tu ?</strong></p><p class="small" style="margin:0 0 10px;">Une estimation suffit : elle sert à te conseiller le bon format et à prévoir les groupes.</p>
-      <div class="field"><input type="number" min="2" max="200" value="${WIZ.players}" onchange="wizSetPlayers(this.value)"></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap;">${[8,12,16,24,32].map(n=>`<button class="btn-ghost" ${WIZ.players===n?'style="border-color:var(--ball);"':''} onclick="wizSetPlayers(${n})">${n}</button>`).join('')}</div>`;
-    if(WIZ.type === 'recreational'){
-      const p = socialSizes(WIZ.players);
-      html += `<p class="small" style="margin-top:12px;">${WIZ.players < 4 ? '⚠️ Il faut au moins 4 joueurs présents pour jouer.' : '🎾 Avec tout le monde présent : ' + wizPlanText(p) + ', tirés au hasard chaque soir.'}</p>`;
-    }
-    html += wizNavHTML('Suivant →', 'wizNext()');
-    return html;
-  }
-  if(key === 'format'){
-    const rec = wizRecommendedFormat();
-    const opts = [['ladder','Échelle','Les groupes montent et descendent selon les résultats de chaque session.'],['pools','Poules fixes','Groupes fixes qui ne bougent jamais.'],['single','Division unique','Un seul groupe avec un classement cumulatif sur la saison.'],['mlp','MLP — équipes','Équipes mixtes fixes, classement par points.']];
-    html += `<p style="margin:0 0 12px;"><strong>Quel format de compétition ?</strong></p><div class="action-grid" style="grid-template-columns:1fr;">
-      ${opts.map(o=>`<button class="action-btn" style="flex-direction:column;align-items:flex-start;${WIZ.format===o[0]?'border-color:var(--ball);background:rgba(255,255,255,0.08);':''}" onclick="wizPickFormat('${o[0]}')"><b>${WIZ.format===o[0]?'✓ ':''}${o[1]}${o[0]===rec?' <span class="tag tag-up">Recommandé</span>':''}</b><span class="small">${o[2]}</span><span class="small" style="color:var(--muted);">${wizFormatNote(o[0])}</span></button>`).join('')}
+    h += `<div class="wz-choices">
+      ${wizChoice('🏆','lime','Ligue compétitive','Classement, cotes et résultats qui comptent. Échelle avec montées et descentes, poules, division unique ou équipes (MLP).',WIZ.type==='competitive',"wizPickType('competitive')")}
+      ${wizChoice('🎉','orange','Ligue récréative','Rotation sociale : chaque soir, les joueurs présents sont répartis au hasard sur les terrains, en évitant autant que possible de rejouer avec les mêmes personnes. Ni cote, ni classement, ni pression.',WIZ.type==='recreational',"wizPickType('recreational')")}
     </div>`;
-    if(WIZ.format === 'mlp') html += `<div class="field" style="margin-top:12px;"><label>Composition des équipes</label>
-      <select onchange="wizSet('mlpSize', parseInt(this.value,10))"><option value="4" ${WIZ.mlpSize===4?'selected':''}>2 hommes + 2 femmes (4 joutes)</option><option value="3" ${WIZ.mlpSize===3?'selected':''}>2 hommes + 1 femme (3 joutes)</option></select></div>`;
-    html += `<p class="small" style="color:var(--paddle);margin-top:10px;">Le format ne pourra pas être changé facilement après coup.</p>`;
-    html += wizNavHTML('Suivant →', 'wizNext()');
-    return html;
-  }
-  if(key === 'calendrier'){
-    html += `<p style="margin:0 0 4px;"><strong>Quand joue-t-on ?</strong></p><p class="small" style="margin:0 0 8px;">Tout est facultatif et modifiable plus tard dans le calendrier de saison.</p>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:140px;"><label>Jour de jeu</label><select onchange="wizSetDay(this.value)"><option value="">— à choisir plus tard —</option>${[1,2,3,4,5,6,0].map(d=>`<option value="${d}" ${String(WIZ.day)===String(d)?'selected':''}>${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1)}</option>`).join('')}</select></div>
-        <div class="field" style="flex:1;min-width:120px;"><label>Heure</label><input type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)"></div>
-        <div class="field" style="flex:1;min-width:120px;"><label>Durée (minutes)</label><input type="number" min="15" step="15" value="${WIZ.duration}" onchange="wizNum('duration',this.value,15,600)"></div>
-      </div>
-      <div class="row">
-        <div class="field" style="flex:1;min-width:150px;"><label>Début de saison</label><input type="date" value="${escapeHTML(WIZ.seasonStart)}" onchange="wizSet('seasonStart',this.value)"></div>
-        <div class="field" style="flex:1;min-width:150px;"><label>Fin de saison</label><input type="date" value="${escapeHTML(WIZ.seasonEnd)}" onchange="wizSet('seasonEnd',this.value)"></div>
-      </div>`;
-    if(wizCanAutoStart()){
-      if(WIZ.day === '') html += `<p class="small" style="color:var(--muted);">Choisis un jour de jeu pour pouvoir démarrer les sessions automatiquement.</p>`;
-      else html += `<div class="card">
-        ${visSwitch('Démarrer la prochaine session automatiquement', 'Dès que tu termines une session, la suivante est créée pour la prochaine date de jeu.', WIZ.autoStart, `WIZ.autoStartTouched=true;wizSet('autoStart',this.checked);if(!this.checked)wizSet('autoPublish',false);render();`)}
-        ${WIZ.autoStart ? visSwitch('Publier automatiquement aux joueurs', 'Sinon la session reste en préparation jusqu\'à ce que tu la publies.', WIZ.autoPublish, `wizSet('autoPublish',this.checked)`) : ''}
-      </div>`;
+  } else if(key === 'effectif'){
+    h += wizStepper('players', 2, 200, 1);
+    h += `<div class="wz-chips" style="justify-content:center;">${[8,12,16,24,32].map(n=>`<button type="button" class="wz-chip${WIZ.players===n?' sel':''}" onclick="wizSetPlayers(${n})">${n}</button>`).join('')}</div>`;
+    if(WIZ.type === 'recreational'){
+      h += WIZ.players < 4 ? wizNote('warn', 'Il faut au moins 4 joueurs présents pour jouer.') : wizNote('ok', 'Avec tout le monde présent : ' + wizPlanText(socialSizes(WIZ.players)) + ', tirés au hasard chaque soir, en variant les duos.');
     }
-    html += wizNavHTML('Suivant →', 'wizNext()');
-    return html;
-  }
-  if(key === 'groupes'){
+  } else if(key === 'format'){
+    const rec = wizRecommendedFormat();
+    const opts = [['ladder','📶','lime','Échelle','Les groupes montent et descendent selon les résultats de chaque session.'],['pools','🧩','','Poules fixes','Groupes fixes qui ne bougent jamais.'],['single','🎯','','Division unique','Un seul groupe avec un classement cumulatif sur la saison.'],['mlp','👥','orange','MLP — équipes','Équipes mixtes fixes, classement par points.']];
+    h += `<div class="wz-choices">${opts.map(o=>{
+      const note = wizFormatNote(o[0]);
+      return wizChoice(o[1], o[2], o[3], o[4], WIZ.format===o[0], "wizPickFormat('"+o[0]+"')", note ? wizNote(note.indexOf('⚠')===0?'warn':'ok', note.replace(/^(⚠️|✓)\s*/,'')) : '', o[0]===rec ? 'Recommandé' : '');
+    }).join('')}</div>`;
+    if(WIZ.format === 'mlp') h += `<span class="wz-lab">Composition des équipes</span><div class="wz-chips">
+      <button type="button" class="wz-chip${WIZ.mlpSize===4?' sel':''}" onclick="wizSet('mlpSize',4);render();">2 H + 2 F · 4 joutes</button>
+      <button type="button" class="wz-chip${WIZ.mlpSize===3?' sel':''}" onclick="wizSet('mlpSize',3);render();">2 H + 1 F · 3 joutes</button></div>`;
+    h += wizNote('', 'Le format ne pourra pas être changé facilement après coup.');
+  } else if(key === 'calendrier'){
+    h += `<span class="wz-lab" style="margin-top:0;">Jour de jeu</span><div class="wz-chips">
+      ${[1,2,3,4,5,6,0].map(d=>`<button type="button" class="wz-chip${String(WIZ.day)===String(d)?' sel':''}" onclick="wizSetDay(String(WIZ.day)==='${d}'?'':'${d}')">${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1,3)}</button>`).join('')}</div>
+      <div class="wz-grid2"><div><span class="wz-lab">Heure</span><input class="wz-in" type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)"></div>
+      <div><span class="wz-lab">Durée (min)</span><input class="wz-in" type="number" min="15" step="15" value="${WIZ.duration}" onchange="wizNum('duration',this.value,15,600)"></div></div>
+      <div class="wz-grid2"><div><span class="wz-lab">Début de saison</span><input class="wz-in" type="date" value="${escapeHTML(WIZ.seasonStart)}" onchange="wizSet('seasonStart',this.value)"></div>
+      <div><span class="wz-lab">Fin de saison</span><input class="wz-in" type="date" value="${escapeHTML(WIZ.seasonEnd)}" onchange="wizSet('seasonEnd',this.value)"></div></div>`;
+    if(wizCanAutoStart()){
+      if(WIZ.day === '') h += wizNote('', 'Choisis un jour de jeu pour pouvoir démarrer les sessions automatiquement.');
+      else h += `<span class="wz-lab">Automatisation</span><div class="wz-card">
+        ${visSwitch('Démarrer la prochaine session automatiquement', 'Dès que tu termines une session, la suivante est créée pour la prochaine date de jeu.', WIZ.autoStart, `WIZ.autoStartTouched=true;wizSet('autoStart',this.checked);if(!this.checked)wizSet('autoPublish',false);render();`)}
+        ${WIZ.autoStart ? visSwitch('Publier automatiquement aux joueurs', "Sinon la session reste en préparation jusqu'à ce que tu la publies.", WIZ.autoPublish, `wizSet('autoPublish',this.checked)`) : ''}</div>`;
+    }
+  } else if(key === 'groupes'){
     const l = WIZ_GSIZE[WIZ.gsize];
     const maxSwap = Math.max(1, Math.floor(l[0]/2));
     if(WIZ.swap > maxSwap) WIZ.swap = maxSwap;
-    html += `<p style="margin:0 0 8px;"><strong>Taille des groupes</strong></p><div class="action-grid" style="grid-template-columns:1fr;">
-      ${Object.keys(WIZ_GSIZE).map(k=>`<button class="action-btn" style="${WIZ.gsize===k?'border-color:var(--ball);background:rgba(255,255,255,0.08);':''}" onclick="wizSet('gsize','${k}');render();">${WIZ.gsize===k?'✓ ':''}${WIZ_GSIZE[k][2]}</button>`).join('')}
-    </div>
-    <p class="small" style="margin-top:10px;">👥 Avec environ ${WIZ.players} joueurs : ${wizPlanText(wizGroupPlan())}.</p>`;
-    if(WIZ.format === 'ladder') html += `<div class="field" style="margin-top:10px;"><label>Joueurs qui montent / descendent entre groupes voisins</label>
-      <select onchange="wizSet('swap', parseInt(this.value,10))">${Array.from({length:maxSwap},(_,i)=>i+1).map(n=>`<option value="${n}" ${WIZ.swap===n?'selected':''}>${n}${n===1?' (le plus courant)':''}</option>`).join('')}</select></div>`;
-    html += wizNavHTML('Suivant →', 'wizNext()');
-    return html;
-  }
-  if(key === 'joueurs'){
-    html += `<p style="margin:0 0 4px;"><strong>Ce que voient les joueurs</strong></p><p class="small" style="margin:0 0 8px;">Seuls les réglages qui s'appliquent à ta ligue sont affichés. Tu pourras tout modifier plus tard.</p><div class="card">`;
+    const gi = { '4':['4️⃣','Groupes de 4','6 matchs à 11 points'], '5':['5️⃣','Groupes de 5','10 matchs à 9 points'], both:['✨','Groupes de 4 ou 5','Le plus courant'], six:['🔢','Groupes de 4 à 6','Le groupe de 6 reste une exception'] };
+    h += `<div class="wz-choices">${Object.keys(gi).map(k=>wizChoice(gi[k][0], WIZ.gsize===k?'lime':'', gi[k][1], gi[k][2], WIZ.gsize===k, "wizSet('gsize','"+k+"');render();", '', k==='both'?'Courant':'')).join('')}</div>`;
+    h += wizNote('ok', 'Avec environ ' + WIZ.players + ' joueurs : ' + wizPlanText(wizGroupPlan()) + '.');
+    if(WIZ.format === 'ladder') h += `<span class="wz-lab">Montées et descentes par session</span><div class="wz-chips">${Array.from({length:maxSwap},(_,i)=>i+1).map(n=>`<button type="button" class="wz-chip${WIZ.swap===n?' sel':''}" onclick="wizSet('swap',${n});render();">${n} joueur${n>1?'s':''}${n===1?' (courant)':''}</button>`).join('')}</div>`;
+  } else if(key === 'joueurs'){
+    h += '<div class="wz-card">';
     if(wizHasRatings()){
-      html += visSwitch('Cotes visibles par les joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', WIZ.rating, `wizSet('rating',this.checked);if(!this.checked)wizSet('ratingSubs',false);render();`);
-      if(WIZ.rating) html += visSwitch('Cotes visibles par les remplaçants', 'Un remplaçant voit sa propre cote.', WIZ.ratingSubs, `wizSet('ratingSubs',this.checked)`);
+      h += visSwitch('Cotes visibles par les joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', WIZ.rating, `wizSet('rating',this.checked);if(!this.checked)wizSet('ratingSubs',false);render();`);
+      if(WIZ.rating) h += visSwitch('Cotes visibles par les remplaçants', 'Un remplaçant voit sa propre cote.', WIZ.ratingSubs, `wizSet('ratingSubs',this.checked)`);
     }
-    if(WIZ.format !== 'mlp') html += visSwitch(WIZ.type==='recreational' ? 'Terrains annoncés avant la publication' : 'Groupe visible avant la publication', 'Les joueurs voient leur groupe dès la création de la session. Sinon, seulement une fois publiée.', WIZ.showGroup, `wizSet('showGroup',this.checked)`);
-    if(wizHasRatings()) html += visSwitch('Statistiques visibles', 'Désactivé : l\'onglet Statistiques est caché aux joueurs.', WIZ.standings, `wizSet('standings',this.checked)`);
-    html += visSwitch('Les joueurs saisissent leurs scores', 'Désactivé : seulement toi (admin) entres les scores.', WIZ.scores, `wizSet('scores',this.checked)`);
-    html += '</div>';
-    if(WIZ.type === 'recreational') html += `<p class="small" style="color:var(--muted);">Ligue récréative : aucune cote ni statistique n'est montrée aux joueurs.</p>`;
-    html += wizNavHTML('Suivant →', 'wizNext()');
-    return html;
+    if(WIZ.format !== 'mlp') h += visSwitch(WIZ.type==='recreational' ? 'Terrains annoncés avant la publication' : 'Groupe visible avant la publication', 'Les joueurs voient leur groupe dès la création de la session. Sinon, seulement une fois publiée.', WIZ.showGroup, `wizSet('showGroup',this.checked)`);
+    if(wizHasRatings()) h += visSwitch('Statistiques visibles', "Désactivé : l'onglet Statistiques est caché aux joueurs.", WIZ.standings, `wizSet('standings',this.checked)`);
+    h += visSwitch('Les joueurs saisissent leurs scores', 'Désactivé : seulement toi (admin) entres les scores.', WIZ.scores, `wizSet('scores',this.checked)`);
+    h += '</div>';
+    if(WIZ.type === 'recreational') h += wizNote('', "Ligue récréative : aucune cote ni statistique n'est montrée aux joueurs.");
+  } else {
+    const fmtName = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Rotation sociale' }[WIZ.format];
+    const members = NEW_LEAGUE_MEMBER_CANDIDATES || [];
+    h += `<span class="wz-lab" style="margin-top:0;">Nom de la ligue</span><input class="wz-in" id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value);WIZ.nameTouched=true;" placeholder="ex: Ligue du mardi">`;
+    if(members.length){
+      h += `<span class="wz-lab">Membres à ajouter comme joueurs (optionnel)</span><div class="wz-card" style="max-height:210px;overflow-y:auto;">
+        ${members.map((m,i)=>`<label class="wz-member"><input type="checkbox" ${WIZ.members[i]?'checked':''} onchange="wizToggleMember(${i},this.checked)"><span>${escapeHTML(m.name)}${m.email?` <span class="small">(${escapeHTML(m.email)})</span>`:''}</span></label>`).join('')}</div>`;
+    }
+    h += '<div class="wz-card">' + visSwitch("Activer le lien d'invitation", "Crée tout de suite un lien à partager pour que de nouveaux membres demandent à rejoindre (tu approuves chaque demande).", WIZ.invite, `wizSet('invite',this.checked)`) + '</div>';
+    const sched = wizScheduleLabel();
+    const rows = [];
+    rows.push([WIZ.type==='recreational'?'🎉':'🏆', (WIZ.type==='recreational'?'Récréative':'Compétitive') + ' · ' + fmtName + ' · ~' + WIZ.players + ' joueurs']);
+    if(sched) rows.push(['📅', escapeHTML(sched) + ' · ' + WIZ.duration + ' min']);
+    if(WIZ.seasonStart || WIZ.seasonEnd) rows.push(['🗓️', 'Saison ' + escapeHTML(WIZ.seasonStart || '…') + ' → ' + escapeHTML(WIZ.seasonEnd || 'sans fin')]);
+    if(WIZ.autoStart) rows.push(['⏩', 'Sessions démarrées automatiquement' + (WIZ.autoPublish ? ' et publiées' : '')]);
+    if(wizHasGroups()) rows.push(['👥', WIZ_GSIZE[WIZ.gsize][2] + (WIZ.format==='ladder' ? ' · ' + WIZ.swap + ' joueur(s) échangé(s)' : '')]);
+    if(WIZ.format === 'social') rows.push(['🎲', 'Terrains tirés au hasard à chaque session, sans rejouer avec les mêmes']);
+    rows.push(['📊', wizHasRatings() ? ('Cotes ' + (WIZ.rating ? 'visibles' : 'cachées')) : 'Aucune cote affichée']);
+    rows.push(['✍️', 'Scores saisis par ' + (WIZ.scores ? 'les joueurs' : "l'admin")]);
+    h += `<div class="wz-sum">${rows.map(r=>`<div class="wz-sum-row"><i>${r[0]}</i><span>${r[1]}</span></div>`).join('')}</div>`;
   }
-  // Étape finale : nom, membres, invitation, résumé
-  const fmtName = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Rotation sociale' }[WIZ.format];
-  const members = NEW_LEAGUE_MEMBER_CANDIDATES || [];
-  html += `<div class="field"><label>Nom de la ligue</label><input id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value);WIZ.nameTouched=true;" placeholder="ex: Ligue du mardi"></div>`;
-  if(members.length){
-    html += `<div class="field"><label>Membres de l'organisation à ajouter comme joueurs (optionnel)</label>
-      <div class="card" style="max-height:200px;overflow-y:auto;padding:10px 12px;">
-        ${members.map((m,i)=>`<label class="row" style="align-items:center;gap:8px;margin-bottom:6px;"><input type="checkbox" ${WIZ.members[i]?'checked':''} onchange="wizToggleMember(${i},this.checked)" style="width:auto;"><span>${escapeHTML(m.name)}${m.email?` <span class="small">(${escapeHTML(m.email)})</span>`:''}</span></label>`).join('')}
-      </div></div>`;
-  }
-  html += '<div class="card">' + visSwitch("Activer le lien d'invitation", "Crée tout de suite un lien à partager pour que de nouveaux membres demandent à rejoindre (tu approuves chaque demande).", WIZ.invite, `wizSet('invite',this.checked)`) + '</div>';
-  const sched = wizScheduleLabel();
-  const lines = [];
-  lines.push((WIZ.type==='recreational'?'🎉 Récréative':'🏆 Compétitive') + ' · ' + fmtName + ' · ~' + WIZ.players + ' joueurs');
-  if(sched) lines.push('📅 ' + escapeHTML(sched) + ' · ' + WIZ.duration + ' min');
-  if(WIZ.seasonStart || WIZ.seasonEnd) lines.push('🗓️ Saison ' + escapeHTML(WIZ.seasonStart || '…') + ' → ' + escapeHTML(WIZ.seasonEnd || 'sans fin'));
-  if(WIZ.autoStart) lines.push('⏩ Sessions démarrées automatiquement' + (WIZ.autoPublish ? ' et publiées' : ''));
-  if(wizHasGroups()) lines.push('👥 ' + WIZ_GSIZE[WIZ.gsize][2] + (WIZ.format==='ladder' ? ' · ' + WIZ.swap + ' joueur(s) échangé(s)' : ''));
-  if(WIZ.format === 'social') lines.push('🎲 Terrains tirés au hasard à chaque session');
-  if(wizHasRatings()) lines.push('Cotes ' + (WIZ.rating ? 'visibles' : 'cachées'));
-  else lines.push('Aucune cote affichée');
-  lines.push('Scores saisis par ' + (WIZ.scores ? 'les joueurs' : "l'admin"));
-  html += `<div class="card" style="margin-top:12px;"><div class="small"><strong>Résumé</strong><br>${lines.join('<br>')}</div></div>`;
-  html += wizNavHTML('Créer la ligue', 'wizCreate()');
-  return html;
+  return h;
+}
+function closeWizard(){ WIZ = null; closeModal(); }
+function wizardSheetHTML(){
+  if(!WIZ) return '';
+  const key = WIZ.steps[WIZ.si];
+  const meta = wizMeta(key);
+  const total = WIZ.steps.length;
+  const last = WIZ.si === total - 1;
+  const anim = WIZ.anim ? ' wz-anim' : ''; WIZ.anim = false;
+  const showNext = key !== 'type';
+  return `<div class="chat-overlay" onclick="if(event.target===this) closeWizard()">
+    <div class="chat-sheet wz-sheet">
+      <div class="wz-top">
+        <button type="button" class="wz-iconbtn" ${WIZ.si>0?'':'disabled'} onclick="wizBack()" aria-label="Retour">←</button>
+        <div class="wz-prog">${WIZ.steps.map((_,i)=>`<div class="wz-seg${i<=WIZ.si?' on':''}"></div>`).join('')}</div>
+        <button type="button" class="wz-iconbtn" onclick="closeWizard()" aria-label="Fermer">✕</button>
+      </div>
+      <div class="wz-body${anim}">
+        <div class="wz-kicker">Étape ${WIZ.si + 1} sur ${total}</div>
+        <h2 class="wz-h">${meta[0]}</h2>
+        <p class="wz-sub">${meta[1]}</p>
+        ${wizBodyHTML(key)}
+      </div>
+      ${showNext ? `<div class="wz-foot"><button type="button" class="wz-cta" onclick="${last?'wizCreate()':'wizNext()'}">${last?'Créer la ligue 🎾':'Continuer'}</button></div>` : ''}
+    </div>
+  </div>`;
 }
 function wizCreate(){
   const name = (WIZ.name||'').trim();
@@ -3856,18 +3928,87 @@ function socialSizes(n, min, max){
   }
   return { sizes: [], left: n };
 }
+// Historique des duos : combien de fois deux joueurs ont partagé un groupe (et été partenaires).
+// Les sessions récentes comptent un peu plus que les anciennes.
+function socialPairHistory(excludeSessionId){
+  const w = {};
+  const key = function(a, b){ return a < b ? a + '|' + b : b + '|' + a; };
+  const sessions = (DATA.sessions || []).filter(function(se){ return se.id !== excludeSessionId; });
+  const N = sessions.length;
+  sessions.forEach(function(se, rank){
+    const f = N > 1 ? 0.5 + 0.5 * (rank / (N - 1)) : 1;
+    (se.groupsData || []).forEach(function(gd){
+      const seen = {};
+      (gd.matches || []).forEach(function(m){
+        const A = m.teamA || [], B = m.teamB || [];
+        A.concat(B).forEach(function(x){ seen[x] = 1; });
+        if(A.length === 2) w[key(A[0], A[1])] = (w[key(A[0], A[1])] || 0) + f;
+        if(B.length === 2) w[key(B[0], B[1])] = (w[key(B[0], B[1])] || 0) + f;
+      });
+      const ids = Object.keys(seen);
+      for(let i = 0; i < ids.length; i++) for(let j = i + 1; j < ids.length; j++){
+        const k = key(ids[i], ids[j]);
+        w[k] = (w[k] || 0) + 2 * f;
+      }
+    });
+  });
+  return { w: w, key: key };
+}
+function socialPlayedCounts(excludeSessionId){
+  const c = {};
+  (DATA.sessions || []).forEach(function(se){
+    if(se.id === excludeSessionId) return;
+    (se.groupsData || []).forEach(function(gd){
+      const seen = {};
+      (gd.matches || []).forEach(function(m){ (m.teamA || []).concat(m.teamB || []).forEach(function(x){ seen[x] = 1; }); });
+      Object.keys(seen).forEach(function(x){ c[x] = (c[x] || 0) + 1; });
+    });
+  });
+  return c;
+}
+// Répartit les joueurs en groupes en minimisant les retrouvailles (recherche aléatoire + échanges).
+function socialBestGrouping(ids, sizes, hist){
+  const cost2 = function(a, b){ return hist.w[hist.key(a, b)] || 0; };
+  const gCost = function(g){ let c = 0; for(let i = 0; i < g.length; i++) for(let j = i + 1; j < g.length; j++) c += cost2(g[i], g[j]); return c; };
+  const split = function(arr){ const out = []; let idx = 0; sizes.forEach(function(sz){ out.push(arr.slice(idx, idx + sz)); idx += sz; }); return out; };
+  let best = null, bestCost = Infinity;
+  const restarts = sizes.length > 1 ? 14 : 1;
+  for(let r = 0; r < restarts; r++){
+    const gs = split(shuffle(ids));
+    let total = 0; gs.forEach(function(g){ total += gCost(g); });
+    if(sizes.length > 1){
+      for(let it = 0; it < 500 && total > 0; it++){
+        const ga = Math.floor(Math.random() * gs.length);
+        let gb = Math.floor(Math.random() * gs.length);
+        if(ga === gb) continue;
+        const ia = Math.floor(Math.random() * gs[ga].length), ib = Math.floor(Math.random() * gs[gb].length);
+        const before = gCost(gs[ga]) + gCost(gs[gb]);
+        const tmp = gs[ga][ia]; gs[ga][ia] = gs[gb][ib]; gs[gb][ib] = tmp;
+        const after = gCost(gs[ga]) + gCost(gs[gb]);
+        if(after <= before){ total += after - before; }
+        else { gs[gb][ib] = gs[ga][ia]; gs[ga][ia] = tmp; }
+      }
+    }
+    if(total < bestCost){ bestCost = total; best = gs.map(function(g){ return g.slice(); }); }
+    if(bestCost === 0) break;
+  }
+  return best;
+}
 function socialShuffleGroups(session){
-  const present = shuffle(DATA.players.filter(p=>!p.injured && !isAbsent(session, p.id)).map(p=>p.id));
+  let present = DATA.players.filter(function(p){ return !p.injured && !isAbsent(session, p.id); }).map(function(p){ return p.id; });
   const plan = socialSizes(present.length);
+  // Quand il y a trop de monde pour les terrains, ceux qui ont le plus joué récemment laissent leur place.
+  if(plan.left > 0){
+    const played = socialPlayedCounts(session.id);
+    present = shuffle(present).sort(function(a, b){ return (played[a] || 0) - (played[b] || 0); }).slice(0, present.length - plan.left);
+  }
   while(DATA.groups.length < plan.sizes.length){
     const n = DATA.groups.length + 1;
     DATA.groups.push({ id: uid('g'), name: 'Terrain ' + n, order: n });
   }
+  const grouping = plan.sizes.length ? socialBestGrouping(present, plan.sizes, socialPairHistory(session.id)) : [];
   const placed = {};
-  let idx = 0;
-  plan.sizes.forEach(function(size, gi){
-    for(let k=0;k<size;k++){ placed[present[idx++]] = DATA.groups[gi].id; }
-  });
+  (grouping || []).forEach(function(g, gi){ g.forEach(function(id){ placed[id] = DATA.groups[gi].id; }); });
   DATA.players.forEach(function(p){
     if(p.injured) return;
     p.groupId = placed[p.id] || null;
