@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 267">
+<meta name="app-build" content="Version 268">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1210,6 +1210,27 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .acc-org-ico{width:52px;height:52px;border-radius:16px;background:var(--court);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;}
 .acc-back{background:none;border:0;color:var(--muted);font:600 16px var(--font-body);padding:4px 0 10px;cursor:pointer;}
 .acc-head2{font-family:var(--font-display);font-weight:600;font-size:24px;text-transform:uppercase;margin:0 0 12px;}
+.ah-org{display:flex;align-items:center;gap:10px;margin:22px 2px 10px;}
+.ah-org .mono{width:34px;height:34px;flex:0 0 auto;border-radius:11px;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px;}
+.ah-org b{font-family:var(--font-display);font-size:16px;letter-spacing:.04em;text-transform:uppercase;min-width:0;}
+.ah-org .ah-org-r{margin-left:auto;flex:0 0 auto;color:var(--muted);font-size:13px;}
+.ah-org .ah-pend{margin-left:auto;flex:0 0 auto;border:0;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;color:#FF9F0A;background:rgba(255,159,10,.16);border-radius:999px;padding:6px 12px;}
+.ah-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.ah-lg{border-radius:22px;background:var(--court-elevated-2);border:1px solid var(--line-soft);padding:14px;display:flex;gap:14px;align-items:stretch;cursor:pointer;}
+.ah-d{flex:0 0 62px;border-radius:16px;background:linear-gradient(160deg,var(--ball),#9CC63F);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-display);text-transform:uppercase;line-height:1;min-height:88px;}
+.ah-d span{font-size:12px;font-weight:600;letter-spacing:.05em;} .ah-d b{font-size:28px;font-weight:700;margin:2px 0;}
+.ah-d.off{background:rgba(255,255,255,.07);color:var(--muted);}
+.ah-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+.ah-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px 8px;flex-wrap:wrap;}
+.ah-top b{font-size:17px;line-height:1.25;}
+.ah-st{flex:0 0 auto;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;}
+.ah-st:before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.ah-st.on{background:rgba(207,234,92,.16);color:var(--ball);} .ah-st.wait{background:rgba(255,214,10,.16);color:#FFD60A;} .ah-st.done{background:rgba(255,159,10,.18);color:#FF9F0A;} .ah-st.off{background:rgba(255,255,255,.07);color:var(--muted);}
+.ah-meta{font-size:14px;color:var(--muted);}
+.ah-warn{font-size:14px;color:#FF9F0A;font-weight:600;}
+.ah-bar{height:6px;border-radius:999px;background:rgba(0,0,0,.3);overflow:hidden;} .ah-bar i{display:block;height:100%;border-radius:999px;background:var(--ball);}
+.ah-cta{align-self:flex-start;margin-top:2px;font-size:14px;font-weight:700;color:var(--court);background:var(--ball);border-radius:999px;padding:7px 14px;}
+.ah-cta.ghost{background:rgba(255,255,255,.08);color:var(--text);}
 .acc-lg{border-radius:22px;background:var(--court-elevated-2);border:1px solid var(--line-soft);padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;}
 .org-hero{display:flex;align-items:center;gap:16px;padding:18px;border-radius:26px;background:linear-gradient(135deg,rgba(217,242,58,.16),rgba(217,242,58,.03) 60%),var(--court-elevated-2);border:1px solid var(--line-soft);box-shadow:0 8px 22px rgba(0,0,0,.25);}
 .org-mono{width:58px;height:58px;border-radius:18px;background:var(--ball);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:.03em;flex:none;}
@@ -5720,7 +5741,14 @@ function summarizeAdminLeague(data, lg){
     let total=0, done=0;
     (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
     out.open = { date: open.date, published: !!open.published, total, done, absences: (open.absences||[]).length };
+    if(out.rec){
+      const courts = {};
+      players.forEach(p=>{ if(p.groupId && !p.injured && !(open.absences||[]).includes(p.id)) courts[p.groupId] = 1; });
+      out.open.courts = Object.keys(courts).length;
+    }
   }
+  out.playDay = typeof data.playDayOfWeek === 'number' ? data.playDayOfWeek : null;
+  out.playTime = data.playTime || '';
   return out;
 }
 function adminSummaryFor(lg){
@@ -5763,21 +5791,19 @@ async function pickAdminOrg(orgId){
   VIEW = { atab:'orgs', adet:false, aorgOpen:true, pcomm: VIEW.pcomm };
   render();
 }
+// État d'une ligue sur l'accueil admin : étiquette (on / wait / done / off) et action principale.
 function adminLeagueState(sum){
-  if(!sum) return { chip:'…', cls:'tag-stay', hint:'' };
-  if(sum.mlp) return { chip:'MLP', cls:'tag-stay', hint:'' };
+  if(!sum) return { label:'…', cls:'off', cta:'' };
+  if(sum.mlp) return { label:'MLP', cls:'off', cta:'Ouvrir', ghost:true };
   const o = sum.open;
-  if(sum.rec){
-    // Récréatif : aucun score à suivre.
-    if(!o) return { chip:'Aucune soirée', cls:'tag-stay', hint:'Lancer la prochaine soirée' };
-    if(!o.published) return { chip:'Non publiée', cls:'tag-yellow', hint:'Publier la soirée' };
-    return { chip:'Publiée', cls:'tag-up', hint:'Voir les terrains' };
-  }
-  if(!o) return { chip:'Aucune session', cls:'tag-stay', hint:'Lancer la prochaine session' };
-  if(!o.published) return { chip:'Non publiée', cls:'tag-yellow', hint:'Publier la session' };
-  if(o.total>0 && o.done===o.total) return { chip:'À terminer', cls:'tag-up', hint:'Tous les scores sont entrés' };
-  return { chip:'En cours', cls:'tag-up', hint:o.done + ' / ' + o.total + ' scores saisis' };
+  const w = sum.rec ? 'soirée' : 'session';
+  if(!o) return { label: sum.rec ? 'Aucune soirée' : 'Aucune session', cls:'off', cta:'Lancer la ' + w, ghost:true };
+  if(!o.published) return { label:'Non publiée', cls:'wait', cta:'Publier la ' + w };
+  if(sum.rec) return { label:'Publiée', cls:'on', cta:'Voir les terrains', ghost:true };
+  if(o.total>0 && o.done===o.total) return { label:'À terminer', cls:'done', cta:'Terminer la session' };
+  return { label:'En cours', cls:'on', cta:'Entrer les scores', ghost:true };
 }
+const FR_MONTHS_SHORT = ['janv','févr','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
 function orgMono(name){ return escapeHTML((String(name||'?').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2) || '?').toUpperCase()); }
 function orgHeroHTML(name, chips){
   return `<div class="org-hero"><div class="org-mono">${orgMono(name)}</div><div class="org-hero-b"><div class="org-hero-t">${escapeHTML(name||'')}</div><div class="org-chips">${chips.filter(Boolean).map(c=>`<span>${c}</span>`).join('')}</div></div></div>`;
@@ -5794,15 +5820,29 @@ function leagueTileHTML(name, sub, onclick, dot){
 function adminLeagueCardHTML(lg){
   const sum = adminSummaryFor(lg);
   const st = adminLeagueState(sum);
-  const lines = [];
-  if(sum && sum.open) lines.push('📅 ' + escapeHTML(frDateLong(sum.open.date)));
-  if(sum && sum.open && sum.open.absences) lines.push('🚫 ' + sum.open.absences + ' absence' + (sum.open.absences>1?'s':''));
-  if(sum && sum.unassigned) lines.push('⚠️ ' + sum.unassigned + ' joueur' + (sum.unassigned>1?'s':'') + (sum.rec ? ' sans terrain' : ' sans groupe'));
-  return `<div class="acc-lg" onclick="openAdminLeague('${lg.id}','session')">
-    <div class="acc-lg-h"><b>${escapeHTML(lg.name)}</b><span class="tag ${st.cls}">${st.chip}</span></div>
-    <div class="small">${escapeHTML(lg.schedule_label || '')}${sum ? ' · ' + sum.players + ' joueur' + (sum.players>1?'s':'') : ''}</div>
-    ${lines.length ? `<div class="acc-lines">${lines.map(x=>`<div>${x}</div>`).join('')}</div>` : ''}
-    <div class="acc-open">${escapeHTML(st.hint || 'Ouvrir')} ›</div>
+  const o = sum && sum.open;
+  // Bloc date façon calendrier : la session ouverte, sinon le jour de jeu habituel (grisé).
+  let dateBlock;
+  const dp = o ? frDateParts(o.date) : null;
+  if(dp && dp.d) dateBlock = `<div class="ah-d"><span>${dp.day.slice(0,3)}</span><b>${dp.d.getDate()}</b><span>${FR_MONTHS_SHORT[dp.d.getMonth()]}</span></div>`;
+  else dateBlock = `<div class="ah-d off"><span>${(sum && sum.playDay !== null && sum.playDay !== undefined) ? FR_DAYS[sum.playDay].slice(0,3) : ''}</span><b>—</b><span></span></div>`;
+  const meta = [];
+  if(sum && sum.playTime) meta.push(fmtHM(sum.playTime));
+  else if(lg.schedule_label) meta.push(escapeHTML(lg.schedule_label));
+  if(sum) meta.push(sum.players + ' joueur' + (sum.players>1?'s':''));
+  if(o && o.absences) meta.push(o.absences + ' absence' + (o.absences>1?'s':''));
+  if(o && sum.rec && o.courts) meta.push(o.courts + ' terrain' + (o.courts>1?'s':''));
+  if(o && !sum.rec && o.total>0 && o.done<o.total) meta.push(o.done + ' / ' + o.total + ' scores'); // complet : l'étiquette « À terminer » suffit
+  const bar = (o && o.published && !sum.rec && o.total>0) ? `<div class="ah-bar"><i style="width:${Math.round(100*o.done/o.total)}%"></i></div>` : '';
+  const warn = (sum && sum.unassigned) ? `<div class="ah-warn">⚠️ ${sum.unassigned} joueur${sum.unassigned>1?'s':''} ${sum.rec ? 'sans terrain' : 'sans groupe'}</div>` : '';
+  return `<div class="ah-lg" onclick="openAdminLeague('${lg.id}','session')">
+    ${dateBlock}
+    <div class="ah-b">
+      <div class="ah-top"><b>${escapeHTML(lg.name)}</b><span class="ah-st ${st.cls}">${st.label}</span></div>
+      <div class="ah-meta">${sum && sum.rec ? '🎉 ' : ''}${meta.join(' · ')}</div>
+      ${warn}${bar}
+      ${st.cta ? `<span class="ah-cta${st.ghost ? ' ghost' : ''}">${st.cta}</span>` : ''}
+    </div>
   </div>`;
 }
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
@@ -5831,30 +5871,20 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
 let ADMIN_HOME_PRELOADED = false;
 function adminHomeHTML(){
   const orgs = adminHomeOrgs();
-  const multi = orgs.length > 1;
   const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid); };
   if(!ADMIN_HOME_PRELOADED){ ADMIN_HOME_PRELOADED = true; Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(()=>{ if(!MODAL && (VIEW.atab===undefined || VIEW.atab==='accueil')) render(); }).catch(function(){}); }
   const ready = ALL_PROFILES && ALL_PROFILES.length && ALL_PROFILE_PLAYERS && ALL_PROFILE_PLAYERS.length;
   let html = '';
-  // À traiter, toutes organisations confondues
-  const todo = [];
-  orgs.forEach(function(o){
-    const oname = multi ? ' · ' + escapeHTML(o.name) : '';
+  orgs.forEach(function(o, i){
+    const ls = leaguesOf(o.id);
     let pending = 0;
     try{ if(ready) pending = approvalsCountForOrg(o.id); }catch(e){}
-    if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheetFor('${o.id}','comptes')"><span class="acc-row-t"><b>${pending} personne${pending>1?'s':''} à approuver</b><small>${multi ? escapeHTML(o.name) : 'Organisation'} › Comptes</small></span><span class="acc-chev">›</span></button>`);
-    leaguesOf(o.id).forEach(lg=>{
-      const sum = adminSummaryFor(lg);
-      if(!sum || sum.mlp) return;
-      if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} ${sum.rec ? 'sans terrain' : 'sans groupe'}</b><small>${escapeHTML(lg.name)}${oname}</small></span><span class="acc-chev">›</span></button>`);
-      if(sum.open && sum.open.published && sum.open.total>0 && sum.open.done===sum.open.total) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>Session prête à terminer</b><small>${escapeHTML(lg.name)}${oname} · tous les scores sont entrés</small></span><span class="acc-chev">›</span></button>`);
-    });
-  });
-  if(todo.length) html += `<div class="pc-sec" style="margin-top:0;">À traiter</div><div class="acc-group" style="margin-bottom:6px;">${todo.join('')}</div>`;
-  // Une section par organisation
-  orgs.forEach(function(o){
-    html += `<div class="pc-sec">${escapeHTML(o.name || 'Mes ligues')} · Mes ligues</div>
-    <div class="pc-list">${leaguesOf(o.id).map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
+    // Les personnes à approuver restent signalées, discrètement, dans l'en-tête de l'organisation.
+    const right = pending > 0
+      ? `<button type="button" class="ah-pend" onclick="openOrgSheetFor('${o.id}','comptes')">${pending} à approuver ›</button>`
+      : `<span class="ah-org-r">${ls.length} ligue${ls.length>1?'s':''}</span>`;
+    html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
+    <div class="ah-grid">${ls.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
   });
   html += accUpcomingHTML();
   setTimeout(()=>refreshAdminSummaries(false), 0);
