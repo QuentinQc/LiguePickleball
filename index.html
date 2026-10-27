@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 266">
+<meta name="app-build" content="Version 267">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3069,6 +3069,15 @@ async function loadLeagues(){
 function myOrgLeagues(){
   return LEAGUES.filter(l=>l.organization_id === CURRENT_ORGANIZATION_ID);
 }
+// Organisations dont je suis admin, l'actuelle en premier (accueil admin multi-organisations).
+function adminHomeOrgs(){
+  if(!MY_ORGANIZATIONS.length) return [{ id: CURRENT_ORGANIZATION_ID, name: '' }];
+  return MY_ORGANIZATIONS.slice().sort(function(a, b){ return (b.id===CURRENT_ORGANIZATION_ID) - (a.id===CURRENT_ORGANIZATION_ID); });
+}
+function adminAllLeagues(){
+  const ids = adminHomeOrgs().map(function(o){ return o.id; });
+  return LEAGUES.filter(function(l){ return ids.indexOf(l.organization_id) !== -1; });
+}
 // Réordonne les ligues (de l'organisation actuelle) par glisser-déposer et
 // sauvegarde le nouvel ordre.
 async function reorderLeague(draggedId, targetId){
@@ -5721,7 +5730,7 @@ function adminSummaryFor(lg){
 async function refreshAdminSummaries(force){
   if(ADMIN_SUMMARY_LOADING) return;
   if(!force && Date.now() - ADMIN_SUMMARY_AT < 45000) return;
-  const others = myOrgLeagues().filter(l=>l.id !== CURRENT_LEAGUE_ID);
+  const others = adminAllLeagues().filter(l=>l.id !== CURRENT_LEAGUE_ID);
   if(!others.length){ ADMIN_SUMMARY_AT = Date.now(); return; }
   ADMIN_SUMMARY_LOADING = true;
   try{
@@ -5738,6 +5747,11 @@ async function refreshAdminSummaries(force){
 }
 function setAAcc(t){ VIEW.atab = t; VIEW.adet = false; if(t==='cal'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); } if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); } render(); }
 async function openAdminLeague(leagueId, tab){
+  const target = LEAGUES.find(l=>l.id===leagueId);
+  if(target && target.organization_id && target.organization_id !== CURRENT_ORGANIZATION_ID){
+    CURRENT_ORGANIZATION_ID = target.organization_id; // ligue d'une autre de mes organisations
+    ADMIN_ORG_PRELOADED = false;
+  }
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchToLeague(leagueId); }
   ADMIN_SUMMARY_AT = 0;
   VIEW = { atab:'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm };
@@ -5814,24 +5828,34 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
   if(active==='orgs' && VIEW.adet && VIEW.tab==='mur') scrollWallToBottom();
 }
 // ---- Accueil admin ----
+let ADMIN_HOME_PRELOADED = false;
 function adminHomeHTML(){
-  const leagues = myOrgLeagues();
-  const org = MY_ORGANIZATIONS.find(o=>o.id===CURRENT_ORGANIZATION_ID);
+  const orgs = adminHomeOrgs();
+  const multi = orgs.length > 1;
+  const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid); };
+  if(!ADMIN_HOME_PRELOADED){ ADMIN_HOME_PRELOADED = true; Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(()=>{ if(!MODAL && (VIEW.atab===undefined || VIEW.atab==='accueil')) render(); }).catch(function(){}); }
+  const ready = ALL_PROFILES && ALL_PROFILES.length && ALL_PROFILE_PLAYERS && ALL_PROFILE_PLAYERS.length;
   let html = '';
-  // À traiter
+  // À traiter, toutes organisations confondues
   const todo = [];
-  let pending = 0;
-  try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
-  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheet('comptes')"><span class="acc-row-t"><b>${pending} personne${pending>1?'s':''} à approuver</b><small>Organisation › Comptes</small></span><span class="acc-chev">›</span></button>`);
-  leagues.forEach(lg=>{
-    const sum = adminSummaryFor(lg);
-    if(!sum || sum.mlp) return;
-    if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} ${sum.rec ? 'sans terrain' : 'sans groupe'}</b><small>${escapeHTML(lg.name)}</small></span><span class="acc-chev">›</span></button>`);
-    if(sum.open && sum.open.published && sum.open.total>0 && sum.open.done===sum.open.total) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>Session prête à terminer</b><small>${escapeHTML(lg.name)} · tous les scores sont entrés</small></span><span class="acc-chev">›</span></button>`);
+  orgs.forEach(function(o){
+    const oname = multi ? ' · ' + escapeHTML(o.name) : '';
+    let pending = 0;
+    try{ if(ready) pending = approvalsCountForOrg(o.id); }catch(e){}
+    if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheetFor('${o.id}','comptes')"><span class="acc-row-t"><b>${pending} personne${pending>1?'s':''} à approuver</b><small>${multi ? escapeHTML(o.name) : 'Organisation'} › Comptes</small></span><span class="acc-chev">›</span></button>`);
+    leaguesOf(o.id).forEach(lg=>{
+      const sum = adminSummaryFor(lg);
+      if(!sum || sum.mlp) return;
+      if(sum.unassigned) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>${sum.unassigned} joueur${sum.unassigned>1?'s':''} ${sum.rec ? 'sans terrain' : 'sans groupe'}</b><small>${escapeHTML(lg.name)}${oname}</small></span><span class="acc-chev">›</span></button>`);
+      if(sum.open && sum.open.published && sum.open.total>0 && sum.open.done===sum.open.total) todo.push(`<button type="button" class="acc-row" onclick="openAdminLeague('${lg.id}','session')"><span class="acc-row-t"><b>Session prête à terminer</b><small>${escapeHTML(lg.name)}${oname} · tous les scores sont entrés</small></span><span class="acc-chev">›</span></button>`);
+    });
   });
   if(todo.length) html += `<div class="pc-sec" style="margin-top:0;">À traiter</div><div class="acc-group" style="margin-bottom:6px;">${todo.join('')}</div>`;
-  html += `<div class="pc-sec">${escapeHTML(org ? org.name : 'Mes ligues')} · Mes ligues</div>
-    <div class="pc-list">${leagues.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
+  // Une section par organisation
+  orgs.forEach(function(o){
+    html += `<div class="pc-sec">${escapeHTML(o.name || 'Mes ligues')} · Mes ligues</div>
+    <div class="pc-list">${leaguesOf(o.id).map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
+  });
   html += accUpcomingHTML();
   setTimeout(()=>refreshAdminSummaries(false), 0);
   return html;
@@ -11792,6 +11816,10 @@ function openOrganizationPage(tab){
     render();
   });
 }
+async function openOrgSheetFor(orgId, tab){
+  if(orgId && orgId !== CURRENT_ORGANIZATION_ID){ await switchToOrganization(orgId); }
+  openOrgSheet(tab);
+}
 function openOrgSheet(tab){
   const safe = f=>Promise.resolve().then(f).catch(e=>console.error(e));
   Promise.all([
@@ -11807,14 +11835,17 @@ function closeOrganizationPage(){ ADMIN_SHOWING_ORG = false; render(); }
 function setOrgSubTab(t){ VIEW.orgSubTab = t; VIEW.orgHub = false; render(); }
 function orgBackToHub(){ VIEW.orgHub = true; render(); }
 function isMobileModern(){ return MODERN_NAV && window.matchMedia('(max-width:640px)').matches; }
+// Personnes à approuver dans une organisation : comptes sans joueur + demandes d'adhésion (pas l'intérêt).
+function approvalsCountForOrg(orgId){
+  const ids = new Set(LEAGUES.filter(l=>l.organization_id===orgId).map(l=>l.id));
+  const linked = new Set(ALL_PROFILE_PLAYERS.filter(pp=>ids.has(pp.league_id)).map(pp=>pp.profile_id));
+  const accts = ALL_PROFILES.filter(p=>p.organization_id===orgId && !linked.has(p.id)).length;
+  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && ids.has(r.league_id) && r.kind !== 'interest').length;
+  return accts + reqs;
+}
 function organizationStatsSummary(){
   const orgLeagues = myOrgLeagues();
-  const orgLeagueIds = new Set(orgLeagues.map(l=>l.id));
-  const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
-  const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
-  const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
-  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id) && r.kind !== 'interest').length;
-  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id)).length + reqs;
+  const pending = approvalsCountForOrg(CURRENT_ORGANIZATION_ID);
   const members = organizationRosterEntries().length;
   return { leagues: orgLeagues.length, members, pending };
 }
