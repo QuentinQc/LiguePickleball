@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 260">
+<meta name="app-build" content="Version 261">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3926,6 +3926,25 @@ function grpWord(plural, cap, d){
   return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 function myGroupLabel(d){ return 'Mon ' + grpWord(false, false, d); }
+// Onglets liés à la performance, retirés en récréatif (joueurs, remplaçants et admin pour le palmarès).
+const REC_HIDDEN_TABS = ['stats','gamification','historique'];
+// Réglages des terrains en récréatif : joueurs par terrain et nombre de terrains disponibles (0 = aucune limite).
+const COURT_SIZE_OPTS = { '4':[4,4,'4 joueurs'], '45':[4,5,'4 ou 5 joueurs'], '46':[4,6,'4 à 6 joueurs'] };
+function socialCourtLimits(){ const o = COURT_SIZE_OPTS[DATA.socialCourtSize] || COURT_SIZE_OPTS['46']; return { min:o[0], max:o[1], label:o[2] }; }
+// Répartition des joueurs présents selon ces réglages : au besoin, on remplit
+// au plus les terrains disponibles et les autres attendent leur tour.
+function socialPlanFor(n){
+  const lim = socialCourtLimits();
+  const K = parseInt(DATA.socialMaxCourts, 10) || 0;
+  const plan = socialSizes(n, lim.min, lim.max);
+  if(K > 0 && plan.sizes.length > K){
+    const m = Math.min(n, K * lim.max);
+    const base = Math.floor(m / K), extra = m % K, sizes = [];
+    for(let i = 0; i < K; i++) sizes.push(base + (i < extra ? 1 : 0));
+    return { sizes: sizes, left: n - m };
+  }
+  return plan;
+}
 // ---- Rotation sociale : à chaque session, les joueurs présents sont répartis
 // au hasard en groupes (terrains) de 4 à 6, en privilégiant les groupes de 4.
 function socialSizes(n, min, max){
@@ -4009,7 +4028,7 @@ function socialBestGrouping(ids, sizes, hist){
 }
 function socialShuffleGroups(session){
   let present = DATA.players.filter(function(p){ return !p.injured && !isAbsent(session, p.id); }).map(function(p){ return p.id; });
-  const plan = socialSizes(present.length);
+  const plan = socialPlanFor(present.length);
   // Quand il y a trop de monde pour les terrains, ceux qui ont le plus joué récemment laissent leur place.
   if(plan.left > 0){
     const played = socialPlayedCounts(session.id);
@@ -5041,7 +5060,7 @@ function applyQuickView(){
   document.querySelectorAll('.tabs .tab.active, .bottom-nav-item.active').forEach(el=>el.classList.remove('active'));
 }
 function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
-  tabs = tabs.filter(t=>!HIDDEN_FEATURES.includes(t[0]));
+  tabs = tabs.filter(t=>!HIDDEN_FEATURES.includes(t[0]) && !(isRecLeague() && t[0]==='gamification'));
   // extraItems (ex: Absence) doivent apparaître à la fois dans les pilules du
   // haut (ordinateur) et dans la barre du bas (mobile) — avant, ils
   // n'étaient ajoutés qu'à la barre du bas, donc invisibles sur ordinateur.
@@ -9992,6 +10011,7 @@ function adminGroupsHTML(){
     const ps = playersInGroup(g.id).filter(p=>!(open && isAbsent(open, p.id))).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const absentInGroup = open ? playersInGroup(g.id).filter(p=>isAbsent(open, p.id)) : [];
     const displayCount = ps.length + absentInGroup.length;
+    if(rec && displayCount === 0) return; // terrain en trop ce soir
     const outOfRange = !rec && displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS()) && displayCount !== 6;
     const isSix = !rec && displayCount === 6;
     html += `
@@ -10213,6 +10233,7 @@ function adminSessionHTML(){
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
+    if(DATA.leagueFormat==='social' && activeRosterForGroup(open, g.id).length===0) return; // terrain en trop ce soir
     const expectedRoster = new Set(activeRosterForGroup(open, g.id));
     const inMatches = new Set();
     gd.matches.forEach(m=>{ m.teamA.forEach(id=>inMatches.add(id)); m.teamB.forEach(id=>inMatches.add(id)); });
@@ -11598,6 +11619,12 @@ function settingsJoueursTabHTML(){
   html += `<div class="vis-grp">Remplaçants</div>`;
   html += subTabDefs().map(([k,l])=>visSwitch(escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('');
   html += '</div>';
+  if(isRecLeague()){
+    // Récréatif : ni cote, ni score, ni journal, ni palmarès.
+    html += settingsSection('Informations');
+    html += '<div class="card">' + visSwitch('Terrain avant publication', 'Montre le terrain dès que la soirée est créée, avant sa publication. Désactivé : le joueur voit son terrain seulement une fois la soirée publiée.', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`) + '</div>';
+    return html;
+  }
   html += settingsSection('Informations', 'La cote reste utilisée en arrière-plan même si elle est cachée. Toi (admin), tu la vois toujours.');
   html += '<div class="card">';
   html += visSwitch('Cote des joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`);
@@ -11947,6 +11974,16 @@ function settingsReglesTabHTML(){
     html += '<div class="card-grid">' + settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()") + '</div>';
     return html;
   }
+  if(isRecLeague()){
+    const lim = socialCourtLimits();
+    const K = parseInt(DATA.socialMaxCourts, 10) || 0;
+    html += settingsSection('Terrains', "Comment les joueurs présents sont répartis au tirage. S'applique au prochain tirage.");
+    html += '<div class="card-grid">';
+    html += settingsRow('👥', 'Joueurs par terrain', lim.label, "openCourtSizeModal()");
+    html += settingsRow('🏟️', 'Terrains disponibles', K ? K + ' terrain' + (K>1?'s':'') + ' au maximum' : 'Aucune limite', "openMaxCourtsModal()");
+    html += '</div>';
+    return html;
+  }
   const matchupSummary = DATA.matchupMode==='manual'
     ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (4 j.), ${(DATA.manualMatchupTemplate5||[]).length} matchs (5 j.)`
     : 'Automatique';
@@ -11961,11 +11998,35 @@ function settingsReglesTabHTML(){
   html += '<div class="card-grid">' + settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()") + '</div>';
   return html;
 }
+function openCourtSizeModal(){
+  const cur = DATA.socialCourtSize || '46';
+  showContentModal('Joueurs par terrain', `<p class="small" style="margin-bottom:12px;">Au tirage, chaque terrain reçoit ce nombre de joueurs. Les terrains de 4 sont privilégiés.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">${Object.keys(COURT_SIZE_OPTS).map(k=>`<button class="btn ${k===cur?'btn-primary':'btn-secondary'}" style="height:52px;font-size:17px;" onclick="setCourtSetting('socialCourtSize','${k}')">${COURT_SIZE_OPTS[k][2]}</button>`).join('')}</div>`);
+}
+function openMaxCourtsModal(){
+  const cur = parseInt(DATA.socialMaxCourts, 10) || 0;
+  const opts = [0,1,2,3,4,5,6,7,8];
+  showContentModal('Terrains disponibles', `<p class="small" style="margin-bottom:12px;">Le tirage n'utilise jamais plus de terrains que ce nombre. S'il y a plus de joueurs que de places, ceux qui ont le plus joué récemment cèdent leur place à tour de rôle.</p>
+    <div class="wz-chips">${opts.map(n=>`<button type="button" class="wz-chip${n===cur?' sel':''}" onclick="setCourtSetting('socialMaxCourts',${n})">${n ? n : 'Aucune limite'}</button>`).join('')}</div>`);
+}
+function setCourtSetting(k, v){
+  DATA[k] = v;
+  closeModal();
+  const open = currentOpenSession();
+  if(open && !open.published && DATA.leagueFormat === 'social'){
+    // Soirée pas encore publiée : on refait le tirage tout de suite avec les nouveaux réglages.
+    socialShuffleGroups(open);
+    open.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
+  }
+  saveAndRender();
+}
 function settingsAvanceTabHTML(){
   let html = settingsSection('Outils');
+  if(!isRecLeague()){
   html += '<div class="card-grid">';
   html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
   html += '</div>';
+  }
   html += `<div class="card">
     <h3>💾 Sauvegarde</h3>
     <p class="small">Filet de sécurité manuel, en plus de la sauvegarde automatique en ligne.</p>
@@ -11975,7 +12036,7 @@ function settingsAvanceTabHTML(){
       <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">
     </div>
   </div>`;
-  if(DATA.leagueFormat !== 'mlp'){
+  if(DATA.leagueFormat !== 'mlp' && !isRecLeague()){
     const lastRecalc = DATA.ratingRecalcAt ? new Date(DATA.ratingRecalcAt).toLocaleDateString('fr-CA') : null;
     html += `<div class="card">
     <h3>📈 Cote évolutive</h3>
@@ -12659,11 +12720,13 @@ function switchRowHTML(id, checked, label){
 // Liste des onglets possibles par rôle, selon le format de ligue actif —
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
+  if(isRecLeague()) return [['classement',myGroupLabel()],['videos','Vidéos']];
   return DATA.leagueFormat === 'mlp'
     ? [['equipe','Mon équipe'],['classement','Classement'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
     : [['classement',myGroupLabel()],['stats','Statistiques'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
+  if(isRecLeague()) return [['dispo','Disponibilité']];
   return [['dispo','Disponibilité'],['gamification','Palmarès'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
@@ -12671,7 +12734,7 @@ function subTabDefs(){
 // Fonctions masquées temporairement (remettre à [] pour les réactiver).
 const HIDDEN_FEATURES = ['gamification','videos','tournois','messagerie'];
 function filterTabs(tabs, hiddenKeys){
-  const hidden = (hiddenKeys || []).concat(HIDDEN_FEATURES);
+  const hidden = (hiddenKeys || []).concat(HIDDEN_FEATURES, isRecLeague() ? REC_HIDDEN_TABS : []);
   const visible = tabs.filter(t => !hidden.includes(t[0]));
   return visible.length ? visible : tabs;
 }
@@ -13249,8 +13312,8 @@ function accountOrgsHTML(me){
     const cur = org.leagues.find(x=>x.lg.id===CURRENT_LEAGUE_ID);
     const hidden = DATA.hiddenPlayerTabs || [];
     const segs = [['group',myGroupLabel()]];
-    if(!hidden.includes('stats')) segs.push(['stats','Statistiques']);
-    if(!hidden.includes('historique')) segs.push(['hist','Historique']);
+    if(!hidden.includes('stats') && !isRecLeague()) segs.push(['stats','Statistiques']);
+    if(!hidden.includes('historique') && !isRecLeague()) segs.push(['hist','Historique']);
     const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
     return `<button type="button" class="acc-back" onclick="setPDet(null)">‹ ${escapeHTML(org.name)}</button>
       <div class="acc-head2">${escapeHTML(cur ? (cur.lg.name + (cur.lg.schedule_label ? ' — '+cur.lg.schedule_label : '')) : '')}</div>
