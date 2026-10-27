@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 239">
+<meta name="app-build" content="Version 240">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4583,6 +4583,31 @@ function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
   }
   return pillsHTML + bottomNavHTML(bottomItems, activeKey);
 }
+// Vérification de sécurité : calcule l'empreinte SHA-256 de la bibliothèque Supabase depuis deux CDN indépendants.
+async function _sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>('0'+b.toString(16)).slice(-2)).join('');
+}
+async function showLibHashes(){
+  showContentModal('Empreinte de la bibliothèque', '<p class="small">Calcul en cours…</p>');
+  const urls = (window.__sbUrls || []).slice(0,3);
+  const rows = [];
+  for(const u of urls){
+    try{
+      const r = await fetch(u); if(!r.ok) throw new Error('HTTP '+r.status);
+      const t = await r.text();
+      rows.push({ u, n:t.length, h: await _sha256Hex(t) });
+    }catch(e){ rows.push({ u, err: String(e && e.message || e) }); }
+  }
+  let cached = null;
+  try{ const c = localStorage.getItem('dk_sb_lib_v1'); if(c) cached = { n:c.length, h: await _sha256Hex(c) }; }catch(e){}
+  const ok = rows.filter(r=>r.h);
+  const same = ok.length>=2 && ok[0].h===ok[1].h;
+  const html = rows.map(r=>`<div style="margin-bottom:12px;"><div class="small" style="color:var(--muted);word-break:break-all;">${escapeHTML(r.u)}</div>${r.err ? `<div class="small" style="color:var(--danger);">Échec : ${escapeHTML(r.err)}</div>` : `<div class="small">${r.n} caractères</div><div style="font-family:monospace;font-size:12px;word-break:break-all;user-select:all;">${r.h}</div>`}</div>`).join('')
+    + (cached ? `<div style="margin-bottom:12px;"><div class="small" style="color:var(--muted);">Copie gardée dans l'appareil</div><div class="small">${cached.n} caractères</div><div style="font-family:monospace;font-size:12px;word-break:break-all;user-select:all;">${cached.h}</div></div>` : '')
+    + `<p class="small" style="margin-top:8px;">${same ? '✅ Les deux sources donnent la même empreinte.' : '⚠️ Les deux sources ne donnent pas la même empreinte (ou une n\'a pas répondu).'}</p>`;
+  showContentModal('Empreinte de la bibliothèque', html);
+}
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
 function openOrgSwitcherPopover(){
   const isSuperAdmin = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
@@ -5273,6 +5298,7 @@ function adminMeHTML(canViewAsPlayer, canViewAsSub){
     <div class="acc-group">
       ${accRow('', 'Mon profil', 'Photo et présentation', `openMyProfileModal()`)}
       ${accRow('', 'Notifications', '', `openNotifSettings()`)}
+      ${isSuper ? accRow('', 'Empreinte de la bibliothèque', 'Vérification de sécurité', `showLibHashes()`) : ''}
       ${isSuper ? accRow('', SUPER_ADMIN_MODE ? 'Revenir à mes organisations' : 'Voir toutes les organisations', 'Super admin', `toggleSuperAdminOrgView()`) : ''}
       ${accRow('', 'Déconnexion', '', `logout()`)}
     </div>`;
