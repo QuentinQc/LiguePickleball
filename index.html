@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 273">
+<meta name="app-build" content="Version 274">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1234,6 +1234,10 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 @keyframes navFwd{from{opacity:.35;transform:translateX(28px);}to{opacity:1;transform:none;}}
 @keyframes navBk{from{opacity:.35;transform:translateX(-28px);}to{opacity:1;transform:none;}}
+.ah-switch{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:2px -16px 12px;padding:0 16px;}
+.ah-switch::-webkit-scrollbar{display:none;}
+.ah-switch button{flex:0 0 auto;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
+.ah-switch button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .nav-fwd{animation:navFwd .22s ease-out;} .nav-back{animation:navBk .22s ease-out;}
 @media (prefers-reduced-motion:reduce){.nav-fwd,.nav-back{animation:none;}}
 .ah-ctas{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;} .ah-ctas .ah-cta{margin-top:0;}
@@ -4664,7 +4668,7 @@ function navBack(){
     if(VIEW.atab === 'orgs' && VIEW.aorgOpen && MY_ORGANIZATIONS.length > 1){ VIEW.aorgOpen = false; render(); return true; }
     return false;
   }
-  if(VIEW.pdet){ setPDet(null); return true; }
+  if(VIEW.pdet){ closeMyLeague(); return true; }
   if(VIEW.porg && myOrgsList().length > 1){ setPOrg(null); return true; }
   return false;
 }
@@ -4689,24 +4693,35 @@ window.addEventListener('popstate', function(){
   NAV_SENTINEL = false;
   navBack();
 });
-// Application installée (pas de barre ni de geste du navigateur) : glisser depuis le bord gauche
-// revient en arrière, comme dans les applications iPhone/iPad. Dans Safari, le geste du navigateur s'en charge.
+// Glisser vers la droite revient en arrière, comme dans les applications iPhone/iPad : depuis le bord
+// gauche, ou n'importe où d'un geste net. Si Safari s'empare du geste de bord, il annule le nôtre
+// (touchcancel) et c'est la sentinelle d'historique qui fait le retour, une seule fois.
 (function(){
-  let sx = 0, sy = 0, dx = 0, tracking = false;
+  let sx = 0, sy = 0, dx = 0, maxDy = 0, edge = false, tracking = false;
+  // Champ de saisie ou zone qui défile à l'horizontale : le glissement lui appartient.
+  const inHScroller = function(el){
+    for(; el && el !== document.body; el = el.parentElement){
+      if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+      if(el.scrollWidth > el.clientWidth + 4){ const ox = getComputedStyle(el).overflowX; if(ox === 'auto' || ox === 'scroll') return true; }
+    }
+    return false;
+  };
   const target = function(){ const m = document.querySelector('#modalRoot > *'); return m || app; };
   const reset = function(){ const t = target(); if(t){ t.style.transition = 'transform .18s ease-out'; t.style.transform = ''; } };
   document.addEventListener('touchstart', function(e){
     tracking = false;
-    if(!isRunningStandalone() || !e.touches || e.touches.length !== 1) return;
+    if(!e.touches || e.touches.length !== 1 || !navCanGoBack()) return;
     const t = e.touches[0];
-    if(t.clientX > 24 || !navCanGoBack()) return;
-    sx = t.clientX; sy = t.clientY; dx = 0; tracking = true;
+    edge = t.clientX <= 40;
+    if(!edge && inHScroller(e.target)) return;
+    sx = t.clientX; sy = t.clientY; dx = 0; maxDy = 0; tracking = true;
   }, { passive:true });
   document.addEventListener('touchmove', function(e){
     if(!tracking) return;
     const t = e.touches[0];
     dx = t.clientX - sx;
     const dy = Math.abs(t.clientY - sy);
+    if(dy > maxDy) maxDy = dy;
     if(dy > 40 && dy > dx){ tracking = false; reset(); return; } // geste vertical : c'est un défilement
     const el = target();
     if(el && dx > 0){ el.style.transition = 'none'; el.style.transform = 'translateX(' + Math.min(dx, 160) * 0.5 + 'px)'; }
@@ -4715,7 +4730,8 @@ window.addEventListener('popstate', function(){
     if(!tracking) return;
     tracking = false;
     reset();
-    if(dx > 70) navBack();
+    // Depuis le bord : 60 px suffisent. Ailleurs : glissement net vers la droite, peu vertical.
+    if(edge ? dx > 60 : (dx > 90 && dx > 2.5 * maxDy)) navBack();
   };
   document.addEventListener('touchend', end);
   document.addEventListener('touchcancel', function(){ tracking = false; reset(); });
@@ -5889,10 +5905,21 @@ async function openAdminLeague(leagueId, tab){
   }
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchToLeague(leagueId); }
   ADMIN_SUMMARY_AT = 0;
-  VIEW = { atab:'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm };
+  // Ouverte depuis l'accueil : le retour y ramène directement (pas à la page de l'organisation).
+  // Passer d'une ligue à l'autre garde l'écran d'origine.
+  const backTo = VIEW.adet ? VIEW.backTo : ((VIEW.atab === undefined || VIEW.atab === 'accueil') ? 'accueil' : null);
+  VIEW = { atab:'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm, backTo: backTo };
   render();
 }
-function closeAdminLeague(){ VIEW.adet = false; render(); }
+function closeAdminLeague(){
+  if(VIEW.backTo === 'accueil'){ VIEW = { atab:'accueil', pcomm: VIEW.pcomm }; render(); return; }
+  VIEW.adet = false; render();
+}
+// Pastilles pour passer directement d'une ligue à l'autre (sans revenir en arrière).
+function leagueSwitchHTML(list, fn, tab){
+  if(list.length < 2) return '';
+  return `<div class="ah-switch">${list.map(function(l){ return `<button type="button" class="${l.id===CURRENT_LEAGUE_ID?'on':''}" onclick="${l.id===CURRENT_LEAGUE_ID ? '' : fn + "('" + l.id + "'" + (tab ? ",'" + tab + "'" : '') + ")"}">${escapeHTML(l.name)}</button>`; }).join('')}</div>`;
+}
 async function pickAdminOrg(orgId){
   if(orgId !== CURRENT_ORGANIZATION_ID){ await switchToOrganization(orgId); }
   VIEW = { atab:'orgs', adet:false, aorgOpen:true, pcomm: VIEW.pcomm };
@@ -6014,8 +6041,9 @@ function adminOrgsHTML(){
     else if(cur==='historique') body = adminHistoryHTML();
     else if(cur==='rapports') body = adminReportsSectionHTML();
     else body = adminSettingsSectionHTML();
-    return `<button type="button" class="acc-back" onclick="closeAdminLeague()">‹ ${escapeHTML(org ? org.name : 'Organisation')}</button>
+    return `<button type="button" class="acc-back" onclick="closeAdminLeague()">‹ ${VIEW.backTo === 'accueil' ? 'Accueil' : escapeHTML(org ? org.name : 'Organisation')}</button>
       <div class="acc-head2">${escapeHTML(lg.name)}${lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</div>
+      ${leagueSwitchHTML(myOrgLeagues(), 'openAdminLeague', cur)}
       <div class="acc-seg acc-seg-scroll">${sections.map(([k,l])=>`<button type="button" class="${k===cur?'on':''}" onclick="setAdminTab('${k}')">${l}</button>`).join('')}</div>
       <div style="margin-top:14px;">${body}</div>`;
   }
@@ -13453,9 +13481,15 @@ function setPOrg(id){ VIEW.porg = id; VIEW.pdet = null; render(); }
 function setPDet(d){ VIEW.pdet = d; render(); }
 async function openMyLeague(leagueId){
   const org = (LEAGUES.find(l=>l.id===leagueId)||{}).organization_id || null;
+  const backTo = VIEW.pdet ? VIEW.pBackTo : ((VIEW.ptab === undefined || VIEW.ptab === 'accueil') ? 'accueil' : null);
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); }
-  VIEW.ptab = 'orgs'; VIEW.porg = org; VIEW.pdet = 'group';
+  VIEW.ptab = 'orgs'; VIEW.porg = org; VIEW.pdet = 'group'; VIEW.pBackTo = backTo;
   render();
+}
+// Retour depuis une ligue (joueur) : vers l'accueil si on en vient, sinon vers l'organisation.
+function closeMyLeague(){
+  if(VIEW.pBackTo === 'accueil'){ VIEW.ptab = 'accueil'; VIEW.pdet = null; VIEW.pBackTo = null; render(); return; }
+  setPDet(null);
 }
 function myOrgsList(){
   const map = {};
@@ -13751,8 +13785,9 @@ function accountOrgsHTML(me){
     if(!hidden.includes('stats') && !isRecLeague()) segs.push(['stats','Statistiques']);
     if(!hidden.includes('historique') && !isRecLeague()) segs.push(['hist','Historique']);
     const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
-    return `<button type="button" class="acc-back" onclick="setPDet(null)">‹ ${escapeHTML(org.name)}</button>
+    return `<button type="button" class="acc-back" onclick="closeMyLeague()">‹ ${VIEW.pBackTo === 'accueil' ? 'Accueil' : escapeHTML(org.name)}</button>
       <div class="acc-head2">${escapeHTML(cur ? (cur.lg.name + (cur.lg.schedule_label ? ' — '+cur.lg.schedule_label : '')) : '')}</div>
+      ${leagueSwitchHTML(org.leagues.map(function(x){ return x.lg; }), 'openMyLeague')}
       ${segs.length>1 ? accSeg(segs, det, 'setPDet') : ''}
       ${det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me)}`;
   }
