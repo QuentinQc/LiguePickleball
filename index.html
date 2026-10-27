@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 242">
+<meta name="app-build" content="Version 243">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1508,9 +1508,19 @@ let OFFLINE_MODE = false; // vrai quand on affiche une copie locale (pas de conn
 let OFFLINE_CACHED_AT = null;
 let SAVE_ERROR = null;
 
+// Lecture des données d'une ligue : par la fonction serveur get_league_data (qui retire aux joueurs les infos
+// réservées aux admins : coordonnées, notes, cotes cachées…). Repli sur la lecture directe tant que la fonction
+// n'est pas installée côté serveur (les admins y ont toujours accès).
+async function fetchLeagueData(leagueId){
+  try{
+    const r = await sb.rpc('get_league_data', { p_league_id: leagueId });
+    if(!r.error) return { data: { data: r.data }, error: null };
+  }catch(e){}
+  return await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+}
 async function loadData(leagueId){
   try{
-    const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+    const { data, error } = await fetchLeagueData(leagueId);
     if(error) throw error;
     STORAGE_OK = true;
     OFFLINE_MODE = false;
@@ -4464,7 +4474,7 @@ async function loadCalLeagues(){
     }
     ids = ids.filter(id=>id && id!==CURRENT_LEAGUE_ID);
     const out = await Promise.all(ids.map(async id=>{
-      const { data } = await sb.from('league_data').select('data').eq('league_id', id).single();
+      const { data } = await fetchLeagueData(id);
       const d = data && data.data; if(!d) return null;
       const l = (LEAGUES||[]).find(x=>x.id===id);
       return { id, name:(l&&l.name)||'Ligue', sessions:d.sessions, blockedDates:d.blockedDates, playDayOfWeek:d.playDayOfWeek, seasonStartDate:d.seasonStartDate, seasonEndDate:d.seasonEndDate, playTime:d.playTime, sessionDurationMin:d.sessionDurationMin };
@@ -5002,12 +5012,8 @@ function renderPending(){
 async function onCreateMyOwnOrganization(){
   showPrompt("Nom de ton organisation (ex: ton nom, ton club) :", '', async (name)=>{
     if(!name || !name.trim()) return;
-    const { data: org, error } = await sb.from('organizations').insert({ name: name.trim() }).select().single();
+    const { error } = await sb.rpc('create_my_organization', { p_name: name.trim() });
     if(error){ showAlert("Erreur lors de la création : " + error.message); return; }
-    const { error: err2 } = await sb.from('profiles').update({ role:'admin', organization_id: org.id }).eq('id', CURRENT_PROFILE.id);
-    if(err2){ showAlert("Erreur lors de la mise à jour du compte : " + err2.message); return; }
-    const { error: err3 } = await sb.from('organization_admins').insert({ profile_id: CURRENT_PROFILE.id, organization_id: org.id });
-    if(err3){ showAlert("Erreur lors de la liaison à l'organisation : " + err3.message); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
   });
@@ -7324,7 +7330,7 @@ async function playerSaveMlpTie(sessionId, tieId, meId){
   if(DATA.mlpPlayerScoreEntry === false){ showAlert("La saisie des scores est réservée aux administrateurs."); return; }
   try{
     const inputs = Array.from(document.querySelectorAll(`input[data-ptie="${tieId}"]`));
-    const { data, error } = await sb.from('league_data').select('data').eq('league_id', CURRENT_LEAGUE_ID).single();
+    const { data, error } = await fetchLeagueData(CURRENT_LEAGUE_ID);
     if(error){ showAlert("Erreur : " + error.message); return; }
     const fresh = data && data.data;
     const session = fresh && (fresh.mlpSessions||[]).find(x=>x.id===sessionId);
@@ -12537,7 +12543,7 @@ async function refreshMySummaries(force){
   try{
     await Promise.all(others.map(async l=>{
       try{
-        const { data, error } = await sb.from('league_data').select('data').eq('league_id', l.league_id).single();
+        const { data, error } = await fetchLeagueData(l.league_id);
         if(error) return;
         MY_LEAGUE_SUMMARY[l.league_id] = summarizeLeagueData(data && data.data, l, l.league_id);
       }catch(e){}
