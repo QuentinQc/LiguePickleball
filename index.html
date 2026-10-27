@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 240">
+<meta name="app-build" content="Version 241">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1287,15 +1287,48 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 // pour que l'app démarre aussi sur un réseau public qui bloque les CDN.
 (function(){
   var KEY='dk_sb_lib_v1', ok=false;
+  // Empreinte SHA-256 officielle de supabase-js 2.45.4 (identique sur jsDelivr et unpkg, vérifiée le 27 oct. 2026).
+  // La copie gardée dans l'appareil n'est exécutée que si elle correspond exactement.
+  window.__SB_SHA256 = '8596965fe918e656600a1b568d3a168f5c0d3d22a600886bb6f44a6555db01e7';
+function sha256hex(str){
+  var bytes;
+  if(typeof TextEncoder!=='undefined'){ bytes = new TextEncoder().encode(str); }
+  else { var u=unescape(encodeURIComponent(str)); bytes=new Uint8Array(u.length); for(var q=0;q<u.length;q++) bytes[q]=u.charCodeAt(q); }
+  var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  var l=bytes.length, nb=((l+9+63)>>6)<<6, m=new Uint8Array(nb);
+  m.set(bytes); m[l]=0x80;
+  var bits=l*8; m[nb-4]=(bits>>>24)&255; m[nb-3]=(bits>>>16)&255; m[nb-2]=(bits>>>8)&255; m[nb-1]=bits&255;
+  m[nb-8]=Math.floor(l/0x20000000)&255; m[nb-7]=(Math.floor(l/0x20000000)>>>8)&255; m[nb-6]=(Math.floor(l/0x20000000)>>>16)&255; m[nb-5]=(Math.floor(l/0x20000000)>>>24)&255;
+  var w=new Array(64), i, j;
+  function rr(x,n){ return (x>>>n)|(x<<(32-n)); }
+  for(i=0;i<nb;i+=64){
+    for(j=0;j<16;j++) w[j]=(m[i+4*j]<<24)|(m[i+4*j+1]<<16)|(m[i+4*j+2]<<8)|m[i+4*j+3];
+    for(j=16;j<64;j++){ var s0=rr(w[j-15],7)^rr(w[j-15],18)^(w[j-15]>>>3), s1=rr(w[j-2],17)^rr(w[j-2],19)^(w[j-2]>>>10); w[j]=(w[j-16]+s0+w[j-7]+s1)|0; }
+    var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+    for(j=0;j<64;j++){
+      var S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^(~e&g), t1=(h+S1+ch+K[j]+w[j])|0;
+      var S0=rr(a,2)^rr(a,13)^rr(a,22), mj=(a&b)^(a&c)^(b&c), t2=(S0+mj)|0;
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+  }
+  var out=''; for(i=0;i<8;i++) out+=('00000000'+(H[i]>>>0).toString(16)).slice(-8);
+  return out;
+}
+
+  window.__sha256hex = sha256hex;
   try{
     var cached = localStorage.getItem(KEY);
-    if(cached && cached.length>50000){ (0,eval)(cached); ok = !!window.supabase; }
+    if(cached && cached.length>50000){
+      if(sha256hex(cached) === window.__SB_SHA256){ (0,eval)(cached); ok = !!window.supabase; }
+      else { try{ localStorage.removeItem(KEY); }catch(e2){} }
+    }
   }catch(e){ ok=false; }
   window.__sbFromCache = ok;
   var urls=[
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
     'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/umd/supabase.min.js',
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js'
   ];
   window.__sbUrls = urls;
@@ -1303,7 +1336,6 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 })();
 </script>
 <script>if(!window.supabase){ document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>'); }</script>
-<script>if(!window.supabase){ document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/umd/supabase.min.js"><\/script>'); }</script>
 <script>if(!window.supabase){ document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"><\/script>'); }</script>
 <script>
 // Une fois la bibliothèque disponible, on en garde une copie locale (une seule fois).
@@ -1313,7 +1345,7 @@ window.addEventListener('load', function(){
     var tryUrl = function(i){
       if(i>=window.__sbUrls.length) return;
       fetch(window.__sbUrls[i]).then(function(r){ return r.ok ? r.text() : Promise.reject(); })
-        .then(function(t){ if(t && t.length>50000){ try{ localStorage.setItem('dk_sb_lib_v1', t); }catch(e){} } })
+        .then(function(t){ if(t && t.length>50000 && window.__sha256hex(t)===window.__SB_SHA256){ try{ localStorage.setItem('dk_sb_lib_v1', t); }catch(e){} } else { return Promise.reject(); } })
         .catch(function(){ tryUrl(i+1); });
     };
     tryUrl(0);
@@ -4605,8 +4637,21 @@ async function showLibHashes(){
   const same = ok.length>=2 && ok[0].h===ok[1].h;
   const html = rows.map(r=>`<div style="margin-bottom:12px;"><div class="small" style="color:var(--muted);word-break:break-all;">${escapeHTML(r.u)}</div>${r.err ? `<div class="small" style="color:var(--danger);">Échec : ${escapeHTML(r.err)}</div>` : `<div class="small">${r.n} caractères</div><div style="font-family:monospace;font-size:12px;word-break:break-all;user-select:all;">${r.h}</div>`}</div>`).join('')
     + (cached ? `<div style="margin-bottom:12px;"><div class="small" style="color:var(--muted);">Copie gardée dans l'appareil</div><div class="small">${cached.n} caractères</div><div style="font-family:monospace;font-size:12px;word-break:break-all;user-select:all;">${cached.h}</div></div>` : '')
+    + `<p class="small" style="margin-top:8px;">${cached && cached.h===window.__SB_SHA256 ? '✅ La copie gardée correspond à l\'empreinte attendue.' : (cached ? '⚠️ La copie gardée ne correspond PAS à l\'empreinte attendue.' : 'Aucune copie gardée.')}</p>`
+    + `<button class="btn btn-secondary" style="width:100%;margin:6px 0;" onclick="testSriLoad(this)">Tester le chargement sécurisé</button><div id="sriRes" class="small"></div>`
     + `<p class="small" style="margin-top:8px;">${same ? '✅ Les deux sources donnent la même empreinte.' : '⚠️ Les deux sources ne donnent pas la même empreinte (ou une n\'a pas répondu).'}</p>`;
   showContentModal('Empreinte de la bibliothèque', html);
+}
+function testSriLoad(btn){
+  const out = document.getElementById('sriRes'); if(out) out.textContent = 'Test en cours…';
+  const old = window.supabase;
+  const sc = document.createElement('script');
+  sc.src = (window.__sbUrls||[])[0];
+  sc.crossOrigin = 'anonymous';
+  sc.integrity = 'sha256-hZaWX+kY5lZgChtWjToWj1wNPSKmAIhrtvRKZVXbAec=';
+  sc.onload = ()=>{ window.supabase = old; sc.remove(); if(out) out.textContent = '✅ Chargement sécurisé réussi (le navigateur a accepté la bibliothèque).'; };
+  sc.onerror = ()=>{ window.supabase = old; sc.remove(); if(out) out.textContent = '❌ Le navigateur a refusé la bibliothèque (ou le réseau a échoué).'; };
+  document.head.appendChild(sc);
 }
 function toggleDrawer(){ DRAWER_OPEN = !DRAWER_OPEN; render(); }
 function openOrgSwitcherPopover(){
