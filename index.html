@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 269">
+<meta name="app-build" content="Version 270">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5786,7 +5786,7 @@ async function refreshAdminSummaries(force){
   }finally{ ADMIN_SUMMARY_LOADING = false; }
   if(SESSION_USER && SESSION_USER.role==='admin' && !MODAL && !ADMIN_VIEWING_AS && !ADMIN_SHOWING_ORG && (VIEW.atab===undefined || VIEW.atab==='accueil' || VIEW.atab==='orgs') && !VIEW.adet) render();
 }
-function setAAcc(t){ VIEW.atab = t; VIEW.adet = false; if(t==='cal'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); } if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); } render(); }
+function setAAcc(t){ VIEW.atab = t; VIEW.adet = false; if(t==='orgs') VIEW.aorgOpen = false; /* onglet Organisations : toujours la liste de toutes les organisations */ if(t==='cal'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); } if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); } render(); }
 async function openAdminLeague(leagueId, tab){
   const target = LEAGUES.find(l=>l.id===leagueId);
   if(target && target.organization_id && target.organization_id !== CURRENT_ORGANIZATION_ID){
@@ -13335,6 +13335,7 @@ function renderPlayer(playerId){
 const PLAYER_CLASSIC_VIEW = false;
 function setPAcc(t){
   VIEW.ptab = t; VIEW.pdet = null;
+  if(t==='orgs') VIEW.porg = null; // onglet Organisations : toujours la liste de toutes les organisations
   if(t==='comm'){ markQuickSeen(VIEW.pcomm==='partenaire' ? 'partenaire' : 'evenements'); }
   if(t==='cal'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); }
   render();
