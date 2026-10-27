@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 237">
+<meta name="app-build" content="Version 238">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5204,6 +5204,7 @@ function adminHomeHTML(){
   return html;
 }
 // ---- Organisations admin ----
+let ADMIN_ORG_PRELOADED = false;
 function adminOrgsHTML(){
   const isSuper = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
   const orgs = (SUPER_ADMIN_MODE && isSuper) ? ALL_ORGANIZATIONS : MY_ORGANIZATIONS;
@@ -5235,6 +5236,7 @@ function adminOrgsHTML(){
   leagues.forEach(lg=>{ const sm = adminSummaryFor(lg); if(sm && typeof sm.players==='number'){ nPlayers += sm.players; known++; } });
   let pending = 0;
   try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
+  if(!ADMIN_ORG_PRELOADED){ ADMIN_ORG_PRELOADED = true; Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(()=>{ if(!MODAL && VIEW.atab==='orgs') render(); }).catch(function(){}); }
   const chips = [leagues.length + ' ligue' + (leagues.length>1?'s':''), known ? nPlayers + ' joueur' + (nPlayers>1?'s':'') : '', pending ? '<b class="org-chip-warn">' + pending + ' en attente</b>' : ''];
   const tiles = leagues.map(lg=>{ const sm = adminSummaryFor(lg); return leagueTileHTML(lg.name, lg.schedule_label||'', `openAdminLeague('${lg.id}','session')`, !!(sm && (sm.unassigned || (sm.open && sm.open.published && sm.open.total>0 && sm.open.done===sm.open.total)))); }).join('');
   return `${back}${orgHeroHTML(org ? org.name : '', chips)}
@@ -10960,8 +10962,9 @@ function openOrganizationPage(tab){
   });
 }
 function openOrgSheet(tab){
+  const safe = f=>Promise.resolve().then(f).catch(e=>console.error(e));
   Promise.all([
-    loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()
+    safe(loadAllProfiles), safe(loadAllProfilePlayers), safe(loadOrgRoster), safe(loadOrgMembers)
   ]).then(()=>{
     VIEW.orgSubTab = tab; VIEW.orgHub = false;
     MODAL_UNDER = null;
@@ -11777,13 +11780,15 @@ function openImportMatchupTemplateModal(){
     <p class="small">Va chercher le mode « Manuelle » et les modèles de rotation (groupes de 4 et de 5, basés sur les numéros de position) de la ligue choisie ci-dessous, et les applique à <strong>${escapeHTML(currentLeagueLabel())}</strong>. Ça remplace le réglage de génération des matchs de cette ligue-ci — le reste de ses données (joueurs, sessions, etc.) n'est pas touché.</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
       ${sources.map(l=>{
-        const safeName = escapeHTML(l.name).replace(/'/g, "\\'");
-        return `<button class="btn-ghost" onclick="confirmImportMatchupTemplate('${l.id}','${safeName}')">${escapeHTML(l.schedule_label || l.name)}</button>`;
+        return `<button class="btn-ghost" onclick="confirmImportMatchupTemplate('${l.id}')">${escapeHTML(l.schedule_label || l.name)}</button>`;
       }).join('')}
     </div>`;
   showContentModal("Importer d'une autre ligue", html);
 }
-function confirmImportMatchupTemplate(sourceLeagueId, sourceName){
+function confirmImportMatchupTemplate(sourceLeagueId){
+  const _sl = (LEAGUES||[]).find(x=>x.id===sourceLeagueId);
+  if(!_sl) return;
+  const sourceName = _sl.name;
   showConfirm(`Importer le modèle de rotation depuis « ${sourceName} » ? Ça remplacera le réglage actuel de génération des matchs de cette ligue-ci (mode + modèles groupes de 4 et de 5).`, ()=>importMatchupTemplateFromLeague(sourceLeagueId, sourceName));
 }
 async function importMatchupTemplateFromLeague(sourceLeagueId, sourceName){
