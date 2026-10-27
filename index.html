@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 246">
+<meta name="app-build" content="Version 247">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5057,11 +5057,11 @@ function renderPending(){
       <button class="btn btn-secondary" onclick="logout()" style="margin-top:8px;">Déconnexion</button>
     </div>
     ${canCreateOrg ? `
-    <div class="card">
-      <h3>Tu démarres ta propre ligue ?</h3>
-      <p class="small">Si tu n'attends pas d'invitation d'un administrateur existant, tu peux créer ta propre organisation et devenir administrateur de tes propres ligues.</p>
-      <button class="btn btn-primary" onclick="onCreateMyOwnOrganization()">Créer mon organisation</button>
-    </div>` : ''}`;
+    <details class="card">
+      <summary style="cursor:pointer;font-weight:600;">Tu démarres ta propre ligue ?</summary>
+      <p class="small" style="margin-top:10px;">Réservé aux organisateurs. Si tu attends une invitation pour jouer, <strong>n'utilise pas ceci</strong> : entre ton code d'invitation plus haut. Tu peux créer ta propre organisation et devenir administrateur de tes propres ligues.</p>
+      <button class="btn btn-secondary" onclick="onCreateMyOwnOrganization()">Créer mon organisation</button>
+    </details>` : ''}`;
 }
 async function onCreateMyOwnOrganization(){
   showPrompt("Nom de ton organisation (ex: ton nom, ton club) :", '', async (name)=>{
