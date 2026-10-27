@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 259">
+<meta name="app-build" content="Version 260">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1797,7 +1797,9 @@ function notifySessionPublished(session){
     league_id: CURRENT_LEAGUE_ID,
     audience: 'players', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
-    body: `${leagueLabel} — session du ${session.date}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
+    body: isRecLeague()
+      ? `${leagueLabel} — soirée du ${session.date}. Ton terrain est prêt. Indique dès maintenant si tu es absent(e).`
+      : `${leagueLabel} — session du ${session.date}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
     url: '/'
   });
   invokeSendNotification({
@@ -1852,7 +1854,7 @@ function notifyAdminsPlayerInjured(playerName){
     league_id: CURRENT_LEAGUE_ID,
     audience: 'admins', category: 'admin_alerts',
     title: '🤕 Blessure signalée',
-    body: `${playerName || 'Un joueur'} s'est déclaré(e) blessé(e) (${currentLeagueLabel()}). Il/elle reste hors de son groupe jusqu'à sa réintégration par un admin.`,
+    body: `${playerName || 'Un joueur'} s'est déclaré(e) blessé(e) (${currentLeagueLabel()}). Il/elle reste hors ${isRecLeague() ? 'des terrains' : 'de son groupe'} jusqu'à sa réintégration par un admin.`,
     url: '/'
   });
 }
@@ -3235,11 +3237,12 @@ function wizScheduleLabel(){
   const d = wizDayName();
   return d ? d.charAt(0).toUpperCase() + d.slice(1) + (WIZ.time ? ' ' + fmtHM(WIZ.time) : '') : '';
 }
-function wizPlanText(plan){
-  if(!plan.sizes.length) return "pas assez de joueurs pour former un groupe";
+function wizPlanText(plan, noun){
+  noun = noun || 'groupe';
+  if(!plan.sizes.length) return "pas assez de joueurs pour former un " + noun;
   const cnt = {}; plan.sizes.forEach(function(x){ cnt[x] = (cnt[x]||0) + 1; });
   const parts = Object.keys(cnt).sort(function(a,b){ return b - a; }).map(function(k){ return cnt[k] + ' de ' + k; });
-  return plan.sizes.length + ' groupe' + (plan.sizes.length>1?'s':'') + ' (' + parts.join(', ') + ')' + (plan.left ? ' · ' + plan.left + ' en attente' : '');
+  return plan.sizes.length + ' ' + noun + (plan.sizes.length>1?'s':'') + ' (' + parts.join(', ') + ')' + (plan.left ? ' · ' + plan.left + ' en attente' : '');
 }
 function wizGroupPlan(){ const l = WIZ_GSIZE[WIZ.gsize]; return socialSizes(WIZ.players, l[0], l[1]); }
 function wizFormatNote(f){
@@ -3266,7 +3269,7 @@ function wizStepper(k, min, max, stepSize){
 function wizMeta(key){
   return {
     type:['Quel genre de ligue ?', "Choisis l'ambiance : tout le reste s'adapte."],
-    effectif:['Combien de joueurs ?', 'Une estimation suffit : elle sert à te conseiller et à prévoir les groupes.'],
+    effectif:['Combien de joueurs ?', 'Une estimation suffit : elle sert à te conseiller et à prévoir les ' + (WIZ && WIZ.type === 'recreational' ? 'terrains.' : 'groupes.')],
     format:['Quel format ?', 'Choisis comment les résultats font bouger la ligue.'],
     calendrier:['Quand joue-t-on ?', 'Tout est facultatif et modifiable plus tard.'],
     groupes:['Taille des groupes', 'Combien de joueurs par groupe sur le terrain.'],
@@ -3285,7 +3288,7 @@ function wizBodyHTML(key){
     h += wizStepper('players', 2, 200, 1);
     h += `<div class="wz-chips" style="justify-content:center;">${[8,12,16,24,32].map(n=>`<button type="button" class="wz-chip${WIZ.players===n?' sel':''}" onclick="wizSetPlayers(${n})">${n}</button>`).join('')}</div>`;
     if(WIZ.type === 'recreational'){
-      h += WIZ.players < 4 ? wizNote('warn', 'Il faut au moins 4 joueurs présents pour jouer.') : wizNote('ok', 'Avec tout le monde présent : ' + wizPlanText(socialSizes(WIZ.players)) + ', tirés au hasard chaque soir, en variant les duos.');
+      h += WIZ.players < 4 ? wizNote('warn', 'Il faut au moins 4 joueurs présents pour jouer.') : wizNote('ok', 'Avec tout le monde présent : ' + wizPlanText(socialSizes(WIZ.players), 'terrain') + ', tirés au hasard chaque soir, en variant les duos.');
     }
   } else if(key === 'format'){
     const rec = wizRecommendedFormat();
@@ -3333,7 +3336,7 @@ function wizBodyHTML(key){
   } else {
     const fmtName = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Rotation sociale' }[WIZ.format];
     const members = NEW_LEAGUE_MEMBER_CANDIDATES || [];
-    h += `<span class="wz-lab" style="margin-top:0;">Nom de la ligue</span><input class="wz-in" id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value);WIZ.nameTouched=true;" placeholder="ex: Ligue du mardi">`;
+    h += `<span class="wz-lab" style="margin-top:0;">Nom de la ligue</span><input class="wz-in" id="wizName" value="${escapeHTML(WIZ.name)}" oninput="wizSet('name',this.value);WIZ.nameTouched=true;" placeholder="${WIZ.type==='recreational' ? 'ex: Rotation du mardi' : 'ex: Ligue du mardi'}">`;
     if(members.length){
       h += `<span class="wz-lab">Membres à ajouter comme joueurs (optionnel)</span><div class="wz-card" style="max-height:210px;overflow-y:auto;">
         ${members.map((m,i)=>`<label class="wz-member"><input type="checkbox" ${WIZ.members[i]?'checked':''} onchange="wizToggleMember(${i},this.checked)"><span>${escapeHTML(m.name)}${m.email?` <span class="small">(${escapeHTML(m.email)})</span>`:''}</span></label>`).join('')}</div>`;
@@ -3915,6 +3918,14 @@ function matchesForGroup(session, gid){
   const ids = activeRosterForGroup(session, gid);
   return ids.length >= 2 ? generateMatches(ids) : [];
 }
+// ---- Vocabulaire selon le type de ligue : en récréatif (rotation sociale), on parle
+// de terrains plutôt que de groupes, et il n'y a ni score, ni classement, ni montée/descente.
+function isRecLeague(d){ d = d || DATA; return !!d && (d.leagueFormat === 'social' || d.leagueType === 'recreational'); }
+function grpWord(plural, cap, d){
+  const w = isRecLeague(d) ? (plural ? 'terrains' : 'terrain') : (plural ? 'groupes' : 'groupe');
+  return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+}
+function myGroupLabel(d){ return 'Mon ' + grpWord(false, false, d); }
 // ---- Rotation sociale : à chaque session, les joueurs présents sont répartis
 // au hasard en groupes (terrains) de 4 à 6, en privilégiant les groupes de 4.
 function socialSizes(n, min, max){
@@ -5907,10 +5918,10 @@ function adminSessionSectionHTML(){
         <div class="sess-date">${escapeHTML(frDateLong(open.date))}</div>
         <span style="display:flex;align-items:center;gap:8px;">
           <span class="sess-chip ${open.published?'on':'off'}">${open.published ? 'Publiée' : 'Non publiée'}</span>
-          <button class="sess-ico" onclick="printMatchSheets('${open.id}')" aria-label="Imprimer les feuilles de match" title="Imprimer les feuilles de match"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-3M7 14h10v7H7z"/></svg></button>
+          ${isRecLeague() ? '' : `<button class="sess-ico" onclick="printMatchSheets('${open.id}')" aria-label="Imprimer les feuilles de match" title="Imprimer les feuilles de match"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-3M7 14h10v7H7z"/></svg></button>`}
         </span>
       </div>
-      <div class="sess-sub">${open.published ? 'Les joueurs voient leurs matchs.' : 'Les joueurs ne voient pas encore leurs matchs.'}</div>
+      <div class="sess-sub">${isRecLeague() ? (open.published ? 'Les joueurs voient leur terrain.' : 'Les joueurs ne voient pas encore leur terrain.') : (open.published ? 'Les joueurs voient leurs matchs.' : 'Les joueurs ne voient pas encore leurs matchs.')}</div>
       ${sessionStepsHTML(open)}
       ${(()=>{
         let tot = 0, dn = 0;
@@ -5919,15 +5930,17 @@ function adminSessionSectionHTML(){
         const pub = open.published
           ? `<button class="sess-main sess-main-alt" onclick="onUnpublishSession()">Masquer la session aux joueurs</button>`
           : `<button class="sess-main" onclick="onPublishSession()">Publier la session aux joueurs</button>`;
-        const fin = `<button class="sess-main ${(open.published && allIn) ? '' : 'sess-main-end'}" onclick="onFinalize()">Terminer la session</button><div class="sess-note" style="text-align:center;margin-top:-8px;">Applique les montées et descentes.</div>`;
+        const fin = isRecLeague()
+          ? `<button class="sess-main ${open.published ? '' : 'sess-main-end'}" onclick="onFinalize()">Terminer la soirée</button><div class="sess-note" style="text-align:center;margin-top:-8px;">La range dans l'historique${DATA.autoStartSessions ? ' et prépare la suivante' : ''}.</div>`
+          : `<button class="sess-main ${(open.published && allIn) ? '' : 'sess-main-end'}" onclick="onFinalize()">Terminer la session</button><div class="sess-note" style="text-align:center;margin-top:-8px;">Applique les montées et descentes.</div>`;
         return pub + fin;
       })()}
       <button class="sess-cancel-link" onclick="onCancelSession()">Annuler la session</button>
-      ${DATA.testMode ? `<div class="row" style="margin-top:10px;"><button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button></div>` : ''}
+      ${(DATA.testMode && !isRecLeague()) ? `<div class="row" style="margin-top:10px;"><button class="btn btn-secondary" onclick="autoFillAllScores()">🎲 Générer des scores aléatoires pour tous les groupes (test)</button></div>` : ''}
     </div>`;
   }
   const sub = VIEW.sessionSubTab || 'groupes';
-  const subTabs = [['groupes','Groupes'],['resultats','Résultats']];
+  const subTabs = isRecLeague() ? [['groupes','Présences'],['resultats','Terrains']] : [['groupes','Groupes'],['resultats','Résultats']];
   html += `<div class="subtabs" id="sessSubtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setSessionSubTab('${k}')">${l}</div>`).join('')}</div>`;
   html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
   return html;
@@ -8804,7 +8817,7 @@ function playerDetailModalHTML(pid){
     <div class="modal-section">
       <h3>Présence — session du ${openSession.date}</h3>
       <p class="small" style="margin-bottom:10px;">${absent ? "Ce joueur est actuellement marqué absent(e) pour cette session." : "Ce joueur est actuellement considéré présent(e) pour cette session."}</p>
-      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette session'}</button>
+      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette ' + (isRecLeague() ? 'soirée' : 'session')}</button>
     </div>`;
   }
   const plannedAbs = plannedAbsencesForPlayer(pid);
@@ -9945,19 +9958,22 @@ async function unlinkAccount(profileId, leagueId){
 
 function adminGroupsHTML(){
   const open = currentOpenSession();
-  let html = `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+  const rec = isRecLeague();
+  let html = rec
+    ? `<div class="card"><p class="small">${open ? "Les terrains sont tirés au hasard parmi les joueurs présents. Marque les absences dans la fiche du joueur : tant que la soirée n'est pas publiée, le tirage est refait automatiquement." : "Aucune soirée en cours : les terrains seront tirés au hasard au démarrage de la prochaine."}</p></div>`
+    : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   const unassigned = DATA.players.filter(p=>!p.groupId);
   const absentNow = open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
   html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
-    <h2>En attente d'assignation <span class="small">(${unassigned.length + absentNow.length})</span></h2>
-    <p class="small">Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner.</p>
+    <h2>${rec ? 'Sans terrain' : "En attente d'assignation"} <span class="small">(${unassigned.length + absentNow.length})</span></h2>
+    <p class="small">${rec ? 'Joueurs absents, blessés, ou qui cèdent leur place quand les terrains sont pleins.' : "Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner."}</p>
     <table>
-      <tr><th>Nom</th><th>Statut</th><th>Groupe</th></tr>
+      <tr><th>Nom</th><th>Statut</th><th>${rec ? 'Dernier terrain' : 'Groupe'}</th></tr>
       ${unassigned.map(p=>{
         const lastGroup = p.lastGroupId ? groupById(p.lastGroupId) : null;
         return `<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
           <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
-          <td>${p.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : '<span class="tag tag-stay">⏳ En attente</span>'}</td>
+          <td>${p.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : (rec && open && isAbsent(open, p.id) ? '<span class="tag tag-orange">🚫 Absent (cette soirée)</span>' : '<span class="tag tag-stay">⏳ En attente</span>')}</td>
           <td>${lastGroup ? escapeHTML(lastGroup.name) : '—'}</td>
         </tr>`;
       }).join('')}
@@ -9969,25 +9985,25 @@ function adminGroupsHTML(){
           <td>${g2 ? escapeHTML(g2.name) : '—'} <span class="small">— gère son remplaçant directement dans ce groupe, ci-dessous</span></td>
         </tr>`;
       }).join('')}
-      ${(unassigned.length + absentNow.length)===0 ? `<tr><td colspan="3" class="empty">Aucun joueur en attente</td></tr>` : ''}
+      ${(unassigned.length + absentNow.length)===0 ? `<tr><td colspan="3" class="empty">${rec ? 'Tout le monde a un terrain' : 'Aucun joueur en attente'}</td></tr>` : ''}
     </table>
   </div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).filter(p=>!(open && isAbsent(open, p.id))).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const absentInGroup = open ? playersInGroup(g.id).filter(p=>isAbsent(open, p.id)) : [];
     const displayCount = ps.length + absentInGroup.length;
-    const outOfRange = displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS()) && displayCount !== 6;
-    const isSix = displayCount === 6;
+    const outOfRange = !rec && displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS()) && displayCount !== 6;
+    const isSix = !rec && displayCount === 6;
     html += `
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;">
         <h2>${escapeHTML(g.name)} <span class="small">(${displayCount} joueur${displayCount>1?'s':''})</span></h2>
-        <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du groupe">⋯</button>
+        <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du ${grpWord()}">⋯</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
       <table>
-        <tr><th>#</th><th>Nom</th><th>Session précédente</th></tr>
+        <tr><th>#</th><th>Nom</th>${rec ? '' : '<th>Session précédente</th>'}</tr>
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
           const prevText = prev ? `${escapeHTML(prev.groupName)} — ${prev.position}${prev.position===1?'er':'e'}/${prev.total}` : '<span class="small">—</span>';
@@ -9998,7 +10014,7 @@ function adminGroupsHTML(){
           ondrop="onRowDrop(event,'${g.id}','${p.id}')">
           <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
           <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
-          <td class="small">${prevText}</td>
+          ${rec ? '' : `<td class="small">${prevText}</td>`}
         </tr>`;
         }).join('')}
         ${absentInGroup.map(p=>{
@@ -10020,14 +10036,14 @@ function adminGroupsHTML(){
             <td class="small">—</td>
           </tr>`;
         }).join('')}
-        ${displayCount===0 ? `<tr><td colspan="3" class="empty">Aucun joueur dans ce groupe</td></tr>`:''}
+        ${displayCount===0 ? `<tr><td colspan="${rec?2:3}" class="empty">Aucun joueur sur ce ${grpWord()}</td></tr>`:''}
       </table>
-      <p class="small">« Session précédente » indique le groupe et le classement du dernier match joué par chaque joueur, pour t'aider à ajuster les positions.</p>
-      <p class="small">Glisse-dépose un joueur sur un autre pour changer sa position (ordinateur seulement).</p>
+      ${rec ? '' : `<p class="small">« Session précédente » indique le groupe et le classement du dernier match joué par chaque joueur, pour t'aider à ajuster les positions.</p>
+      <p class="small">Glisse-dépose un joueur sur un autre pour changer sa position (ordinateur seulement).</p>`}
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
   });
-  html += `
+  if(!rec) html += `
     <div class="card">
       <div class="row" style="justify-content:space-between;">
         <h3>Groupes</h3>
@@ -10062,7 +10078,7 @@ function groupAbsenceManagementHTML(open, g){
       ? `<span class="tag tag-down">🤕 blessé</span> <span class="small">— ne descend pas de groupe pour ça</span>`
       : (loanedTo
         ? `<span class="tag tag-up">changement</span> parti(e) au ${escapeHTML(loanedTo.name)}`
-        : `<span class="small">descendra automatiquement d'un groupe</span>`);
+        : (isRecLeague() ? '' : `<span class="small">descendra automatiquement d'un groupe</span>`));
     html += `<div class="row" style="margin-bottom:8px;align-items:center;flex-wrap:wrap;">
       <span style="min-width:110px;">${escapeHTML(playerName(id))}</span>
       <span style="min-width:150px;">${status}</span>
@@ -10095,13 +10111,13 @@ function addGroup(){
 function openGroupMenu(gid){
   const g = groupById(gid); if(!g) return;
   showContentModal(g.name, `<div style="display:flex;flex-direction:column;gap:10px;">
-    <button class="btn btn-secondary" style="height:56px;font-size:17px;" onclick="closeModal();renameGroup('${gid}')">Renommer le groupe</button>
-    <button class="btn-ghost-danger" style="height:56px;font-size:17px;border-radius:14px;" onclick="closeModal();deleteGroup('${gid}')">Supprimer le groupe</button>
+    <button class="btn btn-secondary" style="height:56px;font-size:17px;" onclick="closeModal();renameGroup('${gid}')">Renommer le ${grpWord()}</button>
+    <button class="btn-ghost-danger" style="height:56px;font-size:17px;border-radius:14px;" onclick="closeModal();deleteGroup('${gid}')">Supprimer le ${grpWord()}</button>
   </div>`);
 }
 function renameGroup(gid){
   const g = groupById(gid);
-  showPrompt('Nouveau nom du groupe :', g.name, (name)=>{
+  showPrompt('Nouveau nom du ' + grpWord() + ' :', g.name, (name)=>{
     if(name && name.trim()){ g.name = name.trim(); saveAndRender(); }
   });
 }
@@ -10335,11 +10351,18 @@ function launchSessionHTML(){
     </div>`;
   }
   const rows = [];
+  if(isRecLeague()){
+    const nAct = (DATA.players||[]).filter(p=>!p.injured).length;
+    rows.push(nAct >= 4
+      ? stepRow('ok', nAct + ' joueurs actifs', 'Les terrains seront tirés au hasard au démarrage, parmi les joueurs présents')
+      : stepRow('warn', nAct + ' joueur' + (nAct>1?'s':'') + ' actif' + (nAct>1?'s':''), 'Il faut au moins 4 joueurs pour former un terrain', `<button class="btn-ghost" onclick="setAdminTab('joueurs')">Joueurs</button>`));
+  } else {
   rows.push(c.bad===0 && c.groups>0
     ? stepRow('ok', c.groups + ' groupe' + (c.groups>1?'s':'') + ' prêt' + (c.groups>1?'s':''), c.total + ' joueurs · de ' + c.min + ' à ' + c.max + ' par groupe')
     : stepRow('warn', c.groups===0 ? 'Aucun groupe' : c.bad + ' groupe' + (c.bad>1?'s':'') + ' hors limites', 'Vérifie les groupes ci-dessous', c.groups===0 ? '' : `<button class="btn-ghost" onclick="goSessionTab('groupes')">Voir</button>`));
   if(c.unassigned>0) rows.push(stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', "Ils ne joueront pas tant qu'ils n'en ont pas", `<button class="btn-ghost" onclick="focusWaitingPlayers()">Placer</button>`));
   else rows.push(stepRow('ok', 'Tous les joueurs ont un groupe', ''));
+  }
   let html = hero + `<div class="lnc-eyebrow" style="margin:0 0 8px;">Avant de démarrer</div><div class="stp-list" style="margin-bottom:16px;">${rows.join('')}</div>`;
   const last = (DATA.sessions||[]).filter(x=>x.status==='closed').slice(-1)[0];
   if(last){
@@ -10350,7 +10373,7 @@ function launchSessionHTML(){
       if(a && b){ if(b.order < a.order) up++; else if(b.order > a.order) down++; }
     });
     html += `<div class="lnc-eyebrow" style="margin:0 0 8px;">Dernière session</div>
-    <div class="lnc-last" onclick="setAdminTab('historique')"><div style="flex:1;"><div style="font-size:17px;font-weight:600;">${escapeHTML(frDateLong(last.date))}</div><div style="font-size:15px;color:var(--muted);">${nm} matchs joués${(up||down)?' · '+up+' montée'+(up>1?'s':'')+', '+down+' descente'+(down>1?'s':''):''}</div></div><span style="color:var(--muted);font-size:22px;">›</span></div>`;
+    <div class="lnc-last" onclick="setAdminTab('historique')"><div style="flex:1;"><div style="font-size:17px;font-weight:600;">${escapeHTML(frDateLong(last.date))}</div><div style="font-size:15px;color:var(--muted);">${isRecLeague() ? 'Rotation sociale · voir l\'historique' : nm + ' matchs joués'}${(up||down)?' · '+up+' montée'+(up>1?'s':'')+', '+down+' descente'+(down>1?'s':''):''}</div></div><span style="color:var(--muted);font-size:22px;">›</span></div>`;
   }
   return html;
 }
@@ -10377,6 +10400,13 @@ function sessionStepsHTML(open){
   const c = launchChecks();
   let total = 0, done = 0;
   (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
+  if(isRecLeague()){
+    const nPlaced = (DATA.players||[]).filter(p=>p.groupId && !p.injured && !isAbsent(open, p.id)).length;
+    return `<div class="stp-list">${[
+      c.unassigned===0 ? stepRow('ok','Terrains tirés au hasard', nPlaced + ' joueur' + (nPlaced>1?'s':'') + ' présent' + (nPlaced>1?'s':'')) : stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans terrain', 'Pas assez de place sur les terrains', `<button class="btn-ghost" onclick="focusWaitingPlayers()">Voir</button>`),
+      open.published ? stepRow('ok','Soirée publiée','') : stepRow('todo','Publier la soirée','Les joueurs verront leur terrain')
+    ].join('')}</div>`;
+  }
   const rows = [
     c.unassigned===0 ? stepRow('ok','Groupes prêts','') : stepRow('warn', c.unassigned + ' joueur' + (c.unassigned>1?'s':'') + ' sans groupe', '', `<button class="btn-ghost" onclick="focusWaitingPlayers()">Placer</button>`),
     open.published ? stepRow('ok','Session publiée','') : stepRow('todo','Publier la session','Les joueurs verront leurs matchs'),
@@ -10594,8 +10624,11 @@ async function emailAbsenceReminder(){
     showAlert("Aucun courriel de joueur trouvé. Les joueurs doivent d'abord créer un compte et être associés (menu ☰ → Organisation).");
     return;
   }
-  const subject = `Rappel — Session du ${open.date}`;
-  const body = `Bonjour,\n\nLa prochaine session de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « Mon groupe »), afin qu'on puisse trouver un remplaçant à temps.\n\nMerci !`;
+  const rec = isRecLeague();
+  const subject = `Rappel — ${rec ? 'Soirée' : 'Session'} du ${open.date}`;
+  const body = rec
+    ? `Bonjour,\n\nLa prochaine soirée de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « ${myGroupLabel()} »), afin que les terrains soient tirés avec les bonnes personnes.\n\nMerci !`
+    : `Bonjour,\n\nLa prochaine session de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « Mon groupe »), afin qu'on puisse trouver un remplaçant à temps.\n\nMerci !`;
   const mailto = `mailto:?bcc=${encodeURIComponent(uniqueEmails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
 }
@@ -10900,8 +10933,11 @@ function onFinalize(){
     const finishedDate = open.date;
     const wasCorrection = !!open.reopenedAt;
     finalizeSession(open);
-    notifySessionResultsPublished(finishedDate, wasCorrection);
-    if(!wasCorrection) notifySessionAwards();
+    // Récréatif : aucun résultat ni palmarès à annoncer.
+    if(!isRecLeague()){
+      notifySessionResultsPublished(finishedDate, wasCorrection);
+      if(!wasCorrection) notifySessionAwards();
+    }
     if(DATA.autoStartSessions){
       autoStartNextSession(finishedDate);
     }
@@ -12625,7 +12661,7 @@ function switchRowHTML(id, checked, label){
 function playerTabDefs(){
   return DATA.leagueFormat === 'mlp'
     ? [['equipe','Mon équipe'],['classement','Classement'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement','Mon groupe'],['stats','Statistiques'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
+    : [['classement',myGroupLabel()],['stats','Statistiques'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
 }
 function subTabDefs(){
   return [['dispo','Disponibilité'],['gamification','Palmarès'],['historique','Historique']];
@@ -12966,7 +13002,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement','Mon groupe',pbIcon()],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement',myGroupLabel(),pbIcon()],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -13094,7 +13130,7 @@ function summarizeLeagueData(data, link, leagueId){
   out.injured = !!me.injured;
   const open = (data.sessions||[]).find(x=>x.status==='open');
   if(open){
-    out.open = { date: open.date, published: !!open.published, canScore: !!data.allowPlayerScoreEntry, visible: !!(open.published || data.showGroupBeforePublish), absent: !!(open.absences && open.absences.includes(me.id)) };
+    out.open = { date: open.date, published: !!open.published, canScore: !!data.allowPlayerScoreEntry, visible: !!(open.published || data.showGroupBeforePublish), rec: isRecLeague(data), absent: !!(open.absences && open.absences.includes(me.id)) };
   }
   return out;
 }
@@ -13183,7 +13219,7 @@ function accountHomeHTML(me){
       <div class="acc-big">${escapeHTML(frDateLong(o.date))}</div>
       <div class="acc-sub">${escapeHTML(sum.schedule || sum.name)}${orgName ? escapeHTML(orgName) : ''}${sum.groupName && !o.absent ? ' · '+escapeHTML(sum.groupName) : ''}</div>
       ${o.absent ? `<div class="modal-badges"><span class="tag tag-orange">🚫 Absence signalée</span></div>` : ''}
-      ${(o.published && !o.absent) ? `<div class="acc-hint">${o.canScore ? 'Touche pour voir ton groupe et saisir les scores' : 'Touche pour voir ton groupe et tes matchs'}</div>` : ''}
+      ${(o.published && !o.absent) ? `<div class="acc-hint">${o.rec ? 'Touche pour voir ton terrain' : (o.canScore ? 'Touche pour voir ton groupe et saisir les scores' : 'Touche pour voir ton groupe et tes matchs')}</div>` : ''}
       <button class="btn btn-secondary acc-btn" onclick="event.stopPropagation();absenceFromHome('${link.league_id}')">${o.absent ? 'Modifier mon absence' : 'Je serai absent'}</button>
     </div>`;
   });
@@ -13212,7 +13248,7 @@ function accountOrgsHTML(me){
   if(VIEW.pdet){
     const cur = org.leagues.find(x=>x.lg.id===CURRENT_LEAGUE_ID);
     const hidden = DATA.hiddenPlayerTabs || [];
-    const segs = [['group','Mon groupe']];
+    const segs = [['group',myGroupLabel()]];
     if(!hidden.includes('stats')) segs.push(['stats','Statistiques']);
     if(!hidden.includes('historique')) segs.push(['hist','Historique']);
     const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
@@ -13323,6 +13359,18 @@ function toggleAdminPlayerView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'playe
 function toggleAdminSubView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'substitute' ? null : 'substitute'; VIEW = { tab: ADMIN_VIEWING_AS ? 'dispo' : (DATA.leagueFormat==='mlp' ? 'equipes' : 'groupes') }; render(); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGuideHTML(){
+  if(isRecLeague()) return `
+    <h3>Mon terrain</h3>
+    <p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. À chaque soirée, les joueurs présents sont répartis au hasard sur les terrains, en évitant autant que possible de rejouer avec les mêmes personnes.</p>
+    <h3 style="margin-top:14px;">Déclarer une absence</h3>
+    <p class="small">Dans la section « Absence » de Mon terrain : « Une session » pour la prochaine soirée, « Plusieurs sessions » pour couvrir une plage de dates à l'avance (vacances), et « Blessure » pour te déclarer hors jeu. Préviens le plus tôt possible pour que les terrains soient tirés avec les bonnes personnes.</p>
+    <h3 style="margin-top:14px;">Voir ton terrain</h3>
+    <p class="small">Ton terrain et tes partenaires apparaissent dans Mon terrain dès que ton administrateur publie la soirée. Quand il y a plus de joueurs que de places, ceux qui ont joué le plus souvent récemment cèdent leur place à tour de rôle.</p>
+    <h3 style="margin-top:14px;">Plusieurs ligues</h3>
+    <p class="small">Si tu joues dans plus d'une ligue avec le même compte, un sélecteur apparaît en haut de ton écran pour choisir laquelle consulter.</p>
+    <h3 style="margin-top:14px;">Besoin d'aide ?</h3>
+    <p class="small">Pour toute question, contacte directement un administrateur de ta ligue.</p>
+  `;
   return `
     <h3>Mon groupe</h3>
     <p class="small">Affiche tes coéquipiers avec leur cote, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
@@ -14120,17 +14168,17 @@ function playerGroupHTML(me){
   // (ou qu'un admin le fasse pour lui).
   if(me.injured){
     return `<div class="card">
-      <h2>Mon groupe</h2>
+      <h2>${myGroupLabel()}</h2>
       <div class="modal-badges" style="margin-bottom:12px;"><span class="tag tag-down">🤕 Blessé(e)</span></div>
-      <p class="small">Tu es indiqué(e) comme blessé(e) — ton groupe, tes matchs et les scores de la session en cours ne sont pas affichés tant que tu ne te déclares pas rétabli(e) (section « Absence »).</p>
+      <p class="small">Tu es indiqué(e) comme blessé(e) — ${isRecLeague() ? "tu n'es placé(e) sur aucun terrain" : 'ton groupe, tes matchs et les scores de la session en cours ne sont pas affichés'} tant que tu ne te déclares pas rétabli(e) (section « Absence »).</p>
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Gérer</button>
     </div>`;
   }
   const g = groupById(me.groupId);
-  const groupMembers = playersInGroup(me.groupId).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
+  const groupMembers = (me.groupId ? playersInGroup(me.groupId) : []).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
   const open = currentOpenSession();
   const absenceBadges = [];
-  if(open && isAbsent(open, me.id)) absenceBadges.push('<span class="tag tag-orange">🚫 Absent(e) cette session</span>');
+  if(open && isAbsent(open, me.id)) absenceBadges.push(`<span class="tag tag-orange">🚫 Absent(e) cette ${isRecLeague() ? 'soirée' : 'session'}</span>`);
   const planned = plannedAbsencesForPlayer(me.id);
   if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
   // Le groupe n'est montré que lorsqu'une session est PUBLIÉE (et que le joueur n'y est pas absent) :
@@ -14138,24 +14186,24 @@ function playerGroupHTML(me){
   const groupVisible = !!(open && (open.published || DATA.showGroupBeforePublish) && !isAbsent(open, me.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
-      <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : '—') : 'Mon groupe'}</h2>
+      <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : (isRecLeague() ? 'Pas de terrain' : '—')) : myGroupLabel()}</h2>
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">🚫 Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
-    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la session du '+escapeHTML(open.date)+'.' : 'Ton groupe sera visible dès la publication de la prochaine session.'}</p>` : `<table>
+    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(open.date)+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : `<table>
       <tr><th>Nom</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}</tr>
       ${groupMembers.map(p=>{
         const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
         return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td>${DATA.showRatingToPlayers ? `<td>${rating.toFixed(2)}</td>` : ''}</tr>`;
       }).join('')}
-      ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">Aucun joueur dans ce groupe</td></tr>` : ''}
+      ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</td></tr>` : ''}
     </table>`}
   </div>`;
   if(open){
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
     const amAbsent = isAbsent(open, me.id);
     if(amAbsent){
-      html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la session du ${open.date} — le groupe et les scores de cette session ne sont pas affichés. Contacte un administrateur si c'est une erreur.</p></div>`;
+      html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la ${isRecLeague() ? 'soirée' : 'session'} du ${open.date} — ${isRecLeague() ? "tu n'es placé(e) sur aucun terrain." : 'le groupe et les scores de cette session ne sont pas affichés.'} Contacte un administrateur si c'est une erreur.</p></div>`;
     } else if(!open.published){
       // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
     } else if(gd && gd.matches.length){
@@ -14242,16 +14290,16 @@ function openOneSessionAbsenceModal(playerId){
   // ajustés en fonction de son absence) — seul un admin peut le réintégrer.
   const html = absent
     ? `<p class="small">Tu es indiqué(e) comme absent(e) pour la session du ${open.date}. Si c'est une erreur ou que ta situation a changé, communique avec un administrateur de la ligue — lui seul peut te réintégrer dans cette session.</p>`
-    : `<p class="small" style="margin-bottom:14px;">Indique ici si tu seras absent(e) pour la session du ${open.date}, avant que les matchs soient finalisés.</p>
-    <button class="btn btn-danger" style="width:100%;" onclick="closeModal();toggleAbsence('${playerId}')">Je serai absent(e) pour cette session</button>`;
+    : `<p class="small" style="margin-bottom:14px;">${isRecLeague() ? `Indique ici si tu seras absent(e) pour la soirée du ${open.date}, pour que les terrains soient tirés sans toi.` : `Indique ici si tu seras absent(e) pour la session du ${open.date}, avant que les matchs soient finalisés.`}</p>
+    <button class="btn btn-danger" style="width:100%;" onclick="closeModal();toggleAbsence('${playerId}')">Je serai absent(e) pour cette ${isRecLeague() ? 'soirée' : 'session'}</button>`;
   showContentModal('Absence — une session', html);
 }
 function openInjuredModal(playerId){
   const p = DATA.players.find(x=>x.id===playerId);
   if(!p) return;
   const html = p.injured
-    ? `<p class="small">Tu es indiqué(e) comme blessé(e), hors de ton groupe. Communique avec un administrateur de la ligue quand tu seras prêt(e) à revenir — lui seul peut te réintégrer.</p>`
-    : `<p class="small" style="margin-bottom:14px;">Tu passeras en attente d'assignation, hors de ton groupe, jusqu'à ce qu'un administrateur te réintègre.</p>
+    ? `<p class="small">Tu es indiqué(e) comme blessé(e), hors ${isRecLeague() ? 'des terrains' : 'de ton groupe'}. Communique avec un administrateur de la ligue quand tu seras prêt(e) à revenir — lui seul peut te réintégrer.</p>`
+    : `<p class="small" style="margin-bottom:14px;">Tu passeras en attente d'assignation, hors ${isRecLeague() ? 'des terrains' : 'de ton groupe'}, jusqu'à ce qu'un administrateur te réintègre.</p>
     <button class="btn btn-danger" style="width:100%;" onclick="closeModal();toggleMyInjured('${playerId}')">Je suis blessé(e)</button>`;
   showContentModal('Blessure', html);
 }
