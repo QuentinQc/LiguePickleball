@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 263">
+<meta name="app-build" content="Version 264">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5458,14 +5458,16 @@ async function loadMyLeagueLinks(profileId){
   MY_LEAGUE_LINKS = error ? [] : (data || []);
 }
 // ---- Invitations à usage unique : un code est lié à UN joueur précis. ----
-async function inviteForEntry(id, kind, renew){
+async function inviteForEntry(id, kind, renew, leagueId){
+  leagueId = leagueId || CURRENT_LEAGUE_ID;
   const { data, error } = await sb.rpc('create_invitation', {
-    p_league_id: CURRENT_LEAGUE_ID,
+    p_league_id: leagueId,
     p_player_id: kind==='p' ? id : null,
     p_substitute_id: kind==='s' ? id : null,
     p_renew: !!renew
   });
   if(error){ showAlert("Impossible de créer l'invitation : " + error.message); return; }
+  markInvited(leagueId, kind, id);
   const code = data && data.code ? String(data.code) : '';
   const exp = data && data.expires_at ? new Date(data.expires_at).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }) : '';
   const url = window.location.origin + window.location.pathname;
@@ -5474,7 +5476,44 @@ async function inviteForEntry(id, kind, renew){
     <div style="font-family:Oswald,sans-serif;font-size:34px;letter-spacing:3px;text-align:center;margin:16px 0;color:var(--ball);">${escapeHTML(code)}</div>
     <button class="btn btn-primary" onclick="copyInviteLink('${escapeHTML(code)}')">Copier le lien d'invitation</button>
     <p class="small" style="margin-top:12px;">Avec le lien, la personne crée son compte (ou se connecte) et l'invitation s'applique toute seule. Sinon, elle peut ouvrir <strong>${escapeHTML(url)}</strong> et entrer le code (« J'ai un code d'invitation »).</p>
-    <button class="btn btn-secondary" style="margin-top:8px;" onclick="inviteForEntry('${id}','${kind}',true)">Générer un nouveau code (annule celui-ci)</button>`);
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="inviteForEntry('${id}','${kind}',true,'${leagueId}')">Générer un nouveau code (annule celui-ci)</button>`);
+}
+// Mémorise la date d'invitation sur la fiche (pour afficher « Invité » dans Membres).
+const INVITE_DAYS = 14;
+async function markInvited(leagueId, kind, id){
+  const stamp = new Date().toISOString();
+  const setOn = function(d){
+    const list = kind==='s' ? (d.substitutePool||[]) : (d.players||[]);
+    const x = list.find(function(y){ return y.id===id; });
+    if(x) x.invitedAt = stamp;
+    return !!x;
+  };
+  try{
+    if(leagueId === CURRENT_LEAGUE_ID && DATA){ if(setOn(DATA)) saveData(); }
+    else {
+      const { data } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
+      const d = data && data.data;
+      if(d && setOn(d)) await sb.from('league_data').update({ data: d, updated_at: stamp }).eq('league_id', leagueId);
+    }
+    await loadOrgRoster();
+  }catch(e){}
+}
+// Statut du compte d'un membre : actif, invité (code encore valide), invitation expirée, ou aucun.
+function memberAccountStatus(e){
+  if(e.profileId) return { key:'actif', tag:'<span class="tag tag-up">Compte actif</span>' };
+  const last = e.rows.reduce(function(m, r){ return (r.invitedAt && (!m || r.invitedAt > m)) ? r.invitedAt : m; }, null);
+  if(last){
+    const exp = new Date(new Date(last).getTime() + INVITE_DAYS*86400000);
+    if(exp > new Date()) return { key:'invite', tag:'<span class="tag tag-yellow">Invité</span>', last: last, exp: exp };
+    return { key:'expire', tag:'<span class="tag tag-orange">Invitation expirée</span>', last: last, exp: exp };
+  }
+  return { key:'aucun', tag:'<span class="tag">Aucun compte</span>' };
+}
+// Invite un membre depuis sa fiche : on utilise sa première place (joueur d'abord).
+function inviteOrgMember(idx){
+  const e = ORG_ROSTER_ENTRIES_CACHE[idx]; if(!e || !e.rows.length) return;
+  const r = e.rows.filter(function(x){ return x.type==='joueur'; })[0] || e.rows[0];
+  inviteForEntry(r.refId, r.type==='remplaçant' ? 's' : 'p', false, r.leagueId);
 }
 function copyInviteCode(code){
   const done = ()=>showAlert('Code copié : ' + code);
@@ -5777,7 +5816,7 @@ function adminHomeHTML(){
   const todo = [];
   let pending = 0;
   try{ if(ALL_PROFILES && ALL_PROFILES.length) pending = organizationStatsSummary().pending; }catch(e){}
-  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheet('comptes')"><span class="acc-row-t"><b>${pending} compte${pending>1?'s':''} en attente</b><small>À approuver et lier à un joueur</small></span><span class="acc-chev">›</span></button>`);
+  if(pending>0) todo.push(`<button type="button" class="acc-row" onclick="openOrgSheet('comptes')"><span class="acc-row-t"><b>${pending} personne${pending>1?'s':''} à approuver</b><small>Organisation › Comptes</small></span><span class="acc-chev">›</span></button>`);
   leagues.forEach(lg=>{
     const sum = adminSummaryFor(lg);
     if(!sum || sum.mlp) return;
@@ -8653,7 +8692,7 @@ function substituteDetailModalHTML(subId){
   } else {
     html += `<p class="small">Aucun compte lié.</p>
       <button class="btn btn-primary" onclick="inviteForEntry('${subId}','s',false)">✉️ Inviter ce remplaçant (code à usage unique)</button>
-      <p class="small" style="color:var(--muted);margin-top:8px;">Ou, pour lier un compte déjà en attente : menu ☰ → Organisation.</p>`;
+      <p class="small" style="color:var(--muted);margin-top:8px;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
   }
   html += `</div>`;
   return html;
@@ -8867,7 +8906,7 @@ function playerDetailModalHTML(pid){
   } else {
     html += `<p class="small">Aucun compte lié.</p>
       <button class="btn btn-primary" onclick="inviteForEntry('${pid}','p',false)">✉️ Inviter ce joueur (code à usage unique)</button>
-      <p class="small" style="color:var(--muted);margin-top:8px;">Ou, pour lier un compte déjà en attente : menu ☰ → Organisation.</p>`;
+      <p class="small" style="color:var(--muted);margin-top:8px;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
   }
   html += `</div>`;
   html += playerNotesSectionHTML();
@@ -9195,10 +9234,15 @@ function organizationRosterEntries(){
     const leagueLabel = l.schedule_label || l.name;
     const addRow = (person, type)=>{
       let entry;
+      const isSubRow = type === 'remplaçant';
       if(person.orgMemberId && byOrgMemberId[person.orgMemberId]){
         entry = byOrgMemberId[person.orgMemberId];
+        if(!entry.profileId){
+          const lk = ALL_PROFILE_PLAYERS.find(pp=>pp.league_id===l.id && (isSubRow ? pp.substitute_id===person.id : pp.player_id===person.id));
+          if(lk) entry.profileId = lk.profile_id;
+        }
       } else {
-        const link = ALL_PROFILE_PLAYERS.find(pp=>pp.league_id===l.id && pp.player_id===person.id);
+        const link = ALL_PROFILE_PLAYERS.find(pp=>pp.league_id===l.id && (isSubRow ? pp.substitute_id===person.id : pp.player_id===person.id));
         const profileId = link ? link.profile_id : null;
         entry = findOrCreateLegacyEntry(profileId, person.name);
         if(profileId && !entry.profileId) entry.profileId = profileId;
@@ -9207,7 +9251,7 @@ function organizationRosterEntries(){
           entry.email = (profile && profile.email) || person.email || null;
         }
       }
-      entry.rows.push({ leagueId:l.id, leagueLabel, type, refId: person.id });
+      entry.rows.push({ leagueId:l.id, leagueLabel, type, refId: person.id, invitedAt: person.invitedAt || null });
       // Le genre (utilisé pour la composition des équipes de tournoi MLP)
       // vit encore sur la fiche joueur/remplaçant de chaque ligue, mais se
       // configure maintenant uniquement depuis cette fiche-ci (voir
@@ -9371,7 +9415,7 @@ function orgMemberDetailModalHTML(idx){
       ${avatarHTML('avatar-circle', initials, linkedProfile && linkedProfile.avatar_url)}
       <div>
         <div style="font-size:19px;font-weight:700;">${escapeHTML(entry.name)}</div>
-        <div class="modal-badges">${entry.profileId ? '<span class="tag tag-up">Compte lié</span>' : '<span class="tag">Aucun compte lié</span>'}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
+        <div class="modal-badges">${memberAccountStatus(entry).tag}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
       </div>
     </div>`;
   if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}${!entry.profileId?` <button class="btn-ghost" style="padding:2px 8px;" onclick="editOrgMemberEmail(${idx})" title="Modifier le courriel">✏️</button>`:''}</p>`;
@@ -9381,6 +9425,7 @@ function orgMemberDetailModalHTML(idx){
     <button class="action-btn" style="width:auto;" ${entry.rows.length?`onclick="setMemberGender(${idx})"`:'disabled title="Ajoute d\'abord à une ligue pour pouvoir définir le genre"'}><span class="icon">⚧️</span> Genre : ${entry.gender==='F'?'Femme':entry.gender==='M'?'Homme':'Non défini'}</button>
   </div>
   <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Ces infos s'appliquent à la fois dans toutes ses ligues — le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte). Le courriel d'un compte lié est celui du compte, non modifiable ici.</p>
+  ${memberAccountSectionHTML(entry, idx, linkedProfile)}
   ${(()=>{ const bioHtml = linkedProfile ? profileBioStyleHTML(linkedProfile) : ''; return bioHtml ? `<div class="modal-section"><h3>Profil</h3>${bioHtml}</div>` : ''; })()}
   <div class="modal-section"><h3>Ligues</h3>`;
   if(entry.rows.length){
@@ -9407,6 +9452,26 @@ function orgMemberDetailModalHTML(idx){
   }
   html += `<button class="action-btn danger" style="width:100%;margin-top:14px;" onclick="confirmFullyDeleteOrgMember(${idx})"><span class="icon">🗑️</span> Supprimer ${escapeHTML(entry.name)} de l'organisation</button>`;
   return html;
+}
+function memberAccountSectionHTML(entry, idx, linkedProfile){
+  const st = memberAccountStatus(entry);
+  const fmt = function(d){ return new Date(d).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }); };
+  let h = '<div class="modal-section"><h3>Compte</h3>';
+  if(st.key === 'actif'){
+    const isAdmin = linkedProfile && linkedProfile.role === 'admin';
+    const admins = ALL_PROFILES.filter(function(p){ return p.organization_id===CURRENT_ORGANIZATION_ID && p.role==='admin'; }).length;
+    h += `<p class="small">${linkedProfile ? escapeHTML(linkedProfile.email || '') + ' · ' : ''}${isAdmin ? '👑 Administrateur' : 'Accès joueur'}</p>`;
+    if(linkedProfile) h += `<button class="btn btn-secondary" ${isAdmin && admins<=1 ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="closeModal();setAccountRole('${linkedProfile.id}','${isAdmin?'player':'admin'}')">${isAdmin ? 'Retirer les droits admin' : 'Rendre admin'}</button>`;
+  } else if(!entry.rows.length){
+    h += `<p class="small">Ajoute d'abord cette personne à une ligue pour pouvoir l'inviter.</p>`;
+  } else if(st.key === 'invite'){
+    h += `<p class="small">Invitation envoyée le ${fmt(st.last)}, valide jusqu'au ${fmt(st.exp)}. Son compte sera relié tout seul quand elle l'utilisera.</p>
+      <button class="btn btn-secondary" onclick="inviteOrgMember(${idx})">✉️ Revoir le code d'invitation</button>`;
+  } else {
+    h += `<p class="small">${st.key==='expire' ? "L'invitation du " + fmt(st.last) + ' a expiré.' : "Pas encore de compte. Envoie-lui une invitation personnelle : son compte sera relié tout seul, sans approbation."}</p>
+      <button class="btn btn-primary" onclick="inviteOrgMember(${idx})">✉️ ${st.key==='expire' ? "Renvoyer l'invitation" : 'Inviter'}</button>`;
+  }
+  return h + '</div>';
 }
 function openOrgMemberDetailModal(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
@@ -9701,15 +9766,18 @@ function organizationAccountsHTML(){
     const linkedInLeague = new Set(orgLinks.filter(pp=>pp.league_id===leagueId).map(pp=>pp.substitute_id));
     return (bucket.substitutePool||[]).filter(s=>!linkedInLeague.has(s.id));
   };
-  const optionsFor = (pr)=> orgLeagues.map(l=>{
+  const sel = (v, cur)=> v===cur ? ' selected' : '';
+  // Compte sans code de ligue : la ligue est choisie dans la liste, encodée « leagueId::j|s::id ».
+  const optionsFor = (pr, cur)=> orgLeagues.map(l=>{
     const label = l.schedule_label || l.name;
     const unlinkedP = unlinkedPlayersByLeague(l.id);
     const unlinkedS = unlinkedSubstitutesByLeague(l.id);
+    const nm = escapeHTML(pr.display_name||pr.email);
     return `<optgroup label="${escapeHTML(label)}">
-      ${unlinkedP.map(pl=>`<option value="${l.id}::j::${pl.id}">${escapeHTML(pl.name)} (joueur)</option>`).join('')}
-      ${unlinkedS.map(s=>`<option value="${l.id}::s::${s.id}">${escapeHTML(s.name)} (remplaçant)</option>`).join('')}
-      <option value="${l.id}::j::__new__">+ Créer un nouveau joueur « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
-      <option value="${l.id}::s::__new__">+ Créer un nouveau remplaçant « ${escapeHTML(pr.display_name||pr.email)} » ici</option>
+      ${unlinkedP.map(pl=>`<option value="${l.id}::j::${pl.id}"${sel(l.id+'::j::'+pl.id, cur)}>${escapeHTML(pl.name)} (joueur)</option>`).join('')}
+      ${unlinkedS.map(s=>`<option value="${l.id}::s::${s.id}"${sel(l.id+'::s::'+s.id, cur)}>${escapeHTML(s.name)} (remplaçant)</option>`).join('')}
+      <option value="${l.id}::j::__new__"${sel(l.id+'::j::__new__', cur)}>+ Nouveau joueur « ${nm} » ici</option>
+      <option value="${l.id}::s::__new__"${sel(l.id+'::s::__new__', cur)}>+ Nouveau remplaçant « ${nm} » ici</option>
     </optgroup>`;
   }).join('');
   const orphaned = orgLinks
@@ -9729,37 +9797,64 @@ function organizationAccountsHTML(){
   };
   const initialsOf = (label)=> (label||'').split(/[ @]/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id));
-  const reqOptions = (r)=>{
+  // Demande par code de ligue : la ligue est connue, on choisit seulement le joueur (« j|s::id »).
+  const reqOptions = (r, cur)=>{
     const pl = unlinkedPlayersByLeague(r.league_id), su = unlinkedSubstitutesByLeague(r.league_id);
     const nm = escapeHTML(r.display_name||r.email||'');
     return `<option value="">— choisir un joueur —</option>
-      ${pl.map(x=>`<option value="j::${x.id}">${escapeHTML(x.name)} (joueur)</option>`).join('')}
-      ${su.map(x=>`<option value="s::${x.id}">${escapeHTML(x.name)} (remplaçant)</option>`).join('')}
-      <option value="j::__new__">+ Nouveau joueur « ${nm} »</option>
-      <option value="s::__new__">+ Nouveau remplaçant « ${nm} »</option>`;
+      ${pl.map(x=>`<option value="j::${x.id}"${sel('j::'+x.id, cur)}>${escapeHTML(x.name)} (joueur)</option>`).join('')}
+      ${su.map(x=>`<option value="s::${x.id}"${sel('s::'+x.id, cur)}>${escapeHTML(x.name)} (remplaçant)</option>`).join('')}
+      <option value="j::__new__"${sel('j::__new__', cur)}>+ Nouveau joueur « ${nm} »</option>
+      <option value="s::__new__"${sel('s::__new__', cur)}>+ Nouveau remplaçant « ${nm} »</option>`;
   };
   const leagueLbl = (id)=>{ const l = orgLeagues.find(x=>x.id===id); return l ? (l.schedule_label || l.name) : '—'; };
+  const matchNote = (m)=> m ? `<div class="small" style="color:var(--ball);margin:2px 0 6px;">✓ Suggestion : ${m.score===3 ? 'même courriel' : (m.score===2 ? 'même nom' : 'nom semblable')} — vérifie avant d'approuver</div>` : '';
+  // Une seule liste : demandes par code de ligue + comptes créés sans code.
+  const items = reqs.map(r=>{
+    const cands = unlinkedPlayersByLeague(r.league_id).map(x=>({ value:'j::'+x.id, person:x }))
+      .concat(unlinkedSubstitutesByLeague(r.league_id).map(x=>({ value:'s::'+x.id, person:x })));
+    const m = bestApprovalMatch(cands, r.email, r.display_name);
+    return { name: r.display_name || '—', email: r.email || '', label: initialsOf(r.display_name||r.email), source: escapeHTML(leagueLbl(r.league_id)),
+      select: `<select id="reqSel_${r.id}">${reqOptions(r, m ? m.value : 'j::__new__')}</select>`, note: matchNote(m),
+      buttons: `<button class="btn btn-primary" style="flex:1;" onclick="approveJoinRequest('${r.id}')">Approuver</button><button class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Refuser</button>`, admin: '' };
+  }).concat(pending.map(pr=>{
+    const cands = [];
+    orgLeagues.forEach(l=>{
+      unlinkedPlayersByLeague(l.id).forEach(x=>cands.push({ value:l.id+'::j::'+x.id, person:x }));
+      unlinkedSubstitutesByLeague(l.id).forEach(x=>cands.push({ value:l.id+'::s::'+x.id, person:x }));
+    });
+    const m = bestApprovalMatch(cands, pr.email, pr.display_name);
+    const cur = m ? m.value : (orgLeagues.length===1 ? orgLeagues[0].id + '::j::__new__' : '');
+    return { name: pr.display_name || '—', badge: pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : '', email: pr.email || '', label: initialsOf(pr.display_name||pr.email), source: 'Inscrit sans code de ligue',
+      select: `<select id="linkSelect_${pr.id}"><option value="">— choisir une ligue et un joueur —</option>${optionsFor(pr, cur)}</select>`, note: matchNote(m),
+      buttons: `<button class="btn btn-primary" style="flex:1;" onclick="linkAccount('${pr.id}')">Approuver</button>`, admin: `<div style="margin-top:6px;">${roleButton(pr)}</div>` };
+  }));
   const reqHTML = `<div class="card">
-    <div class="section-heading"><span class="icon-badge">🙋</span><h3 style="margin:0;">Demandes d'adhésion <span class="small">(${reqs.length})</span></h3></div>
-    <p class="small" style="margin:8px 0 4px;">Ces personnes ont utilisé le code d'une ligue. Choisis qui elles sont dans la ligue, puis approuve — ou refuse.</p>
+    <div class="section-heading" style="justify-content:space-between;">
+      <div class="row" style="gap:10px;align-items:center;"><span class="icon-badge">✅</span><h3 style="margin:0;">À approuver <span class="small">(${items.length})</span></h3></div>
+      <button class="btn-ghost" onclick="refreshAccountsTab()">↻ rafraîchir</button>
+    </div>
+    <p class="small" style="margin:8px 0 4px;">Personnes qui veulent accéder à l'application. Le joueur correspondant est proposé quand on le reconnaît (courriel ou nom) : vérifie-le, puis approuve.</p>
     <div class="member-list">
-      ${reqs.map(r=>`<div class="account-row">
-        <div class="member-avatar">${escapeHTML(initialsOf(r.display_name||r.email))}</div>
+      ${items.map(it=>`<div class="account-row">
+        <div class="member-avatar">${escapeHTML(it.label)}</div>
         <div class="member-info">
-          <div class="member-name">${escapeHTML(r.display_name || '—')}</div>
-          <div class="small">${escapeHTML(r.email||'')} · ${escapeHTML(leagueLbl(r.league_id))}</div>
+          <div class="member-name">${escapeHTML(it.name)}${it.badge || ''}</div>
+          <div class="small">${escapeHTML(it.email)} · ${it.source}</div>
+          ${it.admin}
         </div>
         <div class="account-actions">
-          <select id="reqSel_${r.id}">${reqOptions(r)}</select>
-          <div class="row" style="gap:6px;"><button class="btn btn-primary" style="flex:1;" onclick="approveJoinRequest('${r.id}')">Approuver</button><button class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Refuser</button></div>
+          ${it.select}
+          ${it.note}
+          <div class="row" style="gap:6px;">${it.buttons}</div>
         </div>
       </div>`).join('')}
-      ${reqs.length===0 ? `<p class="empty">Aucune demande</p>` : ''}
+      ${items.length===0 ? `<p class="empty">Rien à approuver 🎉</p>` : ''}
     </div>
   </div>`;
   const codeHTML = `<div class="card">
     <div class="section-heading"><span class="icon-badge">🎟️</span><h3 style="margin:0;">Invitations par ligue</h3></div>
-    <p class="small" style="margin:8px 0 4px;">Un lien d'invitation par ligue (centre, groupe Facebook…). Il ne donne aucun accès : chaque personne apparaît dans les demandes ci-dessus et tu l'approuves. Pour inviter un joueur précis, ouvre sa fiche.</p>
+    <p class="small" style="margin:8px 0 4px;">Un lien d'invitation par ligue (centre, groupe Facebook…). Il ne donne aucun accès : chaque personne apparaît dans « À approuver » ci-dessus. Pour inviter un joueur précis, ouvre sa fiche.</p>
     ${orgLeagues.map(l=>{
       const c = (ALL_JOIN_CODES||[]).find(x=>x.league_id===l.id);
       const live = c && c.active && new Date(c.expires_at) > new Date();
@@ -9774,34 +9869,7 @@ function organizationAccountsHTML(){
       </div>`;
     }).join('')}
   </div>`;
-  let html = reqHTML + codeHTML + `<div class="card">
-    <div class="section-heading" style="justify-content:space-between;">
-      <div class="row" style="gap:10px;align-items:center;">
-        <span class="icon-badge">🔑</span>
-        <h3 style="margin:0;">Comptes en attente <span class="small">(${pending.length})</span></h3>
-      </div>
-      <button class="btn-ghost" onclick="refreshAccountsTab()">↻ rafraîchir</button>
-    </div>
-    <p class="small" style="margin:8px 0 4px;">Ces personnes ont créé un compte mais ne sont associées à un joueur dans aucune ligue de ton organisation. Un compte marqué <span class="tag tag-up">👑 Admin</span> a déjà accès complet à l'espace administrateur, même sans être lié à un joueur.</p>
-    <div class="member-list">
-      ${pending.map(pr=>`<div class="account-row${pr.role==='admin'?' is-admin':''}">
-        <div class="member-avatar">${escapeHTML(initialsOf(pr.display_name||pr.email))}</div>
-        <div class="member-info">
-          <div class="member-name">${escapeHTML(pr.display_name || '—')}${pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : ''}</div>
-          <div class="small">${escapeHTML(pr.email)} · ${profileRoleLabel(pr)}</div>
-          <div style="margin-top:6px;">${roleButton(pr)}</div>
-        </div>
-        <div class="account-actions">
-          <select id="linkSelect_${pr.id}">
-            <option value="">— choisir une ligue et un joueur —</option>
-            ${optionsFor(pr)}
-          </select>
-          <div class="row"><button class="btn btn-secondary" style="width:100%;" onclick="linkAccount('${pr.id}')">Lier ce compte</button></div>
-        </div>
-      </div>`).join('')}
-      ${pending.length===0 ? `<p class="empty">Aucun compte en attente</p>` : ''}
-    </div>
-  </div>`;
+  let html = reqHTML + codeHTML;
   if(orphaned.length){
     html += `<div class="card">
       <div class="section-heading"><span class="icon-badge" style="background:rgba(233,85,107,0.14);color:var(--danger);">⚠️</span><h3 style="margin:0;color:var(--danger);">Comptes orphelins <span class="small" style="color:var(--muted);">(${orphaned.length})</span></h3></div>
@@ -9895,6 +9963,34 @@ function rejectJoinRequest(reqId){
     await loadAllProfiles();
     render();
   });
+}
+// ---- Correspondance automatique pour « À approuver » ----
+function normPersonName(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+// Courriel connu d'un joueur/remplaçant : le sien, sinon celui de sa fiche membre.
+function personEmail(person){
+  if(person.email) return String(person.email).toLowerCase();
+  const m = person.orgMemberId ? ORG_MEMBERS.find(x=>x.id===person.orgMemberId) : null;
+  return (m && m.email) ? String(m.email).toLowerCase() : '';
+}
+// 3 = même courriel, 2 = même nom, 1 = même prénom et même initiale de nom, 0 = rien.
+function personMatchScore(person, email, displayName){
+  if(email && personEmail(person) === String(email).toLowerCase()) return 3;
+  const a = normPersonName(person.name), b = normPersonName(displayName);
+  if(!a || !b) return 0;
+  if(a === b) return 2;
+  const ta = a.split(' '), tb = b.split(' ');
+  if(ta.length > 1 && tb.length > 1 && ta[0] === tb[0] && ta[ta.length-1].charAt(0) === tb[tb.length-1].charAt(0)) return 1;
+  return 0;
+}
+// Meilleur candidat [{value, person}], seulement s'il est seul à ce niveau (sinon on laisse choisir).
+function bestApprovalMatch(cands, email, displayName){
+  let best = null, bestScore = 0, tie = false;
+  cands.forEach(function(c){
+    const sc = personMatchScore(c.person, email, displayName);
+    if(sc > bestScore){ best = c; bestScore = sc; tie = false; }
+    else if(sc && sc === bestScore) tie = true;
+  });
+  return (best && !tie) ? { value: best.value, score: bestScore } : null;
 }
 function refreshAccountsTab(){ Promise.all([loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster()]).then(render); }
 // Recharge ce qui a pu changer après une action sur un compte, et si la
@@ -11698,7 +11794,8 @@ function organizationStatsSummary(){
   const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
   const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
   const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
-  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id)).length;
+  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id)).length;
+  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id)).length + reqs;
   const members = organizationRosterEntries().length;
   return { leagues: orgLeagues.length, members, pending };
 }
@@ -11715,7 +11812,7 @@ function organizationHeroHTML(){
       <div class="stat-chips">
         <div class="stat-chip"><span class="stat-label">Ligues</span><span class="stat-value">${stats.leagues}</span></div>
         <div class="stat-chip"><span class="stat-label">Membres</span><span class="stat-value">${stats.members}</span></div>
-        <div class="stat-chip"><span class="stat-label">Comptes en attente</span><span class="stat-value">${stats.pending}</span></div>
+        <div class="stat-chip"><span class="stat-label">À approuver</span><span class="stat-value">${stats.pending}</span></div>
       </div>
     </div>
   </div>`;
@@ -11727,7 +11824,7 @@ function renderOrganizationManagement(){
     const topbar = topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null);
     if(VIEW.orgHub===true){
       const st = organizationStatsSummary();
-      const sub1 = { general:'Nom et lien d\'invitation', membres:`${st.members} personne${st.members>1?'s':''}`, rapport:'Qui joue où', comptes: st.pending>0 ? `${st.pending} en attente` : 'Accès et approbations', videos:'Vidéos des matchs', tournois:'Tournois de l\'organisation' };
+      const sub1 = { general:'Nom et lien d\'invitation', membres:`${st.members} personne${st.members>1?'s':''}`, rapport:'Qui joue où', comptes: st.pending>0 ? `${st.pending} à approuver` : 'Accès et approbations', videos:'Vidéos des matchs', tournois:'Tournois de l\'organisation' };
       app.innerHTML = `${topbar}${storageBannerHTML()}${pushPromoBannerHTML()}${organizationHeroHTML()}
         <div class="org-hub">${subTabs.map(([k,l])=>{
           const sp = l.indexOf(' ');
@@ -11761,8 +11858,12 @@ function organizationGeneralHTML(){
   html += settingsRow('🏢', 'Nom de l\'organisation', currentOrg ? currentOrg.name : '—', "openOrganizationModal()");
   html += `<div class="card">
     <div class="section-heading"><span class="icon-badge">🔗</span><h3 style="margin:0;">Inviter des joueurs</h3></div>
-    <p class="small">Ce lien associe automatiquement toute personne qui l'utilise pour s'inscrire à ton organisation — c'est le lien à envoyer à tes joueurs (texto, courriel, etc.).</p>
-    <button class="tag tag-up" style="cursor:pointer;border:none;" onclick="copyOrgSignupLink()">🏢 Copier le lien d'inscription de mon organisation</button>
+    <p class="small"><strong>Une personne précise</strong> : ouvre sa fiche dans Membres et touche « Inviter ». Son compte sera relié tout seul, sans approbation.</p>
+    <p class="small"><strong>Tout le monde</strong> (centre, groupe Facebook…) : partage le lien de la ligue. Chaque personne apparaît dans « À approuver ».</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px;">
+      <button class="btn btn-secondary" style="width:auto;" onclick="setOrgSubTab('membres')">👥 Membres</button>
+      <button class="btn btn-secondary" style="width:auto;" onclick="setOrgSubTab('comptes')">🎟️ Liens des ligues</button>
+    </div>
   </div>`;
   html += `<div class="card">
     <div class="section-heading"><span class="icon-badge">➕</span><h3 style="margin:0;">Nouvelle organisation</h3></div>
@@ -11890,7 +11991,7 @@ function orgMembersBodyHTML(){
     ${list.map(({e,i})=>`<div class="member-row">
       ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
       <div class="member-info">
-        <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)}${e.profileId?' <span class="tag tag-up">Compte lié</span>':''}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+        <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)} ${memberAccountStatus(e).tag}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
         ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
         <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
       </div>
@@ -12885,20 +12986,6 @@ function settingsGuideHTML(){
 function copyAppLink(){
   const url = window.location.origin + window.location.pathname;
   const done = ()=> showAlert("Lien copié dans le presse-papier :\n" + url);
-  const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(done).catch(fallback);
-  } else {
-    fallback();
-  }
-}
-function copyOrgSignupLink(){
-  if(!CURRENT_PROFILE || !CURRENT_PROFILE.organization_id){
-    showAlert("Impossible de trouver ton organisation. Contacte le support si ça persiste.");
-    return;
-  }
-  const url = window.location.origin + window.location.pathname + '?org=' + CURRENT_PROFILE.organization_id;
-  const done = ()=> showAlert("Lien d'inscription copié dans le presse-papier :\n" + url);
   const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(done).catch(fallback);
