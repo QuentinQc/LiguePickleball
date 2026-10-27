@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 264">
+<meta name="app-build" content="Version 265">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3162,7 +3162,7 @@ async function onCreateLeague(){
     day:'', time:'', duration:120, seasonStart:'', seasonEnd:'', autoStart:false, autoPublish:false,
     gsize:'both', swap:1,
     rating:true, ratingSubs:false, showGroup:false, scores:true, standings:true,
-    name:'', nameTouched:false, invite:true, members:{} };
+    name:'', nameTouched:false, invite:true, members:{}, city:'', venue:'' };
   setModal({ kind:'content', sheet:'wizard', title:'Créer une nouvelle ligue', htmlContent:'' });
   WIZ.anim = true;
   render();
@@ -3306,6 +3306,8 @@ function wizBodyHTML(key){
       ${[1,2,3,4,5,6,0].map(d=>`<button type="button" class="wz-chip${String(WIZ.day)===String(d)?' sel':''}" onclick="wizSetDay(String(WIZ.day)==='${d}'?'':'${d}')">${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1,3)}</button>`).join('')}</div>
       <div class="wz-grid2"><div><span class="wz-lab">Heure</span><input class="wz-in" type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)"></div>
       <div><span class="wz-lab">Durée (min)</span><input class="wz-in" type="number" min="15" step="15" value="${WIZ.duration}" onchange="wizNum('duration',this.value,15,600)"></div></div>
+      <div class="wz-grid2"><div><span class="wz-lab">Ville</span><input class="wz-in" placeholder="ex: Chicoutimi" value="${escapeHTML(WIZ.city)}" onchange="wizSet('city',this.value)"></div>
+      <div><span class="wz-lab">Lieu de jeu</span><input class="wz-in" placeholder="ex: Centre Pickleball" value="${escapeHTML(WIZ.venue)}" onchange="wizSet('venue',this.value)"></div></div>
       <div class="wz-grid2"><div><span class="wz-lab">Début de saison</span><input class="wz-in" type="date" value="${escapeHTML(WIZ.seasonStart)}" onchange="wizSet('seasonStart',this.value)"></div>
       <div><span class="wz-lab">Fin de saison</span><input class="wz-in" type="date" value="${escapeHTML(WIZ.seasonEnd)}" onchange="wizSet('seasonEnd',this.value)"></div></div>`;
     if(wizCanAutoStart()){
@@ -3346,6 +3348,7 @@ function wizBodyHTML(key){
     const rows = [];
     rows.push([WIZ.type==='recreational'?'🎉':'🏆', (WIZ.type==='recreational'?'Récréative':'Compétitive') + ' · ' + fmtName + ' · ~' + WIZ.players + ' joueurs']);
     if(sched) rows.push(['📅', escapeHTML(sched) + ' · ' + WIZ.duration + ' min']);
+    if(WIZ.city || WIZ.venue) rows.push(['📍', escapeHTML([WIZ.city, WIZ.venue].filter(Boolean).join(' · ')) + ' · visible dans la recherche de ligues']);
     if(WIZ.seasonStart || WIZ.seasonEnd) rows.push(['🗓️', 'Saison ' + escapeHTML(WIZ.seasonStart || '…') + ' → ' + escapeHTML(WIZ.seasonEnd || 'sans fin')]);
     if(WIZ.autoStart) rows.push(['⏩', 'Sessions démarrées automatiquement' + (WIZ.autoPublish ? ' et publiées' : '')]);
     if(wizHasGroups()) rows.push(['👥', WIZ_GSIZE[WIZ.gsize][2] + (WIZ.format==='ladder' ? ' · ' + WIZ.swap + ' joueur(s) échangé(s)' : '')]);
@@ -3398,6 +3401,8 @@ function wizCreate(){
       playDay:day, playTime:w.time || undefined, duration:w.duration, seasonStart:w.seasonStart, seasonEnd:w.seasonEnd,
       autoStart:w.autoStart && w.format!=='mlp' && day!==undefined, autoPublish:w.autoPublish, groupMin:lim[0], groupMax:lim[1], swap:w.swap });
     if(!id) return;
+    const cv = { city: (w.city||'').trim() || null, venue: (w.venue||'').trim() || null };
+    if(cv.city || cv.venue){ try{ await sb.from('leagues').update(cv).eq('id', id); }catch(e){} }
     // Ajoutés un à la fois : chaque ajout relit puis réécrit tout le league_data de la ligue.
     for(const m of selected){
       if(m.profileId){ await addPlayerToLeagueForProfile(id, m.profileId, m.name); }
@@ -5541,8 +5546,9 @@ function renderPending(){
     ${storageBannerHTML()}${pushPromoBannerHTML()}
     <div class="card">
       <h2>Compte créé ✅</h2>
-      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton administrateur t'a remis un code d'invitation, entre-le ici.</p>
+      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton administrateur t'a remis un code d'invitation, entre-le ici. Sinon, cherche une ligue et demande à la rejoindre.</p>
       <button class="btn btn-primary" onclick="openInviteCodePrompt()">🎟️ J'ai un code d'invitation</button>
+      <button class="btn btn-secondary" onclick="openLeagueSearch()" style="margin-top:8px;">🔍 Trouver une ligue près de chez moi</button>
       <button class="btn btn-secondary" onclick="logout()" style="margin-top:8px;">Déconnexion</button>
     </div>
     ${canCreateOrg ? `
@@ -9796,7 +9802,8 @@ function organizationAccountsHTML(){
     return `<button class="btn-ghost" ${disable?'disabled title="Il doit rester au moins un administrateur"':''} onclick="setAccountRole('${pr.id}','${isAdmin?'player':'admin'}')">${isAdmin?'retirer admin':'rendre admin'}</button>`;
   };
   const initialsOf = (label)=> (label||'').split(/[ @]/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
-  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id));
+  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id) && r.kind !== 'interest');
+  const interest = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id) && r.kind === 'interest');
   // Demande par code de ligue : la ligue est connue, on choisit seulement le joueur (« j|s::id »).
   const reqOptions = (r, cur)=>{
     const pl = unlinkedPlayersByLeague(r.league_id), su = unlinkedSubstitutesByLeague(r.league_id);
@@ -9810,14 +9817,15 @@ function organizationAccountsHTML(){
   const leagueLbl = (id)=>{ const l = orgLeagues.find(x=>x.id===id); return l ? (l.schedule_label || l.name) : '—'; };
   const matchNote = (m)=> m ? `<div class="small" style="color:var(--ball);margin:2px 0 6px;">✓ Suggestion : ${m.score===3 ? 'même courriel' : (m.score===2 ? 'même nom' : 'nom semblable')} — vérifie avant d'approuver</div>` : '';
   // Une seule liste : demandes par code de ligue + comptes créés sans code.
-  const items = reqs.map(r=>{
+  const reqItem = (r)=>{
     const cands = unlinkedPlayersByLeague(r.league_id).map(x=>({ value:'j::'+x.id, person:x }))
       .concat(unlinkedSubstitutesByLeague(r.league_id).map(x=>({ value:'s::'+x.id, person:x })));
     const m = bestApprovalMatch(cands, r.email, r.display_name);
     return { name: r.display_name || '—', email: r.email || '', label: initialsOf(r.display_name||r.email), source: escapeHTML(leagueLbl(r.league_id)),
       select: `<select id="reqSel_${r.id}">${reqOptions(r, m ? m.value : 'j::__new__')}</select>`, note: matchNote(m),
-      buttons: `<button class="btn btn-primary" style="flex:1;" onclick="approveJoinRequest('${r.id}')">Approuver</button><button class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Refuser</button>`, admin: '' };
-  }).concat(pending.map(pr=>{
+      buttons: `<button class="btn btn-primary" style="flex:1;" onclick="approveJoinRequest('${r.id}')">${r.kind==='interest' ? 'Ajouter à la ligue' : 'Approuver'}</button><button class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">${r.kind==='interest' ? 'Retirer' : 'Refuser'}</button>`, admin: '' };
+  };
+  const items = reqs.map(reqItem).concat(pending.map(pr=>{
     const cands = [];
     orgLeagues.forEach(l=>{
       unlinkedPlayersByLeague(l.id).forEach(x=>cands.push({ value:l.id+'::j::'+x.id, person:x }));
@@ -9835,8 +9843,15 @@ function organizationAccountsHTML(){
       <button class="btn-ghost" onclick="refreshAccountsTab()">↻ rafraîchir</button>
     </div>
     <p class="small" style="margin:8px 0 4px;">Personnes qui veulent accéder à l'application. Le joueur correspondant est proposé quand on le reconnaît (courriel ou nom) : vérifie-le, puis approuve.</p>
-    <div class="member-list">
-      ${items.map(it=>`<div class="account-row">
+    ${itemsHTML(items, 'Rien à approuver 🎉')}
+  </div>`;
+  const interestHTML = !interest.length ? '' : `<div class="card">
+    <div class="section-heading"><span class="icon-badge">⭐</span><h3 style="margin:0;">Liste d'intérêt <span class="small">(${interest.length})</span></h3></div>
+    <p class="small" style="margin:8px 0 4px;">Ces personnes ont trouvé une ligue complète dans la recherche et aimeraient y jouer. Quand une place se libère, ajoute-les ; sinon, retire-les.</p>
+    ${itemsHTML(interest.map(reqItem), '')}
+  </div>`;
+  function itemsHTML(list, emptyText){ return `<div class="member-list">
+      ${list.map(it=>`<div class="account-row">
         <div class="member-avatar">${escapeHTML(it.label)}</div>
         <div class="member-info">
           <div class="member-name">${escapeHTML(it.name)}${it.badge || ''}</div>
@@ -9849,9 +9864,8 @@ function organizationAccountsHTML(){
           <div class="row" style="gap:6px;">${it.buttons}</div>
         </div>
       </div>`).join('')}
-      ${items.length===0 ? `<p class="empty">Rien à approuver 🎉</p>` : ''}
-    </div>
-  </div>`;
+      ${(list.length===0 && emptyText) ? `<p class="empty">${emptyText}</p>` : ''}
+    </div>`; }
   const codeHTML = `<div class="card">
     <div class="section-heading"><span class="icon-badge">🎟️</span><h3 style="margin:0;">Invitations par ligue</h3></div>
     <p class="small" style="margin:8px 0 4px;">Un lien d'invitation par ligue (centre, groupe Facebook…). Il ne donne aucun accès : chaque personne apparaît dans « À approuver » ci-dessus. Pour inviter un joueur précis, ouvre sa fiche.</p>
@@ -9869,7 +9883,7 @@ function organizationAccountsHTML(){
       </div>`;
     }).join('')}
   </div>`;
-  let html = reqHTML + codeHTML;
+  let html = reqHTML + interestHTML + codeHTML;
   if(orphaned.length){
     html += `<div class="card">
       <div class="section-heading"><span class="icon-badge" style="background:rgba(233,85,107,0.14);color:var(--danger);">⚠️</span><h3 style="margin:0;color:var(--danger);">Comptes orphelins <span class="small" style="color:var(--muted);">(${orphaned.length})</span></h3></div>
@@ -11794,7 +11808,7 @@ function organizationStatsSummary(){
   const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
   const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
   const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
-  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id)).length;
+  const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && orgLeagueIds.has(r.league_id) && r.kind !== 'interest').length;
   const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id)).length + reqs;
   const members = organizationRosterEntries().length;
   return { leagues: orgLeagues.length, members, pending };
@@ -12067,6 +12081,10 @@ function settingsLigueTabHTML(){
   html += '<div class="card-grid">';
   html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
   html += '</div>';
+  const lm = currentLeagueMeta || {};
+  const where = [lm.city, lm.venue].filter(Boolean).join(' · ');
+  html += settingsSection('Recherche de ligues', 'Ce que voient les joueurs des autres organisations qui cherchent une ligue.');
+  html += '<div class="card-grid">' + settingsRow('🔍', 'Visibilité et lieu', (lm.listed === false ? 'Cachée' : (lm.is_full ? 'Visible · Complet' : 'Visible')) + (where ? ' · ' + where : ' · lieu non précisé'), "openLeagueListingModal()") + '</div>';
   html += settingsSection('Joueurs', 'Ajoutez plusieurs personnes d\'un coup depuis les membres de l\'organisation.');
   html += '<div class="card-grid">' + settingsRow('👥', 'Ajouter des membres de l\'organisation', `${(DATA.players||[]).length} joueur(s) · ${(DATA.substitutePool||[]).length} remplaçant(s) dans la ligue`, "openAddToLeagueModal('org')") + '</div>';
   if(DATA.leagueFormat !== 'mlp'){
@@ -12074,6 +12092,35 @@ function settingsLigueTabHTML(){
     html += '<div class="card-grid">' + settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()") + '</div>';
   }
   return html;
+}
+function openLeagueListingModal(){
+  const l = LEAGUES.find(x=>x.id===CURRENT_LEAGUE_ID) || {};
+  const ready = ('listed' in l);
+  const html = `${ready ? '' : `<p class="small" style="color:var(--paddle);">⚠️ La base de données n'est pas encore à jour pour cette fonction : l'enregistrement échouera.</p>`}
+    <p class="small">Les joueurs de toutes les organisations peuvent trouver cette ligue et demander à la rejoindre. Seuls le nom, l'organisation, l'horaire, le type, la ville, le lieu et la description sont montrés, jamais les joueurs ni les résultats.</p>
+    <div class="field"><label>Ville</label><input id="lsCity" placeholder="ex: Chicoutimi" value="${escapeHTML(l.city||'')}"></div>
+    <div class="field"><label>Lieu de jeu</label><input id="lsVenue" placeholder="ex: Centre Pickleball Saguenay" value="${escapeHTML(l.venue||'')}"></div>
+    <div class="field"><label>Description (facultatif)</label><textarea id="lsDesc" rows="3" maxlength="300" placeholder="ex: Niveau 3.0 à 3.5, places limitées">${escapeHTML(l.public_description||'')}</textarea></div>
+    <div class="card">
+      ${visSwitchPlain('lsListed', 'Visible dans la recherche', 'Désactivé : la ligue n\'apparaît plus, seuls les codes et invitations fonctionnent.', l.listed !== false)}
+      ${visSwitchPlain('lsFull', 'Complet', 'Les joueurs peuvent seulement signaler leur intérêt. Tu les vois dans Organisation › Comptes › Liste d\'intérêt.', !!l.is_full)}
+    </div>`;
+  showFormModal('Recherche de ligues', html, saveLeagueListing);
+}
+// Interrupteur lu au moment d'enregistrer (contrairement à visSwitch qui enregistre tout de suite).
+function visSwitchPlain(id, label, desc, checked){
+  return `<div class="vis-row"><div class="vis-txt"><div class="vis-l">${label}</div>${desc?`<div class="small">${desc}</div>`:''}</div><label class="switch"><input type="checkbox" id="${id}" ${checked?'checked':''}><span class="switch-slider"></span></label></div>`;
+}
+function saveLeagueListing(){
+  const val = function(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const v = { city: val('lsCity') || null, venue: val('lsVenue') || null, public_description: val('lsDesc') || null,
+    listed: !!document.getElementById('lsListed').checked, is_full: !!document.getElementById('lsFull').checked };
+  const id = CURRENT_LEAGUE_ID;
+  sb.from('leagues').update(v).eq('id', id).then(function(res){
+    if(res.error){ showAlert("Impossible d'enregistrer : " + res.error.message); return; }
+    const l = LEAGUES.find(x=>x.id===id); if(l) Object.assign(l, v);
+    render();
+  });
 }
 function settingsReglesTabHTML(){
   let html = '';
@@ -13269,7 +13316,7 @@ function renderPlayerAccount(me, drawerHTML, viewSlide){
     <div class="bottom-nav-spacer"></div>`;
   const c = document.getElementById('tabContent');
   c.innerHTML = active==='accueil' ? accountHomeHTML(me)
-    : active==='orgs' ? accountOrgsHTML(me)
+    : active==='orgs' ? (accountOrgsHTML(me) + (VIEW.pdet ? '' : leagueSearchEntryHTML()))
     : active==='comm' ? accountCommHTML(me)
     : active==='cal' ? calendarSheetHTML()
     : accountMeHTML(me);
@@ -13392,6 +13439,81 @@ function accountHomeHTML(me){
     html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
   }
   return html;
+}
+// ---- Recherche de ligues (toutes les organisations) ----
+// Les ligues visibles viennent de la fonction search_leagues (champs publics seulement).
+let LEAGUE_SEARCH = null; // { list, loading, error, q, city }
+async function openLeagueSearch(){
+  LEAGUE_SEARCH = { list: [], loading: true, error: '', q: '', city: '' };
+  showContentModal('Trouver une ligue', leagueSearchHTML);
+  const { data, error } = await sb.rpc('search_leagues');
+  if(!LEAGUE_SEARCH) return;
+  LEAGUE_SEARCH.loading = false;
+  LEAGUE_SEARCH.error = error ? "La recherche de ligues n'est pas encore disponible." : '';
+  LEAGUE_SEARCH.list = error ? [] : (data || []);
+  if(MODAL && MODAL.htmlContent === leagueSearchHTML) render();
+}
+function leagueSearchHTML(){
+  const st = LEAGUE_SEARCH; if(!st) return '';
+  if(st.loading) return '<p class="small">Chargement…</p>';
+  if(st.error) return `<p class="empty">${escapeHTML(st.error)}</p>`;
+  if(!st.list.length) return `<p class="empty">Aucune ligue ouverte pour l'instant.</p>`;
+  const cities = st.list.map(function(l){ return l.city || ''; }).filter(function(c, i, a){ return c && a.indexOf(c) === i; }).sort();
+  setTimeout(leagueSearchApply, 0);
+  return `<p class="small" style="margin-bottom:10px;">Les ligues ouvertes de toutes les organisations. Ta demande est envoyée à l'administrateur de la ligue, qui l'approuve.</p>
+    <input class="orgpick-search" id="lsQ" placeholder="🔍 Nom, ville, organisation…" value="${escapeHTML(st.q)}" oninput="LEAGUE_SEARCH.q=this.value;leagueSearchApply()" style="width:100%;margin-bottom:8px;">
+    ${cities.length > 1 ? `<div class="orgpick-chips" style="margin-bottom:10px;">${[''].concat(cities).map(function(c){ return `<button type="button" class="orgpick-chip ls-city ${st.city===c?'active':''}" data-city="${escapeHTML(c)}" onclick="leagueSearchCity(this)">${c ? escapeHTML(c) : 'Toutes les villes'}</button>`; }).join('')}</div>` : ''}
+    <div id="lsList">${st.list.map(leagueSearchCardHTML).join('')}<p class="empty" id="lsNone" style="display:none;">Aucune ligue ne correspond.</p></div>`;
+}
+function leagueSearchCardHTML(l){
+  const rec = l.league_type === 'recreational';
+  const where = [l.city, l.venue].filter(Boolean).join(' · ');
+  const hay = normPersonName([l.league_name, l.schedule_label, l.city, l.venue, l.organization_name].join(' '));
+  let action;
+  if(l.my_status === 'member') action = '<span class="tag tag-up">Tu en fais partie</span>';
+  else if(l.my_status === 'pending') action = '<span class="tag tag-yellow">Demande envoyée</span>';
+  else if(l.my_status === 'interest') action = '<span class="tag tag-yellow">Intérêt signalé</span>';
+  else action = `<button class="btn ${l.is_full?'btn-secondary':'btn-primary'}" style="width:auto;" onclick="requestJoinLeague('${l.league_id}',${l.is_full?'true':'false'})">${l.is_full ? 'Signaler mon intérêt' : 'Demander à rejoindre'}</button>`;
+  return `<div class="card ls-card" data-s="${escapeHTML(hay)}" data-city="${escapeHTML(l.city||'')}" style="margin-bottom:10px;">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="min-width:0;"><div style="font-weight:700;font-size:17px;">${escapeHTML(l.league_name||'')}</div><div class="small">${escapeHTML(l.organization_name||'')}${l.schedule_label ? ' · ' + escapeHTML(l.schedule_label) : ''}</div></div>
+      <span class="tag ${rec?'tag-orange':'tag-up'}">${rec ? '🎉 Récréative' : '🏆 Compétitive'}</span>
+    </div>
+    ${where ? `<div class="small" style="margin-top:6px;">📍 ${escapeHTML(where)}</div>` : ''}
+    ${l.description ? `<p class="small" style="margin:6px 0 0;">${escapeHTML(l.description)}</p>` : ''}
+    ${l.is_full ? `<div class="small" style="margin-top:6px;color:var(--paddle);">Complet pour l'instant : tu peux signaler ton intérêt.</div>` : ''}
+    <div style="margin-top:10px;">${action}</div>
+  </div>`;
+}
+function leagueSearchApply(){
+  const el = document.getElementById('lsQ'); if(!el) return;
+  const q = normPersonName(el.value);
+  const city = (LEAGUE_SEARCH && LEAGUE_SEARCH.city) || '';
+  let shown = 0;
+  document.querySelectorAll('#lsList .ls-card').forEach(function(c){
+    const ok = (!q || c.getAttribute('data-s').indexOf(q) !== -1) && (!city || c.getAttribute('data-city') === city);
+    c.style.display = ok ? '' : 'none';
+    if(ok) shown++;
+  });
+  const none = document.getElementById('lsNone'); if(none) none.style.display = shown ? 'none' : '';
+}
+function leagueSearchCity(btn){
+  LEAGUE_SEARCH.city = btn.getAttribute('data-city');
+  document.querySelectorAll('.ls-city').forEach(function(b){ b.classList.toggle('active', b === btn); });
+  leagueSearchApply();
+}
+function requestJoinLeague(leagueId, full){
+  const msg = full
+    ? "Cette ligue est complète. Signaler ton intérêt ? L'administrateur verra ta demande et pourra t'ajouter quand une place se libère."
+    : "Envoyer une demande pour rejoindre cette ligue ? L'administrateur devra l'approuver.";
+  showConfirm(msg, async ()=>{
+    const { data, error } = await sb.rpc('request_join_league', { p_league_id: leagueId });
+    if(error || !data || !data.ok){ showAlert((data && data.error) || ("Impossible d'envoyer la demande" + (error ? ' : ' + error.message : '.'))); return; }
+    showAlert(data.kind === 'interest' ? "Intérêt signalé ✅ L'administrateur de la ligue verra ta demande." : "Demande envoyée ✅ Tu seras averti(e) dès qu'elle sera approuvée.");
+  });
+}
+function leagueSearchEntryHTML(){
+  return `<button type="button" class="btn btn-secondary" style="margin-top:16px;width:100%;" onclick="openLeagueSearch()">🔍 Trouver une autre ligue</button>`;
 }
 // ---- Organisations ----
 function accountOrgsHTML(me){
