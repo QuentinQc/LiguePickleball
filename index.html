@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 274">
+<meta name="app-build" content="Version 275">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1904,6 +1904,18 @@ function notifyAdminsPlannedAbsence(playerName, startDate, endDate){
 }
 // Un remplaçant s'indique disponible lui-même — prévient les admins de
 // cette ligue.
+// Une personne demande à rejoindre une ligue (code de ligue ou recherche) — prévient ses admins.
+function notifyAdminsJoinRequest(leagueId, leagueName, kind){
+  if(!leagueId) return;
+  const who = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || "Quelqu'un";
+  invokeSendNotification({
+    league_id: leagueId,
+    audience: 'admins', category: 'admin_alerts',
+    title: kind === 'interest' ? '⭐ Nouvel intérêt' : "🙋 Nouvelle demande d'adhésion",
+    body: `${who} ${kind === 'interest' ? 'aimerait jouer dans' : 'demande à rejoindre'} ${leagueName || 'ta ligue'}. À traiter dans Organisation › Comptes.`,
+    url: '/'
+  });
+}
 function notifyAdminsSubAvailable(subName, sessionDate){
   if(!CURRENT_LEAGUE_ID) return;
   invokeSendNotification({
@@ -4101,6 +4113,62 @@ function socialShuffleGroups(session){
     p.groupId = placed[p.id] || null;
   });
 }
+// Après une absence (ou un retour) en récréatif : on garde les terrains tels quels si c'est encore
+// valable (le terrain de l'absent a simplement une place de moins, un joueur de retour prend une
+// place libre) ; sinon, nouveau tirage complet. Retourne 'kept' ou 'redrawn'.
+function socialReconcile(session){
+  const lim = socialCourtLimits();
+  const isOut = function(p){ return p.injured || isAbsent(session, p.id); };
+  DATA.players.forEach(function(p){ if(isOut(p)) p.groupId = null; });
+  const present = DATA.players.filter(function(p){ return !isOut(p); });
+  const plan = socialPlanFor(present.length);
+  const counts = {};
+  present.forEach(function(p){ if(p.groupId) counts[p.groupId] = (counts[p.groupId] || 0) + 1; });
+  present.filter(function(p){ return !p.groupId; }).forEach(function(p){
+    let best = null;
+    Object.keys(counts).forEach(function(g){ if(counts[g] < lim.max && (best === null || counts[g] < counts[best])) best = g; });
+    if(best){ p.groupId = best; counts[best]++; }
+  });
+  const sizes = Object.keys(counts).map(function(g){ return counts[g]; });
+  const unplaced = present.filter(function(p){ return !p.groupId; }).length;
+  const ok = sizes.length === plan.sizes.length && unplaced === plan.left && sizes.every(function(n){ return n >= lim.min && n <= lim.max; });
+  if(ok) return 'kept';
+  socialShuffleGroups(session);
+  return 'redrawn';
+}
+// Prévient les joueurs quand les terrains d'une soirée déjà publiée ont été refaits.
+function notifySocialRedraw(session){
+  if(!CURRENT_LEAGUE_ID || !session) return;
+  invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, audience:'players', category:'league_sessions',
+    title: '🎲 Terrains refaits',
+    body: `${currentLeagueLabel()} — soirée du ${session.date} : les terrains ont été refaits à la suite d'une absence. Vérifie ton terrain.`,
+    url: '/' });
+}
+// Absence déclarée par le joueur lui-même : le serveur l'enregistre sans toucher aux terrains.
+// Son application calcule la mise à jour et l'envoie (social_apply_draw vérifie qu'elle est valable).
+async function socialRedrawAfterSelfChange(){
+  try{
+    const open = currentOpenSession();
+    if(!open || DATA.leagueFormat !== 'social') return;
+    const nGroups = DATA.groups.length;
+    const before = {};
+    DATA.players.forEach(function(p){ before[p.id] = p.groupId || null; });
+    const res = socialReconcile(open);
+    let changed = false;
+    const assign = {};
+    DATA.players.forEach(function(p){
+      if(p.groupId && !p.injured) assign[p.id] = p.groupId;
+      if((p.groupId || null) !== before[p.id]) changed = true;
+    });
+    // Rien à changer, ou il faudrait créer des terrains : l'admin s'en chargera à sa prochaine ouverture.
+    if(changed && DATA.groups.length === nGroups){
+      const { error } = await sb.rpc('social_apply_draw', { p_league_id: CURRENT_LEAGUE_ID, p_session_id: open.id, p_assign: assign });
+      if(error) console.error(error);
+      else if(res === 'redrawn' && open.published) notifySocialRedraw(open);
+    }
+  }catch(e){ console.error(e); }
+  await scoreReloadFromServer();
+}
 function socialRedraw(){
   const open = currentOpenSession(); if(!open) return;
   showConfirm('Refaire le tirage au sort des terrains avec les joueurs présents ?', ()=>{
@@ -4156,7 +4224,7 @@ function toggleAbsence(playerId){
   if(isPlayerActor()){
     if(isAbsent(open, playerId)) return;
     const hp = DATA.players.find(p=>p.id===playerId), dt = open.date;
-    selfAction('absent_session', { playerId }).then(ok=>{ if(ok) notifyAdminsPlayerAbsent(hp && hp.name, dt); });
+    selfAction('absent_session', { playerId }).then(ok=>{ if(ok){ notifyAdminsPlayerAbsent(hp && hp.name, dt); socialRedrawAfterSelfChange(); } });
     return;
   }
   if(!open.absences) open.absences = [];
@@ -4189,10 +4257,12 @@ function toggleAbsence(playerId){
       groupsToRefresh.add(toGid);
     }
   }
-  if(DATA.leagueFormat === 'social' && !open.published){
-    // Rotation sociale : une absence (ou un retour) refait le tirage des terrains pour que tout le monde joue.
-    socialShuffleGroups(open);
+  if(DATA.leagueFormat === 'social'){
+    // Rotation sociale : une absence (ou un retour) met à jour les terrains pour que tout le monde joue,
+    // en touchant le moins de monde possible ; les joueurs sont prévenus si tout a été retiré.
+    const res = socialReconcile(open);
     open.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
+    if(res === 'redrawn' && open.published) notifySocialRedraw(open);
   } else {
     groupsToRefresh.forEach(gId=>regenerateGroupMatches(open, gId));
   }
@@ -5531,6 +5601,7 @@ async function onAuthResolved(user){
       const r = await sb.rpc('redeem_invitation', { p_code: code });
       let msg = null;
       if(r && r.data){
+        if(r.data.ok && r.data.pending) notifyAdminsJoinRequest(r.data.league_id, null, 'join');
         if(r.data.ok) msg = r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : "Invitation acceptée ✅ Bienvenue dans la ligue !";
         else msg = r.data.error || null;
       } else if(r && r.error){ msg = "Invitation : " + r.error.message; }
@@ -5683,7 +5754,7 @@ function openInviteCodePrompt(){
     const { data, error } = await sb.rpc('redeem_invitation', { p_code: code.trim() });
     if(error){ showAlert("Erreur : " + error.message); return; }
     if(!data || !data.ok){ showAlert((data && data.error) || 'Code invalide ou expiré.'); return; }
-    if(data.pending){ showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
+    if(data.pending){ notifyAdminsJoinRequest(data.league_id, null, 'join'); showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
     showAlert("Invitation acceptée ✅ Bienvenue dans la ligue !");
@@ -9239,7 +9310,7 @@ function toggleMyInjured(pid){
   if(!p || p.injured) return;
   if(isPlayerActor()){
     const pn = p.name;
-    selfAction('injured', { playerId: pid }).then(ok=>{ if(ok) notifyAdminsPlayerInjured(pn); });
+    selfAction('injured', { playerId: pid }).then(ok=>{ if(ok){ notifyAdminsPlayerInjured(pn); socialRedrawAfterSelfChange(); } });
     return;
   }
   p.lastGroupId = p.groupId || p.lastGroupId || null;
@@ -11147,6 +11218,16 @@ function syncOpenSessionMatchCounts(){
 }
 function processPendingRegen(){
   syncOpenSessionMatchCounts();
+  try{
+    const o = currentOpenSession();
+    if(o && DATA.leagueFormat === 'social' && SESSION_USER && SESSION_USER.role === 'admin' && !OFFLINE_MODE
+       && DATA.players.some(function(p){ return p.groupId && (p.injured || isAbsent(o, p.id)); })){
+      const res = socialReconcile(o);
+      o.groupsData = DATA.groups.map(function(g){ return { groupId:g.id, matches:[] }; });
+      saveData();
+      if(res === 'redrawn' && o.published) notifySocialRedraw(o);
+    }
+  }catch(e){ console.error(e); }
   try{
     const open = currentOpenSession();
     if(!open || !Array.isArray(open.regenGroups) || !open.regenGroups.length) return;
@@ -13761,6 +13842,8 @@ function requestJoinLeague(leagueId, full){
   showConfirm(msg, async ()=>{
     const { data, error } = await sb.rpc('request_join_league', { p_league_id: leagueId });
     if(error || !data || !data.ok){ showAlert((data && data.error) || ("Impossible d'envoyer la demande" + (error ? ' : ' + error.message : '.'))); return; }
+    const lsItem = LEAGUE_SEARCH && LEAGUE_SEARCH.list.find(function(x){ return x.league_id === leagueId; });
+    notifyAdminsJoinRequest(leagueId, lsItem && lsItem.league_name, data.kind);
     showAlert(data.kind === 'interest' ? "Intérêt signalé ✅ L'administrateur de la ligue verra ta demande." : "Demande envoyée ✅ Tu seras averti(e) dès qu'elle sera approuvée.");
   });
 }
@@ -14863,7 +14946,7 @@ function submitPlannedAbsence(playerId){
   if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return; }
   if(isPlayerActor()){
     const hp = DATA.players.find(x=>x.id===playerId);
-    selfAction('planned_absence', { playerId, startDate:start, endDate:end }).then(ok=>{ if(ok){ notifyAdminsPlannedAbsence(hp && hp.name, start, end); render(); } });
+    selfAction('planned_absence', { playerId, startDate:start, endDate:end }).then(ok=>{ if(ok){ notifyAdminsPlannedAbsence(hp && hp.name, start, end); socialRedrawAfterSelfChange(); } });
     return;
   }
   addPlannedAbsence(playerId, start, end);
