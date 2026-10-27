@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 241">
+<meta name="app-build" content="Version 242">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1332,11 +1332,12 @@ function sha256hex(str){
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js'
   ];
   window.__sbUrls = urls;
-  if(!ok){ document.write('<script src="'+urls[0]+'"><\/script>'); }
+  // Chargement depuis le réseau : le navigateur refuse tout fichier dont l'empreinte ne correspond pas (SRI).
+  if(!ok){ document.write('<script src="'+urls[0]+'" integrity="sha256-hZaWX+kY5lZgChtWjToWj1wNPSKmAIhrtvRKZVXbAec=" crossorigin="anonymous"><\/script>'); }
 })();
 </script>
-<script>if(!window.supabase){ document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>'); }</script>
-<script>if(!window.supabase){ document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"><\/script>'); }</script>
+<script>if(!window.supabase){ document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha256-hZaWX+kY5lZgChtWjToWj1wNPSKmAIhrtvRKZVXbAec=" crossorigin="anonymous"><\/script>'); }</script>
+<script>if(!window.supabase){ document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js" integrity="sha256-2a1CX3w8GuLl39s3KW9OsmcRFVqgrOXia6ZL1i6en0g=" crossorigin="anonymous"><\/script>'); }</script>
 <script>
 // Une fois la bibliothèque disponible, on en garde une copie locale (une seule fois).
 window.addEventListener('load', function(){
