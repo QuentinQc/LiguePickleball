@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 247">
+<meta name="app-build" content="Version 248">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1416,6 +1416,29 @@ let ADMIN_SHOWING_ORG = false; // true = page pleine page « Organisation » aff
 // Si le lien contient ?org=<id>, ce compte s'inscrit pour rejoindre cette
 // organisation précise (voir Réglages → lien d'inscription d'organisation).
 const SIGNUP_ORG_ID = new URLSearchParams(window.location.search).get('org') || null;
+// Lien d'invitation « ?code=XXXX-XXXX » : le code est gardé (même après la confirmation du courriel)
+// puis appliqué automatiquement à la connexion. On le retire de l'adresse pour ne pas le rejouer.
+let PENDING_CODE = null;
+(function(){
+  try{
+    const c = new URLSearchParams(window.location.search).get('code');
+    if(c){
+      PENDING_CODE = c.trim().slice(0, 40);
+      try{ localStorage.setItem('dinkeo_pending_code', PENDING_CODE); }catch(e){}
+      try{ window.history.replaceState(null, '', window.location.pathname + window.location.hash); }catch(e){}
+    } else {
+      try{ PENDING_CODE = localStorage.getItem('dinkeo_pending_code') || null; }catch(e){}
+    }
+  }catch(e){}
+})();
+function inviteLinkFor(code){ return window.location.origin + window.location.pathname + '?code=' + encodeURIComponent(code); }
+function copyInviteLink(code){
+  const link = inviteLinkFor(code);
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(function(){ showAlert('Lien copié :\n' + link); }, function(){ showAlert('Lien :\n' + link); }); return; }
+  }catch(e){}
+  showAlert('Lien :\n' + link);
+}
 let SIGNUP_ORG_NAME = null;
 let VIEW = { tab: null, error: null };
 
@@ -4843,7 +4866,7 @@ function loginFormInnerHTML(){
         <button class="btn btn-primary" onclick="onResetPassword()">Envoyer le lien</button>
         <p class="small"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← Retour à la connexion</a></p>
       ` : mode==='signup' ? (true ? `
-        ${SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Tu t'inscris pour rejoindre : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong></p>` : `<p class="small">Crée ton compte, puis entre le <strong>code d'invitation</strong> que ton administrateur t'a remis.</p>`}
+        ${PENDING_CODE ? `<p class="small" style="color:var(--ball);">🎟️ Tu as été invité(e) : crée ton compte, ton invitation sera appliquée automatiquement.</p>` : (SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Organisation : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong>. Après ta connexion, entre le code d'invitation de ta ligue.</p>` : `<p class="small">Crée ton compte, puis entre le <strong>code d'invitation</strong> que ton administrateur t'a remis.</p>`)}
         <form onsubmit="onSignUp();return false;" autocomplete="on">
           <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" name="name" autocomplete="name" placeholder="Prénom Nom"></div>
           <div class="field"><label>Courriel</label><input id="signupEmail" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="toi@exemple.com"></div>
@@ -4903,7 +4926,7 @@ async function onSignUp(){
   if(email.toLowerCase() !== emailConfirm.toLowerCase()){ VIEW.error='Les deux courriels ne correspondent pas.'; render(); return; }
   if(password !== passwordConfirm){ VIEW.error='Les deux mots de passe ne correspondent pas.'; render(); return; }
   VIEW.error=null; VIEW.info='Création du compte…'; render();
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname + (PENDING_CODE ? '?code=' + encodeURIComponent(PENDING_CODE) : '') } });
   if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
   VIEW.info = "Compte créé ! Vérifie tes courriels pour confirmer ton adresse, puis connecte-toi. Ensuite, entre ton code d'invitation pour rejoindre ta ligue.";
   VIEW.loginMode = 'signin';
@@ -4931,9 +4954,25 @@ async function onResetPassword(){
   render();
 }
 async function onAuthResolved(user){
-  if(!user){ SESSION_USER = null; CURRENT_PROFILE = null; render(); return; }
+  if(!user){ SESSION_USER = null; CURRENT_PROFILE = null; render(); if(PENDING_CODE && !MODAL) openLoginModal('signup'); return; }
 
-  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  let { data: profile, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if(!error && profile && PENDING_CODE){
+    // Invitation reçue par lien : on l'applique une seule fois, puis on recharge le profil.
+    const code = PENDING_CODE; PENDING_CODE = null;
+    try{ localStorage.removeItem('dinkeo_pending_code'); }catch(e){}
+    try{
+      const r = await sb.rpc('redeem_invitation', { p_code: code });
+      let msg = null;
+      if(r && r.data){
+        if(r.data.ok) msg = r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : "Invitation acceptée ✅ Bienvenue dans la ligue !";
+        else msg = r.data.error || null;
+      } else if(r && r.error){ msg = "Invitation : " + r.error.message; }
+      const again = await sb.from('profiles').select('*').eq('id', user.id).single();
+      if(again && again.data) profile = again.data;
+      if(msg) setTimeout(function(){ showAlert(msg); }, 400);
+    }catch(e){ console.error('invitation par lien', e); }
+  }
   if(error || !profile){
     SESSION_USER = { role:'pending', email: user.email, displayName: user.user_metadata && user.user_metadata.display_name };
     CURRENT_PROFILE = null;
@@ -5022,8 +5061,9 @@ async function inviteForEntry(id, kind, renew){
   showContentModal("Invitation", `
     <p class="small">Envoie ce code <strong>seulement à cette personne</strong>. Il ne fonctionne qu'une fois${exp ? ' et expire le ' + escapeHTML(exp) : ''}.</p>
     <div style="font-family:Oswald,sans-serif;font-size:34px;letter-spacing:3px;text-align:center;margin:16px 0;color:var(--ball);">${escapeHTML(code)}</div>
-    <button class="btn btn-primary" onclick="copyInviteCode('${escapeHTML(code)}')">Copier le code</button>
-    <p class="small" style="margin-top:12px;">Elle ouvre <strong>${escapeHTML(url)}</strong>, crée un compte, puis entre ce code (« J'ai un code d'invitation »).</p>
+    <button class="btn btn-primary" onclick="copyInviteLink('${escapeHTML(code)}')">Copier le lien d'invitation</button>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="copyInviteCode('${escapeHTML(code)}')">Copier le code seulement</button>
+    <p class="small" style="margin-top:12px;">Avec le lien, la personne crée son compte (ou se connecte) et l'invitation s'applique toute seule. Sinon, elle peut ouvrir <strong>${escapeHTML(url)}</strong> et entrer le code (« J'ai un code d'invitation »).</p>
     <button class="btn btn-secondary" style="margin-top:8px;" onclick="inviteForEntry('${id}','${kind}',true)">Générer un nouveau code (annule celui-ci)</button>`);
 }
 function copyInviteCode(code){
@@ -9308,7 +9348,7 @@ function organizationAccountsHTML(){
         <div><div style="font-weight:600;">${escapeHTML(l.schedule_label || l.name)}</div>
           ${live ? `<div class="small"><span style="font-family:Oswald,sans-serif;font-size:20px;letter-spacing:2px;color:var(--ball);">${escapeHTML(c.code)}</span><br>${c.uses}/${c.max_uses} utilisations · expire le ${escapeHTML(new Date(c.expires_at).toLocaleDateString('fr-CA',{day:'numeric',month:'long'}))}</div>` : `<div class="small" style="color:var(--muted);">${c ? 'Code désactivé ou expiré' : 'Aucun code'}</div>`}</div>
         <div class="row" style="gap:6px;flex-wrap:wrap;">
-          ${live ? `<button class="btn-ghost" onclick="copyInviteCode('${escapeHTML(c.code)}')">Copier</button>` : ''}
+          ${live ? `<button class="btn-ghost" onclick="copyInviteCode('${escapeHTML(c.code)}')">Copier le code</button><button class="btn-ghost" onclick="copyInviteLink('${escapeHTML(c.code)}')">Copier le lien</button>` : ''}
           <button class="btn-ghost" onclick="manageJoinCode('${l.id}','create')">${c ? 'Nouveau code' : 'Activer un code'}</button>
           ${live ? `<button class="btn-ghost-danger" onclick="manageJoinCode('${l.id}','disable')">Désactiver</button>` : ''}
         </div>
