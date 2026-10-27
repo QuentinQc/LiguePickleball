@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 238">
+<meta name="app-build" content="Version 239">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13868,8 +13868,16 @@ async function boot(){
   // (voir onAuthResolved) — avant ça, DATA reste vide et l'écran de connexion
   // s'affiche avec un titre générique.
   if(SIGNUP_ORG_ID){
-    const { data } = await sb.from('organizations').select('name').eq('id', SIGNUP_ORG_ID).maybeSingle();
-    if(data) SIGNUP_ORG_NAME = data.name;
+    // Nom de l'organisation du lien d'inscription : via une fonction serveur (la liste des organisations n'est plus publique).
+    // Repli sur l'ancienne lecture directe tant que la fonction n'est pas installée côté serveur.
+    try{
+      const r = await sb.rpc('org_signup_name', { p_id: SIGNUP_ORG_ID });
+      if(!r.error && r.data) SIGNUP_ORG_NAME = r.data;
+      else if(r.error){
+        const { data } = await sb.from('organizations').select('name').eq('id', SIGNUP_ORG_ID).maybeSingle();
+        if(data) SIGNUP_ORG_NAME = data.name;
+      }
+    }catch(e){}
   }
   const { data: { session } } = await sb.auth.getSession();
   if(PASSWORD_RECOVERY_MODE){ render(); return; } // déjà intercepté par l'événement ci-dessus
