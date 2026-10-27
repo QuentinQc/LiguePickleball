@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 262">
+<meta name="app-build" content="Version 263">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -12443,7 +12443,7 @@ function openMlpRosterSizeModal(){
 }
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social:'Rotation sociale (groupes au hasard chaque session)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
+  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social:'Rotation sociale (terrains tirés au hasard à chaque soirée)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
   const html = `
     <p class="small">Format de ligue : <strong>${formatLabel}</strong> <span class="small">(défini à la création, non modifiable ici)</span></p>
     <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
@@ -12459,14 +12459,16 @@ function openGeneralInfoModal(){
       <div class="field" style="flex:1;min-width:140px;"><label>Heure de début des sessions (calendrier)</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
       <div class="field" style="flex:1;min-width:140px;"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
     </div>
-    <div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>`;
+    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>` : ''}`;
   showFormModal('Informations générales', html, saveGeneralInfoForm);
 }
 function saveGeneralInfoForm(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
   const dayVal = document.getElementById('setPlayDay').value;
   DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
-  DATA.swapCount = Math.max(1, parseInt(document.getElementById('setSwap').value,10) || 1);
+  // Montées/descentes : seulement en échelle (le champ n'est pas affiché pour les autres formats).
+  const swapEl = document.getElementById('setSwap');
+  if(swapEl) DATA.swapCount = Math.max(1, parseInt(swapEl.value,10) || 1);
   DATA.playTime = document.getElementById('setPlayTime').value || undefined;
   DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
   const scheduleLabel = document.getElementById('setLeagueSchedule').value.trim();
