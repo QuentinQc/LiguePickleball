@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 288">
+<meta name="app-build" content="Version 289">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1290,6 +1290,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rs-sit{font-size:13px;color:var(--muted);padding:8px 14px 10px;border-top:1px solid var(--line-soft);}
 .rs-tag{font-size:11px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;vertical-align:middle;}
 .rs-acts{margin-top:4px;}
+.rs-m.me{border-color:rgba(207,234,92,.55);box-shadow:0 0 0 1px rgba(207,234,92,.25);}
+.rs-m.ro.todo:not(.me){border-color:var(--line-soft);}
+.rs-sc{flex:none;width:64px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;font-family:var(--font-display);border-radius:12px;background:rgba(0,0,0,.25);}
+.rs-m.wa .rs-line.a .rs-sc,.rs-m.wb .rs-line.b .rs-sc{color:var(--ball);}
+.rs-tag.me{background:rgba(207,234,92,.16);color:var(--ball);}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -10937,7 +10942,7 @@ function rsClass(m){
 function refreshRsMatch(gid, mi, m){
   const el = document.getElementById('rsm_'+gid+'_'+mi);
   if(!el) return;
-  el.className = 'rs-m ' + rsClass(m);
+  el.className = 'rs-m ' + rsClass(m) + (el.classList.contains('me') ? ' me' : '') + (el.getAttribute('data-edit')==='0' ? ' ro' : '');
   const st = el.querySelector('.rs-state'); if(st) st.textContent = rsDone(m) ? '✓' : 'À saisir';
   const open = currentOpenSession(); const gd = open && open.groupsData.find(x=>x.groupId===gid);
   if(!gd) return;
@@ -15119,38 +15124,33 @@ function playerGroupHTML(me){
     } else if(!open.published){
       // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
     } else if(gd && gd.matches.length){
-      html += `<div class="card" id="playerMatchesCard"><h3>Matchs de la session en cours (${fdl(open.date)})</h3>`;
-      if(DATA.leagueFormat==='social'){
-        html += `<p class="small">Ici on joue pour le plaisir : aucun score à entrer. 🎉</p>`;
+      const social = DATA.leagueFormat==='social';
+      const nDone = gd.matches.filter(rsDone).length, nAll = gd.matches.length;
+      html += `<div class="card rs-card" id="playerMatchesCard"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${me.groupId}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i id="rsb_${me.groupId}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
+      if(social){
+        html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer. 🎉</div>`;
       } else if(DATA.allowPlayerScoreEntry && !scoreDayOpen(open.date)){
-        html += `<p class="small">${escapeHTML(scoreDayMsg(open.date))}</p>`;
-      } else if(DATA.allowPlayerScoreEntry && !OFFLINE_MODE){
-        html += `<p class="small">Tu peux entrer les scores directement ci-dessous.</p>`;
+        html += `<div class="ah-meta">${escapeHTML(scoreDayMsg(open.date))}</div>`;
       } else if(DATA.allowPlayerScoreEntry && OFFLINE_MODE){
-        html += `<p class="small" style="color:#FF9F0A;">📴 Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</p>`;
+        html += `<div class="rs-warn">📴 Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</div>`;
       }
       gd.matches.forEach((m,mi)=>{
         const mine = m.teamA.includes(me.id) || m.teamB.includes(me.id);
         const entryOn = DATA.allowPlayerScoreEntry && !OFFLINE_MODE && scoreDayOpen(open.date);
         const lk = entryOn ? scoreLockState(m,false) : null;
         const editable = !!lk && (lk.state==='open' || lk.state==='mine');
-        const mrDone = m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='';
-        const cell = (side, val) => DATA.leagueFormat==='social' ? '' : editable
-          ? `<input class="pill-input" type="number" min="0" inputmode="numeric" aria-label="Score de l'équipe ${side==='A'?1:2}" id="sc_${me.groupId}_${mi}_${side}" value="${val===null?'':val}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)">`
-          : `<div class="mr-score">${val==null||val===''?'—':val}</div>`;
-        const mrSit = m.sit ? ` · repos : ${escapeHTML(sitLabel(m))}` : '';
-        html += `<div class="match-row mr2 ${mine?'me':''}">
-          <div class="mr-head${editable && !mrDone ? ' todo' : ''}" id="mrh_${me.groupId}_${mi}" data-edit="${editable?1:0}" data-sit="${m.sit ? escapeHTML(' · repos : '+sitLabel(m)) : ''}">Match ${mi+1}${editable && !mrDone ? ' · à saisir' : ''}${mrSit}</div>
-          <div class="mr-line">
-            <div class="team">${m.teamA.map(playerName).map(escapeHTML).join(' & ')}</div>
-            ${cell('A', m.scoreA)}
-          </div>
-          <div class="mr-line">
-            <div class="team">${m.teamB.map(playerName).map(escapeHTML).join(' & ')}</div>
-            ${cell('B', m.scoreB)}
-          </div>
-          ${DATA.leagueFormat==='social' ? '' : scoreMarkHTML('ladder', me.groupId, mi, m, false)}
-        </div>`;        
+        const done = rsDone(m);
+        const cell = (side, val) => social ? '' : editable
+          ? `<input class="pill-input rs-in" type="number" min="0" inputmode="numeric" aria-label="Score de l'équipe ${side==='A'?1:2}" id="sc_${me.groupId}_${mi}_${side}" value="${val===null?'':val}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)">`
+          : `<div class="rs-sc">${val==null||val===''?'—':val}</div>`;
+        const team = t=> t.map(id=>escapeHTML(playerName(id)) + (id===me.id ? ' <span class="rs-tag me">toi</span>' : '')).join('<br>');
+        const st = done ? '✓' : (editable ? 'À saisir' : '');
+        html += `<div class="rs-m ${social ? '' : rsClass(m)}${mine?' me':''}${editable?'':' ro'}" id="rsm_${me.groupId}_${mi}" data-edit="${editable?1:0}">
+          <div class="rs-mh"><b>Match ${mi+1}</b>${social ? '' : scoreMarkHTML('ladder', me.groupId, mi, m, false, true)}${st ? `<span class="rs-state">${st}</span>` : ''}</div>
+          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${cell('A', m.scoreA)}</div>
+          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${cell('B', m.scoreB)}</div>
+          ${m.sit ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
+        </div>`;
       });
       html += `</div>`;
     }
