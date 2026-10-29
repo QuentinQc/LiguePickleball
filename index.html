@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 289">
+<meta name="app-build" content="Version 290">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1295,6 +1295,25 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rs-sc{flex:none;width:64px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;font-family:var(--font-display);border-radius:12px;background:rgba(0,0,0,.25);}
 .rs-m.wa .rs-line.a .rs-sc,.rs-m.wb .rs-line.b .rs-sc{color:var(--ball);}
 .rs-tag.me{background:rgba(207,234,92,.16);color:var(--ball);}
+.hs-card{padding:0;overflow:hidden;}
+.hs-sum{list-style:none;display:flex;align-items:center;gap:10px;padding:16px;cursor:pointer;}
+.hs-sum::-webkit-details-marker{display:none;}
+.hs-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+.hs-t b{font-size:17px;}
+.hs-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.hs-chips .pf-chip:before{display:none;}
+.hs-row .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hs-ch{color:var(--muted);font-size:22px;transition:transform .15s;}
+.hs-card[open] .hs-ch{transform:rotate(90deg);}
+.hs-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
+.hs-g{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 2px 0;}
+.hs-rk{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:14px;flex:0 0 auto;}
+.hs-row.me{background:rgba(207,234,92,.08);}
+.hs-mv{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto;}
+.hs-mv.up{background:rgba(207,234,92,.16);color:var(--ball);} .hs-mv.down{background:rgba(255,159,10,.18);color:#FF9F0A;}
+.hs-d{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;} .hs-d.p{color:var(--ball);} .hs-d.n{color:#ff6b6b;}
+.hs-acts{margin-top:8px;}
+.hs-del{color:#ff6b6b;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -12043,7 +12062,7 @@ function setReportsSort(col){
 function adminHistoryHTML(){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
   if(closed.length===0) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
-  return closed.map(s=>sessionSummaryHTML(s, true)).join('');
+  return closed.map((s,i)=>sessionSummaryHTML(s, true, null, i===0)).join('');
 }
 // Retrouve le groupe où un joueur a réellement joué lors d'une session donnée
 // (peut différer de son groupe actuel s'il a été déplacé depuis, ou prêté ce jour-là).
@@ -12064,22 +12083,21 @@ function matchListInnerHTML(s, onlyGroupId){
     if(!gd || !gd.matches || gd.matches.length===0) return;
     any = true;
     const subValues = new Set(gd.substitutes ? Object.values(gd.substitutes) : []);
-    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3>`;
-    gd.matches.forEach(m=>{
+    if(!onlyGroupId) html += `<div class="hs-g">${escapeHTML(g.name)}</div>`;
+    html += `<div class="rs-card">`;
+    gd.matches.forEach((m, mi)=>{
       const nameTag = (id)=>{
-        if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(invité)</span>';
-        const isSub = subValues.has(id);
-        return escapeHTML(playerName(id)) + (isSub ? ' <span class="small">(remplaçant)</span>' : '');
+        if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="rs-tag">invité</span>';
+        return escapeHTML(playerName(id)) + (subValues.has(id) ? ' <span class="rs-tag">rempl.</span>' : '');
       };
-      const sa = (m.scoreA===null || m.scoreA==='' || m.scoreA===undefined) ? '—' : m.scoreA;
-      const sb = (m.scoreB===null || m.scoreB==='' || m.scoreB===undefined) ? '—' : m.scoreB;
-      const mi = gd.matches.indexOf(m);
-      html += `<div class="match-row mr2">
-        <div class="mr-head">Match ${mi+1}</div>
-        <div class="mr-line"><div class="team">${m.teamA.map(nameTag).join(' & ')}</div><div class="mr-score">${sa}</div></div>
-        <div class="mr-line"><div class="team">${m.teamB.map(nameTag).join(' & ')}</div><div class="mr-score">${sb}</div></div>
+      const sc = v => (v===null || v==='' || v===undefined) ? '—' : v;
+      html += `<div class="rs-m ${rsDone(m) ? rsClass(m) : ''}">
+        <div class="rs-mh"><b>Match ${mi+1}</b></div>
+        <div class="rs-line a"><div class="rs-team">${m.teamA.map(nameTag).join('<br>')}</div><div class="rs-sc">${sc(m.scoreA)}</div></div>
+        <div class="rs-line b"><div class="rs-team">${m.teamB.map(nameTag).join('<br>')}</div><div class="rs-sc">${sc(m.scoreB)}</div></div>
       </div>`;
     });
+    html += `</div>`;
   });
   if(!any) html += `<p class="empty">Aucun match enregistré pour cette session.</p>`;
   return html;
@@ -12089,7 +12107,7 @@ function showMatchHistoryModal(sessionId, onlyGroupId){
   const s = DATA.sessions.find(x=>x.id===sessionId);
   if(!s) return;
   const g = onlyGroupId ? groupById(onlyGroupId) : null;
-  const title = 'Matchs — session du ' + s.date + (g ? ' — ' + g.name : '');
+  const title = 'Matchs — ' + fdl(s.date) + (g ? ' — ' + g.name : '');
   showContentModal(title, matchListInnerHTML(s, onlyGroupId));
 }
 // ---- Rouvrir une session terminée (format Échelle) ----
@@ -12172,59 +12190,65 @@ function deleteSession(sessionId){
     }
   });
 }
-function sessionSummaryHTML(s, withDelete, viewerPlayerId){
+function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
   const restrictGroupId = viewerPlayerId ? playerSessionGroupId(s, viewerPlayerId) : null;
   const showRating = !viewerPlayerId || DATA.showRatingToPlayers; // toujours visible pour l'admin (pas de viewerPlayerId)
-  let html = `<div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 class="sess-date" style="margin:0;">${typeof frDateLong==='function'?frDateLong(s.date):('Session du '+s.date)}${s.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
-      <div class="row" style="gap:8px;">
-        <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})">${pbIcon()} Matchs${viewerPlayerId ? ' de mon groupe' : ''}</button>
-        ${withDelete ? `<button class="btn-ghost-danger" onclick="deleteSession('${s.id}')">supprimer</button>` : ''}
-      </div>
-    </div>`;
-  if(withDelete && !viewerPlayerId && isLatestClosedSession(s)) html += `<button class="btn-ghost" style="margin:8px 0;" onclick="reopenLadderSession('${s.id}')">🔓 Rouvrir pour corriger les scores</button>`;
+  const mvs = (s.movements||[]);
+  const ups = mvs.filter(m=>m.reason!=='absence' && m.toGroupId===groupAbove(m.fromGroupId)).length;
+  const downs = mvs.length - ups;
+  const chips = [];
+  if(s.reopenedAt) chips.push(`<span class="pf-chip warn">Corrigée</span>`);
+  if(viewerPlayerId){
+    const myMv = mvs.find(m=>m.playerId===viewerPlayerId);
+    if(myMv) chips.push(myMv.toGroupId===groupAbove(myMv.fromGroupId) ? `<span class="pf-chip on">▲ Tu montes</span>` : `<span class="pf-chip warn">▼ Tu descends</span>`);
+  } else if(mvs.length){
+    if(ups) chips.push(`<span class="pf-chip on">▲ ${ups}</span>`);
+    if(downs) chips.push(`<span class="pf-chip warn">▼ ${downs}</span>`);
+  }
+  let body = '';
   groupsSorted().forEach(g=>{
     const rows = s.standingsByGroup ? s.standingsByGroup[g.id] : null;
     if(!rows || rows.length===0) return;
     const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===g.id) : null;
     const subValues = new Set(gd && gd.substitutes ? Object.values(gd.substitutes) : []);
-    html += `<h3 style="margin-top:10px;">${escapeHTML(g.name)}</h3><table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th>${showRating ? '<th>Cote</th>' : ''}<th></th></tr>`;
+    body += `<div class="hs-g">${escapeHTML(g.name)}</div><div class="pf-list">`;
     rows.forEach((r,i)=>{
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
-      const mv = (s.movements||[]).find(m=>m.playerId===r.playerId && m.fromGroupId===g.id);
-      let tag;
-      if(isGuest){ tag = `<span class="tag tag-stay">invité</span>`; }
-      else {
-        const moveTag = mv ? (mv.toGroupId===groupAbove(g.id) ? `<span class="tag tag-up">monte</span>` : `<span class="tag tag-down">descend</span>`) : `<span class="tag tag-stay">reste</span>`;
-        tag = isSub ? moveTag + ` <span class="small">(remplaçant)</span>` : moveTag;
-      }
+      const mv = mvs.find(m=>m.playerId===r.playerId && m.fromGroupId===g.id);
+      const move = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? `<span class="hs-mv up" title="Monte">▲</span>` : `<span class="hs-mv down" title="Descend">▼</span>`) : '';
       const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
-      const played = r.played || 0;
-      const scheduled = r.scheduled || 0;
+      const played = r.played || 0, scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
-      const currentPlayer = findRatablePerson(r.playerId); // joueur régulier OU remplaçant du bassin
-      const currentRating = currentPlayer && typeof currentPlayer.rating === 'number' ? currentPlayer.rating : null;
-      const deltaCell = typeof delta === 'number'
-        ? `${currentRating!==null ? currentRating.toFixed(2)+' ' : ''}<span style="color:${delta>=0?'var(--ball)':'var(--danger)'};font-weight:600;">(${delta>=0?'+':''}${delta.toFixed(3)})</span>`
-        : (currentRating!==null ? currentRating.toFixed(2) : `<span class="small">—</span>`);
-      html += `<tr><td>${i+1}</td><td>${escapeHTML(playerName(r.playerId))}</td><td>${r.pf}</td><td>${avg}</td><td>${scheduled ? played+'/'+scheduled : '—'}${incomplete ? ' <span class="small" style="color:var(--paddle);">⚠</span>' : ''}</td><td>${r.wins}-${r.losses}</td>${showRating ? `<td>${deltaCell}</td>` : ''}<td>${tag}</td></tr>`;
+      const tags = (isGuest ? ' <span class="rs-tag">invité</span>' : '') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '') + (r.playerId===viewerPlayerId ? ' <span class="rs-tag me">toi</span>' : '');
+      const sub = `${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}${incomplete ? ` · <span style="color:var(--paddle);">${played}/${scheduled} joués</span>` : ''}`;
+      const right = (showRating && typeof delta === 'number') ? `<span class="hs-d ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span>` : '';
+      body += `<div class="pf-row hs-row${r.playerId===viewerPlayerId?' me':''}" style="cursor:default;">
+        <span class="hs-rk">${i+1}</span>
+        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}</small></span>
+        ${right}${move}
+      </div>`;
     });
-    html += `</table>`;
+    body += `</div>`;
   });
-  const absenceDemotions = (s.movements||[]).filter(m=>m.reason==='absence');
+  const absenceDemotions = mvs.filter(m=>m.reason==='absence');
   if(absenceDemotions.length){
-    html += `<h3 style="margin-top:10px;">Descentes automatiques (absence)</h3><table><tr><th>Joueur</th><th>De</th><th>Vers</th></tr>`;
+    body += `<div class="hs-g">Descentes automatiques (absence)</div><div class="pf-list">`;
     absenceDemotions.forEach(m=>{
       const fromG = groupById(m.fromGroupId), toG = groupById(m.toGroupId);
-      html += `<tr><td>${escapeHTML(playerName(m.playerId))}</td><td>${escapeHTML(fromG?fromG.name:'—')}</td><td>${escapeHTML(toG?toG.name:'—')}</td></tr>`;
+      body += `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(playerName(m.playerId))}<small>${escapeHTML(fromG?fromG.name:'—')} → ${escapeHTML(toG?toG.name:'—')}</small></span><span class="hs-mv down">▼</span></div>`;
     });
-    html += `</table>`;
+    body += `</div>`;
   }
-  html += `</div>`;
-  return html;
+  body += `<div class="pf-list hs-acts"><button class="pf-row" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})"><span class="ic">${pbIcon()}</span><span class="t">${viewerPlayerId ? 'Matchs de mon groupe' : 'Voir les matchs'}</span><span class="ch">›</span></button>`;
+  if(withDelete && !viewerPlayerId && isLatestClosedSession(s)) body += `<button class="pf-row" onclick="reopenLadderSession('${s.id}')"><span class="ic">🔓</span><span class="t">Rouvrir pour corriger les scores</span><span class="ch">›</span></button>`;
+  if(withDelete) body += `<button class="pf-row hs-del" onclick="deleteSession('${s.id}')"><span class="ic">🗑</span><span class="t">Supprimer cette session</span><span class="ch">›</span></button>`;
+  body += `</div>`;
+  return `<details class="card hs-card"${isOpen?' open':''}>
+    <summary class="hs-sum"><span class="hs-t"><b>${escapeHTML(frDateLong(s.date))}</b>${chips.length ? `<span class="hs-chips">${chips.join('')}</span>` : ''}</span><span class="hs-ch">›</span></summary>
+    <div class="hs-body">${body}</div>
+  </details>`;
 }
 function groupAbove(gid){
   const sorted = groupsSorted();
@@ -15273,7 +15297,7 @@ function submitPlannedAbsence(playerId){
 function playerHistoryHTML(me){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
   if(closed.length===0) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
-  return closed.map(s=>sessionSummaryHTML(s, false, me.id)).join('');
+  return closed.map((s,i)=>sessionSummaryHTML(s, false, me.id, i===0)).join('');
 }
 
 
