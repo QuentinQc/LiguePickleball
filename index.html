@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 283">
+<meta name="app-build" content="Version 284">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9046,7 +9046,6 @@ function substituteDetailModalHTML(subId){
       ${avatarHTML('pf-av', initials, profile && profile.avatar_url, profile && profile.avatar_url ? '' : 'background:linear-gradient(135deg,#FFD60A,#FF9F0A);')}
       <div style="min-width:0;flex:1;">
         <div class="pf-nr"><div class="pf-name">${escapeHTML(s.name)}</div>${(DATA.leagueFormat !== 'mlp' && !isRecLeague()) ? `<button type="button" class="pf-rt" onclick="closeModal();editPlayerRating('${subId}')" aria-label="Modifier la cote"><b>${rating.toFixed(2)}</b><span>Cote</span></button>` : ''}</div>
-        ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
         <div class="pf-chips">${chips.join('')}</div>
       </div>
     </div>
@@ -9225,7 +9224,6 @@ function playerDetailModalHTML(pid){
       ${avatarHTML('pf-av', initials, profile && profile.avatar_url)}
       <div style="min-width:0;flex:1;">
         <div class="pf-nr"><div class="pf-name">${escapeHTML(p.name)}</div>${(!isMlp && !isRecLeague()) ? `<button type="button" class="pf-rt" onclick="closeModal();editPlayerRating('${pid}')" aria-label="Modifier la cote"><b>${rating.toFixed(2)}</b><span>Cote</span></button>` : ''}</div>
-        ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
         ${chips.length ? `<div class="pf-chips">${chips.join('')}</div>` : ''}
       </div>
     </div>
