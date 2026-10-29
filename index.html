@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 284">
+<meta name="app-build" content="Version 285">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -578,6 +578,7 @@ tr.draggable-row:active{cursor:grabbing;}
 .drop-target{transition:background .12s ease, outline .12s ease;}
 .drop-target-hover{background:rgba(207,234,92,0.1);outline:2px dashed var(--ball);outline-offset:-2px;}
 tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--ball);background:rgba(207,234,92,0.15);}
+.pf-row.draggable-row{cursor:grab;} .pf-row.row-drop-hover{box-shadow:inset 0 3px 0 var(--ball);background:rgba(207,234,92,0.15);}
 .court-mark{width:52px;height:52px;border-radius:12px;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
 .court-mark img{width:100%;height:100%;object-fit:cover;}
 .brand{display:flex;gap:10px;align-items:center;}
@@ -1271,6 +1272,7 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
 .pf-seg button{border:0;border-radius:11px;padding:11px;font-family:inherit;font-weight:700;font-size:15px;background:transparent;color:var(--muted);cursor:pointer;}
 .pf-seg button.on{background:var(--ball);color:var(--court);} .pf-seg button.on.bad{background:#FF9F0A;color:#2b1700;}
+.m-x{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .nav-fwd{animation:navFwd .22s ease-out;} .nav-back{animation:navBk .22s ease-out;}
 @media (prefers-reduced-motion:reduce){.nav-fwd,.nav-back{animation:none;}}
 .ah-ctas{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;} .ah-ctas .ah-cta{margin-top:0;}
@@ -1863,15 +1865,15 @@ function notifySessionPublished(session){
     audience: 'players', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
     body: isRecLeague()
-      ? `${leagueLabel} — soirée du ${session.date}. Ton terrain est prêt. Indique dès maintenant si tu es absent(e).`
-      : `${leagueLabel} — session du ${session.date}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
+      ? `${leagueLabel} — soirée du ${fdl(session.date)}. Ton terrain est prêt. Indique dès maintenant si tu es absent(e).`
+      : `${leagueLabel} — session du ${fdl(session.date)}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
     url: '/'
   });
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
     audience: 'substitutes', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
-    body: `${leagueLabel} — une session est prévue le ${session.date}. Indique ta disponibilité si tu peux remplacer.`,
+    body: `${leagueLabel} — une session est prévue le ${fdl(session.date)}. Indique ta disponibilité si tu peux remplacer.`,
     url: '/'
   });
 }
@@ -4178,7 +4180,7 @@ function notifySocialRedraw(session){
   if(!CURRENT_LEAGUE_ID || !session) return;
   invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, audience:'players', category:'league_sessions',
     title: '🎲 Terrains refaits',
-    body: `${currentLeagueLabel()} — soirée du ${session.date} : les terrains ont été refaits à la suite d'une absence. Vérifie ton terrain.`,
+    body: `${currentLeagueLabel()} — soirée du ${fdl(session.date)} : les terrains ont été refaits à la suite d'une absence. Vérifie ton terrain.`,
     url: '/' });
 }
 // Absence déclarée par le joueur lui-même : le serveur l'enregistre sans toucher aux terrains.
@@ -8358,7 +8360,7 @@ function mlpHistoryHTML(){
   return closed.map(session=>`
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;">Session du ${session.date}${session.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
+        <h3 style="margin:0;">Session du ${fdl(session.date)}${session.reopenedAt ? ' <span class="tag tag-orange" title="Résultats corrigés après la clôture">✏️ corrigée</span>' : ''}</h3>
         <span class="tag tag-stay">🔒 ${(session.ties||[]).length} affrontement${(session.ties||[]).length>1?'s':''}</span>
       </div>
       ${isAdminView ? `<button class="btn-ghost" style="margin:8px 0;" onclick="reopenMlpSession('${session.id}')">🔓 Rouvrir pour corriger</button>` : ''}
@@ -9161,7 +9163,7 @@ function emailAvailabilityRequest(){
   const emails = [...new Set(pool.filter(s=>s.email).map(s=>s.email))];
   if(emails.length===0){ showAlert("Aucun remplaçant n'a de courriel enregistré."); return; }
   const open = currentOpenSession();
-  const dateLine = open ? `la session du ${open.date}` : 'notre prochaine session';
+  const dateLine = open ? `la session du ${fdl(open.date)}` : 'notre prochaine session';
   const subject = `Disponibilité — ${DATA.leagueName}`;
   const body = `Bonjour,\n\nEst-ce que quelqu'un serait disponible pour dépanner comme remplaçant(e) pour ${dateLine} ?\n\nRéponds-moi directement si oui !\n\nMerci !`;
   window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -9806,6 +9808,7 @@ function saveAddOrgMemberForm(){
 // Fiche détaillée d'un membre : ses ligues (avec son statut dans chacune),
 // avec possibilité de le retirer d'une ligue ou de l'ajouter à une autre,
 // le tout sans quitter la fiche (on la reconstruit après chaque action).
+// Fiche d'un membre de l'organisation : même modèle que la fiche joueur (en-tête, onglets, listes).
 function orgMemberDetailModalHTML(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
   if(!entry) return `<p class="small">Membre introuvable.</p>`;
@@ -9813,53 +9816,68 @@ function orgMemberDetailModalHTML(idx){
   const linkedProfile = entry.profileId ? ALL_PROFILES.find(x=>x.id===entry.profileId) : null;
   const alreadyIn = new Set(entry.rows.map(r=>r.leagueId));
   const remaining = myOrgLeagues().filter(l=>!alreadyIn.has(l.id));
-  let html = `
-    <div class="modal-header-row">
-      ${avatarHTML('avatar-circle', initials, linkedProfile && linkedProfile.avatar_url)}
-      <div>
-        <div style="font-size:19px;font-weight:700;">${escapeHTML(entry.name)}</div>
-        <div class="modal-badges">${memberAccountStatus(entry).tag}${!entry.orgMemberId?' <span class="tag">Détecté par nom</span>':''}</div>
+  const st = memberAccountStatus(entry);
+  const stCls = { actif:'acc', invite:'on', expire:'warn', aucun:'acc' }[st.key] || 'acc';
+  const stLbl = { actif: st.shared ? 'Compte actif (partagé)' : 'Compte actif', invite:'Invité', expire:'Invitation expirée', aucun:'Aucun compte' }[st.key];
+  const chips = [`<span class="pf-chip ${stCls}">${stLbl}</span>`];
+  if(linkedProfile && linkedProfile.role === 'admin') chips.push(`<span class="pf-chip on">👑 Admin</span>`);
+  if(!entry.orgMemberId) chips.push(`<span class="pf-chip acc">Détecté par nom</span>`);
+  let html = `<div class="pf-hero">
+    <div class="pf-top">
+      ${avatarHTML('pf-av', initials, linkedProfile && linkedProfile.avatar_url)}
+      <div style="min-width:0;flex:1;">
+        <div class="pf-name">${escapeHTML(entry.name)}</div>
+        <div class="pf-chips">${chips.join('')}</div>
       </div>
-    </div>`;
-  if(entry.email) html += `<p class="small" style="margin:10px 0;">${escapeHTML(entry.email)}${!entry.profileId?` <button class="btn-ghost" style="padding:2px 8px;" onclick="editOrgMemberEmail(${idx})" title="Modifier le courriel">✏️</button>`:''}</p>`;
-  else if(!entry.profileId) html += `<p class="small" style="margin:10px 0;">Aucun courriel <button class="btn-ghost" style="padding:2px 8px;" onclick="editOrgMemberEmail(${idx})">✏️ Ajouter</button></p>`;
-  html += `<div class="row" style="align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap;">
-    <button class="action-btn" style="width:auto;" onclick="renameOrgMember(${idx})"><span class="icon">✏️</span> Renommer</button>
-    <button class="action-btn" style="width:auto;" ${entry.rows.length?`onclick="setMemberGender(${idx})"`:'disabled title="Ajoute d\'abord à une ligue pour pouvoir définir le genre"'}><span class="icon">⚧️</span> Genre : ${entry.gender==='F'?'Femme':entry.gender==='M'?'Homme':'Non défini'}</button>
-  </div>
-  <p class="small" style="margin:-4px 0 10px;color:var(--muted);">Ces infos s'appliquent à la fois dans toutes ses ligues — le genre n'est utilisé que pour former des équipes de tournoi MLP (double féminin/masculin/mixte). Le courriel d'un compte lié est celui du compte, non modifiable ici.</p>
-  ${memberAccountSectionHTML(entry, idx, linkedProfile)}
-  ${(()=>{ const bioHtml = linkedProfile ? profileBioStyleHTML(linkedProfile) : ''; return bioHtml ? `<div class="modal-section"><h3>Profil</h3>${bioHtml}</div>` : ''; })()}
-  <div class="modal-section"><h3>Ligues</h3>`;
-  if(entry.rows.length){
-    html += entry.rows.map((r,ri)=>`
-      <div class="row" style="align-items:center;justify-content:space-between;gap:8px;padding:8px 0;${ri>0?'border-top:1px solid var(--line-soft);':''}">
-        <div class="row" style="align-items:center;gap:8px;min-width:0;flex:1;">
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.leagueLabel)}</span>
-          <span class="tag ${r.type==='remplaçant'?'tag-yellow':'tag-up'}" style="cursor:pointer;" onclick="confirmToggleMemberLeagueType(${idx},${ri})" title="Cliquer pour changer le statut">${r.type==='remplaçant'?'🔄 Remplaçant':'Joueur'} ✏️</span>
-        </div>
-        <button class="btn-ghost-danger" onclick="confirmRemovePersonFromLeague(${idx},${ri})" title="Retirer de cette ligue">🗑️</button>
-      </div>`).join('');
+    </div>
+  </div>`;
+  const tabs = [['ligues','Ligues' + (entry.rows.length ? `<i>${entry.rows.length}</i>` : '')],['infos','Infos'],['compte','Compte']];
+  const tab = tabs.some(t=>t[0]===PF_TAB) ? PF_TAB : 'ligues';
+  html += `<div class="pf-tabs">${tabs.map(t=>`<button type="button" class="${t[0]===tab?'on':''}" onclick="PF_TAB='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
+  if(tab === 'ligues'){
+    html += entry.rows.length ? `<div class="pf-list">${entry.rows.map((r,ri)=>`
+      <div class="pf-row" style="cursor:default;">
+        <span class="t">${escapeHTML(r.leagueLabel)}</span>
+        <button type="button" class="pf-chip ${r.type==='remplaçant'?'warn':'on'}" style="border:0;cursor:pointer;font-family:inherit;" onclick="confirmToggleMemberLeagueType(${idx},${ri})">${r.type==='remplaçant'?'Remplaçant':'Joueur'}</button>
+        <button type="button" class="btn-ghost-danger" onclick="confirmRemovePersonFromLeague(${idx},${ri})" aria-label="Retirer de cette ligue">🗑️</button>
+      </div>`).join('')}</div>
+      <p class="small" style="color:var(--muted);margin:6px 2px 0;">Touche l'étiquette pour passer de joueur à remplaçant.</p>` : `<p class="small" style="color:var(--muted);">Aucune ligue pour l'instant.</p>`;
+    if(remaining.length){
+      const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
+      html += `<div class="pf-sec">Ajouter à une ligue</div>
+        <div class="pf-list">${remaining.map(l=>`<label class="pf-row">
+          <input type="checkbox" class="orgDetailLeague" value="${l.id}" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--ball);">
+          <span class="t">${escapeHTML(l.schedule_label || l.name)}</span>
+          <select class="orgDetailLeagueType" data-league-id="${l.id}" onclick="event.stopPropagation()" style="width:auto;min-height:36px;padding:4px 8px;">
+            <option value="joueur" ${roleGuess==='remplacant'?'':'selected'}>Joueur</option>
+            <option value="remplacant" ${roleGuess==='remplacant'?'selected':''}>Remplaçant</option>
+          </select>
+        </label>`).join('')}</div>
+        <button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="saveOrgMemberDetailAdd(${idx})">+ Ajouter</button>`;
+    }
+  } else if(tab === 'infos'){
+    if(linkedProfile && linkedProfile.bio) html += `<p class="pf-bio">« ${escapeHTML(linkedProfile.bio)} »</p>`;
+    const gLbl = entry.gender==='F' ? 'Femme' : (entry.gender==='M' ? 'Homme' : 'Non défini');
+    html += `<div class="pf-list">
+      <button type="button" class="pf-row" onclick="renameOrgMember(${idx})"><span class="ic">✏️</span><span class="t">Nom<small>${escapeHTML(entry.name)}</small></span><span class="ch">›</span></button>
+      ${entry.profileId
+        ? `<div class="pf-row" style="cursor:default;"><span class="ic">✉️</span><span class="t">Courriel<small>${escapeHTML(entry.email || '—')} · celui du compte</small></span></div>`
+        : `<button type="button" class="pf-row" onclick="editOrgMemberEmail(${idx})"><span class="ic">✉️</span><span class="t">Courriel<small>${entry.email ? escapeHTML(entry.email) : 'Aucun — à ajouter pour la liaison automatique'}</small></span><span class="ch">›</span></button>`}
+      ${entry.rows.length
+        ? `<button type="button" class="pf-row" onclick="setMemberGender(${idx})"><span class="ic">⚧️</span><span class="t">Genre<small>${gLbl} · sert aux équipes MLP</small></span><span class="ch">›</span></button>`
+        : `<div class="pf-row" style="cursor:default;"><span class="ic">⚧️</span><span class="t">Genre<small>Ajoute d'abord à une ligue</small></span></div>`}
+    </div>
+    <p class="small" style="color:var(--muted);margin:6px 2px 0;">Ces infos s'appliquent dans toutes ses ligues.</p>
+    <div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="confirmFullyDeleteOrgMember(${idx})">Supprimer de l'organisation</button></div>`;
   } else {
-    html += `<p class="small">Aucune ligue pour l'instant.</p>`;
+    html += memberAccountSectionHTML(entry, idx, linkedProfile);
   }
-  html += `</div>`;
-  if(remaining.length){
-    const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
-    html += `
-      <div class="modal-section">
-        <h3>Ajouter à une ligue</h3>
-        ${remaining.map(l=>leagueTypeRowHTML(l, 'orgDetailLeague', roleGuess)).join('')}
-        <button class="btn btn-secondary" style="margin-top:6px;width:100%;" onclick="saveOrgMemberDetailAdd(${idx})">+ Ajouter</button>
-      </div>`;
-  }
-  html += `<button class="action-btn danger" style="width:100%;margin-top:14px;" onclick="confirmFullyDeleteOrgMember(${idx})"><span class="icon">🗑️</span> Supprimer ${escapeHTML(entry.name)} de l'organisation</button>`;
   return html;
 }
 function memberAccountSectionHTML(entry, idx, linkedProfile){
   const st = memberAccountStatus(entry);
   const fmt = function(d){ return new Date(d).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }); };
-  let h = '<div class="modal-section"><h3>Compte</h3>';
+  let h = '<div class="pf-list" style="padding:14px;">';
   if(st.key === 'actif'){
     const isAdmin = linkedProfile && linkedProfile.role === 'admin';
     const admins = ALL_PROFILES.filter(function(p){ return p.organization_id===CURRENT_ORGANIZATION_ID && p.role==='admin'; }).length;
@@ -9914,7 +9932,9 @@ async function linkEntryToProfile(idx, profileId){
 function openOrgMemberDetailModal(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
   if(!entry) return;
-  showContentModal(escapeHTML(entry.name), orgMemberDetailModalHTML(idx));
+  const key = 'm:' + (entry.orgMemberId || entry.name);
+  if(key !== PF_PID){ PF_PID = key; PF_TAB = 'ligues'; }
+  showContentModal('', function(){ return orgMemberDetailModalHTML(idx); });
 }
 // Recharge les données affectées puis reconstruit la fiche à jour, pour que
 // retirer/ajouter une ligue se reflète immédiatement sans fermer la fiche.
@@ -10284,19 +10304,21 @@ function organizationAccountsHTML(){
     <p class="small" style="margin:8px 0 4px;">Ces personnes ont trouvé une ligue complète dans la recherche et aimeraient y jouer. Quand une place se libère, ajoute-les ; sinon, retire-les.</p>
     ${itemsHTML(interest.map(reqItem), '')}
   </div>`;
-  function itemsHTML(list, emptyText){ return `<div class="member-list">
-      ${list.map(it=>`<div class="account-row">
-        <div class="member-avatar">${escapeHTML(it.label)}</div>
-        <div class="member-info">
-          <div class="member-name">${escapeHTML(it.name)}${it.badge || ''}</div>
-          <div class="small">${escapeHTML(it.email)} · ${it.source}</div>
-          ${it.admin}
+  // Une carte par personne : qui, d'où, le joueur proposé, puis Approuver / Refuser côte à côte.
+  function itemsHTML(list, emptyText){ return `<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+      ${list.map(it=>`<div class="pf-list" style="padding:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="member-avatar">${escapeHTML(it.label)}</div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:700;font-size:16px;">${escapeHTML(it.name)}${it.badge || ''}</div>
+            <div class="small" style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(it.email)} · ${it.source}</div>
+          </div>
         </div>
-        <div class="account-actions">
-          ${it.select}
-          ${it.note}
-          <div class="row" style="gap:6px;">${it.buttons}</div>
-        </div>
+        <div class="pf-sec" style="margin:12px 2px 6px;">Joueur dans la ligue</div>
+        <div style="width:100%;">${it.select.replace('<select ', '<select style="width:100%;" ')}</div>
+        ${it.note}
+        <div class="row" style="gap:8px;margin-top:10px;">${it.buttons}</div>
+        ${it.admin}
       </div>`).join('')}
       ${(list.length===0 && emptyText) ? `<p class="empty">${emptyText}</p>` : ''}
     </div>`; }
@@ -10539,26 +10561,23 @@ function adminGroupsHTML(){
   html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
     <h2>${rec ? 'Sans terrain' : "En attente d'assignation"} <span class="small">(${unassigned.length + absentNow.length})</span></h2>
     <p class="small">${rec ? 'Joueurs absents, blessés, ou qui cèdent leur place quand les terrains sont pleins.' : "Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner."}</p>
-    <table>
-      <tr><th>Nom</th><th>Statut</th><th>${rec ? 'Dernier terrain' : 'Groupe'}</th></tr>
+    <div class="pf-list" style="margin-top:8px;">
       ${unassigned.map(p=>{
         const lastGroup = p.lastGroupId ? groupById(p.lastGroupId) : null;
-        return `<tr class="draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')">
-          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
-          <td>${p.injured ? '<span class="tag tag-down">🤕 Blessé</span>' : (rec && open && isAbsent(open, p.id) ? '<span class="tag tag-orange">🚫 Absent (cette soirée)</span>' : '<span class="tag tag-stay">⏳ En attente</span>')}</td>
-          <td>${lastGroup ? escapeHTML(lastGroup.name) : '—'}</td>
-        </tr>`;
+        const chip = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`
+          : (rec && open && isAbsent(open, p.id) ? `<span class="pf-chip warn">${gw(p,'Absent','Absente','Absent(e)')}</span>` : '<span class="pf-chip acc">En attente</span>');
+        return `<div class="pf-row draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')" onclick="openPlayerDetailModal('${p.id}')">
+          <span class="t">${escapeHTML(p.name)}${lastGroup ? `<small>${rec ? 'Dernier terrain' : 'Dernier groupe'} : ${escapeHTML(lastGroup.name)}</small>` : ''}</span>${chip}
+        </div>`;
       }).join('')}
       ${absentNow.map(p=>{
         const g2 = groupById(p.groupId);
-        return `<tr>
-          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
-          <td><span class="tag tag-orange">🚫 Absent (cette session)</span></td>
-          <td>${g2 ? escapeHTML(g2.name) : '—'} <span class="small">— gère son remplaçant directement dans ce groupe, ci-dessous</span></td>
-        </tr>`;
+        return `<div class="pf-row" onclick="openPlayerDetailModal('${p.id}')">
+          <span class="t">${escapeHTML(p.name)}<small>${g2 ? escapeHTML(g2.name) + ' · ' : ''}remplaçant à choisir dans son ${grpWord()}, ci-dessous</small></span><span class="pf-chip warn">${gw(p,'Absent','Absente','Absent(e)')}</span>
+        </div>`;
       }).join('')}
-      ${(unassigned.length + absentNow.length)===0 ? `<tr><td colspan="3" class="empty">${rec ? 'Tout le monde a un terrain' : 'Aucun joueur en attente'}</td></tr>` : ''}
-    </table>
+      ${(unassigned.length + absentNow.length)===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">${rec ? 'Tout le monde a un terrain' : 'Aucun joueur en attente'}</span></div>` : ''}
+    </div>
   </div>`;
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).filter(p=>!(open && isAbsent(open, p.id))).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
@@ -10569,26 +10588,26 @@ function adminGroupsHTML(){
     const isSix = !rec && displayCount === 6;
     html += `
     <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
-      <div class="row" style="justify-content:space-between;">
-        <h2>${escapeHTML(g.name)} <span class="small">(${displayCount} joueur${displayCount>1?'s':''})</span></h2>
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span><span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span></div>
         <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du ${grpWord()}">⋯</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">⚠ Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
       ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
-      <table>
-        <tr><th>#</th><th>Nom</th>${rec ? '' : '<th>Session précédente</th>'}</tr>
+      <div class="pf-list" style="margin-top:10px;">
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
-          const prevText = prev ? `${escapeHTML(prev.groupName)} — ${prev.position}${prev.position===1?'er':'e'}/${prev.total}` : '<span class="small">—</span>';
-          return `<tr class="draggable-row" draggable="true"
+          const prevText = prev ? `Dernière session : ${escapeHTML(prev.groupName)}, ${prev.position}${prev.position===1?'er':'e'} sur ${prev.total}` : '';
+          return `<div class="pf-row draggable-row" draggable="true"
           ondragstart="onPlayerDragStart(event,'${p.id}')"
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
-          ondrop="onRowDrop(event,'${g.id}','${p.id}')">
-          <td style="width:28px;color:var(--muted);font-family:var(--font-display);">${i+1}</td>
-          <td class="clickable-row" onclick="openPlayerDetailModal('${p.id}')">${escapeHTML(p.name)}</td>
-          ${rec ? '' : `<td class="small">${prevText}</td>`}
-        </tr>`;
+          ondrop="onRowDrop(event,'${g.id}','${p.id}')"
+          onclick="openPlayerDetailModal('${p.id}')">
+          ${rec ? '' : `<span style="width:22px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${i+1}</span>`}
+          <span class="t">${escapeHTML(p.name)}${(!rec && prevText) ? `<small>${prevText}</small>` : ''}</span>
+          ${p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>` : ''}
+        </div>`;
         }).join('')}
         ${absentInGroup.map(p=>{
           const gd = open.groupsData.find(x=>x.groupId===g.id);
@@ -10597,22 +10616,19 @@ function adminGroupsHTML(){
             const isRealPlayer = !isGuestOrSubId(subId);
             const isSubPool = isSubPoolId(subId);
             const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
-            return `<tr>
-              <td style="width:28px;color:var(--muted);font-family:var(--font-display);">↳</td>
-              <td${openFn ? ` class="clickable-row" onclick="${openFn}"` : ''}>${escapeHTML(playerName(subId))}${isRealPlayer ? '' : ` <span class="tag tag-yellow">remplace ${escapeHTML(p.name)}</span>`}</td>
-              <td class="small">—</td>
-            </tr>`;
+            return `<div class="pf-row"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
+              <span style="width:22px;color:var(--muted);text-align:center;">↳</span>
+              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)}</small></span><span class="pf-chip on">Remplaçant</span>
+            </div>`;
           }
-          return `<tr>
-            <td style="width:28px;color:var(--muted);font-family:var(--font-display);">—</td>
-            <td class="clickable-row" style="opacity:0.6;" onclick="openPlayerDetailModal('${p.id}')">Place vide <span class="tag tag-orange">🚫 ${escapeHTML(p.name)} absent(e)</span></td>
-            <td class="small">—</td>
-          </tr>`;
+          return `<div class="pf-row" style="opacity:.75;" onclick="openPlayerDetailModal('${p.id}')">
+            <span style="width:22px;color:var(--muted);text-align:center;">—</span>
+            <span class="t">Place vide<small>${escapeHTML(p.name)} est ${gw(p,'absent','absente','absent(e)')}</small></span><span class="pf-chip warn">Sans remplaçant</span>
+          </div>`;
         }).join('')}
-        ${displayCount===0 ? `<tr><td colspan="${rec?2:3}" class="empty">Aucun joueur sur ce ${grpWord()}</td></tr>`:''}
-      </table>
-      ${rec ? '' : `<p class="small">« Session précédente » indique le groupe et le classement du dernier match joué par chaque joueur, pour t'aider à ajuster les positions.</p>
-      <p class="small">Glisse-dépose un joueur sur un autre pour changer sa position (ordinateur seulement).</p>`}
+        ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
+      </div>
+      ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Sur ordinateur, glisse-dépose un joueur pour changer sa position ou son groupe.</p>`}
       ${open ? groupAbsenceManagementHTML(open, g) : ''}
     </div>`;
   });
@@ -10639,7 +10655,7 @@ function groupAbsenceManagementHTML(open, g){
   const subs = gd.substitutes || {};
   const inUse = substitutesInUse(open, g.id, null);
   let html = `<div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;">
-    <h3 style="margin-bottom:8px;">Remplaçants — session du ${open.date}</h3>`;
+    <h3 style="margin-bottom:8px;">Remplaçants — session du ${fdl(open.date)}</h3>`;
   allIds.forEach(id=>{
     const isInjured = injuredIds.includes(id);
     const currentSub = subs[id];
@@ -10864,6 +10880,8 @@ function frDateParts(str){
   if(isNaN(d.getTime())) return { day:'', rest:String(str), d:null };
   return { day: FR_DAYS[d.getDay()], rest: d.getDate() + (d.getDate()===1 ? 'er' : '') + ' ' + FR_MONTHS[d.getMonth()], d };
 }
+// Date dans une phrase : « mardi 3 novembre ».
+function fdl(str){ return frDateLong(str).toLowerCase(); }
 function frDateLong(str){
   const p = frDateParts(str);
   return p.d ? (p.day.charAt(0).toUpperCase() + p.day.slice(1) + ' ' + p.rest) : p.rest;
@@ -11096,7 +11114,7 @@ function printableMatchSheetsHTML(session){
           <div class="ms-group">${escapeHTML(g.name)}</div>
         </div>
         <div class="ms-meta">
-          <div>Session du <strong>${session.date}</strong></div>
+          <div>Session du <strong>${fdl(session.date)}</strong></div>
           <div>Matchs en <strong>${target} points</strong></div>
         </div>
       </div>
@@ -11199,10 +11217,10 @@ async function emailAbsenceReminder(){
     return;
   }
   const rec = isRecLeague();
-  const subject = `Rappel — ${rec ? 'Soirée' : 'Session'} du ${open.date}`;
+  const subject = `Rappel — ${rec ? 'Soirée' : 'Session'} du ${fdl(open.date)}`;
   const body = rec
-    ? `Bonjour,\n\nLa prochaine soirée de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « ${myGroupLabel()} »), afin que les terrains soient tirés avec les bonnes personnes.\n\nMerci !`
-    : `Bonjour,\n\nLa prochaine session de ${DATA.leagueName} aura lieu le ${open.date}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « Mon groupe »), afin qu'on puisse trouver un remplaçant à temps.\n\nMerci !`;
+    ? `Bonjour,\n\nLa prochaine soirée de ${DATA.leagueName} aura lieu le ${fdl(open.date)}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « ${myGroupLabel()} »), afin que les terrains soient tirés avec les bonnes personnes.\n\nMerci !`
+    : `Bonjour,\n\nLa prochaine session de ${DATA.leagueName} aura lieu le ${fdl(open.date)}.\n\nSi tu ne peux pas être présent(e), merci d'indiquer ton absence dès maintenant dans l'application (onglet « Mon groupe »), afin qu'on puisse trouver un remplaçant à temps.\n\nMerci !`;
   const mailto = `mailto:?bcc=${encodeURIComponent(uniqueEmails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
 }
@@ -13562,7 +13580,7 @@ function substituteAvailabilityHTML(sub){
   }
   const available = (open.availableSubs||[]).includes(sub.id);
   return `<div class="card">
-    <h2>Session du ${open.date}</h2>
+    <h2>Session du ${fdl(open.date)}</h2>
     <p class="small">${available ? "Tu es marqué(e) disponible pour cette session — les administrateurs peuvent te contacter." : "Indique ici si tu es disponible pour dépanner lors de cette session."}</p>
     <button class="btn ${available?'btn-secondary':'btn-primary'}" onclick="toggleSubAvailability('${sub.id}')">${available ? "Je ne suis plus disponible" : "Je suis disponible pour cette session"}</button>
   </div>`;
@@ -13849,7 +13867,7 @@ async function absenceFromHome(leagueId){
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); }
   MY_SUMMARY_AT = 0;
   VIEW.ptab = 'accueil'; render();
-  openOneSessionAbsenceModal(link.player_id);
+  openAbsenceHub(link.player_id);
 }
 function accUpcomingHTML(){
   const todayStr = fmtDate(new Date());
@@ -14140,7 +14158,7 @@ function mlpPlayerTeamHTML(me){
   if(open){
     const myTies = (open.ties||[]).filter(t=>t.teamAId===team.id || t.teamBId===team.id);
     if(myTies.length){
-      html += `<h3 style="margin:16px 0 4px;">Affrontements de la session (${escapeHTML(open.date)})</h3><p class="small" style="margin:0 0 10px;color:var(--muted);">Entre les scores de chaque partie après le match : le résultat se calcule automatiquement.</p>`;
+      html += `<h3 style="margin:16px 0 4px;">Affrontements de la session (${escapeHTML(fdl(open.date))})</h3><p class="small" style="margin:0 0 10px;color:var(--muted);">Entre les scores de chaque partie après le match : le résultat se calcule automatiquement.</p>`;
       myTies.forEach(tie=>{ html += mlpPlayerTieEntryHTML(tie, team, me, open.id); });
     }
   }
@@ -14937,7 +14955,7 @@ function previousGroupSessionInnerHTML(me){
   const subValues = new Set(gd && gd.substitutes ? Object.values(gd.substitutes) : []);
   let html = `<div class="card-divider"></div>
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">Session précédente (${s.date})</h3>
+      <h3 style="margin:0;">Session précédente (${fdl(s.date)})</h3>
       <button class="tag tag-stay" style="cursor:pointer;border:none;" onclick="showMatchHistoryModal('${s.id}','${gid}')">${pbIcon()} Mes matchs</button>
     </div>
     <table><tr><th>#</th><th>Joueur</th><th>Points</th><th>Moy./match</th><th>Joués</th><th>V-D</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}<th></th></tr>`;
@@ -14974,9 +14992,9 @@ function playerGroupHTML(me){
   const groupMembers = (me.groupId ? playersInGroup(me.groupId) : []).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
   const open = currentOpenSession();
   const absenceBadges = [];
-  if(open && isAbsent(open, me.id)) absenceBadges.push(`<span class="tag tag-orange">🚫 Absent(e) cette ${isRecLeague() ? 'soirée' : 'session'}</span>`);
+  if(open && isAbsent(open, me.id)) absenceBadges.push(`<span class="pf-chip warn">${gw(me,'Absent','Absente','Absent(e)')} cette ${isRecLeague() ? 'soirée' : 'session'}</span>`);
   const planned = plannedAbsencesForPlayer(me.id);
-  if(planned.length) absenceBadges.push(`<span class="tag tag-yellow">🌴 ${planned.length} plage${planned.length>1?'s':''}</span>`);
+  if(planned.length) absenceBadges.push(`<span class="pf-chip acc">${planned.length} absence${planned.length>1?'s':''} prévue${planned.length>1?'s':''}</span>`);
   // Le groupe n'est montré que lorsqu'une session est PUBLIÉE (et que le joueur n'y est pas absent) :
   // avant, la composition peut encore changer et ne reflète pas la session à venir.
   const groupVisible = !!(open && (open.published || DATA.showGroupBeforePublish) && !isAbsent(open, me.id));
@@ -14986,24 +15004,25 @@ function playerGroupHTML(me){
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">🚫 Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
-    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(open.date)+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : `<table>
-      <tr><th>Nom</th>${DATA.showRatingToPlayers ? '<th>Cote</th>' : ''}</tr>
-      ${groupMembers.map(p=>{
+    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${groupMembers.map(p=>{
         const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
-        return `<tr class="${p.id===me.id?'me':''}"><td>${escapeHTML(p.name)}${p.id===me.id?' <span class="small">(toi)</span>':''}</td>${DATA.showRatingToPlayers ? `<td>${rating.toFixed(2)}</td>` : ''}</tr>`;
-      }).join('')}
-      ${groupMembers.length===0 ? `<tr><td colspan="${DATA.showRatingToPlayers?2:1}" class="empty">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</td></tr>` : ''}
-    </table>`}
+        const ini = (p.name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+        return `<div class="pf-row" style="cursor:default;${p.id===me.id?'background:rgba(207,234,92,.08);':''}">
+          <span class="member-avatar">${escapeHTML(ini)}</span>
+          <span class="t">${escapeHTML(p.name)}${p.id===me.id?' <span class="pf-chip on" style="margin-left:6px;">toi</span>':''}</span>
+          ${DATA.showRatingToPlayers ? `<span style="font-family:var(--font-display);font-size:18px;color:var(--ball);">${rating.toFixed(2)}</span>` : ''}
+        </div>`;
+      }).join('')}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
   </div>`;
   if(open){
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
     const amAbsent = isAbsent(open, me.id);
     if(amAbsent){
-      html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la ${isRecLeague() ? 'soirée' : 'session'} du ${open.date} — ${isRecLeague() ? "tu n'es placé(e) sur aucun terrain." : 'le groupe et les scores de cette session ne sont pas affichés.'} Contacte un administrateur si c'est une erreur.</p></div>`;
+      html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la ${isRecLeague() ? 'soirée' : 'session'} du ${fdl(open.date)} — ${isRecLeague() ? "tu n'es placé(e) sur aucun terrain." : 'le groupe et les scores de cette session ne sont pas affichés.'} Contacte un administrateur si c'est une erreur.</p></div>`;
     } else if(!open.published){
       // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
     } else if(gd && gd.matches.length){
-      html += `<div class="card" id="playerMatchesCard"><h3>Matchs de la session en cours (${open.date})</h3>`;
+      html += `<div class="card" id="playerMatchesCard"><h3>Matchs de la session en cours (${fdl(open.date)})</h3>`;
       if(DATA.leagueFormat==='social'){
         html += `<p class="small">Ici on joue pour le plaisir : aucun score à entrer. 🎉</p>`;
       } else if(DATA.allowPlayerScoreEntry && !scoreDayOpen(open.date)){
@@ -15046,35 +15065,56 @@ function absenceHistoryHTML(playerId){
   const abs = sess.filter(x=>isAbsent(x, playerId));
   const closedN = sess.filter(x=>x.status==='closed').length;
   const closedAbs = abs.filter(x=>x.status==='closed').length;
-  const planned = plannedAbsencesForPlayer(playerId);
-  let html = `<div class="pc-sec" style="margin-top:20px;">Historique</div>`;
+  let html = `<div class="pf-sec" style="margin-top:20px;">Historique</div>`;
   if(closedN) html += `<p class="small" style="margin:0 2px 8px;color:var(--muted);">${closedAbs} absence${closedAbs>1?'s':''} sur ${closedN} session${closedN>1?'s':''} terminée${closedN>1?'s':''}</p>`;
   if(abs.length){
     html += `<div class="acc-group">${abs.map(x=>`<div class="acc-row" style="cursor:default;min-height:52px;"><span class="acc-row-t"><b>${escapeHTML(frDateLong ? frDateLong(x.date) : x.date)}</b><small>${x.status==='closed' ? 'Session terminée' : 'Session à venir'}</small></span><span class="tag tag-orange">Absent(e)</span></div>`).join('')}</div>`;
   } else html += `<p class="small" style="color:var(--muted);margin:0 2px;">Aucune absence enregistrée.</p>`;
-  if(planned.length){
-    html += `<div class="pc-sec">Plages d'absence déclarées</div><div class="acc-group">${planned.map(a=>`<div class="acc-row" style="cursor:default;min-height:48px;"><span class="acc-row-t"><b>${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</b></span></div>`).join('')}</div>`;
-  }
+  // Les absences prévues sont déjà listées juste au-dessus dans l'écran Absence.
+
   return html;
 }
+// Écran Absence du joueur : même modèle que l'écran admin « Blessé / absent ». Le joueur peut se
+// déclarer absent ou blessé et ajouter des absences prévues ; seul un admin peut annuler.
 function absenceHubContentHTML(playerId){
   const p = DATA.players.find(x=>x.id===playerId);
   if(!p) return `<p class="small">Introuvable.</p>`;
   const open = currentOpenSession();
-  const absentToday = open && isAbsent(open, playerId);
+  const absent = !!(open && isAbsent(open, playerId));
   const planned = plannedAbsencesForPlayer(playerId);
-  const badges = [];
-  if(absentToday) badges.push('<span class="tag tag-orange">Absent(e) cette session</span>');
-  if(planned.length) badges.push(`<span class="tag tag-yellow">${planned.length} plage${planned.length>1?'s':''} d'absence</span>`);
-  if(p.injured) badges.push('<span class="tag tag-down">Blessé(e)</span>');
-  return `
-    <div class="modal-badges" style="margin-bottom:14px;">${badges.length ? badges.join('') : '<span class="small" style="color:var(--muted);">Aucune absence déclarée</span>'}</div>
-    <div class="action-grid">
-      <button class="action-btn" ${!open?'disabled title="Aucune session en cours"':''} onclick="openOneSessionAbsenceModal('${playerId}')">Une session</button>
-      <button class="action-btn" onclick="openPlannedAbsenceModal('${playerId}')">Plusieurs sessions</button>
-      <button class="action-btn" onclick="openInjuredModal('${playerId}')">Blessure</button>
+  const adminNote = `<p class="small" style="color:var(--muted);margin:6px 2px 0;">Pour annuler, communique avec un administrateur de la ligue.</p>`;
+  let h = '';
+  if(open){
+    h += `<div class="pf-sec" style="margin-top:0;">${isRecLeague() ? 'Soirée' : 'Session'} du ${escapeHTML(frDateLong(open.date).toLowerCase())}</div>
+      <div class="pf-seg">
+        <button type="button" class="${!absent?'on':''}">✓ ${gw(p,'Présent','Présente','Présent(e)')}</button>
+        <button type="button" class="${absent?'on bad':''}" onclick="${absent ? '' : `confirmMyAbsence('${playerId}')`}">${gw(p,'Absent','Absente','Absent(e)')}</button>
+      </div>
+      ${absent ? adminNote : ''}`;
+  }
+  h += `<div class="pf-sec">Blessure</div>
+    <div class="pf-seg">
+      <button type="button" class="${!p.injured?'on':''}">En forme</button>
+      <button type="button" class="${p.injured?'on bad':''}" onclick="${p.injured ? '' : `confirmMyInjury('${playerId}')`}">${gw(p,'Blessé','Blessée','Blessé(e)')}</button>
     </div>
+    ${p.injured ? adminNote : ''}
+    <div class="pf-sec">Absences prévues (vacances)</div>
+    <div class="pf-list">${planned.length ? planned.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.startDate))}${a.startDate!==a.endDate ? ' → ' + escapeHTML(frDateLong(a.endDate)) : ''}</span></div>`).join('') : `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div>`}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:10px;">
+      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+    </div>
+    <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${playerId}')">+ Ajouter une absence prévue</button>
+    <p class="small" style="color:var(--muted);margin:6px 2px 0;">Tu seras automatiquement ${gw(p,'absent','absente','absent(e)')} pour toute ${isRecLeague() ? 'soirée' : 'session'} dans cette plage.</p>
     ${absenceHistoryHTML(playerId)}`;
+  return h;
+}
+function confirmMyAbsence(pid){
+  const open = currentOpenSession(); if(!open) return;
+  showConfirm(`Te déclarer absent(e) pour la ${isRecLeague() ? 'soirée' : 'session'} du ${frDateLong(open.date).toLowerCase()} ? Seul un administrateur pourra l'annuler.`, function(){ toggleAbsence(pid); openAbsenceHub(pid); });
+}
+function confirmMyInjury(pid){
+  showConfirm("Te déclarer blessé(e) ? Tu sortiras de ton groupe jusqu'à ce qu'un administrateur te réintègre.", function(){ toggleMyInjured(pid); openAbsenceHub(pid); });
 }
 function openAbsenceHub(playerId){
   showContentModal('Absence', ()=>absenceHubContentHTML(playerId));
@@ -15087,8 +15127,8 @@ function openOneSessionAbsenceModal(playerId){
   // remettre présent tout seul (ça pourrait perturber les groupes/matchs déjà
   // ajustés en fonction de son absence) — seul un admin peut le réintégrer.
   const html = absent
-    ? `<p class="small">Tu es indiqué(e) comme absent(e) pour la session du ${open.date}. Si c'est une erreur ou que ta situation a changé, communique avec un administrateur de la ligue — lui seul peut te réintégrer dans cette session.</p>`
-    : `<p class="small" style="margin-bottom:14px;">${isRecLeague() ? `Indique ici si tu seras absent(e) pour la soirée du ${open.date}, pour que les terrains soient tirés sans toi.` : `Indique ici si tu seras absent(e) pour la session du ${open.date}, avant que les matchs soient finalisés.`}</p>
+    ? `<p class="small">Tu es indiqué(e) comme absent(e) pour la session du ${fdl(open.date)}. Si c'est une erreur ou que ta situation a changé, communique avec un administrateur de la ligue — lui seul peut te réintégrer dans cette session.</p>`
+    : `<p class="small" style="margin-bottom:14px;">${isRecLeague() ? `Indique ici si tu seras absent(e) pour la soirée du ${fdl(open.date)}, pour que les terrains soient tirés sans toi.` : `Indique ici si tu seras absent(e) pour la session du ${fdl(open.date)}, avant que les matchs soient finalisés.`}</p>
     <button class="btn btn-danger" style="width:100%;" onclick="closeModal();toggleAbsence('${playerId}')">Je serai absent(e) pour cette ${isRecLeague() ? 'soirée' : 'session'}</button>`;
   showContentModal('Absence — une session', html);
 }
@@ -15110,7 +15150,7 @@ function plannedAbsenceModalContentHTML(playerId){
   // lui-même une fois déclarée — seul un admin peut annuler une absence.
   const rows = list.length ? list.map(a=>`
     <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
-      <span class="small">${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</span>
+      <span class="small">${fdl(a.startDate)}${a.startDate!==a.endDate ? ' → '+fdl(a.endDate) : ''}</span>
     </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune absence prévue pour l'instant.</p>`;
   return `
     <p class="small" style="margin-bottom:10px;">Couvre une plage de dates à l'avance — tu seras automatiquement marqué(e) absent(e) pour toute session créée dans cette plage. Pour annuler une plage déjà déclarée, communique avec un administrateur.</p>
@@ -15203,7 +15243,7 @@ function modalHTML(){
     const inner = `
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
         <h3 style="margin:0;">${escapeHTML(MODAL.title)}</h3>
-        <button class="btn-ghost" onclick="closeModal()">✕ fermer</button>
+        <button type="button" class="m-x" onclick="closeModal()" aria-label="Fermer">✕</button>
       </div>
       ${bodyHtml}
       ${MODAL.kind==='form' ? `<div class="row" style="justify-content:flex-end;margin-top:14px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
