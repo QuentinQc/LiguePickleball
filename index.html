@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 290">
+<meta name="app-build" content="Version 291">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1314,6 +1314,10 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .hs-d{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;} .hs-d.p{color:var(--ball);} .hs-d.n{color:#ff6b6b;}
 .hs-acts{margin-top:8px;}
 .hs-del{color:#ff6b6b;}
+.sb-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;}
+.sb-tile{background:rgba(0,0,0,.2);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.sb-tile b{font-family:var(--font-display);font-size:22px;color:var(--ball);line-height:1;}
+.sb-tile span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -13701,15 +13705,51 @@ function renderSubstitute(subId){
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
 function substituteAvailabilityHTML(sub){
   const open = currentOpenSession();
+  const rec = isRecLeague();
   if(!open){
-    return `<div class="card"><p class="small">Aucune session en cours pour l'instant. Reviens ici quand une session sera lancée pour indiquer ta disponibilité.</p></div>`;
+    return `<div class="card"><div class="pf-sec" style="margin-top:0;">Prochaine ${rec?'soirée':'session'}</div><div class="ah-meta">Aucune ${rec?'soirée':'session'} prévue pour l'instant. Reviens ici quand elle sera lancée pour indiquer ta disponibilité.</div></div>`;
   }
   const available = (open.availableSubs||[]).includes(sub.id);
-  return `<div class="card">
-    <h2>Session du ${fdl(open.date)}</h2>
-    <p class="small">${available ? "Tu es marqué(e) disponible pour cette session — les administrateurs peuvent te contacter." : "Indique ici si tu es disponible pour dépanner lors de cette session."}</p>
-    <button class="btn ${available?'btn-secondary':'btn-primary'}" onclick="toggleSubAvailability('${sub.id}')">${available ? "Je ne suis plus disponible" : "Je suis disponible pour cette session"}</button>
-  </div>`;
+  // Remplaçant déjà placé dans un groupe (session publiée seulement)
+  let placedGd = null, replaces = null;
+  const enc = 'sub::' + sub.id; // un remplaçant du bassin est noté « sub::<id> » dans les matchs
+  if(open.published){
+    (open.groupsData||[]).forEach(gd=>{
+      const subs = gd.substitutes || {};
+      Object.keys(subs).forEach(abs=>{ if(subs[abs]===enc || subs[abs]===sub.id){ placedGd = gd; replaces = abs; } });
+    });
+  }
+  const placedG = placedGd ? groupById(placedGd.groupId) : null;
+  const chip = placedGd ? `<span class="pf-chip on">${gw(sub,'Placé','Placée','Placé(e)')}</span>` : (available ? `<span class="pf-chip on">${gw(sub,'Disponible','Disponible','Disponible')}</span>` : `<span class="pf-chip acc">Non indiqué</span>`);
+  let html = `<div class="card"><div class="pf-hero">
+      <div class="pf-sec" style="margin:0 0 4px;">Prochaine ${rec?'soirée':'session'}</div>
+      <div class="pf-name">${escapeHTML(frDateLong(open.date))}</div>
+      <div class="pf-chips">${chip}</div>
+    </div>`;
+  if(placedGd){
+    html += `<div class="pf-list" style="margin-top:14px;"><div class="pf-row" style="cursor:default;"><span class="ic">🔄</span><span class="t">${escapeHTML(placedG ? placedG.name : (rec?'Terrain':'Groupe'))}<small>Tu remplaces ${escapeHTML(playerName(replaces))}</small></span></div></div>`;
+  } else {
+    html += `<p class="ah-meta" style="margin:14px 2px 10px;">${available ? "Les administrateurs savent que tu peux dépanner. Ils te contacteront s'ils ont besoin de toi." : "Indique si tu peux dépanner lors de cette " + (rec?'soirée':'session') + "."}</p>
+      <button class="btn ${available?'btn-secondary':'btn-primary'}" style="width:100%;" onclick="toggleSubAvailability('${sub.id}')">${available ? "Je ne suis plus disponible" : "Je suis disponible"}</button>`;
+  }
+  html += `</div>`;
+  if(placedGd && DATA.leagueFormat!=='social'){
+    const mine = (placedGd.matches||[]).map((m,mi)=>({m,mi})).filter(x=>x.m.teamA.includes(enc) || x.m.teamB.includes(enc));
+    if(mine.length){
+      html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Mes matchs</div></div>`;
+      mine.forEach(({m,mi})=>{
+        const team = t=> t.map(id=>escapeHTML(playerName(id)) + (id===enc ? ' <span class="rs-tag me">toi</span>' : '')).join('<br>');
+        const sc = v => (v===null || v==='' || v===undefined) ? '—' : v;
+        html += `<div class="rs-m me ro ${rsDone(m) ? rsClass(m) : ''}">
+          <div class="rs-mh"><b>Match ${mi+1}</b>${rsDone(m) ? '<span class="rs-state">✓</span>' : ''}</div>
+          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div><div class="rs-sc">${sc(m.scoreA)}</div></div>
+          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div><div class="rs-sc">${sc(m.scoreB)}</div></div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
+  return html;
 }
 function toggleSubAvailability(subId){
   const open = currentOpenSession();
@@ -13740,6 +13780,7 @@ function toggleSubAvailability(subId){
 // Recherche, dans tout l'historique, les sessions où ce remplaçant a
 // effectivement joué (peu importe le groupe), avec le résultat pour chacune.
 function computeSubstituteAppearances(subId){
+  const enc = 'sub::' + subId; // forme utilisée dans les matchs
   const closed = DATA.sessions.filter(s=>s.status==='closed');
   const appearances = [];
   closed.forEach(s=>{
@@ -13747,7 +13788,7 @@ function computeSubstituteAppearances(subId){
       let wins=0, losses=0, pf=0, played=0;
       (gd.matches||[]).forEach(m=>{
         if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB==='') return;
-        const inA = (m.teamA||[]).includes(subId), inB = (m.teamB||[]).includes(subId);
+        const inA = (m.teamA||[]).includes(subId) || (m.teamA||[]).includes(enc), inB = (m.teamB||[]).includes(subId) || (m.teamB||[]).includes(enc);
         if(!inA && !inB) return;
         const sa=Number(m.scoreA), sb=Number(m.scoreB);
         if(sa===sb) return;
@@ -13773,32 +13814,20 @@ function substituteHistoryHTML(sub){
   const groupCounts = {};
   appearances.forEach(a=>{ groupCounts[a.groupName] = (groupCounts[a.groupName]||0)+1; });
   const favoriteGroup = Object.keys(groupCounts).sort((a,b)=>groupCounts[b]-groupCounts[a])[0];
-  const ratingCard = DATA.showRatingToSubs ? `<div class="card">
-    <h3>Ta cote</h3>
-    <table>
-      <tr><td class="small">Cote actuelle</td><td><strong>${(typeof sub.rating==='number'?sub.rating:RATING_DEFAULT).toFixed(2)}</strong></td></tr>
-      <tr><td class="small">Matchs comptés vers ta cote</td><td>${typeof sub.ratingGames==='number'?sub.ratingGames:0}</td></tr>
-    </table>
-    <p class="small" style="margin-top:8px;">Ta cote évolue au fil des matchs que tu dépannes, comme pour les joueurs réguliers.</p>
-  </div>` : '';
-  return `${ratingCard}<div class="card">
-    <h3>Tes statistiques comme remplaçant</h3>
-    <table>
-      <tr><td class="small">Sessions dépannées</td><td>${appearances.length}</td></tr>
-      <tr><td class="small">Victoires</td><td>${totalWins}</td></tr>
-      <tr><td class="small">Défaites</td><td>${totalLosses}</td></tr>
-      <tr><td class="small">Taux de victoire</td><td>${winRate}</td></tr>
-      <tr><td class="small">Groupe le plus fréquent</td><td>${favoriteGroup ? escapeHTML(favoriteGroup) : '—'}</td></tr>
-    </table>
+  const tile = (v, l)=>`<div class="sb-tile"><b>${v}</b><span>${l}</span></div>`;
+  let html = `<div class="card"><div class="pf-sec" style="margin-top:0;">Mes statistiques</div><div class="sb-tiles">
+    ${DATA.showRatingToSubs ? tile((typeof sub.rating==='number'?sub.rating:RATING_DEFAULT).toFixed(2), 'Cote') : ''}
+    ${tile(appearances.length, appearances.length>1?'Sessions':'Session')}
+    ${tile(totalWins+'-'+totalLosses, 'V-D')}
+    ${tile(winRate, 'Victoires')}
   </div>
-  <div class="card">
-    <h3>Historique des sessions</h3>
-    <table>
-      <tr><th>Date</th><th>Groupe</th><th>V-D</th><th>Points</th></tr>
-      ${appearances.map(a=>`<tr><td>${a.date}</td><td>${escapeHTML(a.groupName)}</td><td>${a.wins}-${a.losses}</td><td>${a.pf}</td></tr>`).join('')}
-      ${appearances.length===0 ? `<tr><td colspan="4" class="empty">Aucune session jouée comme remplaçant pour l'instant</td></tr>` : ''}
-    </table>
+  ${favoriteGroup ? `<div class="ah-meta" style="margin:10px 2px 0;">Groupe le plus fréquent : <b style="color:var(--text);">${escapeHTML(favoriteGroup)}</b></div>` : ''}
+  ${DATA.showRatingToSubs ? `<div class="ah-meta" style="margin:6px 2px 0;">Ta cote évolue au fil des matchs que tu dépannes (${typeof sub.ratingGames==='number'?sub.ratingGames:0} comptés).</div>` : ''}
   </div>`;
+  html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Sessions dépannées</div>`;
+  html += appearances.length ? `<div class="pf-list">${appearances.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.date))}<small>${escapeHTML(a.groupName)} · ${a.pf} pts</small></span><span class="pf-chip ${a.wins>=a.losses?'on':'acc'}">${a.wins}-${a.losses}</span></div>`).join('')}</div>` : `<div class="ah-meta">Aucune session jouée comme remplaçant pour l'instant.</div>`;
+  html += `</div>`;
+  return html;
 }
 function renderPlayer(playerId){
   const me = DATA.players.find(p=>p.id===(playerId || SESSION_USER.playerId));
