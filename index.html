@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 282">
+<meta name="app-build" content="Version 283">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1240,13 +1240,18 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .ah-switch button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .pf-hero{margin:-4px -4px 0;padding:18px 16px 16px;border-radius:20px;background:radial-gradient(380px 200px at 100% 0%,rgba(207,234,92,.18),transparent 60%),linear-gradient(160deg,#184740,#123a34);}
 .pf-top{display:flex;align-items:center;gap:16px;}
-.pf-av{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:26px;flex:0 0 auto;box-shadow:0 0 0 4px rgba(207,234,92,.18);}
+.pf-av{width:60px;height:60px;align-self:flex-start;border-radius:50%;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:26px;flex:0 0 auto;box-shadow:0 0 0 4px rgba(207,234,92,.18);}
 .pf-name{font-family:var(--font-display);font-size:24px;font-weight:600;text-transform:uppercase;line-height:1.05;overflow-wrap:anywhere;}
-.pf-sub{color:var(--muted);font-size:14px;margin-top:4px;overflow-wrap:anywhere;}
+.pf-sub{color:var(--muted);font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .pf-chip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;}
 .pf-chip:before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
 .pf-chip.on{background:rgba(207,234,92,.16);color:var(--ball);} .pf-chip.acc{background:rgba(255,255,255,.08);color:var(--text);} .pf-chip.warn{background:rgba(255,159,10,.18);color:#FF9F0A;}
+.pf-nr{display:flex;align-items:flex-start;gap:10px;}
+.pf-nr .pf-name{flex:1;min-width:0;}
+.pf-rt{margin-left:auto;flex:0 0 auto;border:0;cursor:pointer;font-family:inherit;color:var(--text);background:rgba(0,0,0,.22);border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.pf-rt b{font-family:var(--font-display);font-size:24px;color:var(--ball);line-height:1;}
+.pf-rt span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
 .pf-rate{margin-top:14px;display:flex;align-items:center;gap:12px;width:100%;border:0;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);background:rgba(0,0,0,.22);border-radius:16px;padding:10px 14px;}
 .pf-rate b{font-family:var(--font-display);font-size:26px;color:var(--ball);line-height:1;}
 .pf-rate span{flex:1;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
@@ -9039,13 +9044,12 @@ function substituteDetailModalHTML(subId){
   let html = `<div class="pf-hero">
     <div class="pf-top">
       ${avatarHTML('pf-av', initials, profile && profile.avatar_url, profile && profile.avatar_url ? '' : 'background:linear-gradient(135deg,#FFD60A,#FF9F0A);')}
-      <div style="min-width:0;">
-        <div class="pf-name">${escapeHTML(s.name)}</div>
+      <div style="min-width:0;flex:1;">
+        <div class="pf-nr"><div class="pf-name">${escapeHTML(s.name)}</div>${(DATA.leagueFormat !== 'mlp' && !isRecLeague()) ? `<button type="button" class="pf-rt" onclick="closeModal();editPlayerRating('${subId}')" aria-label="Modifier la cote"><b>${rating.toFixed(2)}</b><span>Cote</span></button>` : ''}</div>
         ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
         <div class="pf-chips">${chips.join('')}</div>
       </div>
     </div>
-    ${(DATA.leagueFormat !== 'mlp' && !isRecLeague()) ? `<button type="button" class="pf-rate" onclick="closeModal();editPlayerRating('${subId}')"><b>${rating.toFixed(2)}</b><span>Cote · toucher pour modifier</span><span style="flex:0;font-size:16px;">✏️</span></button>` : ''}
   </div>`;
   const tabs = [['gestion','Gestion'],['compte','Compte']];
   const tab = tabs.some(t=>t[0]===PF_TAB) ? PF_TAB : 'gestion';
@@ -9219,13 +9223,12 @@ function playerDetailModalHTML(pid){
   let html = `<div class="pf-hero">
     <div class="pf-top">
       ${avatarHTML('pf-av', initials, profile && profile.avatar_url)}
-      <div style="min-width:0;">
-        <div class="pf-name">${escapeHTML(p.name)}</div>
+      <div style="min-width:0;flex:1;">
+        <div class="pf-nr"><div class="pf-name">${escapeHTML(p.name)}</div>${(!isMlp && !isRecLeague()) ? `<button type="button" class="pf-rt" onclick="closeModal();editPlayerRating('${pid}')" aria-label="Modifier la cote"><b>${rating.toFixed(2)}</b><span>Cote</span></button>` : ''}</div>
         ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
         ${chips.length ? `<div class="pf-chips">${chips.join('')}</div>` : ''}
       </div>
     </div>
-    ${(!isMlp && !isRecLeague()) ? `<button type="button" class="pf-rate" onclick="closeModal();editPlayerRating('${pid}')"><b>${rating.toFixed(2)}</b><span>Cote · toucher pour modifier</span><span style="flex:0;font-size:16px;">✏️</span></button>` : ''}
     ${isMlp ? `<div style="margin-top:12px;">${mlpTeamPillHTML(mlpTm)}</div>` : ''}
   </div>`;
 
