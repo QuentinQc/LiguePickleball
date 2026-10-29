@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 280">
+<meta name="app-build" content="Version 281">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1238,6 +1238,34 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .ah-switch::-webkit-scrollbar{display:none;}
 .ah-switch button{flex:0 0 auto;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
 .ah-switch button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
+.pf-hero{margin:-4px -4px 0;padding:18px 16px 16px;border-radius:20px;background:radial-gradient(380px 200px at 100% 0%,rgba(207,234,92,.18),transparent 60%),linear-gradient(160deg,#184740,#123a34);}
+.pf-top{display:flex;align-items:center;gap:16px;}
+.pf-av{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:26px;flex:0 0 auto;box-shadow:0 0 0 4px rgba(207,234,92,.18);}
+.pf-name{font-family:var(--font-display);font-size:24px;font-weight:600;text-transform:uppercase;line-height:1.05;overflow-wrap:anywhere;}
+.pf-sub{color:var(--muted);font-size:14px;margin-top:4px;overflow-wrap:anywhere;}
+.pf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.pf-chip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;}
+.pf-chip:before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;}
+.pf-chip.on{background:rgba(207,234,92,.16);color:var(--ball);} .pf-chip.acc{background:rgba(255,255,255,.08);color:var(--text);} .pf-chip.warn{background:rgba(255,159,10,.18);color:#FF9F0A;}
+.pf-rate{margin-top:14px;display:flex;align-items:center;gap:12px;width:100%;border:0;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);background:rgba(0,0,0,.22);border-radius:16px;padding:10px 14px;}
+.pf-rate b{font-family:var(--font-display);font-size:26px;color:var(--ball);line-height:1;}
+.pf-rate span{flex:1;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+.pf-tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin:16px 0 12px;border-bottom:1px solid var(--line-soft);}
+.pf-tabs button{border:0;background:transparent;color:var(--muted);font-family:inherit;font-weight:700;font-size:15px;padding:8px 2px 10px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
+.pf-tabs button.on{color:var(--text);border-bottom-color:var(--ball);}
+.pf-tabs i{font-style:normal;font-size:11px;background:rgba(255,255,255,.1);border-radius:999px;padding:1px 7px;margin-left:5px;}
+.pf-list{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
+.pf-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-top:1px solid var(--line-soft);font-size:15px;width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;color:var(--text);font-family:inherit;text-align:left;cursor:pointer;}
+.pf-list > .pf-row:first-child{border-top:0;}
+.pf-row .ic{width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.pf-row .t{flex:1;min-width:0;} .pf-row .t small{display:block;color:var(--muted);font-size:13px;margin-top:1px;}
+.pf-row .ch{color:var(--muted);font-size:20px;}
+.pf-danger{margin-top:12px;} .pf-danger .pf-row{color:#ff6b6b;justify-content:center;font-weight:700;}
+.pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
+.pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
+.pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
+.pf-seg button{border:0;border-radius:11px;padding:11px;font-family:inherit;font-weight:700;font-size:15px;background:transparent;color:var(--muted);cursor:pointer;}
+.pf-seg button.on{background:var(--ball);color:var(--court);} .pf-seg button.on.bad{background:#FF9F0A;color:#2b1700;}
 .nav-fwd{animation:navFwd .22s ease-out;} .nav-back{animation:navBk .22s ease-out;}
 @media (prefers-reduced-motion:reduce){.nav-fwd,.nav-back{animation:none;}}
 .ah-ctas{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;} .ah-ctas .ah-cta{margin-top:0;}
@@ -9149,7 +9177,7 @@ function adminPlayersHTML(){
     const waiting = !g && !p.injured;
     return { name:p.name, f:[g?'g_'+g.id:'wait'].concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-      tags:`${p.status==='new'?' <span class="small">🆕</span>':''}${pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : ''}${p.injured?' <span class="tag tag-down">🤕</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">🚫</span>':''}`,
+      tags:`${pr && pr.role==='admin' ? ' <span class="tag tag-up">👑</span>' : ''}${p.injured?' <span class="tag tag-down">🤕</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">🚫</span>':''}`,
       sub:`${escapeHTML(g ? g.name : 'En attente')}${link?' · ✅ Compte':''}` };
   });
   const nInj = rows.filter(r=>r.f.includes('inj')).length;
@@ -9159,108 +9187,134 @@ function adminPlayersHTML(){
     empty:'Aucun joueur pour l\'instant.' });
 }
 // Contenu détaillé (pop-up) pour gérer un joueur : infos, actions, et compte lié.
+// Accord selon le genre connu du joueur (sinon forme neutre « (e) »).
+function gw(p, m, f, n){ return p && p.gender === 'F' ? f : (p && p.gender === 'M' ? m : n); }
+let PF_TAB = 'gestion';
 function playerDetailModalHTML(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return `<p class="small">Joueur introuvable.</p>`;
-  const g = groupById(p.groupId);
   const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
   const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===pid);
   const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
   const openSession = currentOpenSession();
   const absent = openSession ? isAbsent(openSession, pid) : false;
   const initials = p.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-  const isAdminAccount = profile && profile.role === 'admin';
-
-  const badges = [];
-  if(p.status==='new') badges.push('<span class="tag tag-yellow">🆕 Nouveau</span>');
-  if(p.injured) badges.push('<span class="tag tag-down">🤕 Blessé</span>');
-  if(absent) badges.push('<span class="tag tag-orange">🚫 Absent cette session</span>');
-  if(isAdminAccount) badges.push('<span class="tag tag-up">👑 Admin</span>');
-  const isMlp = DATA.leagueFormat==='mlp';
+  const isMlp = DATA.leagueFormat === 'mlp';
   const mlpTm = isMlp ? mlpTeamOf(pid) : null;
-  if(isMlp) badges.push(mlpTeamPillHTML(mlpTm));
-  else if(!p.injured) badges.push(g ? '<span class="tag tag-green">Régulier</span>' : '<span class="tag tag-stay">⏳ En attente</span>');
+  const planned = plannedAbsencesForPlayer(pid);
 
-  let html = `
-    <div class="modal-header-row">
-      ${avatarHTML('avatar-circle', initials, profile && profile.avatar_url)}
-      <div>
-        <div style="font-size:19px;font-weight:700;">${escapeHTML(p.name)}</div>
-        <div class="modal-badges">${badges.join('')}</div>
+  const chips = [];
+  if(p.injured) chips.push(`<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`);
+  if(absent) chips.push(`<span class="pf-chip warn">${gw(p,'Absent','Absente','Absent(e)')}</span>`);
+  if(profile) chips.push(`<span class="pf-chip acc">Compte actif</span>`);
+  if(profile && profile.role === 'admin') chips.push(`<span class="pf-chip on">👑 Admin</span>`);
+
+  let html = `<div class="pf-hero">
+    <div class="pf-top">
+      ${avatarHTML('pf-av', initials, profile && profile.avatar_url)}
+      <div style="min-width:0;">
+        <div class="pf-name">${escapeHTML(p.name)}</div>
+        ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
+        ${chips.length ? `<div class="pf-chips">${chips.join('')}</div>` : ''}
       </div>
     </div>
-    ${isMlp ? `
-    <div class="stat-chips">
-      <div class="stat-chip"><span class="stat-label">Équipe</span><span class="stat-value" style="font-size:16px;">${escapeHTML(mlpTm?mlpTm.name:'—')}</span></div>
-    </div>
-    <h3 style="margin:6px 0 8px;">Genre</h3>
-    <div class="g-pick">
-      <button type="button" class="${p.gender==='F'?'on g-F':''}" onclick="setPlayerGender('${pid}','F');openPlayerDetailModal('${pid}')">♀ Femme</button>
-      <button type="button" class="${p.gender==='M'?'on g-M':''}" onclick="setPlayerGender('${pid}','M');openPlayerDetailModal('${pid}')">♂ Homme</button>
-    </div>
-    <div class="action-grid">
-      <button class="action-btn" onclick="openMlpAssignPopup('${pid}')"><span class="icon">👥</span> ${mlpTm?"Changer d'équipe":'Placer dans une équipe'}</button>
-      <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
-      <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
-      <button class="action-btn danger" onclick="closeModal();removePlayer('${pid}')"><span class="icon">🗑️</span> Retirer de la ligue</button>
-    </div>` : `
-    <div class="stat-chips">
-      <div class="stat-chip"><span class="stat-label">Groupe</span><span class="stat-value">${escapeHTML(g ? g.name : '—')}</span></div>
-      <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${rating.toFixed(2)}</span></div>
-    </div>
-    <div class="action-grid">
-      <button class="action-btn" onclick="closeModal();editPlayerRating('${pid}')"><span class="icon">📊</span> Modifier la cote</button>
-      <button class="action-btn" onclick="togglePlayerStatus('${pid}')"><span class="icon">${p.status==='new'?'✅':'🆕'}</span> ${p.status==='new' ? 'Marquer confirmé(e)' : 'Marquer nouveau/nouvelle'}</button>
-      <button class="action-btn" onclick="togglePlayerInjured('${pid}')"><span class="icon">${p.injured?'💪':'🤕'}</span> ${p.injured ? 'Marquer rétabli(e)' : 'Marquer blessé(e)'}</button>
-      <button class="action-btn" onclick="convertPlayerToSubstitute('${pid}')"><span class="icon">🔄</span> Convertir en remplaçant</button>
-      <button class="action-btn danger" onclick="closeModal();removePlayer('${pid}')"><span class="icon">🗑️</span> Retirer de la ligue</button>
-    </div>
-`}
-    ${p.injured && !isMlp ? `<p class="small" style="color:var(--danger);">Basculé en attente d'assignation (Session → Groupes), avec son dernier groupe indiqué pour faciliter son retour. Il reste dans la liste des joueurs et ne descend pas de groupe pour cette raison.</p>` : ''}`;
-  if(openSession){
-    html += `
-    <div class="modal-section">
-      <h3>Présence — session du ${openSession.date}</h3>
-      <p class="small" style="margin-bottom:10px;">${absent ? "Ce joueur est actuellement marqué absent(e) pour cette session." : "Ce joueur est actuellement considéré présent(e) pour cette session."}</p>
-      <button class="btn ${absent ? 'btn-secondary' : 'btn-danger'}" onclick="toggleAbsence('${pid}');openPlayerDetailModal('${pid}')">${absent ? 'Marquer présent(e)' : 'Marquer absent(e) pour cette ' + (isRecLeague() ? 'soirée' : 'session')}</button>
-    </div>`;
-  }
-  const plannedAbs = plannedAbsencesForPlayer(pid);
-  html += `<div class="modal-section">
-    <h3>🌴 Absences prévues (vacances)</h3>
-    ${plannedAbs.length ? plannedAbs.map(a=>`
-      <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
-        <span class="small">${a.startDate}${a.startDate!==a.endDate ? ' → '+a.endDate : ''}</span>
-        <button class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}');openPlayerDetailModal('${pid}')">retirer</button>
-      </div>`).join('') : `<p class="small" style="color:var(--muted);">Aucune, déclarées par le joueur lui-même.</p>`}
+    ${(!isMlp && !isRecLeague()) ? `<button type="button" class="pf-rate" onclick="closeModal();editPlayerRating('${pid}')"><b>${rating.toFixed(2)}</b><span>Cote · toucher pour modifier</span><span style="flex:0;font-size:16px;">✏️</span></button>` : ''}
+    ${isMlp ? `<div style="margin-top:12px;">${mlpTeamPillHTML(mlpTm)}</div>` : ''}
   </div>`;
-  // Lecture seule ici — la liaison/déliaison d'un compte, le changement de
-  // rôle et la gestion multi-ligues se font maintenant uniquement depuis
-  // Organisation (menu ☰), pas depuis la fiche d'un joueur d'une ligue.
-  html += `<div class="modal-section"><h3>Compte lié</h3>`;
-  if(profile){
-    const isAdmin = profile.role === 'admin';
-    html += `<p class="small">${escapeHTML(profile.email)} — ${isAdmin ? '👑 Admin' : 'Joueur'}</p>
-      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>
-      ${profileBioStyleHTML(profile)}`;
+
+  const nNotes = (CURRENT_PLAYER_NOTES || []).length;
+  const tabs = [['gestion','Gestion'],['notes','Notes' + (nNotes ? `<i>${nNotes}</i>` : '')],['compte','Compte']];
+  const tab = tabs.some(t=>t[0]===PF_TAB) ? PF_TAB : 'gestion';
+  html += `<div class="pf-tabs">${tabs.map(t=>`<button type="button" class="${t[0]===tab?'on':''}" onclick="PF_TAB='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
+
+  if(tab === 'gestion'){
+    if(profile && profile.bio) html += `<p class="pf-bio">« ${escapeHTML(profile.bio)} »</p>`;
+    // Résumé de l'état pour le bouton Blessé / absent.
+    const st = [];
+    if(p.injured) st.push(gw(p,'Blessé','Blessée','Blessé(e)'));
+    if(absent) st.push(gw(p,'Absent','Absente','Absent(e)') + ' le ' + frDateLong(openSession.date).toLowerCase());
+    if(planned.length) st.push(planned.length + ' absence' + (planned.length>1?'s':'') + ' prévue' + (planned.length>1?'s':''));
+    html += `<div class="pf-list">
+      <button type="button" class="pf-row" onclick="openAdminAbsenceHub('${pid}')"><span class="ic">🩹</span><span class="t">Blessé / absent<small>${st.length ? escapeHTML(st.join(' · ')) : 'Aucune absence ni blessure'}</small></span><span class="ch">›</span></button>
+      ${isMlp ? `<button type="button" class="pf-row" onclick="openMlpAssignPopup('${pid}')"><span class="ic">👥</span><span class="t">${mlpTm ? "Changer d'équipe" : 'Placer dans une équipe'}<small>${escapeHTML(mlpTm ? mlpTm.name : 'Aucune équipe')}</small></span><span class="ch">›</span></button>` : ''}
+      <button type="button" class="pf-row" onclick="convertPlayerToSubstitute('${pid}')"><span class="ic">🔄</span><span class="t">${gw(p,'Convertir en remplaçant','Convertir en remplaçante','Convertir en remplaçant(e)')}</span><span class="ch">›</span></button>
+    </div>`;
+    if(isMlp) html += `<div class="pf-sec">Genre</div>
+      <div class="g-pick">
+        <button type="button" class="${p.gender==='F'?'on g-F':''}" onclick="setPlayerGender('${pid}','F');openPlayerDetailModal('${pid}')">♀ Femme</button>
+        <button type="button" class="${p.gender==='M'?'on g-M':''}" onclick="setPlayerGender('${pid}','M');openPlayerDetailModal('${pid}')">♂ Homme</button>
+      </div>`;
+    html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="closeModal();removePlayer('${pid}')">Retirer de la ligue</button></div>`;
+  } else if(tab === 'notes'){
+    html += playerNotesSectionHTML();
   } else {
-    html += `<p class="small">Aucun compte lié.</p>
-      <button class="btn btn-primary" onclick="inviteForEntry('${pid}','p',false)">✉️ Inviter ce joueur (code à usage unique)</button>
-      <p class="small" style="color:var(--muted);margin-top:8px;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
+    html += `<div class="pf-list" style="padding:14px;">`;
+    if(profile){
+      html += `<p class="small" style="margin:0 0 6px;">${escapeHTML(profile.email || '')} — ${profile.role === 'admin' ? '👑 Admin' : 'Joueur'}</p>
+        <p class="small" style="color:var(--muted);margin:0;">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
+    } else {
+      html += `<p class="small" style="margin:0 0 10px;">Aucun compte lié.</p>
+        <button class="btn btn-primary" onclick="inviteForEntry('${pid}','p',false)">✉️ Inviter ce joueur (code à usage unique)</button>
+        <p class="small" style="color:var(--muted);margin:8px 0 0;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
+    }
+    html += `</div>`;
   }
-  html += `</div>`;
-  html += playerNotesSectionHTML();
   return html;
 }
+// Blessé / absent (admin) : présence à la session en cours, blessure et absences prévues, au même endroit.
+function openAdminAbsenceHub(pid){
+  showContentModal('', function(){ return adminAbsenceHubHTML(pid); });
+}
+function adminAbsenceHubHTML(pid){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p) return `<p class="small">Joueur introuvable.</p>`;
+  const open = currentOpenSession();
+  const absent = open ? isAbsent(open, pid) : false;
+  const planned = plannedAbsencesForPlayer(pid);
+  let h = `<button type="button" class="acc-back" onclick="openPlayerDetailModal('${pid}')">‹ ${escapeHTML(p.name)}</button>
+    <div class="pf-name" style="margin:4px 2px 0;">Blessé / absent</div>`;
+  if(open){
+    h += `<div class="pf-sec">${isRecLeague() ? 'Soirée' : 'Session'} du ${escapeHTML(frDateLong(open.date).toLowerCase())}</div>
+      <div class="pf-seg">
+        <button type="button" class="${!absent?'on':''}" onclick="${absent ? `toggleAbsence('${pid}')` : ''}">✓ ${gw(p,'Présent','Présente','Présent(e)')}</button>
+        <button type="button" class="${absent?'on bad':''}" onclick="${absent ? '' : `toggleAbsence('${pid}')`}">${gw(p,'Absent','Absente','Absent(e)')}</button>
+      </div>`;
+  }
+  h += `<div class="pf-sec">Blessure</div>
+    <div class="pf-seg">
+      <button type="button" class="${!p.injured?'on':''}" onclick="${p.injured ? `setPlayerInjured('${pid}',false)` : ''}">En forme</button>
+      <button type="button" class="${p.injured?'on bad':''}" onclick="${p.injured ? '' : `setPlayerInjured('${pid}',true)`}">${gw(p,'Blessé','Blessée','Blessé(e)')}</button>
+    </div>
+    ${p.injured ? `<p class="small" style="color:var(--muted);margin:6px 2px 0;">Hors de son groupe jusqu'à son retour ; il faudra le replacer ensuite (Session › Groupes).</p>` : ''}
+    <div class="pf-sec">Absences prévues (vacances)</div>
+    <div class="pf-list">${planned.length ? planned.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.startDate))}${a.startDate!==a.endDate ? ' → ' + escapeHTML(frDateLong(a.endDate)) : ''}</span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`).join('') : `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div>`}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:10px;">
+      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+    </div>
+    <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${pid}')">+ Ajouter une absence prévue</button>`;
+  return h;
+}
+// Blessure : bascule en attente en gardant une trace du dernier groupe ; au retour, reste en attente pour être replacé.
+function setPlayerInjured(pid, injured){
+  const p = DATA.players.find(x=>x.id===pid);
+  if(!p || !!p.injured === !!injured) return;
+  if(injured){ p.lastGroupId = p.groupId || p.lastGroupId || null; p.groupId = null; p.injured = true; }
+  else p.injured = false;
+  saveAndRender();
+}
+let PF_PID = null;
 function openPlayerDetailModal(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return;
+  if(pid !== PF_PID){ PF_PID = pid; PF_TAB = 'gestion'; } // autre joueur : on repart de l'onglet Gestion
   const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===pid);
   const loadPromise = link
     ? loadPlayerNotesForProfile(link.profile_id)
     : loadPlayerNotesForPlayer(CURRENT_LEAGUE_ID, pid);
   loadPromise.then(()=>{
-    showContentModal(escapeHTML(p.name), playerDetailModalHTML(pid));
+    // Contenu recalculé à chaque affichage : les onglets et les actions se mettent à jour sans recharger.
+    showContentModal('', function(){ return playerDetailModalHTML(pid); });
   });
 }
 async function loadPlayerNotesForProfile(profileId){
@@ -11592,14 +11646,13 @@ function reportsListHTML(){
           <th class="sortable" onclick="setReportsListSort('name')">Nom${arrow('name')}</th>
           <th class="sortable" onclick="setReportsListSort('group')">Groupe${arrow('group')}</th>
           <th class="sortable" onclick="setReportsListSort('rating')">Cote${arrow('rating')}</th>
-          <th class="sortable" onclick="setReportsListSort('status')">Statut${arrow('status')}</th>
         </tr>
         ${ratingList.map(p=>{
           const g = groupById(p.groupId);
           const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-          return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td><td>${p.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td></tr>`;
+          return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td></tr>`;
         }).join('')}
-        ${ratingList.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+        ${ratingList.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
       </table>
     </div>
     <div class="card">
@@ -11673,7 +11726,6 @@ function reportsSessionHTML(){
     <table>
       <tr>
         <th class="sortable" onclick="setReportsSort('name')">Nom${arrow('name')}</th>
-        <th>Statut</th>
         <th class="sortable" onclick="setReportsSort('wins')">V${arrow('wins')}</th>
         <th class="sortable" onclick="setReportsSort('losses')">D${arrow('losses')}</th>
         <th class="sortable" onclick="setReportsSort('winRate')">% V${arrow('winRate')}</th>
@@ -11685,7 +11737,6 @@ function reportsSessionHTML(){
       </tr>
       ${sorted.map(r=>`<tr>
         <td>${escapeHTML(r.player.name)}</td>
-        <td>${r.player.status==='new' ? '🆕 Nouveau' : 'Confirmé'}</td>
         <td>${r.wins}</td>
         <td>${r.losses}</td>
         <td>${pct(r.winRate)}</td>
@@ -11695,7 +11746,7 @@ function reportsSessionHTML(){
         <td style="color:${r.ratingChange>0?'var(--ball)':(r.ratingChange<0?'var(--danger)':'inherit')};">${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
         <td>${r.subCount}</td>
       </tr>`).join('')}
-      ${sorted.length===0 ? `<tr><td colspan="10" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
+      ${sorted.length===0 ? `<tr><td colspan="9" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
     </table>
     <p class="small">Le taux d'absence se calcule sur les sessions où le joueur était présent ou absent dans son groupe (les sessions avant qu'il rejoigne la ligue ne comptent pas contre lui).</p>
   </div>`;
@@ -11729,8 +11780,7 @@ const PRINT_COLS = {
   liste: [
     ['nom','Nom',p=>escapeHTML(p.name)],
     ['groupe','Groupe',p=>{ const g=groupById(p.groupId); return escapeHTML(g?g.name:'—'); }],
-    ['cote','Cote',p=>(typeof p.rating==='number'?p.rating:RATING_DEFAULT).toFixed(2)],
-    ['statut','Statut',p=>p.status==='new'?'Nouveau':'Confirmé']
+    ['cote','Cote',p=>(typeof p.rating==='number'?p.rating:RATING_DEFAULT).toFixed(2)]
   ],
   remp: [
     ['nom','Nom',p=>escapeHTML(p.name)],
@@ -11740,7 +11790,6 @@ const PRINT_COLS = {
   ],
   session: [
     ['nom','Nom',r=>escapeHTML(r.player.name)],
-    ['statut','Statut',r=>r.player.status==='new'?'Nouveau':'Confirmé'],
     ['v','V',r=>r.wins],
     ['d','D',r=>r.losses],
     ['pv','% V',r=>_pcPct(r.winRate)],
