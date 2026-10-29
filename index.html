@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 275">
+<meta name="app-build" content="Version 276">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5617,6 +5617,15 @@ async function onAuthResolved(user){
     return;
   }
   CURRENT_PROFILE = profile;
+  // Liaison automatique : un joueur/remplaçant enregistré avec le courriel (confirmé) de ce compte,
+  // et pas encore relié, est relié tout de suite — sans passer par « À approuver ».
+  try{
+    const al = await sb.rpc('auto_link_by_email');
+    if(al && al.data && al.data.linked > 0){
+      const names = (al.data.leagues || []).join(', ');
+      setTimeout(function(){ showAlert('Ton compte a été relié automatiquement à ' + (al.data.linked > 1 ? 'tes ligues' : 'ta ligue') + (names ? ' : ' + names : '') + ' ✅'); }, 400);
+    }
+  }catch(e){ console.error('liaison automatique', e); }
 
   if(profile.role === 'admin'){
     SESSION_USER = { role:'admin', email: profile.email };
@@ -9741,6 +9750,7 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
       <button class="btn btn-secondary" onclick="inviteOrgMember(${idx})">✉️ Revoir le code d'invitation</button>`;
   } else {
     h += `<p class="small">${st.key==='expire' ? "L'invitation du " + fmt(st.last) + ' a expiré.' : "Pas encore de compte. Envoie-lui une invitation personnelle : son compte sera relié tout seul, sans approbation."}</p>
+      <p class="small" style="color:var(--muted);">${entry.email ? "Ou simplement : s'il crée son compte avec " + escapeHTML(entry.email) + ", il sera relié automatiquement." : "Astuce : ajoute son courriel ci-dessus. S'il crée son compte avec ce courriel, il sera relié automatiquement."}</p>
       <button class="btn btn-primary" onclick="inviteOrgMember(${idx})">✉️ ${st.key==='expire' ? "Renvoyer l'invitation" : 'Inviter'}</button>`;
   }
   return h + '</div>';
