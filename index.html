@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 277">
+<meta name="app-build" content="Version 278">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1527,7 +1527,8 @@ let VIEW = { tab: null, error: null };
 // ---------- multi-ligues ----------
 let LEAGUES = [];              // toutes les ligues (admins) ou non utilisé (joueurs)
 let CURRENT_LEAGUE_ID = null;  // ligue actuellement affichée
-let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...]
+let MY_LEAGUE_LINKS = [];      // pour un joueur : [{league_id, player_id}, ...] — UN lien par ligue (la personne choisie)
+let MY_LEAGUE_LINKS_ALL = [];  // tous les liens du compte : un compte familial peut avoir plusieurs joueurs dans une même ligue
 let MY_LINK_IN_CURRENT_LEAGUE = null; // pour un admin qui joue aussi : son propre lien dans la ligue affichée
 let LEAGUE_WALL_MESSAGES = [];  // messages du mur de discussion de CURRENT_LEAGUE_ID, rechargés à chaque changement de ligue
 let PARTNER_POSTS = [];         // annonces "trouver un partenaire" de CURRENT_LEAGUE_ID, rechargées à chaque changement de ligue
@@ -3506,8 +3507,11 @@ async function switchToOrganization(orgId){
 // Vérifie si le compte admin courant est lui-même lié à un joueur dans cette ligue.
 async function refreshMyLinkForCurrentLeague(){
   if(!CURRENT_PROFILE || !CURRENT_LEAGUE_ID){ MY_LINK_IN_CURRENT_LEAGUE = null; return; }
-  const { data, error } = await sb.from('profile_players').select('*').eq('profile_id', CURRENT_PROFILE.id).eq('league_id', CURRENT_LEAGUE_ID).maybeSingle();
-  MY_LINK_IN_CURRENT_LEAGUE = error ? null : data;
+  const { data, error } = await sb.from('profile_players').select('*').eq('profile_id', CURRENT_PROFILE.id).eq('league_id', CURRENT_LEAGUE_ID);
+  const list = error ? [] : (data || []);
+  // Compte familial : la personne choisie pour cette ligue, sinon un joueur régulier d'abord.
+  const chosen = activePersonMap()[CURRENT_LEAGUE_ID];
+  MY_LINK_IN_CURRENT_LEAGUE = list.find(function(l){ return l.id === chosen; }) || list.find(function(l){ return l.player_id; }) || list[0] || null;
 }
 // Change la ligue affichée par un joueur qui joue dans plusieurs ligues.
 // Change de ligue affichée pour un compte qui joue dans plusieurs ligues —
@@ -5690,7 +5694,48 @@ async function onAuthResolved(user){
 }
 async function loadMyLeagueLinks(profileId){
   const { data, error } = await sb.from('profile_players').select('*').eq('profile_id', profileId);
-  MY_LEAGUE_LINKS = error ? [] : (data || []);
+  MY_LEAGUE_LINKS_ALL = error ? [] : (data || []);
+  pickActiveLinks();
+}
+// ---- Compte familial : plusieurs joueurs reliés au même compte dans une ligue ----
+// La personne pour qui on agit est choisie par ligue et mémorisée sur l'appareil.
+function activePersonMap(){ try{ return JSON.parse(localStorage.getItem('dinkeo_active_person') || '{}') || {}; }catch(e){ return {}; } }
+function pickActiveLinks(){
+  const map = activePersonMap(), byLeague = {}, order = [];
+  MY_LEAGUE_LINKS_ALL.forEach(function(l){
+    if(!byLeague[l.league_id]){ byLeague[l.league_id] = []; order.push(l.league_id); }
+    byLeague[l.league_id].push(l);
+  });
+  MY_LEAGUE_LINKS = order.map(function(id){
+    const list = byLeague[id];
+    return list.find(function(l){ return l.id === map[id]; }) || list.find(function(l){ return l.player_id; }) || list[0];
+  });
+}
+function familyLinksFor(leagueId){ return MY_LEAGUE_LINKS_ALL.filter(function(l){ return l.league_id === leagueId; }); }
+function linkPersonName(l){
+  const id = l.player_id || l.substitute_id;
+  const x = (DATA.players || []).concat(DATA.substitutePool || []).find(function(y){ return y.id === id; });
+  return x ? String(x.name || '').split(' ')[0] : '?';
+}
+async function setActivePerson(leagueId, linkId){
+  const map = activePersonMap(); map[leagueId] = linkId;
+  try{ localStorage.setItem('dinkeo_active_person', JSON.stringify(map)); }catch(e){}
+  pickActiveLinks();
+  const keep = { ptab: VIEW.ptab, porg: VIEW.porg, pdet: VIEW.pdet, pBackTo: VIEW.pBackTo };
+  if(SESSION_USER && SESSION_USER.role === 'admin'){ MY_LINK_IN_CURRENT_LEAGUE = MY_LEAGUE_LINKS.find(function(l){ return l.league_id === leagueId; }) || null; }
+  await switchMyLeague(leagueId);
+  Object.assign(VIEW, keep);
+  render();
+}
+// Pastilles « Je suis : Marie / Jean », seulement si le compte a plusieurs joueurs dans la ligue affichée.
+function familySwitchHTML(){
+  const fam = familyLinksFor(CURRENT_LEAGUE_ID);
+  if(fam.length < 2) return '';
+  const cur = MY_LEAGUE_LINKS.find(function(l){ return l.league_id === CURRENT_LEAGUE_ID; });
+  return `<div class="ah-switch" style="align-items:center;"><span class="small" style="flex:0 0 auto;color:var(--muted);">Je suis :</span>${fam.map(function(l){
+    const on = cur && cur.id === l.id;
+    return `<button type="button" class="${on?'on':''}" onclick="${on ? '' : "setActivePerson('" + l.league_id + "','" + l.id + "')"}">${escapeHTML(linkPersonName(l))}</button>`;
+  }).join('')}</div>`;
 }
 // ---- Invitations à usage unique : un code est lié à UN joueur précis. ----
 async function inviteForEntry(id, kind, renew, leagueId){
@@ -5735,7 +5780,12 @@ async function markInvited(leagueId, kind, id){
 }
 // Statut du compte d'un membre : actif, invité (code encore valide), invitation expirée, ou aucun.
 function memberAccountStatus(e){
-  if(e.profileId) return { key:'actif', tag:'<span class="tag tag-up">Compte actif</span>' };
+  if(e.profileId){
+    // Compte familial : le même compte relié à plusieurs joueurs d'une même ligue.
+    const mine = ALL_PROFILE_PLAYERS.filter(function(pp){ return pp.profile_id === e.profileId; });
+    const shared = mine.length > new Set(mine.map(function(pp){ return pp.league_id; })).size;
+    return { key:'actif', shared: shared, tag: shared ? '<span class="tag tag-up">Compte actif (partagé)</span>' : '<span class="tag tag-up">Compte actif</span>' };
+  }
   const last = e.rows.reduce(function(m, r){ return (r.invitedAt && (!m || r.invitedAt > m)) ? r.invitedAt : m; }, null);
   if(last){
     const exp = new Date(new Date(last).getTime() + INVITE_DAYS*86400000);
@@ -5820,7 +5870,7 @@ async function logout(){
   ADMIN_VIEWING_AS = null;
   LEAGUES = [];
   CURRENT_LEAGUE_ID = null;
-  MY_LEAGUE_LINKS = [];
+  MY_LEAGUE_LINKS = []; MY_LEAGUE_LINKS_ALL = [];
   MY_LINK_IN_CURRENT_LEAGUE = null;
   MY_ORGANIZATIONS = [];
   CURRENT_ORGANIZATION_ID = null;
@@ -9761,9 +9811,43 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
   } else {
     h += `<p class="small">${st.key==='expire' ? "L'invitation du " + fmt(st.last) + ' a expiré.' : "Pas encore de compte. Envoie-lui une invitation personnelle : son compte sera relié tout seul, sans approbation."}</p>
       <p class="small" style="color:var(--muted);">${entry.email ? "Ou simplement : s'il crée son compte avec " + escapeHTML(entry.email) + ", il sera relié automatiquement." : "Astuce : ajoute son courriel ci-dessus. S'il crée son compte avec ce courriel, il sera relié automatiquement."}</p>
-      <button class="btn btn-primary" onclick="inviteOrgMember(${idx})">✉️ ${st.key==='expire' ? "Renvoyer l'invitation" : 'Inviter'}</button>`;
+      <button class="btn btn-primary" onclick="inviteOrgMember(${idx})">✉️ ${st.key==='expire' ? "Renvoyer l'invitation" : 'Inviter'}</button>
+      <button class="btn btn-secondary" style="margin-top:8px;" onclick="openLinkExistingAccount(${idx})">👪 Relier à un compte existant</button>`;
   }
   return h + '</div>';
+}
+// Compte familial : relier ce membre (toutes ses ligues) au compte d'un proche qui partage son courriel.
+function openLinkExistingAccount(idx){
+  const e = ORG_ROSTER_ENTRIES_CACHE[idx]; if(!e || !e.rows.length) return;
+  const ids = new Set(myOrgLeagues().map(function(l){ return l.id; }));
+  const linked = new Set(ALL_PROFILE_PLAYERS.filter(function(pp){ return ids.has(pp.league_id); }).map(function(pp){ return pp.profile_id; }));
+  const accts = ALL_PROFILES.filter(function(p){ return linked.has(p.id) || p.organization_id === CURRENT_ORGANIZATION_ID; })
+    .sort(function(a, b){ return String(a.display_name || a.email || '').localeCompare(String(b.display_name || b.email || '')); });
+  const html = `<p class="small">Pour un couple ou une famille qui partage une adresse courriel : ${escapeHTML(e.name)} sera relié(e) à ce compte, dans toutes ses ligues. Le compte pourra choisir « Je suis : … » dans chaque ligue.</p>
+    <div class="field"><label>Compte</label><select id="lnkAcct"><option value="">— choisir un compte —</option>${accts.map(function(p){ return `<option value="${p.id}">${escapeHTML(p.display_name || '—')} — ${escapeHTML(p.email || '')}</option>`; }).join('')}</select></div>`;
+  showFormModal('Relier à un compte existant', html, function(){
+    const v = (document.getElementById('lnkAcct') || {}).value;
+    if(!v){ showAlert('Choisis un compte.'); return false; }
+    linkEntryToProfile(idx, v);
+  });
+}
+async function linkEntryToProfile(idx, profileId){
+  const e = ORG_ROSTER_ENTRIES_CACHE[idx]; if(!e) return;
+  for(const r of e.rows){
+    const row = r.type === 'remplaçant'
+      ? { profile_id: profileId, league_id: r.leagueId, substitute_id: r.refId }
+      : { profile_id: profileId, league_id: r.leagueId, player_id: r.refId };
+    const { error } = await sb.from('profile_players').insert(row);
+    if(error){
+      showAlert(String(error.message || '').indexOf('profile_id_league_id') !== -1
+        ? `Ce compte est déjà relié à un autre joueur de « ${r.leagueLabel} ». La base de données doit d'abord être mise à jour pour les comptes familiaux.`
+        : "Erreur : " + error.message);
+      break;
+    }
+  }
+  if(e.orgMemberId){ try{ await sb.from('org_members').update({ profile_id: profileId }).eq('id', e.orgMemberId); }catch(err){} }
+  await loadOrgMembers();
+  await refreshAfterAccountChange(profileId, e.rows[0].leagueId);
 }
 function openOrgMemberDetailModal(idx){
   const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
@@ -13661,6 +13745,7 @@ function summarizeLeagueData(data, link, leagueId){
   if(!me) return out;
   const g = (data.groups||[]).find(x=>x.id===me.groupId);
   out.groupName = g ? g.name : null;
+  out.meName = me.name || null;
   out.rating = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
   out.injured = !!me.injured;
   const open = (data.sessions||[]).find(x=>x.status==='open');
@@ -13787,6 +13872,12 @@ function playerLeagueCardHTML(it){
   const meta = [];
   if(sum && sum.playTime) meta.push(fmtHM(sum.playTime));
   else if(lg.schedule_label) meta.push(escapeHTML(lg.schedule_label));
+  if(familyLinksFor(id).length > 1 && it.link && (it.link.player_id || it.link.substitute_id)){
+    const pid = it.link.player_id || it.link.substitute_id;
+    const fd = (id === CURRENT_LEAGUE_ID) ? DATA : null;
+    const pn = fd ? ((fd.players || []).concat(fd.substitutePool || []).find(function(y){ return y.id === pid; }) || {}).name : (sum && sum.meName);
+    if(pn) meta.unshift('👤 ' + escapeHTML(String(pn).split(' ')[0]));
+  }
   if(o && o.visible && !o.absent && sum.groupName) meta.push(escapeHTML(sum.groupName));
   if(sum && sum.showRating && !sum.rec && !sum.isSub && typeof sum.rating === 'number') meta.push('Cote ' + sum.rating.toFixed(2));
   return `<div class="ah-lg" onclick="openMyLeague('${id}')">
@@ -13896,6 +13987,7 @@ function accountOrgsHTML(me){
     return `<button type="button" class="acc-back" onclick="closeMyLeague()">‹ ${VIEW.pBackTo === 'accueil' ? 'Accueil' : escapeHTML(org.name)}</button>
       <div class="acc-head2">${escapeHTML(cur ? (cur.lg.name + (cur.lg.schedule_label ? ' — '+cur.lg.schedule_label : '')) : '')}</div>
       ${leagueSwitchHTML(org.leagues.map(function(x){ return x.lg; }), 'openMyLeague')}
+      ${familySwitchHTML()}
       ${segs.length>1 ? accSeg(segs, det, 'setPDet') : ''}
       ${det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me)}`;
   }
