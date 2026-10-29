@@ -2961,35 +2961,19 @@ function onPartnerRealtimeChange(){
     }
   });
 }
-// ---- Mise en place / démontage des abonnements temps réel (mur + partenaire).
+// ---- Mise en place / démontage de l'abonnement temps réel (partenaire).
 // Appelé à chaque changement de ligue/organisation : on retire l'ancien
 // abonnement (s'il existe) avant d'en ouvrir un nouveau, pour ne jamais
 // accumuler des canaux qui pointent vers une ligue/organisation périmée.
 function teardownRealtimeChannels(){
-  if(WALL_REALTIME_CHANNEL){ sb.removeChannel(WALL_REALTIME_CHANNEL); WALL_REALTIME_CHANNEL = null; }
   if(PARTNER_REALTIME_CHANNEL){ sb.removeChannel(PARTNER_REALTIME_CHANNEL); PARTNER_REALTIME_CHANNEL = null; }
-  if(DM_REALTIME_CHANNEL){ sb.removeChannel(DM_REALTIME_CHANNEL); DM_REALTIME_CHANNEL = null; }
 }
 function setupRealtimeChannels(){
   teardownRealtimeChannels();
-  const orgId = currentLeagueOrgId();
-  if(orgId){
-    WALL_REALTIME_CHANNEL = sb.channel(`org_messages_${orgId}`)
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'org_messages', filter:`organization_id=eq.${orgId}` }, payload => onWallRealtimeInsert(payload.new))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'org_messages', filter:`organization_id=eq.${orgId}` }, payload => onWallRealtimeDelete(payload.old))
-      .subscribe();
-  }
   if(CURRENT_LEAGUE_ID){
     PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${CURRENT_LEAGUE_ID}`)
       .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`league_id=eq.${CURRENT_LEAGUE_ID}` }, () => onPartnerRealtimeChange())
       .subscribe();
-  }
-  if(CURRENT_PROFILE && orgId){
-    DM_REALTIME_CHANNEL = sb.channel(`dm_${CURRENT_PROFILE.id}`)
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'direct_messages', filter:`recipient_id=eq.${CURRENT_PROFILE.id}` }, payload => onDmRealtimeInsert(payload.new))
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'direct_messages' }, payload => onDmRealtimeDelete(payload.old))
-      .subscribe();
-    loadDirectMessages();
   }
   loadNotifPrefs();
 }
@@ -3628,8 +3612,6 @@ async function switchToLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
-  await loadOrgVideoData(currentLeagueOrgId());
-  await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
   setupRealtimeChannels();
@@ -3672,8 +3654,6 @@ async function switchMyLeague(leagueId){
   const loaded = await loadData(leagueId);
   DATA = loaded || defaultData();
   migrateData();
-  await loadOrgVideoData(currentLeagueOrgId());
-  await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
   setupRealtimeChannels();
@@ -4146,7 +4126,7 @@ function grpWord(plural, cap, d){
 }
 function myGroupLabel(d){ return 'Mon ' + grpWord(false, false, d); }
 // Onglets liés à la performance, retirés en récréatif (joueurs, remplaçants et admin pour le palmarès).
-const REC_HIDDEN_TABS = ['stats','gamification','historique'];
+const REC_HIDDEN_TABS = ['stats','historique'];
 // Réglages des terrains en récréatif : joueurs par terrain et nombre de terrains disponibles (0 = aucune limite).
 const COURT_SIZE_OPTS = { '4':[4,4,'4 joueurs'], '45':[4,5,'4 ou 5 joueurs'], '46':[4,6,'4 à 6 joueurs'] };
 function socialCourtLimits(){ const o = COURT_SIZE_OPTS[DATA.socialCourtSize] || COURT_SIZE_OPTS['46']; return { min:o[0], max:o[1], label:o[2] }; }
@@ -4855,7 +4835,6 @@ function render(){
   }
   applyQuickView();
   modernizeSubtabs();
-  updateChatFab();
   if(PENDING_GO) setTimeout(applyPendingGo, 0);
   afterRenderNav();
 }
@@ -5118,39 +5097,30 @@ function notifSettingsHTML(){
   const on = (k)=> p[k] !== false;
   const row = (key,label,sub)=>`<label class="notif-row"><span><strong>${label}</strong>${sub?`<span class="small" style="display:block;color:var(--muted);">${sub}</span>`:''}</span><input type="checkbox" ${on(key)?'checked':''} onchange="setNotifToggle('${key}',this.checked)"></label>`;
   const hours = (sel,key)=>`<select onchange="setNotifQuietHour('${key}',this.value)" style="width:auto;">${Array.from({length:24},(_,h)=>`<option value="${h}" ${h===sel?'selected':''}>${String(h).padStart(2,'0')} h</option>`).join('')}</select>`;
-  const muted = p.muted_channels || [];
-  const chans = [{id:'general',name:'🌐 Général'}].concat(wallChannels().map(l=>({id:l.id,name:l.name})));
   return `<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification. Il faut d'abord activer les notifications sur cet appareil (menu ☰).</p>
     <div class="notif-list">
       <h4 style="margin:4px 0 6px;">🏓 Ma ligue</h4>
       ${row('league_sessions','📅 Nouvelles sessions','Quand une session est publiée')}
-      ${row('league_results','🏆 Résultats et palmarès','Résultats publiés ou corrigés, palmarès de la session')}
+      ${row('league_results','🏆 Résultats','Résultats publiés ou corrigés')}
       ${row('league_announce','📣 Annonces de l\'admin')}
       ${(SESSION_USER && SESSION_USER.role==='admin') ? row('admin_alerts','🛎️ Alertes admin','Absences, blessures et remplaçants disponibles signalés par les joueurs') : ''}
       <h4 style="margin:14px 0 6px;">💬 Communauté</h4>
-      ${row('wall','💬 Messages du mur','Seulement quand un canal était calme depuis 10 min')}
-      ${row('dm','✉️ Messages privés')}
-      <label class="notif-row"><span><strong>Aperçu des messages privés</strong><span class="small" style="display:block;color:var(--muted);">Afficher le texte sur l'écran verrouillé</span></span><input type="checkbox" ${p.dm_preview===true?'checked':''} onchange="setNotifToggle('dm_preview',this.checked)"></label>
       ${row('partner','🤝 Annonces de partenaire','Nouvelles annonces et personnes intéressées par la tienne')}
       ${row('events','🎉 Nouveaux événements')}
     </div>
     <h4 style="margin:16px 0 8px;">🌙 Heures calmes</h4>
     <label class="notif-row"><span><strong>Aucune notification la nuit</strong></span><input type="checkbox" ${p.quiet_enabled===true?'checked':''} onchange="setNotifToggle('quiet_enabled',this.checked)"></label>
     <div class="row" style="gap:8px;align-items:center;margin-top:8px;"><span class="small">De</span>${hours(p.quiet_start == null ? 22 : p.quiet_start,'quiet_start')}<span class="small">à</span>${hours(p.quiet_end == null ? 7 : p.quiet_end,'quiet_end')}</div>
-    <h4 style="margin:16px 0 8px;">🔕 Canaux en sourdine</h4>
-    <div class="notif-list">${chans.map(c=>`<label class="notif-row"><span>${escapeHTML(c.name)}</span><input type="checkbox" ${muted.includes(c.id)?'checked':''} onchange="toggleMutedChannel('${c.id}',this.checked)"></label>`).join('')}</div>`;
+`;
 }
-// ---- Ouverture directe depuis une notification (?go=partenaire, chat:<canal>, dm:<profil>) ----
+// ---- Ouverture directe depuis une notification (?go=partenaire ou evenements) ----
 let PENDING_GO = null;
 function handleGo(go){ PENDING_GO = go; applyPendingGo(); }
 function applyPendingGo(){
   if(!PENDING_GO || !SESSION_USER || !DATA || !CURRENT_PROFILE) return;
   const go = PENDING_GO;
-  if(go.startsWith('dm:') && !DM_AVAILABLE) return; // réessayé quand les messages privés sont chargés
   PENDING_GO = null;
   if(go==='partenaire' || go==='evenements') openQuickView(go);
-  else if(go.startsWith('chat:')) openChat(go.slice(5));
-  else if(go.startsWith('dm:')) openDmThread(go.slice(3));
 }
 try{
   const goParam = new URLSearchParams(location.search).get('go');
@@ -5437,7 +5407,6 @@ function applyQuickView(){
   document.querySelectorAll('.tabs .tab.active, .bottom-nav-item.active').forEach(el=>el.classList.remove('active'));
 }
 function tabsBarHTML(tabs, activeKey, setTabFn, extraItems){
-  tabs = tabs.filter(t=>!HIDDEN_FEATURES.includes(t[0]) && !(isRecLeague() && t[0]==='gamification'));
   // extraItems (ex: Absence) doivent apparaître à la fois dans les pilules du
   // haut (ordinateur) et dans la barre du bas (mobile) — avant, ils
   // n'étaient ajoutés qu'à la barre du bas, donc invisibles sur ordinateur.
@@ -5825,8 +5794,6 @@ async function onAuthResolved(user){
   const loaded = await loadData(CURRENT_LEAGUE_ID);
   DATA = loaded || defaultData();
   migrateData();
-  await loadOrgVideoData(currentLeagueOrgId());
-  await loadWallChannel('general');
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   await loadSocialEvents();
   setupRealtimeChannels();
@@ -6056,7 +6023,7 @@ function renderAdmin(){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
   const viewSlide = viewSlideHTML([
@@ -6113,14 +6080,11 @@ function renderAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='session') c.innerHTML = adminSessionSectionHTML();
   else if(VIEW.tab==='joueurs') c.innerHTML = adminPlayersSectionHTML();
-  else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
-  else if(VIEW.tab==='gamification' && !HIDDEN_FEATURES.includes('gamification')) c.innerHTML = gamificationHTML();
   else if(VIEW.tab==='historique') c.innerHTML = adminHistoryHTML();
   else if(VIEW.tab==='rapports') c.innerHTML = adminReportsSectionHTML();
   else c.innerHTML = adminSettingsSectionHTML();
-  if(VIEW.tab==='mur') scrollWallToBottom();
 }
 // ================== Vue admin « compte d'abord » (v218) ==================
 // Accueil · Organisations · Communauté · Moi. Mettre ADMIN_CLASSIC_VIEW à true pour revenir à l'ancienne vue.
@@ -6282,7 +6246,6 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
   else if(active==='comm') c.innerHTML = adminCommHTML();
   else if(active==='cal') c.innerHTML = calendarSheetHTML();
   else c.innerHTML = adminMeHTML(canViewAsPlayer, canViewAsSub);
-  if(active==='orgs' && VIEW.adet && VIEW.tab==='mur') scrollWallToBottom();
 }
 // ---- Accueil admin ----
 let ADMIN_HOME_PRELOADED = false;
@@ -6399,7 +6362,7 @@ function meRow(ico, title, sub, onclick){
 // N'affiche rien des concepts propres à l'échelle (groupes, montées/descentes).
 function renderMlpAdmin(){
   processPendingRegen();
-  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['gamification','Palmarès','🏆'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
+  const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
   const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
@@ -6443,14 +6406,11 @@ function renderMlpAdmin(){
   const c = document.getElementById('tabContent');
   if(VIEW.tab==='equipes') c.innerHTML = mlpTeamsSectionHTML();
   else if(VIEW.tab==='sessions') c.innerHTML = mlpSessionsSectionHTML();
-  else if(VIEW.tab==='mur') c.innerHTML = leagueWallHTML();
   else if(VIEW.tab==='partenaire') c.innerHTML = partnerBoardHTML();
   else if(VIEW.tab==='evenements') c.innerHTML = socialEventsHTML();
-  else if(VIEW.tab==='gamification' && !HIDDEN_FEATURES.includes('gamification')) c.innerHTML = gamificationHTML();
   else if(VIEW.tab==='classement') c.innerHTML = mlpStandingsHTML();
   else if(VIEW.tab==='reglages') c.innerHTML = mlpSettingsSectionHTML();
   else c.innerHTML = adminPlayersSectionHTML();
-  if(VIEW.tab==='mur') scrollWallToBottom();
 }
 // Réglages en ligue MLP — même structure à tiroirs (Organisation/Ligue/Jeu/
 // Avancé) que les autres formats, pour que rien ne soit injoignable selon le
@@ -8272,7 +8232,6 @@ function closeMlpSession(sessionId){
   if(!session) return;
   session.status = 'closed';
   notifySessionResultsPublished(session.date, !!session.reopenedAt);
-  if(!session.reopenedAt) notifySessionAwards();
   saveAndRender();
 }
 function mlpTieCardHTML(session, tie){
@@ -11685,7 +11644,6 @@ function onFinalize(){
     // Récréatif : aucun résultat ni palmarès à annoncer.
     if(!isRecLeague()){
       notifySessionResultsPublished(finishedDate, wasCorrection);
-      if(!wasCorrection) notifySessionAwards();
     }
     if(DATA.autoStartSessions){
       autoStartNextSession(finishedDate);
@@ -12331,15 +12289,6 @@ function settingsJoueursTabHTML(){
   html += '<div class="pf-list st-list">';
   html += settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement(s) enregistré(s)`, 'openScoreLogModal()');
   html += '</div>';
-  const palOffP = (DATA.hiddenPlayerTabs||[]).includes('gamification'), palOffS = (DATA.hiddenSubTabs||[]).includes('gamification');
-  if(palOffP || palOffS) html += `<div class="card" style="border-color:#FF9F0A;"><div class="small">🙈 L'onglet Palmarès est masqué pour ${palOffP&&palOffS?'les joueurs et les remplaçants':(palOffP?'les joueurs':'les remplaçants')} (réglage « Onglets » plus haut) : personne de ce groupe ne voit le palmarès ni ne reçoit sa notification de fin de session.</div></div>`;
-  html += settingsSection('Palmarès', 'Choisis quels prix les joueurs voient. Les prix masqués restent visibles pour toi, estompés. Si la cote est cachée, les prix basés sur la cote le sont aussi.');
-  html += '<div class="card">';
-  html += palAwardDefs().map(([k,ico,l])=>{
-    if(PAL_RATING_KEYS.includes(k) && !DATA.showRatingToPlayers) return `<div class="vis-row" style="opacity:.55;"><div class="vis-txt"><div class="vis-l">${ico} ${escapeHTML(l)}</div><div class="small">Masqué automatiquement : la cote est cachée aux joueurs.</div></div><label class="switch"><input type="checkbox" disabled><span class="switch-slider"></span></label></div>`;
-    return visSwitch(ico+' '+escapeHTML(l), '', !(DATA.palHidden||[]).includes(k), `toggleHiddenKey('palHidden','${k}',this.checked)`);
-  }).join('');
-  html += '</div>';
   return html;
 }
 function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
@@ -12352,8 +12301,7 @@ function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
 function openOrganizationPage(tab){
   DRAWER_OPEN = false;
   Promise.all([
-    loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers(),
-    loadOrgTournamentData(CURRENT_ORGANIZATION_ID), loadOrgVideoData(currentLeagueOrgId())
+    loadAllProfiles(), loadAllProfilePlayers(), loadOrgRoster(), loadOrgMembers()
   ]).then(()=>{
     ADMIN_SHOWING_ORG = true;
     if(tab){ VIEW.orgSubTab = tab; VIEW.orgHub = false; } // accès direct à une section
@@ -12419,7 +12367,7 @@ function organizationHeroHTML(){
 }
 function renderOrganizationManagement(){
   const sub = VIEW.orgSubTab || 'general';
-  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['rapport','📊 Rapport'],['comptes','🔑 Comptes'],['videos','🎬 Vidéos'],['tournois','🏆 Tournois']].filter(t=>!HIDDEN_FEATURES.includes(t[0]));
+  const subTabs = [['general','🏢 Général'],['membres','👥 Membres'],['rapport','📊 Rapport'],['comptes','🔑 Comptes']];
   if(isMobileModern()){
     const topbar = topbarHTML('', '', `<button class="btn-ghost" onclick="closeOrganizationPage()">← Retour</button>`, null, null, null, null);
     if(VIEW.orgHub===true){
@@ -12448,8 +12396,6 @@ function renderOrganizationManagement(){
   if(sub==='membres') c.innerHTML = organizationMembersCardHTML();
   else if(sub==='rapport') c.innerHTML = organizationReportHTML();
   else if(sub==='comptes') c.innerHTML = organizationAccountsHTML();
-  else if(sub==='videos') c.innerHTML = adminVideosSectionHTML();
-  else if(sub==='tournois') c.innerHTML = adminTournamentsSectionHTML();
   else c.innerHTML = organizationGeneralHTML();
 }
 function organizationGeneralHTML(){
@@ -13443,21 +13389,20 @@ function switchRowHTML(id, checked, label){
 // Liste des onglets possibles par rôle, selon le format de ligue actif —
 // sert à la fois au rendu (filterTabs) et au réglage admin ci-dessous.
 function playerTabDefs(){
-  if(isRecLeague()) return [['classement',myGroupLabel()],['videos','Vidéos']];
+  if(isRecLeague()) return [['classement',myGroupLabel()]];
   return DATA.leagueFormat === 'mlp'
-    ? [['equipe','Mon équipe'],['classement','Classement'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']]
-    : [['classement',myGroupLabel()],['stats','Statistiques'],['gamification','Palmarès'],['historique','Historique'],['videos','Vidéos']];
+    ? [['equipe','Mon équipe'],['classement','Classement'],['historique','Historique']]
+    : [['classement',myGroupLabel()],['stats','Statistiques'],['historique','Historique']];
 }
 function subTabDefs(){
   if(isRecLeague()) return [['dispo','Disponibilité']];
-  return [['dispo','Disponibilité'],['gamification','Palmarès'],['historique','Historique']];
+  return [['dispo','Disponibilité'],['historique','Historique']];
 }
 // Filtre une liste d'onglets [clé,label,icône] selon les clés cachées par
 // l'admin, sans jamais retourner une liste vide (filet de sécurité).
 // Fonctions masquées temporairement (remettre à [] pour les réactiver).
-const HIDDEN_FEATURES = ['gamification','videos','tournois','messagerie'];
 function filterTabs(tabs, hiddenKeys){
-  const hidden = (hiddenKeys || []).concat(HIDDEN_FEATURES, isRecLeague() ? REC_HIDDEN_TABS : []);
+  const hidden = (hiddenKeys || []).concat(isRecLeague() ? REC_HIDDEN_TABS : []);
   const visible = tabs.filter(t => !hidden.includes(t[0]));
   return visible.length ? visible : tabs;
 }
@@ -13616,7 +13561,7 @@ function renderSubstitute(subId){
     app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['gamification','Palmarès','🏆'],['historique','Historique','📜']];
+  const rawTabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -13651,8 +13596,7 @@ function renderSubstitute(subId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : substituteAvailabilityHTML(sub)))));
-  if(activeTab==='mur') scrollWallToBottom();
+  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : substituteAvailabilityHTML(sub)));
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
 function substituteAvailabilityHTML(sub){
@@ -13790,7 +13734,7 @@ function renderPlayer(playerId){
     return;
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpPlayer(me); return; }
-  const rawTabs = [['classement',myGroupLabel(),pbIcon()],['stats','Statistiques','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['classement',myGroupLabel(),pbIcon()],['stats','Statistiques','📊'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -13830,8 +13774,7 @@ function renderPlayer(playerId){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : playerGroupHTML(me)))))));
-  if(activeTab==='mur') scrollWallToBottom();
+  c.innerHTML = activeTab==='historique' ? playerHistoryHTML(me) : (activeTab==='stats' ? playerStatsTabHTML(me) : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : playerGroupHTML(me))));
 }
 // ================== Vue joueur « compte d'abord » (v211) ==================
 // Accueil · Organisations · Communauté · Moi. Mettre PLAYER_CLASSIC_VIEW à true pour revenir à l'ancienne vue.
@@ -14212,7 +14155,7 @@ function accountMeHTML(me){
     <div class="pf-list pf-danger">${meRow('', 'Déconnexion', '', `logout()`)}</div>`;
 }
 function renderMlpPlayer(me){
-  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
+  const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['historique','Historique','📜']];
   const tabs = filterTabs(rawTabs, DATA.hiddenPlayerTabs);
   const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
@@ -14249,8 +14192,7 @@ function renderMlpPlayer(me){
     <div class="bottom-nav-spacer"></div>
   `;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML(me) : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='videos' ? playerVideosHTML(me) : (activeTab==='mur' ? leagueWallHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : (activeTab==='gamification' ? gamificationHTML() : mlpPlayerTeamHTML(me)))))));
-  if(activeTab==='mur') scrollWallToBottom();
+  c.innerHTML = activeTab==='classement' ? mlpStandingsHTML(me) : (activeTab==='historique' ? mlpHistoryHTML() : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : mlpPlayerTeamHTML(me))));
 }
 function mlpPlayerTeamHTML(me){
   const team = (DATA.mlpTeams||[]).find(t=>t.memberIds.includes(me.id));
@@ -15338,7 +15280,6 @@ function modalChoiceClick(idx){
 function modalHTML(){
   if(!MODAL) return '';
   const overlay = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-  if(MODAL.kind === 'content' && MODAL.chat) return chatModalHTML();
   if(MODAL.kind === 'content' && MODAL.sheet) return sheetModalHTML();
   if(MODAL.kind === 'content' || MODAL.kind === 'form'){
     const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.15);';
