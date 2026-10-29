@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 292">
+<meta name="app-build" content="Version 293">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1267,6 +1267,7 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .pf-row .t{flex:1;min-width:0;} .pf-row .t small{display:block;color:var(--muted);font-size:13px;margin-top:1px;}
 .pf-row .ch{color:var(--muted);font-size:20px;}
 .pf-danger{margin-top:12px;} .pf-danger .pf-row{color:#ff6b6b;justify-content:center;font-weight:700;}
+.pf-danger .pf-row .t{text-align:center;}
 .rs-card{display:flex;flex-direction:column;gap:10px;}
 .rs-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .rs-name{font-family:var(--font-display);font-size:22px;font-weight:600;text-transform:uppercase;line-height:1.1;}
@@ -6360,24 +6361,31 @@ function adminCommHTML(){
 function adminMeHTML(canViewAsPlayer, canViewAsSub){
   const name = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
   const isSuper = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
-  return `<div class="acc-me">
-      ${avatarHTML('partner-pill-avatar', partnerInitials(name), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, 'width:72px;height:72px;font-size:26px;')}
-      <div><div style="font-size:22px;font-weight:700;">${escapeHTML(name)}</div><div class="small">Administrateur${isSuper ? ' · 🛡️ Super admin' : ''}</div></div>
+  const nOrgs = (MY_ORGANIZATIONS||[]).length;
+  return meHeroHTML(name, `<span class="pf-chip on">Administrateur</span>${isSuper ? '<span class="pf-chip warn">Super admin</span>' : ''}${nOrgs ? `<span class="pf-chip acc">${nOrgs} organisation${nOrgs>1?'s':''}</span>` : ''}`)
+    + `<div class="pf-sec">Voir comme</div>
+    ${(canViewAsPlayer || canViewAsSub) ? `<div class="pf-list">
+      ${canViewAsPlayer ? meRow('🏓', 'Joueur', "Voir l'app comme un joueur", `toggleAdminPlayerView()`) : ''}
+      ${canViewAsSub ? meRow('🔄', 'Remplaçant', "Voir l'app comme un remplaçant", `toggleAdminSubView()`) : ''}
+    </div>` : '<div class="ah-meta" style="margin:0 2px;">Aucun profil joueur lié à ton compte dans cette ligue.</div>'}
+    <div class="pf-sec">Compte</div>
+    <div class="pf-list">
+      ${meRow('👤', 'Mon profil', 'Photo et présentation', `openMyProfileModal()`)}
+      ${meRow('🔔', 'Notifications', '', `openNotifSettings()`)}
+      ${isSuper ? meRow('🔐', 'Empreinte de la bibliothèque', 'Vérification de sécurité', `showLibHashes()`) : ''}
+      ${isSuper ? meRow('🛡️', SUPER_ADMIN_MODE ? 'Revenir à mes organisations' : 'Voir toutes les organisations', 'Super admin', `toggleSuperAdminOrgView()`) : ''}
     </div>
-    <div class="pc-sec">Voir comme</div>
-    <div class="acc-group">
-      ${canViewAsPlayer ? accRow('', 'Joueur', 'Voir l\'app comme un joueur', `toggleAdminPlayerView()`) : ''}
-      ${canViewAsSub ? accRow('', 'Remplaçant', 'Voir l\'app comme un remplaçant', `toggleAdminSubView()`) : ''}
-      ${(!canViewAsPlayer && !canViewAsSub) ? '<p class="small" style="color:var(--muted);padding:0 4px;">Aucun profil joueur lié à ton compte dans cette ligue.</p>' : ''}
-    </div>
-    <div class="pc-sec">Compte</div>
-    <div class="acc-group">
-      ${accRow('', 'Mon profil', 'Photo et présentation', `openMyProfileModal()`)}
-      ${accRow('', 'Notifications', '', `openNotifSettings()`)}
-      ${isSuper ? accRow('', 'Empreinte de la bibliothèque', 'Vérification de sécurité', `showLibHashes()`) : ''}
-      ${isSuper ? accRow('', SUPER_ADMIN_MODE ? 'Revenir à mes organisations' : 'Voir toutes les organisations', 'Super admin', `toggleSuperAdminOrgView()`) : ''}
-      ${accRow('', 'Déconnexion', '', `logout()`)}
-    </div>`;
+    <div class="pf-list pf-danger">${meRow('', 'Déconnexion', '', `logout()`)}</div>`;
+}
+// En-tête de l'onglet « Moi » (admin et joueur) : même carte que la fiche joueur.
+function meHeroHTML(name, chips){
+  return `<div class="pf-hero" style="margin:0 0 4px;"><div class="pf-top">
+      ${avatarHTML('pf-av', partnerInitials(name), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, '')}
+      <div style="flex:1;min-width:0;"><div class="pf-name">${escapeHTML(name)}</div><div class="pf-chips">${chips}</div></div>
+    </div></div>`;
+}
+function meRow(ico, title, sub, onclick){
+  return `<button type="button" class="pf-row" onclick="${onclick}">${ico ? `<span class="ic">${ico}</span>` : ''}<span class="t">${title}${sub ? `<small>${sub}</small>` : ''}</span>${ico ? '<span class="ch">›</span>' : ''}</button>`;
 }
 // ==================== ADMIN — LIGUE MLP (vue entièrement séparée) ====================
 // Menu propre au format MLP : Joueurs, Équipes, Sessions, Classement, Réglages.
@@ -14216,24 +14224,25 @@ function accountCommHTML(me){
 // ---- Moi ----
 function accountMeHTML(me){
   const nLeagues = MY_LEAGUE_LINKS.length, nOrgs = myOrgsList().length;
-  return `<div class="acc-me">
-      ${avatarHTML('partner-pill-avatar', partnerInitials(me.name), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, 'width:72px;height:72px;font-size:26px;')}
-      <div><div style="font-size:22px;font-weight:700;">${escapeHTML(me.name)}</div><div class="small">${nOrgs} organisation${nOrgs>1?'s':''} · ${nLeagues} ligue${nLeagues>1?'s':''}</div></div>
+  return meHeroHTML(me.name, `<span class="pf-chip acc">${nOrgs} organisation${nOrgs>1?'s':''}</span><span class="pf-chip acc">${nLeagues} ligue${nLeagues>1?'s':''}</span>`)
+    + `<div class="pf-sec">Mon jeu</div>
+    <div class="pf-list">
+      ${meRow('🚫', 'Mes absences', 'Une session, plusieurs sessions, blessure', `openAbsenceHub('${me.id}')`)}
+      ${meRow('📅', 'Mon agenda', 'Ajouter les sessions à mon calendrier', `openCalSubscribe()`)}
+      ${DATA.showRatingToPlayers ? meRow('📈', 'Comment fonctionne la cote ?', '', `showRatingExplanationModal()`) : ''}
     </div>
-    <div class="pc-sec">Mon jeu</div>
-    <div class="acc-group">
-      ${accRow('', 'Mes absences', 'Une session, plusieurs sessions, blessure', `openAbsenceHub('${me.id}')`)}
-      ${accRow('', 'Mon agenda', 'Ajouter les sessions à mon calendrier', `openCalSubscribe()`)}
-      ${DATA.showRatingToPlayers ? accRow('', 'Comment fonctionne la cote ?', '', `showRatingExplanationModal()`) : ''}
+    <div class="pf-sec">Compte</div>
+    <div class="pf-list">
+      ${meRow('👤', 'Mon profil', 'Nom, photo, courriel', `openMyProfileModal()`)}
+      ${meRow('🔔', 'Notifications', '', `openNotifSettings()`)}
+      ${meRow('🎟️', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
     </div>
-    <div class="pc-sec">Compte</div>
-    <div class="acc-group">
-      ${accRow('', 'Mon profil', 'Nom, photo, courriel', `openMyProfileModal()`)}
-      ${accRow('', 'Notifications', '', `openNotifSettings()`)}
-      ${accRow('', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
-      ${accRow('', 'Guide', '', `showPlayerGuideModal()`)}
-      ${accRow('', 'Règles de la ligue', '', `showLeagueRulesModal()`)}
-    </div>`;
+    <div class="pf-sec">Aide</div>
+    <div class="pf-list">
+      ${meRow('📖', 'Guide', '', `showPlayerGuideModal()`)}
+      ${meRow('📋', 'Règles de la ligue', '', `showLeagueRulesModal()`)}
+    </div>
+    <div class="pf-list pf-danger">${meRow('', 'Déconnexion', '', `logout()`)}</div>`;
 }
 function renderMlpPlayer(me){
   const rawTabs = [['equipe','Mon équipe','👥'],['classement','Classement','📊'],['gamification','Palmarès','🏆'],['historique','Historique','📜'],['videos','Vidéos','🎬']];
