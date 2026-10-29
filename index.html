@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 281">
+<meta name="app-build" content="Version 282">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9022,53 +9022,60 @@ function setSubsSort(col){
 }
 // Pop-up de gestion d'un remplaçant : infos, et gestion de son compte (lier
 // un compte en attente comme remplaçant, changer son rôle, le délier).
+// Fiche d'un remplaçant : même modèle que la fiche d'un joueur (playerDetailModalHTML).
 function substituteDetailModalHTML(subId){
   const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
   if(!s) return `<p class="small">Remplaçant introuvable.</p>`;
   const link = (LEAGUE_PLAYER_LINKS||[]).find(l=>l.substitute_id===subId);
   const profile = link ? ALL_PROFILES.find(pr=>pr.id===link.profile_id) : null;
   const initials = s.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-  let html = `
-    <div class="modal-header-row">
-      ${avatarHTML('avatar-circle', initials, profile && profile.avatar_url, profile && profile.avatar_url ? '' : 'background:linear-gradient(135deg, #FFD60A, #FF9F0A);')}
-      <div>
-        <div style="font-size:19px;font-weight:700;">${escapeHTML(s.name)}</div>
-        <div class="modal-badges"><span class="tag tag-yellow">Remplaçant</span></div>
+  const rating = typeof s.rating === 'number' ? s.rating : RATING_DEFAULT;
+  const open = currentOpenSession();
+  const available = !!(open && (open.availableSubs||[]).includes(subId));
+  const chips = [`<span class="pf-chip warn">${gw(s,'Remplaçant','Remplaçante','Remplaçant(e)')}</span>`];
+  if(available) chips.push(`<span class="pf-chip on">Disponible</span>`); // pour la session en cours
+  if(profile) chips.push(`<span class="pf-chip acc">Compte actif</span>`);
+  if(profile && profile.role === 'admin') chips.push(`<span class="pf-chip on">👑 Admin</span>`);
+  let html = `<div class="pf-hero">
+    <div class="pf-top">
+      ${avatarHTML('pf-av', initials, profile && profile.avatar_url, profile && profile.avatar_url ? '' : 'background:linear-gradient(135deg,#FFD60A,#FF9F0A);')}
+      <div style="min-width:0;">
+        <div class="pf-name">${escapeHTML(s.name)}</div>
+        ${profile && profile.email ? `<div class="pf-sub">${escapeHTML(profile.email)}</div>` : ''}
+        <div class="pf-chips">${chips.join('')}</div>
       </div>
     </div>
-    <p class="small" style="margin:10px 0;">${s.notes ? escapeHTML(s.notes) : ''}</p>
-    <div class="stat-chips">
-      <div class="stat-chip"><span class="stat-label">Cote</span><span class="stat-value">${(typeof s.rating==='number'?s.rating:RATING_DEFAULT).toFixed(2)}</span></div>
-      <div class="stat-chip"><span class="stat-label">Matchs comptés</span><span class="stat-value">${typeof s.ratingGames==='number'?s.ratingGames:0}</span></div>
+    ${(DATA.leagueFormat !== 'mlp' && !isRecLeague()) ? `<button type="button" class="pf-rate" onclick="closeModal();editPlayerRating('${subId}')"><b>${rating.toFixed(2)}</b><span>Cote · toucher pour modifier</span><span style="flex:0;font-size:16px;">✏️</span></button>` : ''}
+  </div>`;
+  const tabs = [['gestion','Gestion'],['compte','Compte']];
+  const tab = tabs.some(t=>t[0]===PF_TAB) ? PF_TAB : 'gestion';
+  html += `<div class="pf-tabs">${tabs.map(t=>`<button type="button" class="${t[0]===tab?'on':''}" onclick="PF_TAB='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
+  if(tab === 'gestion'){
+    if(profile && profile.bio) html += `<p class="pf-bio">« ${escapeHTML(profile.bio)} »</p>`;
+    html += `<div class="pf-list">
+      <button type="button" class="pf-row" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="ic">📝</span><span class="t">Notes<small>${s.notes ? escapeHTML(s.notes) : 'Aucune note'}</small></span><span class="ch">›</span></button>
+      <button type="button" class="pf-row" onclick="convertSubstituteToPlayer('${subId}')"><span class="ic">🔄</span><span class="t">${gw(s,'Convertir en joueur régulier','Convertir en joueuse régulière','Convertir en joueur régulier')}</span><span class="ch">›</span></button>
     </div>
-    <div class="action-grid">
-      <button class="action-btn" onclick="closeModal();editSubstituteInPool('${subId}')"><span class="icon">📝</span> Notes</button>
-      <button class="action-btn" onclick="closeModal();editPlayerRating('${subId}')"><span class="icon">📊</span> Modifier la cote</button>
-      <button class="action-btn" onclick="convertSubstituteToPlayer('${subId}')"><span class="icon">🔄</span> Convertir en joueur régulier</button>
-      <button class="action-btn danger" onclick="closeModal();removeSubstituteFromPool('${subId}')"><span class="icon">🗑️</span> Retirer</button>
-    </div>
-    <div class="modal-section"><h3>Compte lié</h3>`;
-  // Lecture seule ici — comme pour un joueur régulier, le nom, le courriel,
-  // le genre et la liaison/déliaison d'un compte se gèrent uniquement depuis
-  // la fiche du membre (menu ☰ → Organisation → Membres), jamais depuis une
-  // ligue précise : une même personne peut être dans plusieurs ligues à la
-  // fois, donc ça ne peut pas être une info propre à une seule d'entre elles.
-  if(profile){
-    html += `<p class="small">${escapeHTML(profile.email)} — Remplaçant</p>
-      <p class="small" style="color:var(--muted);">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>
-      ${profileBioStyleHTML(profile)}`;
+    <div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="closeModal();removeSubstituteFromPool('${subId}')">Retirer de la ligue</button></div>`;
   } else {
-    html += `<p class="small">Aucun compte lié.</p>
-      <button class="btn btn-primary" onclick="inviteForEntry('${subId}','s',false)">✉️ Inviter ce remplaçant (code à usage unique)</button>
-      <p class="small" style="color:var(--muted);margin-top:8px;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
+    html += `<div class="pf-list" style="padding:14px;">`;
+    if(profile){
+      html += `<p class="small" style="margin:0 0 6px;">${escapeHTML(profile.email || '')} — ${gw(s,'Remplaçant','Remplaçante','Remplaçant(e)')}</p>
+        <p class="small" style="color:var(--muted);margin:0;">Pour délier ce compte, changer son rôle ou gérer ses autres ligues : menu ☰ → Organisation.</p>`;
+    } else {
+      html += `<p class="small" style="margin:0 0 10px;">Aucun compte lié.</p>
+        <button class="btn btn-primary" onclick="inviteForEntry('${subId}','s',false)">✉️ Inviter ce remplaçant (code à usage unique)</button>
+        <p class="small" style="color:var(--muted);margin:8px 0 0;">S'il a déjà créé un compte, il apparaît dans Organisation › Comptes › À approuver.</p>`;
+    }
+    html += `</div>`;
   }
-  html += `</div>`;
   return html;
 }
 function openSubstituteDetailModal(subId){
   const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
   if(!s) return;
-  showContentModal(escapeHTML(s.name), substituteDetailModalHTML(subId));
+  if(subId !== PF_PID){ PF_PID = subId; PF_TAB = 'gestion'; }
+  showContentModal('', function(){ return substituteDetailModalHTML(subId); });
 }
 // Convertit un joueur régulier en remplaçant : il quitte son groupe et la
 // liste des Réguliers, rejoint le bassin de Remplaçants. Son compte lié (s'il
