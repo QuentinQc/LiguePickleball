@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 286">
+<meta name="app-build" content="Version 287">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1668,10 +1668,25 @@ async function fetchLeagueData(leagueId){
   }catch(e){}
   return await sb.from('league_data').select('data').eq('league_id', leagueId).single();
 }
+// ---- Enregistrement protégé contre l'écrasement ----
+// DATA_VERSION = updated_at de league_data au moment où DATA a été chargée. saveData n'écrit que si
+// la ligue n'a pas changé depuis ; sinon (absence ou score enregistré entre-temps par un joueur,
+// autre admin), elle recharge la ligue au lieu d'effacer ces changements.
+let DATA_VERSION = null, DATA_VERSION_FOR = null;
+async function fetchLeagueVersion(leagueId){
+  try{
+    const r = await sb.from('league_data').select('updated_at').eq('league_id', leagueId).single();
+    return (r.error || !r.data) ? null : r.data.updated_at;
+  }catch(e){ return null; }
+}
 async function loadData(leagueId){
   try{
+    // Version lue AVANT les données : si une écriture se glisse entre les deux, l'enregistrement
+    // suivant sera simplement refusé puis rechargé (jamais l'inverse, qui effacerait des données).
+    const ver = (leagueId === CURRENT_LEAGUE_ID) ? await fetchLeagueVersion(leagueId) : undefined;
     const { data, error } = await fetchLeagueData(leagueId);
     if(error) throw error;
+    if(leagueId === CURRENT_LEAGUE_ID){ DATA_VERSION = ver; DATA_VERSION_FOR = leagueId; }
     STORAGE_OK = true;
     OFFLINE_MODE = false;
     const result = (data && data.data && Object.keys(data.data).length>0) ? data.data : null;
@@ -1994,16 +2009,42 @@ function openSendAnnouncementModal(){
   });
 }
 // ==================== FIN NOTIFICATIONS PUSH ====================
-async function saveData(){
+// Les enregistrements partent l'un après l'autre : deux clics rapides ne doivent pas se
+// prendre mutuellement pour une modification venue d'ailleurs.
+let SAVE_CHAIN = Promise.resolve();
+function saveData(){
+  SAVE_CHAIN = SAVE_CHAIN.then(saveDataNow, saveDataNow);
+  return SAVE_CHAIN;
+}
+async function saveDataNow(){
   if(!CURRENT_LEAGUE_ID) return;
+  const leagueId = CURRENT_LEAGUE_ID;
+  const guarded = !!DATA_VERSION && DATA_VERSION_FOR === leagueId;
   try{
-    const { error } = await sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', CURRENT_LEAGUE_ID);
+    let q = sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
+    if(guarded) q = q.eq('updated_at', DATA_VERSION);
+    const { data: rows, error } = await q.select('updated_at');
     if(error) throw error;
+    if(guarded && (!rows || !rows.length)){ await onSaveConflict(leagueId); return; }
+    if(rows && rows[0] && rows[0].updated_at){ DATA_VERSION = rows[0].updated_at; DATA_VERSION_FOR = leagueId; }
     SAVE_ERROR = null;
     STORAGE_OK = true;
   }catch(e){
     SAVE_ERROR = "La sauvegarde a échoué : " + (e && e.message ? e.message : 'erreur inconnue');
     console.error('Erreur de sauvegarde', e);
+  }
+}
+// La ligue a changé ailleurs depuis son chargement : on recharge plutôt que d'écraser.
+let SAVE_CONFLICT_SHOWN = false;
+async function onSaveConflict(leagueId){
+  if(leagueId !== CURRENT_LEAGUE_ID) return;
+  const loaded = await loadData(leagueId);
+  if(loaded){ DATA = loaded; migrateData(); }
+  render();
+  if(!SAVE_CONFLICT_SHOWN){
+    SAVE_CONFLICT_SHOWN = true;
+    showAlert("La ligue venait d'être modifiée ailleurs (un joueur ou un autre admin). Elle a été rechargée pour ne rien effacer : vérifie ta dernière modification et refais-la au besoin.");
+    setTimeout(function(){ SAVE_CONFLICT_SHOWN = false; }, 4000);
   }
 }
 // ---- Vidéos : stockées au niveau de l'ORGANISATION (partagées entre toutes
