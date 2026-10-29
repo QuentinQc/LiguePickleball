@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 279">
+<meta name="app-build" content="Version 280">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -15319,6 +15319,20 @@ async function boot(){
       }
     }catch(e){}
   }
+  // Liens des courriels (modèles Supabase en français) : « ?token_hash=…&type=… » pointent vers
+  // dinkeo.ca plutôt que vers supabase.co. On valide le jeton ici, ce qui ouvre la session.
+  let linkError = null;
+  try{
+    const qs = new URLSearchParams(window.location.search);
+    const th = qs.get('token_hash'), tt = qs.get('type');
+    if(th && tt){
+      try{ window.history.replaceState(null, '', window.location.pathname + window.location.hash); }catch(e){}
+      const { error } = await sb.auth.verifyOtp({ token_hash: th, type: tt });
+      if(error) linkError = "Ce lien est expiré ou a déjà été utilisé. Connecte-toi, ou redemande un nouveau lien.";
+      else if(tt === 'recovery') PASSWORD_RECOVERY_MODE = true;
+    }
+  }catch(e){ console.error('lien du courriel', e); }
+  if(linkError) setTimeout(function(){ showAlert(linkError); }, 400);
   const { data: { session } } = await sb.auth.getSession();
   if(PASSWORD_RECOVERY_MODE){ render(); return; } // déjà intercepté par l'événement ci-dessus
   if(session && session.user){
