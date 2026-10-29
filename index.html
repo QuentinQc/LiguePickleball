@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 285">
+<meta name="app-build" content="Version 286">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1273,6 +1273,15 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .pf-seg button{border:0;border-radius:11px;padding:11px;font-family:inherit;font-weight:700;font-size:15px;background:transparent;color:var(--muted);cursor:pointer;}
 .pf-seg button.on{background:var(--ball);color:var(--court);} .pf-seg button.on.bad{background:#FF9F0A;color:#2b1700;}
 .m-x{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.lg-card{border-radius:18px;background:var(--court-elevated-2);border:1px solid var(--line-soft);padding:12px 14px;}
+.lg-card-h{display:flex;align-items:center;gap:12px;}
+.lg-card-ic{width:40px;height:40px;border-radius:12px;background:rgba(207,234,92,.14);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:18px;}
+.lg-card-t{flex:1;min-width:0;} .lg-card-t b{display:block;font-size:16px;} .lg-card-t small{color:var(--muted);font-size:13px;}
+.lg-card .pf-seg{margin-top:10px;} .lg-card .pf-seg button{padding:9px;font-size:14px;}
+.lg-x{border:0;background:transparent;color:#ff6b6b;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:6px 4px;}
+.lg-add{display:flex;gap:6px;flex:0 0 auto;}
+.lg-add button{border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-family:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 11px;cursor:pointer;white-space:nowrap;}
+.lg-add button:first-child{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .nav-fwd{animation:navFwd .22s ease-out;} .nav-back{animation:navBk .22s ease-out;}
 @media (prefers-reduced-motion:reduce){.nav-fwd,.nav-back{animation:none;}}
 .ah-ctas{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;} .ah-ctas .ah-cta{margin-top:0;}
@@ -9835,25 +9844,28 @@ function orgMemberDetailModalHTML(idx){
   const tab = tabs.some(t=>t[0]===PF_TAB) ? PF_TAB : 'ligues';
   html += `<div class="pf-tabs">${tabs.map(t=>`<button type="button" class="${t[0]===tab?'on':''}" onclick="PF_TAB='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
   if(tab === 'ligues'){
-    html += entry.rows.length ? `<div class="pf-list">${entry.rows.map((r,ri)=>`
-      <div class="pf-row" style="cursor:default;">
-        <span class="t">${escapeHTML(r.leagueLabel)}</span>
-        <button type="button" class="pf-chip ${r.type==='remplaçant'?'warn':'on'}" style="border:0;cursor:pointer;font-family:inherit;" onclick="confirmToggleMemberLeagueType(${idx},${ri})">${r.type==='remplaçant'?'Remplaçant':'Joueur'}</button>
-        <button type="button" class="btn-ghost-danger" onclick="confirmRemovePersonFromLeague(${idx},${ri})" aria-label="Retirer de cette ligue">🗑️</button>
-      </div>`).join('')}</div>
-      <p class="small" style="color:var(--muted);margin:6px 2px 0;">Touche l'étiquette pour passer de joueur à remplaçant.</p>` : `<p class="small" style="color:var(--muted);">Aucune ligue pour l'instant.</p>`;
+    const lgOf = function(id){ return LEAGUES.find(function(l){ return l.id === id; }) || {}; };
+    html += `<div class="pf-sec" style="margin-top:0;">Ses ligues</div>`;
+    html += entry.rows.length ? `<div style="display:flex;flex-direction:column;gap:10px;">${entry.rows.map((r,ri)=>{
+      const lg = lgOf(r.leagueId), sub = r.type === 'remplaçant';
+      return `<div class="lg-card">
+        <div class="lg-card-h">
+          <span class="lg-card-ic">${pbIcon()}</span>
+          <span class="lg-card-t"><b>${escapeHTML(lg.name || r.leagueLabel)}</b>${lg.schedule_label ? `<small>${escapeHTML(lg.schedule_label)}</small>` : ''}</span>
+          <button type="button" class="lg-x" onclick="confirmRemovePersonFromLeague(${idx},${ri})">Retirer</button>
+        </div>
+        <div class="pf-seg">
+          <button type="button" class="${sub?'':'on'}" onclick="${sub ? `confirmToggleMemberLeagueType(${idx},${ri})` : ''}">Joueur</button>
+          <button type="button" class="${sub?'on':''}" onclick="${sub ? '' : `confirmToggleMemberLeagueType(${idx},${ri})`}">Remplaçant</button>
+        </div>
+      </div>`;
+    }).join('')}</div>` : `<p class="small" style="color:var(--muted);margin:0 2px;">Dans aucune ligue pour l'instant.</p>`;
     if(remaining.length){
-      const roleGuess = entry.rows.some(r=>r.type==='joueur') ? 'joueur' : 'remplacant';
-      html += `<div class="pf-sec">Ajouter à une ligue</div>
-        <div class="pf-list">${remaining.map(l=>`<label class="pf-row">
-          <input type="checkbox" class="orgDetailLeague" value="${l.id}" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--ball);">
-          <span class="t">${escapeHTML(l.schedule_label || l.name)}</span>
-          <select class="orgDetailLeagueType" data-league-id="${l.id}" onclick="event.stopPropagation()" style="width:auto;min-height:36px;padding:4px 8px;">
-            <option value="joueur" ${roleGuess==='remplacant'?'':'selected'}>Joueur</option>
-            <option value="remplacant" ${roleGuess==='remplacant'?'selected':''}>Remplaçant</option>
-          </select>
-        </label>`).join('')}</div>
-        <button class="btn btn-secondary" style="margin-top:10px;width:100%;" onclick="saveOrgMemberDetailAdd(${idx})">+ Ajouter</button>`;
+      html += `<div class="pf-sec">Autres ligues de l'organisation</div>
+        <div class="pf-list">${remaining.map(l=>`<div class="pf-row" style="cursor:default;">
+          <span class="t">${escapeHTML(l.name)}${l.schedule_label ? `<small>${escapeHTML(l.schedule_label)}</small>` : ''}</span>
+          <span class="lg-add"><button type="button" onclick="addMemberToLeague(${idx},'${l.id}','joueur')">+ Joueur</button><button type="button" onclick="addMemberToLeague(${idx},'${l.id}','remplacant')">+ Remplaçant</button></span>
+        </div>`).join('')}</div>`;
     }
   } else if(tab === 'infos'){
     if(linkedProfile && linkedProfile.bio) html += `<p class="pf-bio">« ${escapeHTML(linkedProfile.bio)} »</p>`;
@@ -10059,11 +10071,16 @@ function confirmToggleMemberLeagueType(idx, rowIdx){
     if(ok) await refreshOrgMemberDetailModal(idx, [row.leagueId]);
   });
 }
+// Ajout d'un toucher depuis la fiche membre (onglet Ligues).
+function addMemberToLeague(idx, leagueId, type){ return addMemberToLeagues(idx, [{ leagueId: leagueId, type: type }]); }
 async function saveOrgMemberDetailAdd(idx){
-  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
-  if(!entry) return;
   const picks = readPerLeagueTypes('orgDetailLeague');
   if(!picks.length){ showAlert("Choisis au moins une ligue."); return; }
+  return addMemberToLeagues(idx, picks);
+}
+async function addMemberToLeagues(idx, picks){
+  const entry = ORG_ROSTER_ENTRIES_CACHE[idx];
+  if(!entry) return;
   let orgMemberId = entry.orgMemberId;
   if(!orgMemberId){
     const member = await createOrgMember(entry.name, entry.email, null, entry.profileId || null);
