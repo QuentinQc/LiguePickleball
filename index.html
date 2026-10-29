@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 287">
+<meta name="app-build" content="Version 288">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1267,6 +1267,29 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .pf-row .t{flex:1;min-width:0;} .pf-row .t small{display:block;color:var(--muted);font-size:13px;margin-top:1px;}
 .pf-row .ch{color:var(--muted);font-size:20px;}
 .pf-danger{margin-top:12px;} .pf-danger .pf-row{color:#ff6b6b;justify-content:center;font-weight:700;}
+.rs-card{display:flex;flex-direction:column;gap:10px;}
+.rs-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.rs-name{font-family:var(--font-display);font-size:22px;font-weight:600;text-transform:uppercase;line-height:1.1;}
+.rs-bar{margin-bottom:4px;}
+.rs-warn{font-size:14px;color:#FF9F0A;font-weight:600;background:rgba(255,159,10,.1);border-radius:12px;padding:10px 12px;}
+.rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
+.rs-m.todo{border-color:rgba(255,214,10,.35);}
+.rs-mh{display:flex;align-items:center;gap:8px;padding:10px 14px 6px;}
+.rs-mh b{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.rs-mh .sc-mark{margin-left:0;}
+.rs-state{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;}
+.rs-m.todo .rs-state{background:rgba(255,214,10,.16);color:#FFD60A;}
+.rs-m.done .rs-state{background:rgba(207,234,92,.16);color:var(--ball);}
+.rs-line{display:flex;align-items:center;gap:12px;padding:8px 10px 8px 14px;}
+.rs-line.b{border-top:1px solid var(--line-soft);}
+.rs-team{flex:1;min-width:0;font-size:16px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;}
+.rs-m.done .rs-team{color:var(--muted);font-weight:500;}
+.rs-m.wa .rs-line.a .rs-team,.rs-m.wb .rs-line.b .rs-team{color:var(--text);font-weight:700;}
+.rs-in{flex:none;width:64px !important;height:52px;font-size:26px;font-family:var(--font-display);border-radius:12px;text-align:center;}
+.rs-m.wa .rs-line.a .rs-in,.rs-m.wb .rs-line.b .rs-in{border-color:var(--ball);color:var(--ball);}
+.rs-sit{font-size:13px;color:var(--muted);padding:8px 14px 10px;border-top:1px solid var(--line-soft);}
+.rs-tag{font-size:11px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;vertical-align:middle;}
+.rs-acts{margin-top:4px;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -10867,46 +10890,61 @@ function adminSessionHTML(){
     const stale = !manual && DATA.leagueFormat !== 'social' && (expectedRoster.size !== inMatches.size || [...expectedRoster].some(id=>!inMatches.has(id)));
     const activeCount = expectedRoster.size;
     const info = DATA.leagueFormat==='social' ? (activeCount+' joueur'+(activeCount>1?'s':'')) : activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
-    html += `<div class="card"><h3>${escapeHTML(g.name)}</h3>${info ? `<p class="small">${info}</p>` : ''}`;
-    if(stale) html += `<p class="small" style="color:var(--danger);">Les matchs affichés ne reflètent plus les absences/remplaçants actuels — clique sur « Refaire les matchs » ci-dessous.</p>`;
+    const nDone = gd.matches.filter(rsDone).length, nAll = gd.matches.length;
+    const showProg = DATA.leagueFormat!=='social' && nAll>0;
+    html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">${escapeHTML(g.name)}</div>${showProg ? `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${g.id}">${nDone} / ${nAll}</span>` : ''}</div>${info ? `<div class="ah-meta">${info}</div>` : ''}${showProg ? `<div class="ah-bar rs-bar"><i id="rsb_${g.id}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>` : ''}`;
+    if(stale) html += `<div class="rs-warn">Les matchs affichés ne reflètent plus les absences et remplaçants actuels. Refais les matchs de ce groupe.</div>`;
     if(DATA.leagueFormat==='social'){
       const names = activeRosterForGroup(open, g.id).map(playerName).map(escapeHTML);
-      html += names.length ? `<p style="margin:6px 0 0;font-size:16px;line-height:1.6;">${names.join(' · ')}</p>` : `<p class="empty">Aucun joueur sur ce terrain.</p>`;
+      html += names.length ? `<div class="pf-list rs-names">${names.map(n=>`<div class="pf-row" style="cursor:default;">${n}</div>`).join('')}</div>` : `<p class="empty">Aucun joueur sur ce terrain.</p>`;
     } else if(gd.matches.length===0){ html += `<p class="empty">${manual ? 'Aucun modèle de rotation défini — configure-le dans Réglages → Paramètres de ligue.' : 'Pas assez de joueurs pour générer des matchs.'}</p>`; }
     gd.matches.forEach((m, mi)=>{
       const nameTag = (id)=>{
-        if(!id) return '<span class="small">— (position vide)</span>';
-        if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(invité)</span>';
-        if(isSubPoolId(id)) return escapeHTML(playerName(id)) + ' <span class="small">(remplaçant)</span>';
+        if(!id) return '<span class="rs-tag">position vide</span>';
+        if(isGuestId(id)) return escapeHTML(playerName(id)) + ' <span class="rs-tag">invité</span>';
+        if(isSubPoolId(id)) return escapeHTML(playerName(id)) + ' <span class="rs-tag">rempl.</span>';
         const p = DATA.players.find(x=>x.id===id);
         const isSub = p && p.groupId !== g.id;
-        return escapeHTML(p ? p.name : '?') + (isSub ? ' <span class="small">(remplaçant)</span>' : '');
+        return escapeHTML(p ? p.name : '?') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '');
       };
-      const mrDone = m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='';
-      const mrSit = (!manual && m.sit) ? ` · repos : ${escapeHTML(sitLabel(m))}` : '';
+      const team = t=> t.length ? t.map(nameTag).join('<br>') : '<span class="rs-tag">position vide</span>';
+      const sit = (!manual && m.sit) ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : '';
       html += `
-        <div class="match-row mr2">
-          <div class="mr-head${mrDone?'':' todo'}" id="mrh_${g.id}_${mi}" data-edit="1" data-sit="${(!manual && m.sit) ? escapeHTML(' · repos : '+sitLabel(m)) : ''}">Match ${mi+1}${mrDone?'':' · à saisir'}${mrSit}</div>
-          <div class="mr-line">
-            <div class="team">${m.teamA.length ? m.teamA.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
-            <input class="pill-input" type="number" inputmode="numeric" min="0" aria-label="Score de l'équipe 1" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${g.id}','${mi}','A',this.value)">
-          </div>
-          <div class="mr-line">
-            <div class="team">${m.teamB.length ? m.teamB.map(nameTag).join(' & ') : '<span class="small">— (position vide)</span>'}</div>
-            <input class="pill-input" type="number" inputmode="numeric" min="0" aria-label="Score de l'équipe 2" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${g.id}','${mi}','B',this.value)">
-          </div>
-          ${scoreMarkHTML('ladder', g.id, mi, m, false)}
+        <div class="rs-m ${rsClass(m)}" id="rsm_${g.id}_${mi}">
+          <div class="rs-mh"><b>Match ${mi+1}</b>${scoreMarkHTML('ladder', g.id, mi, m, false, true)}<span class="rs-state">${rsDone(m)?'✓':'À saisir'}</span></div>
+          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div><input class="pill-input rs-in" type="number" inputmode="numeric" min="0" aria-label="Score de l'équipe 1" value="${m.scoreA===null?'':m.scoreA}" onchange="setScore('${g.id}','${mi}','A',this.value)"></div>
+          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div><input class="pill-input rs-in" type="number" inputmode="numeric" min="0" aria-label="Score de l'équipe 2" value="${m.scoreB===null?'':m.scoreB}" onchange="setScore('${g.id}','${mi}','B',this.value)"></div>
+          ${sit}
         </div>`;
     });
-    html += DATA.leagueFormat==='social' ? `<button class="btn-ghost" onclick="socialRedraw()">🎲 Refaire le tirage des terrains</button>` : `<button class="btn-ghost" onclick="regenerate('${g.id}')">Refaire les matchs de ce groupe</button>`;
+    html += `<div class="pf-list rs-acts">` + (DATA.leagueFormat==='social' ? `<button class="pf-row" onclick="socialRedraw()"><span class="ic">🎲</span><span class="t">Refaire le tirage des terrains</span><span class="ch">›</span></button>` : `<button class="pf-row" onclick="regenerate('${g.id}')"><span class="ic">↻</span><span class="t">Refaire les matchs de ce groupe</span><span class="ch">›</span></button>`);
     if(DATA.testMode && gd.matches.length){
-      html += ` <button class="btn-ghost" onclick="autoFillGroupScores('${g.id}')">🎲 générer des scores aléatoires (test)</button>`;
+      html += `<button class="pf-row" onclick="autoFillGroupScores('${g.id}')"><span class="ic">🎲</span><span class="t">Scores aléatoires (test)</span><span class="ch">›</span></button>`;
     }
+    html += `</div>`;
     html += `</div>`;
   });
   return html;
 }
 
+function rsDone(m){ return m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!==''; }
+function rsClass(m){
+  if(!rsDone(m)) return 'todo';
+  const a = Number(m.scoreA), b = Number(m.scoreB);
+  return 'done' + (a>b ? ' wa' : (b>a ? ' wb' : ''));
+}
+// Met à jour la carte du match et la progression du groupe sans redessiner (garde le focus).
+function refreshRsMatch(gid, mi, m){
+  const el = document.getElementById('rsm_'+gid+'_'+mi);
+  if(!el) return;
+  el.className = 'rs-m ' + rsClass(m);
+  const st = el.querySelector('.rs-state'); if(st) st.textContent = rsDone(m) ? '✓' : 'À saisir';
+  const open = currentOpenSession(); const gd = open && open.groupsData.find(x=>x.groupId===gid);
+  if(!gd) return;
+  const n = gd.matches.filter(rsDone).length, t = gd.matches.length;
+  const c = document.getElementById('rsc_'+gid); if(c){ c.textContent = n+' / '+t; c.className = 'ah-st '+(n===t?'on':'wait'); }
+  const b = document.getElementById('rsb_'+gid); if(b) b.style.width = Math.round(100*n/(t||1))+'%';
+}
 function m_hasSitOut(matches){ return matches.some(m=>m.sit); }
 // Vérifie la date choisie contre les dates bloquées et la fin de saison
 // configurées dans le calendrier (jusqu'ici cette vérification n'existait
@@ -11554,6 +11592,7 @@ function setScore(gid, mi, which, val){
   else m.scoreB = val===''? null : Number(val);
   saveData();
   refreshMatchHead(gid, mi, m);
+  refreshRsMatch(gid, mi, m);
 }
 function regenerate(gid){
   const open = currentOpenSession();
