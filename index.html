@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 291">
+<meta name="app-build" content="Version 292">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1318,6 +1318,9 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sb-tile{background:rgba(0,0,0,.2);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;}
 .sb-tile b{font-family:var(--font-display);font-size:22px;color:var(--ball);line-height:1;}
 .sb-tile span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+.rp-sort{margin:10px -16px 10px;}
+.rp-sort button{font-size:13px;padding:6px 12px;}
+.rp-v{font-family:var(--font-display);font-size:18px;color:var(--ball);flex:0 0 auto;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -11766,7 +11769,7 @@ function computePlayerReports(){
 function adminReportsSectionHTML(){
   const sub = VIEW.reportsSubTab || 'liste';
   const subTabs = [['liste','Liste'],['session','Rapport de session']];
-  let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setReportsSubTab('${k}')">${l}</div>`).join('')}</div>`;
+  let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
   html += sub === 'session' ? reportsSessionHTML() : reportsListHTML();
   return html;
 }
@@ -11784,36 +11787,27 @@ function reportsListHTML(){
     const cmp = av<bv ? -1 : (av>bv ? 1 : a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     return sortDir==='asc' ? cmp : -cmp;
   });
-  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const pool = DATA.substitutePool || [];
+  const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   return `
+    <div class="pf-list" style="margin-bottom:14px;"><button class="pf-row" onclick="printReportsList()"><span class="ic">🖨️</span><span class="t">Imprimer…</span><span class="ch">›</span></button></div>
     <div class="card">
-      <button class="btn-ghost" onclick="printReportsList()">🖨️ Imprimer…</button>
+      <div class="rs-top"><div class="pf-sec" style="margin:0;">Joueurs (${ratingList.length})</div></div>
+      ${rpSortHTML([['rating','Cote'],['name','Nom'],['group',grpWord(false,true)]], sortBy, sortDir, 'setReportsListSort')}
+      ${ratingList.length ? `<div class="pf-list">${ratingList.map(p=>{
+        const g = groupById(p.groupId);
+        const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
+        return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}<small>${escapeHTML(g?g.name:'Sans '+grpWord(false,false))}</small></span><span class="rp-v">${rating.toFixed(2)}</span></div>`;
+      }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
     </div>
     <div class="card">
-      <h2>Liste des joueurs et leur cote <span class="small">(${ratingList.length})</span></h2>
-      <table>
-        <tr>
-          <th class="sortable" onclick="setReportsListSort('name')">Nom${arrow('name')}</th>
-          <th class="sortable" onclick="setReportsListSort('group')">Groupe${arrow('group')}</th>
-          <th class="sortable" onclick="setReportsListSort('rating')">Cote${arrow('rating')}</th>
-        </tr>
-        ${ratingList.map(p=>{
-          const g = groupById(p.groupId);
-          const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-          return `<tr><td>${escapeHTML(p.name)}</td><td>${escapeHTML(g?g.name:'—')}</td><td>${rating.toFixed(2)}</td></tr>`;
-        }).join('')}
-        ${ratingList.length===0 ? `<tr><td colspan="3" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
-      </table>
-    </div>
-    <div class="card">
-      <h2>Remplaçants <span class="small">(${pool.length})</span></h2>
-      <table>
-        <tr><th>Nom</th><th>Courriel</th><th>Notes</th></tr>
-        ${pool.map(s=>`<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.email||'—')}</td><td>${escapeHTML(s.notes||'—')}</td></tr>`).join('')}
-        ${pool.length===0 ? `<tr><td colspan="3" class="empty">Aucun remplaçant enregistré pour l'instant</td></tr>` : ''}
-      </table>
+      <div class="pf-sec" style="margin-top:0;">Remplaçants (${pool.length})</div>
+      ${pool.length ? `<div class="pf-list">${pool.map(x=>`<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(x.name))}</span><span class="t">${escapeHTML(x.name)}${x.email ? `<small>${escapeHTML(x.email)}</small>` : ''}${x.notes ? `<small>${escapeHTML(x.notes)}</small>` : ''}</span></div>`).join('')}</div>` : `<div class="ah-meta">Aucun remplaçant enregistré pour l'instant.</div>`}
     </div>`;
+}
+// Pastilles de tri (remplacent les en-têtes de tableau cliquables) : toucher la pastille active inverse l'ordre.
+function rpSortHTML(opts, sortBy, sortDir, fn){
+  return `<div class="ah-switch rp-sort">${opts.map(([k,l])=>`<button class="${sortBy===k?'on':''}" onclick="${fn}('${k}')">${l}${sortBy===k ? (sortDir==='asc' ? ' ↑' : ' ↓') : ''}</button>`).join('')}</div>`;
 }
 function reportsSessionHTML(){
   const closedCount = DATA.sessions.filter(s=>s.status==='closed').length;
@@ -11846,60 +11840,43 @@ function reportsSessionHTML(){
     const cmp = av<bv ? -1 : (av>bv ? 1 : 0);
     return sortDir==='asc' ? cmp : -cmp;
   });
-  const arrow = (col)=> sortBy===col ? (sortDir==='asc' ? ' ▲' : ' ▼') : '';
   const pct = (x)=> x===null ? '—' : Math.round(x*100)+'%';
-
-  let html = `<div class="card">
-    <button class="btn-ghost" onclick="printReportsSession()">🖨️ Imprimer…</button>
+  const nSubs = (DATA.substitutePool||[]).length;
+  const hl = (ic, label, val)=> `<div class="pf-row" style="cursor:default;"><span class="ic">${ic}</span><span class="t">${val}<small>${label}</small></span></div>`;
+  const delta = d=> `<span class="hs-d ${d>=0?'p':'n'}">${d>=0?'+':''}${d.toFixed(3)}</span>`;
+  let html = `<div class="pf-list" style="margin-bottom:14px;"><button class="pf-row" onclick="printReportsSession()"><span class="ic">🖨️</span><span class="t">Imprimer…</span><span class="ch">›</span></button></div>
+  <div class="card">
+    <div class="pf-sec" style="margin-top:0;">Vue d'ensemble</div>
+    <div class="sb-tiles">
+      <div class="sb-tile"><b>${closedCount}</b><span>Session${closedCount>1?'s':''}</span></div>
+      <div class="sb-tile"><b>${DATA.players.length}</b><span>Joueur${DATA.players.length>1?'s':''}</span></div>
+      <div class="sb-tile"><b>${nSubs}</b><span>Rempl.</span></div>
+      <div class="sb-tile"><b>${avgAbsenceRate===null ? '—' : pct(avgAbsenceRate)}</b><span>Absences</span></div>
+    </div>
+    <div class="pf-list" style="margin-top:12px;">
+      ${hl('🏆', 'Meilleur taux de victoire', topWinRate ? escapeHTML(topWinRate.player.name)+' · '+pct(topWinRate.winRate) : '—')}
+      ${hl('⚡', 'Le plus de matchs joués', mostActive && mostActive.played>0 ? escapeHTML(mostActive.player.name)+' · '+mostActive.played+' matchs' : '—')}
+      ${hl('📈', 'Plus forte progression de cote', bestGain ? escapeHTML(bestGain.player.name)+' · '+(bestGain.ratingChange>=0?'+':'')+bestGain.ratingChange.toFixed(3) : '—')}
+      ${hl('🚫', "Taux d'absence le plus élevé", mostAbsent && mostAbsent.absenceRate>0 ? escapeHTML(mostAbsent.player.name)+' · '+pct(mostAbsent.absenceRate) : 'Aucune absence')}
+    </div>
   </div>
   <div class="card">
-    <h2>Vue d'ensemble</h2>
-    <p class="small">${closedCount} session${closedCount>1?'s':''} terminée${closedCount>1?'s':''} au total · ${DATA.players.length} joueur${DATA.players.length>1?'s':''} · ${(DATA.substitutePool||[]).length} remplaçant${(DATA.substitutePool||[]).length>1?'s':''}</p>
-    <table>
-      <tr><td class="small">Meilleur taux de victoire</td><td>${topWinRate ? escapeHTML(topWinRate.player.name)+' — '+pct(topWinRate.winRate) : '—'}</td></tr>
-      <tr><td class="small">Joueur le plus actif (matchs joués)</td><td>${mostActive && mostActive.played>0 ? escapeHTML(mostActive.player.name)+' — '+mostActive.played+' matchs' : '—'}</td></tr>
-      <tr><td class="small">Taux d'absence moyen de la ligue</td><td>${avgAbsenceRate===null ? '—' : pct(avgAbsenceRate)}</td></tr>
-      <tr><td class="small">Taux d'absence le plus élevé</td><td>${mostAbsent ? escapeHTML(mostAbsent.player.name)+' — '+pct(mostAbsent.absenceRate) : '—'}</td></tr>
-      <tr><td class="small">Plus forte progression de cote</td><td>${bestGain ? escapeHTML(bestGain.player.name)+' — '+(bestGain.ratingChange>=0?'+':'')+bestGain.ratingChange.toFixed(3) : '—'}</td></tr>
-    </table>
+    <div class="pf-sec" style="margin-top:0;">Classement cumulatif</div>
+    <div class="ah-meta" style="margin:0 2px 10px;">Total des points sur toutes les sessions terminées.</div>
+    ${reports.length ? `<div class="pf-list">${reports.slice().sort((a,b)=>b.totalPoints-a.totalPoints).map((r,i)=>`<div class="pf-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(r.player.name)}<small>${r.wins}-${r.losses}</small></span><span class="rp-v">${r.totalPoints}</span></div>`).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
   </div>
   <div class="card">
-    <h2>Classement cumulatif de la saison</h2>
-    <p class="small">Total des points, victoires et défaites sur toutes les sessions terminées — pertinent surtout en format Poules fixes ou Division unique, mais visible pour tous les formats.</p>
-    <table>
-      <tr><th>#</th><th>Nom</th><th>Points</th><th>V-D</th></tr>
-      ${reports.slice().sort((a,b)=>b.totalPoints-a.totalPoints).map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHTML(r.player.name)}</td><td>${r.totalPoints}</td><td>${r.wins}-${r.losses}</td></tr>`).join('')}
-      ${reports.length===0 ? `<tr><td colspan="4" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
-    </table>
-  </div>
-  <div class="card">
-    <h2>Par joueur</h2>
-    <table>
-      <tr>
-        <th class="sortable" onclick="setReportsSort('name')">Nom${arrow('name')}</th>
-        <th class="sortable" onclick="setReportsSort('wins')">V${arrow('wins')}</th>
-        <th class="sortable" onclick="setReportsSort('losses')">D${arrow('losses')}</th>
-        <th class="sortable" onclick="setReportsSort('winRate')">% V${arrow('winRate')}</th>
-        <th class="sortable" onclick="setReportsSort('absenceRate')">Taux absence${arrow('absenceRate')}</th>
-        <th class="sortable" onclick="setReportsSort('promotions')">Montées${arrow('promotions')}</th>
-        <th class="sortable" onclick="setReportsSort('relegations')">Descentes${arrow('relegations')}</th>
-        <th class="sortable" onclick="setReportsSort('ratingChange')">Δ Cote${arrow('ratingChange')}</th>
-        <th class="sortable" onclick="setReportsSort('subCount')">Remplacements${arrow('subCount')}</th>
-      </tr>
-      ${sorted.map(r=>`<tr>
-        <td>${escapeHTML(r.player.name)}</td>
-        <td>${r.wins}</td>
-        <td>${r.losses}</td>
-        <td>${pct(r.winRate)}</td>
-        <td>${pct(r.absenceRate)}${r.absenceRate!==null ? ` <span class="small">(${r.sessionsAbsent}/${r.sessionsAbsent+r.sessionsAppeared})</span>` : ''}</td>
-        <td>${r.promotions}</td>
-        <td>${r.relegations}</td>
-        <td style="color:${r.ratingChange>0?'var(--ball)':(r.ratingChange<0?'var(--danger)':'inherit')};">${r.ratingChange>=0?'+':''}${r.ratingChange.toFixed(3)}</td>
-        <td>${r.subCount}</td>
-      </tr>`).join('')}
-      ${sorted.length===0 ? `<tr><td colspan="9" class="empty">Aucun joueur pour l'instant</td></tr>` : ''}
-    </table>
-    <p class="small">Le taux d'absence se calcule sur les sessions où le joueur était présent ou absent dans son groupe (les sessions avant qu'il rejoigne la ligue ne comptent pas contre lui).</p>
+    <div class="pf-sec" style="margin-top:0;">Par joueur</div>
+    ${rpSortHTML([['winRate','% victoires'],['wins','Victoires'],['losses','Défaites'],['ratingChange','Δ cote'],['absenceRate','Absences'],['promotions','Montées'],['relegations','Descentes'],['subCount','Remplacements'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
+    ${sorted.length ? `<div class="pf-list">${sorted.map(r=>{
+      const bits = [`${r.wins}-${r.losses} · ${pct(r.winRate)}`];
+      if(r.absenceRate!==null) bits.push(`abs. ${pct(r.absenceRate)} (${r.sessionsAbsent}/${r.sessionsAbsent+r.sessionsAppeared})`);
+      if(r.promotions) bits.push(`▲${r.promotions}`);
+      if(r.relegations) bits.push(`▼${r.relegations}`);
+      if(r.subCount) bits.push(`${r.subCount} rempl.`);
+      return `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(r.player.name)}<small>${bits.join(' · ')}</small></span>${delta(r.ratingChange)}</div>`;
+    }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
+    <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Le taux d'absence ne compte que les sessions où le joueur faisait partie de la ligue.</div>
   </div>`;
   return html;
 }
