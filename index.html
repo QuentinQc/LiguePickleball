@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 298">
+<meta name="app-build" content="Version 299">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1643,7 +1643,16 @@ async function subscribeToPush(){
     return;
   }
   try{
-    const permission = await Notification.requestPermission();
+    // Edge et Chrome masquent parfois la demande (simple cloche dans la barre d'adresse) :
+    // si rien n'est répondu après quelques secondes, on explique où cliquer.
+    let answered = false;
+    const hint = setTimeout(function(){
+      if(!answered) showAlert("Ton navigateur a peut-être masqué la demande. Clique sur la petite cloche (ou le cadenas) dans la barre d'adresse, puis choisis « Autoriser ».");
+    }, 4000);
+    let permission;
+    try{ permission = await Notification.requestPermission(); }
+    finally{ answered = true; clearTimeout(hint); }
+    if(MODAL && MODAL.kind === 'alert' && /masqué la demande/.test(MODAL.message||'')) dropModal();
     if(permission === 'denied'){ showNotifBlockedHelp(); render(); return; }
     if(permission !== 'granted'){
       showAlert("La demande d'autorisation a été fermée sans réponse. Réessaie et choisis « Autoriser ». Si rien ne s'affiche, cherche une petite cloche barrée à droite de la barre d'adresse et clique dessus.");
@@ -1667,6 +1676,7 @@ async function subscribeToPush(){
     }, { onConflict: 'endpoint' });
     if(error){ showAlert("Erreur lors de l'activation des notifications : " + error.message); return; }
     PUSH_SUBSCRIBED = true;
+    showAlert("🔔 Notifications activées sur cet appareil.");
   }catch(e){
     console.error("Erreur d'abonnement aux notifications", e);
     showAlert("Impossible d'activer les notifications sur cet appareil : " + (e && e.message ? e.message : String(e)));
@@ -1713,7 +1723,7 @@ function pushPromoBannerHTML(){
     ? "Ajoute Dinkeo à ton écran d'accueil (Safari → Partager → « Sur l'écran d'accueil »), puis ouvre l'app depuis cette icône pour activer les notifications — sessions, résultats et annonces, même app fermée."
     : "Active les notifications pour être averti(e) des nouvelles sessions, des résultats et des annonces, même quand l'app est fermée.";
   const actionBtn = iosNotStandalone ? '' :
-    `<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="togglePushNotifications();dismissPushPromo()">🔔 Activer maintenant</button>`;
+    `<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="togglePushNotifications()">🔔 Activer maintenant</button>`;
   return `<div class="card" style="position:relative;border-color:var(--ball);background:rgba(207,234,92,0.10);">
     <button onclick="dismissPushPromo()" aria-label="Fermer" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;line-height:1;">✕</button>
     <strong style="color:var(--ball);">${iosNotStandalone ? '📲' : '🔔'} Active les notifications</strong>
@@ -4197,12 +4207,25 @@ function markQuickSeen(k){
 function setNotifToggle(key, checked){ saveNotifPref({ [key]: !!checked }); }
 function setNotifQuietHour(key, v){ saveNotifPref({ [key]: parseInt(v,10) }); }
 function openNotifSettings(){ showContentModal('🔔 Notifications', notifSettingsHTML); }
+// Bloc « Cet appareil » en tête des réglages de notifications : état + bouton (le menu ☰ n'existe plus).
+function notifDeviceBlockHTML(){
+  const iosNotStandalone = isIOSDevice() && !isRunningStandalone();
+  let sub, btn = '';
+  if(iosNotStandalone) sub = "Ajoute Dinkeo à l'écran d'accueil (Safari › Partager › « Sur l'écran d'accueil ») et ouvre l'app depuis son icône.";
+  else if(!PUSH_SUPPORTED) sub = "Ce navigateur ne prend pas en charge les notifications.";
+  else if(PUSH_SUBSCRIBED){ sub = 'Activées'; btn = `<button type="button" class="btn btn-secondary" onclick="togglePushNotifications()">Désactiver</button>`; }
+  else if(notifPermission() === 'denied') sub = 'Bloquées par le navigateur. ' + notifBlockedSteps();
+  else { sub = 'Désactivées'; btn = `<button type="button" class="btn btn-primary" onclick="togglePushNotifications()">Activer</button>`; }
+  return `<div class="card" style="padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">
+    <div style="flex:1;min-width:0;"><div style="font-weight:700;">📱 Cet appareil</div><div class="small" style="color:var(--muted);">${escapeHTML(sub)}</div></div>${btn}
+  </div>`;
+}
 function notifSettingsHTML(){
   const p = NOTIF_PREFS || {};
   const on = (k)=> p[k] !== false;
   const row = (key,label,sub)=>`<label class="notif-row"><span><strong>${label}</strong>${sub?`<span class="small" style="display:block;color:var(--muted);">${sub}</span>`:''}</span><input type="checkbox" ${on(key)?'checked':''} onchange="setNotifToggle('${key}',this.checked)"></label>`;
   const hours = (sel,key)=>`<select onchange="setNotifQuietHour('${key}',this.value)" style="width:auto;">${Array.from({length:24},(_,h)=>`<option value="${h}" ${h===sel?'selected':''}>${String(h).padStart(2,'0')} h</option>`).join('')}</select>`;
-  return `<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification. Il faut d'abord activer les notifications sur cet appareil (menu ☰).</p>
+  return `${notifDeviceBlockHTML()}<p class="small" style="margin-top:0;color:var(--muted);">Choisis ce qui t'envoie une notification.</p>
     <div class="notif-list">
       <h4 style="margin:4px 0 6px;">🏓 Ma ligue</h4>
       ${row('league_sessions','📅 Nouvelles sessions','Quand une session est publiée')}
