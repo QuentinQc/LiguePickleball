@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 311">
+<meta name="app-build" content="Version 312">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1169,6 +1169,27 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .lg-nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;}
 .lg-nav button.on{background:var(--ball);color:var(--court);}
 @media (min-width:641px){ .lg-nav button{flex-direction:row;gap:8px;font-size:14px;padding:9px 6px;} .lg-nav svg{width:20px;height:20px;} }
+.au-hero{display:flex;align-items:center;gap:14px;margin:0 0 18px;}
+.au-hero img{width:54px;height:54px;border-radius:15px;flex:0 0 auto;box-shadow:0 6px 18px rgba(0,0,0,.35);}
+.au-t{font-family:var(--font-display);font-size:24px;font-weight:600;text-transform:uppercase;line-height:1.1;}
+.au-s{color:var(--muted);font-size:14px;line-height:1.45;margin-top:3px;}
+.au-f{display:block;margin-bottom:12px;}
+.au-lab{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 2px 6px;}
+.au-box{position:relative;display:flex;align-items:center;}
+.au-ic{position:absolute;left:14px;font-size:16px;opacity:.75;pointer-events:none;}
+#modalRoot .au-box input,#app .au-box input{width:100%;box-sizing:border-box;height:52px;min-height:52px;padding:0 48px 0 44px;font-size:16px;border-radius:14px;}
+.au-eye{position:absolute;right:6px;width:40px;height:40px;border:0;border-radius:10px;background:transparent;cursor:pointer;font-size:17px;}
+.au-btn{width:100%;height:52px;font-size:16px;border-radius:999px;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:10px;}
+.au-btn:disabled{opacity:.75;cursor:default;}
+.au-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(12,38,34,.3);border-top-color:var(--court);animation:auSpin .8s linear infinite;}
+@keyframes auSpin{to{transform:rotate(360deg);}}
+.au-err{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.35);color:#ffc2c2;border-radius:14px;padding:11px 13px;font-size:14px;line-height:1.45;margin:2px 0 12px;}
+.au-err .au-link{display:block;padding:6px 0 0;}
+.au-link{background:none;border:0;color:var(--ball);font:600 14px var(--font-body);cursor:pointer;padding:8px 4px;}
+.au-note{background:rgba(207,234,92,.10);border:1px solid rgba(207,234,92,.25);border-radius:14px;padding:10px 13px;font-size:14px;line-height:1.45;margin:0 0 14px;}
+.au-ok{text-align:center;padding:6px 4px 2px;}
+.au-big{font-size:52px;line-height:1;margin-bottom:10px;}
+.au-card{max-width:440px;margin:24px auto;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -4631,96 +4652,123 @@ function escapeHTML(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&'
 // ---- Login (Supabase Auth : courriel + mot de passe) ----
 // ---- Définir un nouveau mot de passe (après avoir cliqué le lien reçu par courriel) ----
 function renderSetNewPassword(){
+  const busy = !!auState().busy;
   app.innerHTML = `
     ${topbarHTML('Nouveau mot de passe')}
-    ${storageBannerHTML()}${pushPromoBannerHTML()}
-    <div class="card">
-      <h2>Choisis un nouveau mot de passe</h2>
-      ${VIEW.error ? `<p class="small" style="color:var(--danger);">${escapeHTML(VIEW.error)}</p>` : ''}
-      ${VIEW.info ? `<p class="small" style="color:var(--ball);">${escapeHTML(VIEW.info)}</p>` : ''}
-      <div class="field"><label>Nouveau mot de passe</label><input id="newPassword" type="password" placeholder="6 caractères minimum"></div>
-      <div class="field"><label>Confirme le nouveau mot de passe</label><input id="newPasswordConfirm" type="password" placeholder="Retape le même mot de passe"></div>
-      <button class="btn btn-primary" onclick="onSetNewPassword()">Enregistrer le nouveau mot de passe</button>
+    <div class="card au-card">
+      <div class="au-hero"><img src="${LOGO_DATA_URI}" alt=""><div><div class="au-t">Nouveau mot de passe</div><div class="au-s">Choisis-en un que tu n'utilises pas ailleurs.</div></div></div>
+      <form onsubmit="onSetNewPassword();return false;">
+        ${auField('newPassword', 'Nouveau mot de passe', 'password', '🔒', 'autocomplete="new-password" placeholder="6 caractères minimum"')}
+        ${auErrorHTML()}
+        <button type="submit" class="btn btn-primary au-btn" ${busy?'disabled':''}>${busy ? '<span class="au-spin"></span>Enregistrement…' : 'Enregistrer et me connecter'}</button>
+      </form>
     </div>`;
 }
 async function onSetNewPassword(){
-  const password = document.getElementById('newPassword').value;
-  const passwordConfirm = document.getElementById('newPasswordConfirm').value;
-  if(!password || password.length < 6){ VIEW.error = 'Le mot de passe doit contenir au moins 6 caractères.'; render(); return; }
-  if(password !== passwordConfirm){ VIEW.error = 'Les deux mots de passe ne correspondent pas.'; render(); return; }
-  VIEW.error = null; VIEW.info = 'Mise à jour…'; render();
+  const A = auState(); const password = A.newPassword || '';
+  if(password.length < 6){ VIEW.error = { text: 'Le mot de passe doit contenir au moins 6 caractères.' }; render(); return; }
+  VIEW.error = null; A.busy = true; render();
   const { error } = await sb.auth.updateUser({ password });
-  if(error){ VIEW.info = null; VIEW.error = error.message; render(); return; }
+  A.busy = false;
+  if(error){ VIEW.error = authErrorFR(error); render(); return; }
   PASSWORD_RECOVERY_MODE = false;
   VIEW = {};
   const { data: { user } } = await sb.auth.getUser();
   await onAuthResolved(user);
 }
-// Ouvre l'app Mail avec un gabarit de questions pré-rempli, pour les
-// visiteurs qui demandent l'accès sans avoir de lien d'inscription.
-function openAccessRequestEmail(){
-  const subject = "Demande d'accès - Dinkeo";
-  const body = [
-    "Bonjour,",
-    "",
-    "Je souhaiterais accéder à Dinkeo pour ma ligue de pickleball.",
-    "",
-    "Pourquoi souhaitez-vous y accéder ?",
-    "",
-    "",
-    "Quel type de ligue avez-vous (échelle, poules fixes, division unique, tournoi, etc.) ?",
-    "",
-    "",
-    "Combien de joueurs environ ?",
-    "",
-    "",
-    "Vos besoins particuliers :",
-    "",
-    "",
-    "Merci !"
-  ].join("\n");
-  window.location.href = "mailto:quentin.qc.carpentier@gmail.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+// ---------- Connexion / création de compte / mot de passe oublié ----------
+// Les champs tapés sont gardés dans VIEW.auth : une erreur ou un rendu ne les efface plus.
+function auState(){ if(!VIEW.auth) VIEW.auth = { email: lastLoginEmail() }; return VIEW.auth; }
+function auSet(k, v){ auState()[k] = v; }
+function auField(key, label, type, icon, attrs){
+  const A = auState(), pw = type === 'password';
+  return `<label class="au-f"><span class="au-lab">${label}</span><span class="au-box"><span class="au-ic" aria-hidden="true">${icon}</span>
+    <input id="au_${key}" type="${type}" value="${escapeHTML(A[key]||'')}" oninput="auSet('${key}',this.value)" ${attrs||''}>
+    ${pw ? `<button type="button" class="au-eye" onclick="auTogglePw(this)" aria-label="Afficher le mot de passe">👁️</button>` : ''}</span></label>`;
+}
+function auTogglePw(btn){
+  const inp = btn.parentNode.querySelector('input'); if(!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? '🙈' : '👁️';
+  btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+}
+// Messages d'erreur de Supabase traduits en français clair.
+function authErrorFR(error){
+  const m = String((error && error.message) || error || '');
+  if(/invalid login credentials/i.test(m)) return { text: "Courriel ou mot de passe incorrect." };
+  if(/email not confirmed/i.test(m)) return { text: "Ton courriel n'est pas encore confirmé. Ouvre le lien reçu par courriel (regarde aussi dans les indésirables).", resend: true };
+  if(/already registered|already been registered|user already exists/i.test(m)) return { text: "Un compte existe déjà avec ce courriel. Connecte-toi, ou utilise « Mot de passe oublié ».", toSignin: true };
+  if(/at least 6|password should be/i.test(m)) return { text: "Le mot de passe doit contenir au moins 6 caractères." };
+  if(/invalid email|unable to validate email|email address .* is invalid/i.test(m)) return { text: "Ce courriel ne semble pas valide." };
+  if(/for security purposes|rate limit|too many requests|after \d+ seconds/i.test(m)) return { text: "Trop d'essais rapprochés. Patiente une minute, puis réessaie." };
+  if(/failed to fetch|network|load failed/i.test(m)) return { text: "Pas de connexion internet. Vérifie ta connexion et réessaie." };
+  return { text: m || "Une erreur est survenue. Réessaie." };
+}
+function auErrorHTML(){
+  const e = VIEW.error; if(!e) return '';
+  const o = typeof e === 'string' ? { text: e } : e;
+  return `<div class="au-err" role="alert">⚠️ ${escapeHTML(o.text)}
+    ${o.resend ? `<button type="button" class="au-link" onclick="auResendConfirmation()">Renvoyer le courriel de confirmation</button>` : ''}
+    ${o.toSignin ? `<button type="button" class="au-link" onclick="setLoginMode('signin')">Aller à la connexion</button>` : ''}</div>`;
 }
 function loginFormInnerHTML(){
-  const mode = VIEW.loginMode || 'signin'; // 'signin' | 'signup' | 'reset'
-  return `
-      <div class="pf-seg" style="margin-bottom:16px;">
-        <button type="button" class="${mode!=='signup'?'on':''}" onclick="setLoginMode('signin')">Connexion</button>
-        <button type="button" class="${mode==='signup'?'on':''}" onclick="setLoginMode('signup')">Créer un compte</button>
-      </div>
-      ${mode==='reset' ? `
-        <p class="small">Entre ton courriel pour recevoir un lien de réinitialisation de mot de passe.</p>
-        <div class="field"><label>Courriel</label><input id="resetEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="toi@exemple.com" value="${escapeHTML(lastLoginEmail())}"></div>
-        <button class="btn btn-primary" style="width:100%;" onclick="onResetPassword()">Envoyer le lien</button>
-        <p class="small" style="text-align:center;margin-top:14px;"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← Retour à la connexion</a></p>
-      ` : mode==='signup' ? (true ? `
-        ${PENDING_CODE ? `<p class="small" style="color:var(--ball);">🎟️ Tu as été invité(e) : crée ton compte, ton invitation sera appliquée automatiquement.</p>` : (SIGNUP_ORG_NAME ? `<p class="small" style="color:var(--ball);">Organisation : <strong>${escapeHTML(SIGNUP_ORG_NAME)}</strong>. Après ta connexion, entre le code d'invitation de ta ligue.</p>` : `<p class="small">Crée ton compte, puis entre le <strong>code d'invitation</strong> que ton administrateur t'a remis.</p>`)}
-        <form onsubmit="onSignUp();return false;" autocomplete="on">
-          <div class="field"><label>Ton nom (affiché dans la ligue)</label><input id="signupName" name="name" autocomplete="name" placeholder="Prénom Nom"></div>
-          <div class="field"><label>Courriel</label><input id="signupEmail" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="toi@exemple.com"></div>
-          <div class="field"><label>Confirme ton courriel</label><input id="signupEmailConfirm" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" placeholder="Retape le même courriel"></div>
-          <div class="field"><label>Mot de passe</label><input id="signupPassword" name="new-password" type="password" autocomplete="new-password" placeholder="6 caractères minimum"></div>
-          <div class="field"><label>Confirme ton mot de passe</label><input id="signupPasswordConfirm" type="password" autocomplete="new-password" placeholder="Retape le même mot de passe"></div>
-          <button type="submit" class="btn btn-primary" style="width:100%;">Créer mon compte</button>
-        </form>
-      ` : `
-        <p class="small">${SIGNUP_ORG_ID ? "Ce lien d'inscription ne correspond à aucune organisation valide." : "L'inscription se fait uniquement par invitation."} Si tu souhaites rejoindre une ligue sur cette app, contacte-nous par courriel.</p>
-        <button class="btn btn-primary" onclick="openAccessRequestEmail()" style="width:100%;">📧 Nous envoyer un courriel</button>
-        <p class="small" style="margin-top:10px;"><a href="#" onclick="setLoginMode('signin');return false;" style="color:var(--ball);">← J'ai déjà un compte</a></p>
-      `) : `
-        <form onsubmit="onSignIn();return false;" autocomplete="on">
-          <div class="field"><label>Courriel</label><input id="signinEmail" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="toi@exemple.com" value="${escapeHTML(lastLoginEmail())}"></div>
-          <div class="field"><label>Mot de passe</label><input id="signinPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-          <button type="submit" class="btn btn-primary" style="width:100%;">Se connecter</button>
-        </form>
-        <p class="small" style="text-align:center;margin-top:14px;"><a href="#" onclick="setLoginMode('reset');return false;" style="color:var(--ball);">Mot de passe oublié ?</a></p>
-      `}
-      ${VIEW.error ? `<p class="err">${escapeHTML(VIEW.error)}</p>` : ''}
-      ${VIEW.info ? `<p class="small" style="color:var(--ball);">${escapeHTML(VIEW.info)}</p>` : ''}`;
+  const mode = VIEW.loginMode || 'signin'; // signin | signup | reset | sent-signup | sent-reset
+  const A = auState(), busy = !!A.busy;
+  const hero = (t, sub)=>`<div class="au-hero"><img src="${LOGO_DATA_URI}" alt=""><div><div class="au-t">${t}</div><div class="au-s">${sub}</div></div></div>`;
+  const btn = (label, busyLabel)=>`<button type="submit" class="btn btn-primary au-btn" ${busy?'disabled':''}>${busy ? '<span class="au-spin"></span>' + busyLabel : label}</button>`;
+  if(mode === 'sent-signup' || mode === 'sent-reset'){
+    const signup = mode === 'sent-signup';
+    return `<div class="au-ok"><div class="au-big">📬</div><div class="au-t">Vérifie tes courriels</div>
+      <p class="au-s" style="margin:8px 0 18px;">${signup ? 'Un lien de confirmation a été envoyé à' : 'Un lien pour choisir un nouveau mot de passe a été envoyé à'} <b style="color:var(--text);">${escapeHTML(A.email||'')}</b>.
+      ${signup ? 'Clique dessus, puis reviens te connecter.' : 'Il est valide pendant une heure.'} Pense à regarder dans les indésirables.</p>
+      <button type="button" class="btn btn-primary au-btn" onclick="setLoginMode('signin')">Se connecter</button>
+      ${signup ? `<button type="button" class="au-link" onclick="auResendConfirmation()">Je n'ai rien reçu : renvoyer le courriel</button>` : `<button type="button" class="au-link" onclick="setLoginMode('reset')">Je n'ai rien reçu : renvoyer le lien</button>`}
+      ${VIEW.info ? `<p class="au-s" style="color:var(--ball);margin-top:6px;">${escapeHTML(VIEW.info)}</p>` : ''}</div>`;
+  }
+  if(mode === 'reset'){
+    return `${hero('Mot de passe oublié', 'Entre ton courriel : on t\'envoie un lien pour en choisir un nouveau.')}
+      <form onsubmit="onResetPassword();return false;" autocomplete="on">
+        ${auField('email', 'Courriel', 'email', '✉️', 'name="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="toi@exemple.com"')}
+        ${auErrorHTML()}${btn('Envoyer le lien', 'Envoi…')}
+      </form>
+      <div style="text-align:center;margin-top:6px;"><button type="button" class="au-link" onclick="setLoginMode('signin')">← Retour à la connexion</button></div>`;
+  }
+  const seg = `<div class="pf-seg" style="margin-bottom:18px;">
+      <button type="button" class="${mode!=='signup'?'on':''}" onclick="setLoginMode('signin')">Connexion</button>
+      <button type="button" class="${mode==='signup'?'on':''}" onclick="setLoginMode('signup')">Créer un compte</button>
+    </div>`;
+  if(mode === 'signup'){
+    const invite = PENDING_CODE ? `<div class="au-note">🎟️ Tu as été invité(e) : ton invitation sera appliquée dès que ton compte sera créé.</div>`
+      : SIGNUP_ORG_NAME ? `<div class="au-note">🏢 Organisation : <b>${escapeHTML(SIGNUP_ORG_NAME)}</b></div>`
+      : `<div class="au-note">🎟️ Après ta connexion, entre le code d'invitation de ta ligue ou cherche une ligue près de chez toi.</div>`;
+    return `${hero('Bienvenue 👋', 'Crée ton compte en quelques secondes.')}${seg}${invite}
+      <form onsubmit="onSignUp();return false;" autocomplete="on">
+        ${auField('name', 'Ton nom', 'text', '👤', 'name="name" autocomplete="name" placeholder="Prénom Nom"')}
+        ${auField('email', 'Courriel', 'email', '✉️', 'name="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="toi@exemple.com"')}
+        ${auField('password', 'Mot de passe', 'password', '🔒', 'name="new-password" autocomplete="new-password" placeholder="6 caractères minimum"')}
+        ${auErrorHTML()}${btn('Créer mon compte', 'Création du compte…')}
+      </form>`;
+  }
+  return `${hero('Bon retour 👋', 'Connecte-toi pour retrouver tes ligues.')}${seg}
+    ${VIEW.info ? `<div class="au-note">ℹ️ ${escapeHTML(VIEW.info)}</div>` : ''}
+    <form onsubmit="onSignIn();return false;" autocomplete="on">
+      ${auField('email', 'Courriel', 'email', '✉️', 'name="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="toi@exemple.com"')}
+      ${auField('password', 'Mot de passe', 'password', '🔒', 'name="password" autocomplete="current-password" placeholder="Ton mot de passe"')}
+      <div style="text-align:right;margin:-4px 0 8px;"><button type="button" class="au-link" onclick="setLoginMode('reset')">Mot de passe oublié ?</button></div>
+      ${auErrorHTML()}${btn('Se connecter', 'Connexion…')}
+    </form>`;
+}
+async function auResendConfirmation(){
+  const A = auState(); const email = (A.email||'').trim();
+  if(!email){ VIEW.error = { text: "Entre ton courriel d'abord." }; render(); return; }
+  const { error } = await sb.auth.resend({ type:'signup', email, options:{ emailRedirectTo: window.location.origin + window.location.pathname } });
+  if(error){ VIEW.error = authErrorFR(error); VIEW.loginMode = VIEW.loginMode==='sent-signup' ? 'signin' : VIEW.loginMode; render(); return; }
+  VIEW.error = null; VIEW.loginMode = 'sent-signup'; VIEW.info = 'Courriel renvoyé ✓'; render();
 }
 function openLoginModal(mode){
   if(mode) VIEW.loginMode = mode;
-  MODAL = { kind:'content', title:'Connexion', htmlContent: loginFormInnerHTML };
+  MODAL = { kind:'content', title:'', htmlContent: loginFormInnerHTML };
   render();
 }
 function renderLogin(){
@@ -4740,44 +4788,45 @@ function renderLogin(){
     </section>
   `;
 }
-function setLoginMode(m){ VIEW.loginMode = m; VIEW.error=null; VIEW.info=null; render(); }
+function setLoginMode(m){ VIEW.loginMode = m; VIEW.error=null; VIEW.info=null; auState().busy = false; render(); }
 
 async function onSignUp(){
-  const name = document.getElementById('signupName').value.trim();
-  const email = document.getElementById('signupEmail').value.trim();
-  const emailConfirm = document.getElementById('signupEmailConfirm').value.trim();
-  const password = document.getElementById('signupPassword').value;
-  const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
-  if(!name){ VIEW.error='Entre ton nom.'; render(); return; }
-  if(!email || !password){ VIEW.error='Courriel et mot de passe requis.'; render(); return; }
-  if(email.toLowerCase() !== emailConfirm.toLowerCase()){ VIEW.error='Les deux courriels ne correspondent pas.'; render(); return; }
-  if(password !== passwordConfirm){ VIEW.error='Les deux mots de passe ne correspondent pas.'; render(); return; }
-  VIEW.error=null; VIEW.info='Création du compte…'; render();
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname + (PENDING_CODE ? '?code=' + encodeURIComponent(PENDING_CODE) : '') } });
-  if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
-  VIEW.info = "Compte créé ! Vérifie tes courriels pour confirmer ton adresse, puis connecte-toi. Ensuite, entre ton code d'invitation pour rejoindre ta ligue.";
-  VIEW.loginMode = 'signin';
+  const A = auState();
+  const name = (A.name||'').trim(), email = (A.email||'').trim(), password = A.password || '';
+  if(!name){ VIEW.error = { text: 'Entre ton nom : il sera affiché dans ta ligue.' }; render(); return; }
+  if(!email){ VIEW.error = { text: 'Entre ton courriel.' }; render(); return; }
+  if(password.length < 6){ VIEW.error = { text: 'Le mot de passe doit contenir au moins 6 caractères.' }; render(); return; }
+  VIEW.error = null; A.busy = true; render();
+  const { error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined }, emailRedirectTo: window.location.origin + window.location.pathname + (PENDING_CODE ? '?code=' + encodeURIComponent(PENDING_CODE) : '') } });
+  A.busy = false;
+  if(error){ VIEW.error = authErrorFR(error); render(); return; }
+  A.password = '';
+  try{ localStorage.setItem('dinkeo_last_email', email); }catch(e){}
+  VIEW.loginMode = 'sent-signup'; VIEW.info = null;
   render();
 }
 function lastLoginEmail(){ try{ return localStorage.getItem('dinkeo_last_email') || ''; }catch(e){ return ''; } }
 async function onSignIn(){
-  const email = document.getElementById('signinEmail').value.trim();
-  const password = document.getElementById('signinPassword').value;
-  if(!email || !password){ VIEW.error='Courriel et mot de passe requis.'; render(); return; }
-  VIEW.error=null; VIEW.info='Connexion…'; render();
+  const A = auState();
+  const email = (A.email||'').trim(), password = A.password || '';
+  if(!email || !password){ VIEW.error = { text: 'Entre ton courriel et ton mot de passe.' }; render(); return; }
+  VIEW.error = null; A.busy = true; render();
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
+  A.busy = false;
+  if(error){ VIEW.error = authErrorFR(error); render(); return; }
   try{ localStorage.setItem('dinkeo_last_email', email); }catch(e){}
+  A.password = '';
   MODAL = null;
   await onAuthResolved(data.user);
 }
 async function onResetPassword(){
-  const email = document.getElementById('resetEmail').value.trim();
-  if(!email){ VIEW.error='Entre ton courriel.'; render(); return; }
-  VIEW.error=null; VIEW.info='Envoi en cours…'; render();
+  const A = auState(); const email = (A.email||'').trim();
+  if(!email){ VIEW.error = { text: 'Entre ton courriel.' }; render(); return; }
+  VIEW.error = null; A.busy = true; render();
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
-  if(error){ VIEW.info=null; VIEW.error = error.message; render(); return; }
-  VIEW.info = "Si ce courriel correspond à un compte, un lien de réinitialisation vient d'être envoyé.";
+  A.busy = false;
+  if(error){ VIEW.error = authErrorFR(error); render(); return; }
+  VIEW.loginMode = 'sent-reset'; VIEW.info = null;
   render();
 }
 async function onAuthResolved(user){
