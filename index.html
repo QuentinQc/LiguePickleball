@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 303">
+<meta name="app-build" content="Version 304">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -339,7 +339,8 @@ tr.me{background:rgba(207,234,92,0.1);}
 .wz-member input{width:20px;height:20px;flex:0 0 auto;}
 
 @media (max-width:640px){.chat-sheet-lg{height:96vh;height:96dvh;}}
-.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.chat-overlay{overscroll-behavior:contain;touch-action:pan-y;}
 .sheet-body > .card:last-child{margin-bottom:0;}
 .addtab-bar{display:flex;gap:4px;padding:4px;background:var(--court-elevated-2);border-radius:999px;margin-bottom:14px;}
 .addtab{flex:1;border:none;background:transparent;color:var(--muted);padding:9px 8px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
@@ -4056,7 +4057,14 @@ window.addEventListener('popstate', function(){
     }
     return false;
   };
-  const target = function(){ const m = document.querySelector('#modalRoot > *'); return m || app; };
+  // Élément décalé pendant le geste : la fenêtre ouverte, sinon le panneau de ligue, sinon le contenu.
+  // Jamais #app entier : un décalage sur #app déplace aussi ce qui est « fixe » (panneau, barres),
+  // ce qui faisait sauter le panneau de ligue vers le haut sur iPhone.
+  const target = function(){
+    const m = document.querySelector('#modalRoot > *'); if(m) return m;
+    const sh = document.querySelector('.lg-sheet'); if(sh) return sh;
+    return document.getElementById('tabContent') || null;
+  };
   const reset = function(){ const t = target(); if(t){ t.style.transition = 'transform .18s ease-out'; t.style.transform = ''; } };
   document.addEventListener('touchstart', function(e){
     tracking = false;
@@ -4072,9 +4080,10 @@ window.addEventListener('popstate', function(){
     dx = t.clientX - sx;
     const dy = Math.abs(t.clientY - sy);
     if(dy > maxDy) maxDy = dy;
-    if(dy > 40 && dy > dx){ tracking = false; reset(); return; } // geste vertical : c'est un défilement
+    if(dy > 12 && dy > dx){ tracking = false; reset(); return; } // geste vertical : c'est un défilement
     const el = target();
-    if(el && dx > 0){ el.style.transition = 'none'; el.style.transform = 'translateX(' + Math.min(dx, 160) * 0.5 + 'px)'; }
+    // On ne bouge l'écran qu'une fois le geste clairement horizontal.
+    if(el && dx > 10 && dx > dy * 1.5){ el.style.transition = 'none'; el.style.transform = 'translateX(' + Math.min(dx, 160) * 0.5 + 'px)'; }
   }, { passive:true });
   const end = function(){
     if(!tracking) return;
