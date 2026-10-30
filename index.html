@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 306">
+<meta name="app-build" content="Version 307">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -455,15 +455,10 @@ body.modern-nav.scrolled .shell-me .shell-me-av{width:34px;height:34px;font-size
 }
 /* Interrupteur à glissière (on/off), pour les réglages booléens — plus clair
    qu'une case à cocher pour ce genre de choix "activé / désactivé". */
-.st-sec{margin:18px 2px 8px;}
-.st-sec-t{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
-.st-sec-h{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
 .vis-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;}
 .vis-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
 .vis-txt{flex:1;min-width:0;}
 .vis-l{font-size:14.5px;font-weight:600;}
-.vis-grp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 0 0;}
-.vis-grp:not(:first-child){margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);}
 .match-row{position:relative;}
 .sc-mark{position:absolute;left:calc(50% + 68px);top:50%;transform:translateY(-50%);z-index:1;font-size:11px;line-height:1;width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(255,159,10,.5);background:#2b2412;color:#FF9F0A;cursor:pointer;}
 .sc-mark.inline{position:static;transform:none;margin-left:8px;width:auto;height:auto;border-radius:999px;padding:3px 9px;font-size:10px;}
@@ -655,7 +650,6 @@ tr.row-drop-hover td{box-shadow:inset 0 3px 0 var(--ball), inset 0 -3px 0 var(--
   .row > .btn,.row > .btn-secondary,.row > .btn-primary{flex:1 1 auto;}
   .topbar h1{font-size:19px;}
   .hamburger-btn{font-size:34px;padding:8px 10px 8px 0;}
-  .court-mark{width:44px;height:44px;font-size:14px;}
   th,td{padding:7px 6px;font-size:13px;}
   .tab{padding:9px 12px;font-size:12px;}
   .match-row{gap:6px;padding:9px 0;}
@@ -972,8 +966,7 @@ body.modern-nav .topbar h2,body.modern-nav .drawer-header h2{font-size:15px;}
 p,td{font-size:16px;}
 .small{font-size:14px;}
 label{font-size:14px;}
-.f-label,.eyebrow,.st-sec-t,.lnc-eyebrow{font-size:13px;}
-.st-sec-h{font-size:14px;}
+.f-label,.eyebrow,.lnc-eyebrow{font-size:13px;}
 h2{font-size:22px;}
 h3{font-size:17px;}
 th{font-size:12px;}
@@ -1049,7 +1042,6 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .acc-row-t small{font-size:15px;color:var(--muted);}
 .acc-chev{color:var(--muted);font-size:22px;}
 .acc-back{background:none;border:0;color:var(--muted);font:600 16px var(--font-body);padding:4px 0 10px;cursor:pointer;}
-.acc-head2{font-family:var(--font-display);font-weight:600;font-size:24px;text-transform:uppercase;margin:0 0 12px;}
 .ah-org{display:flex;align-items:center;gap:10px;margin:22px 2px 10px;}
 .ah-org .mono{width:34px;height:34px;flex:0 0 auto;border-radius:11px;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px;}
 .ah-org b{font-family:var(--font-display);font-size:16px;letter-spacing:.04em;text-transform:uppercase;min-width:0;}
@@ -1164,6 +1156,13 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .lg-ov{z-index:950;}
 .lg-sheet{max-width:780px;}
 .lg-sheet .chat-head-ico .pbi{width:24px;height:24px;}
+.st-sw .ic:empty{display:none;}
+.st-sw .switch{flex:0 0 auto;}
+.st-days .wz-chip{padding:9px 13px;font-size:14px;}
+.st-tb.off .t{color:var(--muted);}
+.st-arrows{display:flex;gap:4px;flex:0 0 auto;}
+.st-arrows button{width:32px;height:32px;border-radius:10px;border:0;background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;font-size:12px;}
+.st-arrows button:disabled{opacity:.3;cursor:default;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -1226,7 +1225,6 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
   body.modern-nav .bottom-nav-spacer{height:104px;}
   body.modern-nav .bottom-nav{display:flex;position:fixed;z-index:900;left:50%;right:auto;transform:translateX(-50%);width:min(560px,calc(100% - 28px));bottom:calc(16px + env(safe-area-inset-bottom));padding:8px;border-radius:999px;background:rgba(18,58,52,.8);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 40px rgba(0,0,0,.45);justify-content:space-between;gap:2px;overflow:visible;}
   body.modern-nav .more-sheet{left:50%;right:auto;transform:translateX(-50%);width:min(560px,100%);animation:none;}
-  body.modern-nav .chat-fab{bottom:calc(112px + env(safe-area-inset-bottom,0px));}
 }
 .acc-seg-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .acc-seg-scroll button{flex:none;padding:0 16px;white-space:nowrap;}
@@ -9925,22 +9923,80 @@ function groupAbove(gid){
 function settingsRow(icon, title, summary, onClickFn){
   return `<button type="button" class="pf-row" onclick="${onClickFn}"><span class="ic">${icon}</span><span class="t">${escapeHTML(title)}${summary ? `<small class="st-sum">${escapeHTML(summary)}</small>` : ''}</span><span class="ch">›</span></button>`;
 }
-function settingsSection(title, hint){
-  return `<div class="st-sec"><div class="st-sec-t">${title}</div>${hint?`<div class="st-sec-h">${hint}</div>`:''}</div>`;
-}
-// Réglages : 4 tiroirs — Ligue (identité/calendrier), Règles (jeu),
-// Joueurs (ce qu'ils voient et peuvent faire), Avancé (test, sauvegarde, danger).
+// Réglages : une seule page en groupes (comme les Réglages de l'iPhone). Chaque ligne montre sa
+// valeur actuelle et ouvre sa fenêtre ; les simples oui/non sont des interrupteurs dans la liste.
 // Même structure pour tous les formats ; seules les lignes propres à un format changent.
+function stSwitchRow(icon, title, sub, checked, js){
+  return `<div class="pf-row st-sw" style="cursor:default;"><span class="ic">${icon}</span><span class="t">${title}${sub?`<small>${sub}</small>`:''}</span><label class="switch"><input type="checkbox" ${checked?'checked':''} onchange="${js}"><span class="switch-slider"></span></label></div>`;
+}
+function stGroup(title, rows){
+  const body = rows.filter(Boolean).join('');
+  return body ? `<div class="pf-sec">${title}</div><div class="pf-list st-list">${body}</div>` : '';
+}
 function adminSettingsSectionHTML(){
-  let sub = VIEW.settingsSubTab || 'ligue';
-  if(sub==='jeu') sub = 'regles';
-  const subTabs = [['ligue','Ligue'],['regles','Règles'],['joueurs','Joueurs'],['avance','Avancé']];
-  let html = `<div class="pf-tabs" style="margin-top:0;">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setSettingsSubTab2('${k}')">${l}</button>`).join('')}</div>`;
-  if(sub==='regles') html += settingsReglesTabHTML();
-  else if(sub==='joueurs') html += settingsJoueursTabHTML();
-  else if(sub==='avance') html += settingsAvanceTabHTML();
-  else html += settingsLigueTabHTML();
+  const mlp = DATA.leagueFormat === 'mlp', rec = isRecLeague();
+  const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
+  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Récréatif' }[DATA.leagueFormat] || 'Échelle';
+  const where = [lm.city, lm.venue].filter(Boolean).join(' · ');
+  const calSummary = DATA.autoStartSessions ? 'Démarrage automatique' + (DATA.seasonEndDate ? ' · jusqu\'au ' + fdl(DATA.seasonEndDate) : '') : 'Démarrage manuel';
+  let html = stGroup('Ligue', [
+    settingsRow('📋', 'Informations générales', [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
+    mlp ? '' : settingsRow('📅', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
+    settingsRow('🔍', 'Visibilité et lieu', (lm.listed === false ? 'Cachée' : (lm.is_full ? 'Visible · Complet' : 'Visible')) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
+    settingsRow('👥', 'Ajouter des membres', `${(DATA.players||[]).length} joueur${(DATA.players||[]).length>1?'s':''} · ${(DATA.substitutePool||[]).length} remplaçant${(DATA.substitutePool||[]).length>1?'s':''}`, "openAddToLeagueModal('org')")
+  ]);
+  let regles;
+  if(mlp) regles = [settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()')];
+  else if(rec){
+    const lim = socialCourtLimits(), K = parseInt(DATA.socialMaxCourts, 10) || 0;
+    regles = [settingsRow('👥', 'Joueurs par terrain', lim.label, 'openCourtSizeModal()'),
+      settingsRow('🏟️', 'Terrains disponibles', K ? K + ' au maximum' : 'Aucune limite', 'openMaxCourtsModal()')];
+  } else {
+    const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
+    regles = [settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, 'openGroupSizeModal()'),
+      settingsRow('🎯', 'Génération des matchs', DATA.matchupMode==='manual' ? 'Manuelle (modèle de rotation)' : 'Automatique', 'openMatchupSettingsModal()'),
+      settingsRow(pbIcon(), 'Format des matchs', `4 j. : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 j. : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts`, 'openMatchFormatModal()'),
+      settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère', 'openTiebreakModal()')];
+  }
+  html += stGroup('Règles du jeu', regles);
+  const hiddenN = (DATA.hiddenPlayerTabs||[]).filter(k=>playerTabDefs().some(d=>d[0]===k)).length + (DATA.hiddenSubTabs||[]).filter(k=>subTabDefs().some(d=>d[0]===k)).length;
+  const vue = [adminOwnLink('player') ? settingsRow('👁️', 'Voir comme un joueur', "L'app telle que tes joueurs la voient", 'toggleAdminPlayerView()') : '',
+    (playerTabDefs().length > 1 || subTabDefs().length > 1) ? settingsRow('🗂️', 'Onglets visibles', hiddenN ? hiddenN + ' masqué' + (hiddenN>1?'s':'') : 'Tous visibles', 'openTabVisibilityModal()') : ''];
+  if(rec){
+    vue.push(stSwitchRow('🏟️', 'Terrain avant publication', 'Visible dès la création de la soirée', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
+  } else {
+    vue.push(stSwitchRow('📈', 'Cote des joueurs', 'Sa cote et celle de son groupe', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`));
+    vue.push(stSwitchRow('🔄', 'Cote des remplaçants', 'Sa propre cote', DATA.showRatingToSubs, `setDataFlag('showRatingToSubs',this.checked)`));
+    if(!mlp) vue.push(stSwitchRow('🗓️', 'Groupe avant publication', 'Visible dès la création de la session', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
+    vue.push(mlp ? stSwitchRow('✍️', 'Saisie des scores', 'Par les joueurs des deux équipes', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`)
+                 : stSwitchRow('✍️', 'Saisie des scores', 'Par les joueurs eux-mêmes', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`));
+    vue.push(settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement${(DATA.scoreLog||[]).length>1?'s':''} enregistré${(DATA.scoreLog||[]).length>1?'s':''}`, 'openScoreLogModal()'));
+  }
+  html += stGroup('Ce que voient les joueurs', vue);
+  const lastRecalc = DATA.ratingRecalcAt ? new Date(DATA.ratingRecalcAt).toLocaleDateString('fr-CA') : null;
+  html += stGroup('Avancé', [
+    settingsRow('📖', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()'),
+    rec ? '' : settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé · ${DATA.testMatches4||2} / ${DATA.testMatches5||3} matchs` : 'Désactivé', 'openTestModeModal()'),
+    settingsRow('⬇️', 'Exporter les données', 'Fichier de sauvegarde', 'exportData()'),
+    settingsRow('⬆️', 'Importer une sauvegarde', 'Remplace les données de la ligue', 'triggerImport()'),
+    (mlp || rec) ? '' : settingsRow('📊', 'Recalculer les cotes', DATA.ratingModel===2 ? 'Formule v2' + (lastRecalc ? ' · ' + lastRecalc : '') : '⚠️ Anciennes cotes : à recalculer une fois', 'recalcAllRatings()'),
+    (mlp || rec || !DATA.ratingBackup) ? '' : settingsRow('↩️', 'Annuler le dernier recalcul', '', 'restoreRatingBackup()'),
+    settingsRow('➕', 'Créer une nouvelle ligue', 'Dans cette organisation', 'onCreateLeague()')
+  ]);
+  html += `<input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">`;
+  html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
+    <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs sont conservés.</p>`;
   return html;
+}
+// Onglets visibles pour les joueurs et les remplaçants (au moins un reste toujours visible).
+function openTabVisibilityModal(){
+  showContentModal('Onglets visibles', function(){
+    return `<p class="small" style="margin:0 0 12px;color:var(--muted);">Ce qui apparaît dans le portail. Au moins un onglet reste toujours visible.</p>
+      <div class="pf-sec" style="margin-top:0;">Joueurs réguliers</div>
+      <div class="pf-list">${playerTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenPlayerTabs||[]).includes(k), `toggleHiddenKey('hiddenPlayerTabs','${k}',this.checked,playerTabDefs)`)).join('')}</div>
+      <div class="pf-sec">Remplaçants</div>
+      <div class="pf-list">${subTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('')}</div>`;
+  });
 }
 // ---- Interrupteurs à enregistrement immédiat ----
 function visSwitch(label, desc, checked, js){
@@ -9957,40 +10013,6 @@ function toggleHiddenKey(listKey, key, visible, defsFn){
   DATA[listKey] = [...set];
   saveAndRender();
 }
-function settingsJoueursTabHTML(){
-  const mlp = DATA.leagueFormat==='mlp';
-  let html = `<div class="pf-list st-list">` + settingsRow('👁️', 'Voir comme un joueur', "Vois l'app exactement comme tes joueurs la voient.", 'toggleAdminPlayerView()') + `</div>`;
-  html += settingsSection('Onglets', 'Ce qui apparaît dans le portail. Au moins un onglet reste toujours visible.');
-  html += '<div class="card">';
-  html += `<div class="vis-grp">Joueurs réguliers</div>`;
-  html += playerTabDefs().map(([k,l])=>visSwitch(escapeHTML(l), '', !(DATA.hiddenPlayerTabs||[]).includes(k), `toggleHiddenKey('hiddenPlayerTabs','${k}',this.checked,playerTabDefs)`)).join('');
-  html += `<div class="vis-grp">Remplaçants</div>`;
-  html += subTabDefs().map(([k,l])=>visSwitch(escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('');
-  html += '</div>';
-  if(isRecLeague()){
-    // Récréatif : ni cote, ni score, ni journal, ni palmarès.
-    html += settingsSection('Informations');
-    html += '<div class="card">' + visSwitch('Terrain avant publication', 'Montre le terrain dès que la soirée est créée, avant sa publication. Désactivé : le joueur voit son terrain seulement une fois la soirée publiée.', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`) + '</div>';
-    return html;
-  }
-  html += settingsSection('Informations', 'La cote reste utilisée en arrière-plan même si elle est cachée. Toi (admin), tu la vois toujours.');
-  html += '<div class="card">';
-  html += visSwitch('Cote des joueurs', 'Chaque joueur voit sa cote et celle de son groupe.', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`);
-  html += visSwitch('Cote des remplaçants', 'Un remplaçant voit sa propre cote.', DATA.showRatingToSubs, `setDataFlag('showRatingToSubs',this.checked)`);
-  if(!mlp) html += visSwitch('Groupe avant publication', 'Montre le groupe dès que la session est créée, avant sa publication. Désactivé : le joueur voit son groupe seulement une fois la session publiée.', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`);
-  html += '</div>';
-  html += settingsSection('Scores', mlp ? 'Qui peut inscrire les résultats des affrontements.' : 'Qui peut inscrire les scores des matchs.');
-  html += '<div class="card">';
-  if(mlp) html += visSwitch('Saisie par les joueurs', 'Les joueurs des deux équipes peuvent entrer les scores de leur affrontement. Désactivé : ils les voient seulement, tu les entres.', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`);
-  else html += visSwitch('Saisie par les joueurs', 'Les joueurs entrent leurs propres scores. Désactivé : réservé aux administrateurs.', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`);
-  html += '</div>';
-  html += settingsSection('Journal', 'Chaque saisie ou modification de score est enregistrée : qui, quand, ancien et nouveau score.');
-  html += '<div class="pf-list st-list">';
-  html += settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement(s) enregistré(s)`, 'openScoreLogModal()');
-  html += '</div>';
-  return html;
-}
-function setSettingsSubTab2(t){ VIEW.settingsSubTab = t; render(); }
 // Ouvre la gestion de l'organisation en PAGE PLEINE (pas une pop-up) — trop
 // de contenu (membres, comptes, invitation…) pour tenir dans une pop-up, et
 // les actions à l'intérieur (+ Assigner, + Nouvelle personne) ouvrent leur
@@ -10301,29 +10323,6 @@ function organizationReportHTML(){
     <div id="orgListBody">${orgReportBodyHTML()}</div>
   </div>`;
 }
-function settingsLigueTabHTML(){
-  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
-  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Rotation sociale' }[DATA.leagueFormat] || 'Échelle';
-  const calSummary = DATA.autoStartSessions
-    ? `Démarrage automatique${DATA.seasonEndDate ? ' — saison jusqu\'au '+DATA.seasonEndDate : ''}`
-    : 'Démarrage manuel';
-  let html = settingsSection('Identité', 'Nom, horaire et format de la ligue.');
-  html += '<div class="pf-list st-list">';
-  html += settingsRow('📋', 'Informations générales', `${DATA.leagueName}${scheduleLabel?' — '+scheduleLabel:''} · ${formatSummary}`, "openGeneralInfoModal()");
-  html += '</div>';
-  const lm = currentLeagueMeta || {};
-  const where = [lm.city, lm.venue].filter(Boolean).join(' · ');
-  html += settingsSection('Recherche de ligues', 'Ce que voient les joueurs des autres organisations qui cherchent une ligue.');
-  html += '<div class="pf-list st-list">' + settingsRow('🔍', 'Visibilité et lieu', (lm.listed === false ? 'Cachée' : (lm.is_full ? 'Visible · Complet' : 'Visible')) + (where ? ' · ' + where : ' · lieu non précisé'), "openLeagueListingModal()") + '</div>';
-  html += settingsSection('Joueurs', 'Ajoutez plusieurs personnes d\'un coup depuis les membres de l\'organisation.');
-  html += '<div class="pf-list st-list">' + settingsRow('👥', 'Ajouter des membres de l\'organisation', `${(DATA.players||[]).length} joueur(s) · ${(DATA.substitutePool||[]).length} remplaçant(s) dans la ligue`, "openAddToLeagueModal('org')") + '</div>';
-  if(DATA.leagueFormat !== 'mlp'){
-    html += settingsSection('Calendrier');
-    html += '<div class="pf-list st-list">' + settingsRow('📅', 'Calendrier de saison', calSummary, "openSeasonCalendarModal()") + '</div>';
-  }
-  return html;
-}
 function openLeagueListingModal(){
   const l = LEAGUES.find(x=>x.id===CURRENT_LEAGUE_ID) || {};
   const ready = ('listed' in l);
@@ -10353,37 +10352,6 @@ function saveLeagueListing(){
     render();
   });
 }
-function settingsReglesTabHTML(){
-  let html = '';
-  if(DATA.leagueFormat === 'mlp'){
-    html += settingsSection('Équipes');
-    html += '<div class="pf-list st-list">' + settingsRow('⚧️', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), "openMlpRosterSizeModal()") + '</div>';
-    return html;
-  }
-  if(isRecLeague()){
-    const lim = socialCourtLimits();
-    const K = parseInt(DATA.socialMaxCourts, 10) || 0;
-    html += settingsSection('Terrains', "Comment les joueurs présents sont répartis au tirage. S'applique au prochain tirage.");
-    html += '<div class="pf-list st-list">';
-    html += settingsRow('👥', 'Joueurs par terrain', lim.label, "openCourtSizeModal()");
-    html += settingsRow('🏟️', 'Terrains disponibles', K ? K + ' terrain' + (K>1?'s':'') + ' au maximum' : 'Aucune limite', "openMaxCourtsModal()");
-    html += '</div>';
-    return html;
-  }
-  const matchupSummary = DATA.matchupMode==='manual'
-    ? `Manuelle — ${(DATA.manualMatchupTemplate4||[]).length} matchs (4 j.), ${(DATA.manualMatchupTemplate5||[]).length} matchs (5 j.)`
-    : 'Automatique';
-  html += settingsSection('Groupes et matchs');
-  html += '<div class="pf-list st-list">';
-  html += settingsRow('👥', 'Taille des groupes', `Min ${DATA.groupMinPlayers||4} · Max ${DATA.groupMaxPlayers||5} joueurs`, "openGroupSizeModal()");
-  html += settingsRow('🎯', 'Génération des matchs', matchupSummary, "openMatchupSettingsModal()");
-  html += settingsRow(pbIcon(), 'Format des matchs', `4 joueurs : ${DATA.rules4Matches||6} × ${DATA.rules4Points||11} pts · 5 joueurs : ${DATA.rules5Matches||10} × ${DATA.rules5Points||9} pts · 6 joueurs : ${DATA.rules6Matches||6} × ${DATA.rules6Points||11} pts`, "openMatchFormatModal()");
-  html += '</div>';
-  html += settingsSection('Classement');
-  const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/^\S+\s/,''));
-  html += '<div class="pf-list st-list">' + settingsRow('⚖️', 'Ordre de départage', enabledCriteria.length ? enabledCriteria.join(' → ') : 'Aucun critère activé', "openTiebreakModal()") + '</div>';
-  return html;
-}
 function openCourtSizeModal(){
   const cur = DATA.socialCourtSize || '46';
   showContentModal('Joueurs par terrain', `<p class="small" style="margin-bottom:12px;">Au tirage, chaque terrain reçoit ce nombre de joueurs. Les terrains de 4 sont privilégiés.</p>
@@ -10405,32 +10373,6 @@ function setCourtSetting(k, v){
     open.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
   }
   saveAndRender();
-}
-function settingsAvanceTabHTML(){
-  let html = settingsSection('Outils');
-  html += '<div class="pf-list st-list">';
-  html += settingsRow('📖', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()');
-  if(!isRecLeague()) html += settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé — ${DATA.testMatches4||2} matchs (4j) / ${DATA.testMatches5||3} matchs (5j)` : 'Désactivé', "openTestModeModal()");
-  html += '</div>';
-  html += settingsSection('Sauvegarde', 'Filet de sécurité manuel, en plus de la sauvegarde automatique en ligne.');
-  html += `<div class="pf-list st-list">
-    ${settingsRow('⬇️', 'Exporter les données', 'Télécharger un fichier de sauvegarde', 'exportData()')}
-    ${settingsRow('⬆️', 'Importer une sauvegarde', 'Remplace les données de la ligue', 'triggerImport()')}
-  </div>
-  <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">`;
-  if(DATA.leagueFormat !== 'mlp' && !isRecLeague()){
-    const lastRecalc = DATA.ratingRecalcAt ? new Date(DATA.ratingRecalcAt).toLocaleDateString('fr-CA') : null;
-    html += settingsSection('Cote évolutive', DATA.ratingModel===2 ? '✅ Formule v2 appliquée' + (lastRecalc ? ' (recalcul du ' + lastRecalc + ')' : '') + '.' : "⚠️ Les cotes actuelles viennent de l'ancienne formule. Recalcule-les une fois pour repartir sur une base cohérente. Les nouvelles sessions utilisent déjà la formule v2.");
-    html += `<div class="pf-list st-list">
-      ${settingsRow('📈', "Recalculer les cotes depuis l'historique", '', 'recalcAllRatings()')}
-      ${DATA.ratingBackup ? settingsRow('↩️', 'Annuler le dernier recalcul', '', 'restoreRatingBackup()') : ''}
-    </div>`;
-  }
-  html += settingsSection('Gestion des ligues');
-  html += `<div class="pf-list st-list">${settingsRow('➕', 'Créer une nouvelle ligue', 'Dans cette organisation', 'onCreateLeague()')}</div>`;
-  html += settingsSection('Zone dangereuse', `Supprime définitivement « ${escapeHTML(DATA.leagueName)} » — joueurs, ${DATA.leagueFormat==='mlp'?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs ne sont pas supprimés, seulement leur lien à cette ligue.`);
-  html += `<div class="pf-list pf-danger" style="margin-top:0;"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>`;
-  return html;
 }
 
 
@@ -10521,23 +10463,28 @@ function openMlpRosterSizeModal(){
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
   const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social:'Rotation sociale (terrains tirés au hasard à chaque soirée)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
+  const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : '';
   const html = `
-    <p class="small">Format de ligue : <strong>${formatLabel}</strong> <span class="small">(défini à la création, non modifiable ici)</span></p>
+    <div class="pf-chips" style="margin:0 0 14px;"><span class="pf-chip acc">${formatLabel}</span></div>
     <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
-    <div class="field"><label>Jour et heure (étiquette affichée dans le sélecteur de ligue, ex: « Lundi 19h »)</label><input id="setLeagueSchedule" placeholder="ex: Lundi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
-    <div class="field">
-      <label>Jour de jeu habituel (pour la date suggérée automatiquement)</label>
-      <select id="setPlayDay">
-        <option value="">— non défini (date du jour par défaut) —</option>
-        ${['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map((d,i)=>`<option value="${i}" ${DATA.playDayOfWeek===i?'selected':''}>${d}</option>`).join('')}
-      </select>
+    <div class="field"><label>Horaire affiché</label><input id="setLeagueSchedule" placeholder="ex: Mardi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
+    <div class="field"><label>Jour de jeu</label>
+      <input type="hidden" id="setPlayDay" value="${pd}">
+      <div class="wz-chips st-days">${days.map((d,i)=>`<button type="button" class="wz-chip${pd===i?' sel':''}" onclick="pickChip(this,'setPlayDay','${i}')">${d}</button>`).join('')}<button type="button" class="wz-chip${pd===''?' sel':''}" onclick="pickChip(this,'setPlayDay','')">Aucun</button></div>
     </div>
     <div class="row">
-      <div class="field" style="flex:1;min-width:140px;"><label>Heure de début des sessions (calendrier)</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
+      <div class="field"><label>Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
+      <div class="field"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
     </div>
-    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Nombre de joueurs qui échangent entre groupes adjacents à chaque session</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"></div>` : ''}`;
+    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Joueurs qui montent / descendent</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"><div class="small" style="color:var(--muted);margin-top:4px;">Entre deux groupes voisins, à chaque session.</div></div>` : ''}
+    <p class="small" style="color:var(--muted);margin:4px 0 0;">Le format est choisi à la création de la ligue et ne se change pas ici.</p>`;
   showFormModal('Informations générales', html, saveGeneralInfoForm);
+}
+// Pastilles de choix dans un formulaire : met la valeur dans le champ caché, sans redessiner la fenêtre.
+function pickChip(btn, inputId, value){
+  const inp = document.getElementById(inputId); if(inp) inp.value = value;
+  Array.from(btn.parentNode.children).forEach(function(b){ b.classList.toggle('sel', b === btn); });
 }
 function saveGeneralInfoForm(){
   DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
@@ -10577,21 +10524,16 @@ function openMatchupSettingsModal(){
 function matchupSettingsFormHTML(){
   const mode = SETTINGS_MATCHUP_PREVIEW;
   return `
-    <div class="field">
-      <label>Composition des équipes</label>
-      <select id="setMatchupMode" onchange="SETTINGS_MATCHUP_PREVIEW=this.value;render();">
-        <option value="auto" ${mode!=='manual'?'selected':''}>Automatique — l'app génère les matchs et les rotations</option>
-        <option value="manual" ${mode==='manual'?'selected':''}>Manuelle — je définis un modèle de rotation par position</option>
-      </select>
+    <div class="pf-seg" style="margin-bottom:10px;">
+      <button type="button" class="${mode!=='manual'?'on':''}" onclick="SETTINGS_MATCHUP_PREVIEW='auto';render();">Automatique</button>
+      <button type="button" class="${mode==='manual'?'on':''}" onclick="SETTINGS_MATCHUP_PREVIEW='manual';render();">Manuelle</button>
     </div>
+    <p class="small" style="color:var(--muted);margin:0 0 10px;">${mode==='manual' ? 'Tu définis toi-même un modèle de rotation selon la position des joueurs dans le groupe.' : "L'app génère les matchs et les rotations à chaque session."}</p>
     ${mode==='manual' ? `
-    <p class="small">Un modèle séparé pour les groupes de 4 et de 5 joueurs, basé sur les numéros de position (# dans l'onglet Groupes). Appliqué automatiquement à chaque session.</p>
-    <div class="row">
-      <button class="btn-ghost" onclick="closeModal();openTemplateModal(4)">Modifier le modèle — groupes de 4</button>
-      <button class="btn-ghost" onclick="closeModal();openTemplateModal(5)">Modifier le modèle — groupes de 5</button>
-    </div>` : `<p class="small">Enregistre pour appliquer ce choix, puis reviens ici pour configurer un modèle si tu passes en manuel.</p>`}
-    ${myOrgLeagues().filter(l=>l.id!==CURRENT_LEAGUE_ID).length>0 ? `<div class="row" style="margin-top:10px;">
-      <button class="btn-ghost" onclick="closeModal();openImportMatchupTemplateModal()">📥 Importer le modèle d'une autre ligue</button>
+    <div class="pf-list">
+      ${settingsRow('4️⃣', 'Modèle — groupes de 4', (DATA.manualMatchupTemplate4||[]).length + ' match' + ((DATA.manualMatchupTemplate4||[]).length>1?'s':''), 'closeModal();openTemplateModal(4)')}
+      ${settingsRow('5️⃣', 'Modèle — groupes de 5', (DATA.manualMatchupTemplate5||[]).length + ' match' + ((DATA.manualMatchupTemplate5||[]).length>1?'s':''), 'closeModal();openTemplateModal(5)')}
+      ${myOrgLeagues().filter(l=>l.id!==CURRENT_LEAGUE_ID).length>0 ? settingsRow('📥', "Importer le modèle d'une autre ligue", '', 'closeModal();openImportMatchupTemplateModal()') : ''}
     </div>` : ''}`;
 }
 function saveMatchupSettingsForm(){
@@ -10754,15 +10696,15 @@ function openTiebreakModal(){
 }
 function tiebreakFormHTML(){
   return `
-    <p class="small">Quand deux joueurs sont à égalité, l'app utilise les critères activés ci-dessous, dans l'ordre, jusqu'à ce qu'un les départage. Coche/décoche pour activer, utilise les flèches pour réordonner.</p>
-    ${TIEBREAK_STATE.map((c,i)=>`
-      <div class="row" style="align-items:center;gap:8px;margin-bottom:6px;background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 10px;">
-        <input type="checkbox" ${c.enabled?'checked':''} style="width:auto;" onchange="toggleTiebreakCriterion(${i})">
-        <span style="flex:1;">${TIEBREAK_CRITERIA[c.key].label}</span>
-        <button class="btn-icon" ${i===0?'disabled':''} onclick="moveTiebreakCriterion(${i},-1)">▲</button>
-        <button class="btn-icon" ${i===TIEBREAK_STATE.length-1?'disabled':''} onclick="moveTiebreakCriterion(${i},1)">▼</button>
-      </div>`).join('')}
-    <p class="small" style="margin-top:8px;">Si tous les critères activés sont encore à égalité, les deux joueurs gardent leur position relative actuelle.</p>`;
+    <p class="small" style="color:var(--muted);margin:0 0 12px;">En cas d'égalité, les critères activés s'appliquent dans l'ordre jusqu'à ce que l'un d'eux départage. Utilise les flèches pour changer l'ordre.</p>
+    <div class="pf-list">${TIEBREAK_STATE.map((c,i)=>{
+      const lab = TIEBREAK_CRITERIA[c.key].label, m = /^(\S+)\s(.*)$/.exec(lab);
+      return `<div class="pf-row st-tb${c.enabled?'':' off'}" style="cursor:default;">
+        <span class="ic">${m ? m[1] : ''}</span><span class="t">${escapeHTML(m ? m[2] : lab)}</span>
+        <span class="st-arrows"><button type="button" ${i===0?'disabled':''} onclick="moveTiebreakCriterion(${i},-1)" aria-label="Monter">▲</button><button type="button" ${i===TIEBREAK_STATE.length-1?'disabled':''} onclick="moveTiebreakCriterion(${i},1)" aria-label="Descendre">▼</button></span>
+        <label class="switch"><input type="checkbox" ${c.enabled?'checked':''} onchange="toggleTiebreakCriterion(${i})"><span class="switch-slider"></span></label>
+      </div>`; }).join('')}</div>
+    <p class="small" style="color:var(--muted);margin:10px 0 0;">Si tout reste à égalité, les joueurs gardent leur position actuelle.</p>`;
 }
 function toggleTiebreakCriterion(i){ TIEBREAK_STATE[i].enabled = !TIEBREAK_STATE[i].enabled; render(); }
 function moveTiebreakCriterion(i, dir){
