@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 301">
+<meta name="app-build" content="Version 302">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1155,6 +1155,9 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .cal-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:10px;}
 .cal-add input{width:100%;box-sizing:border-box;min-width:0;}
 .st-sum{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lg-ov{z-index:950;}
+.lg-sheet{max-width:780px;}
+.lg-sheet .chat-head-ico .pbi{width:24px;height:24px;}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -1965,7 +1968,7 @@ function sheetModalHTML(){
         <div class="chat-head-txt"><div class="chat-head-title">${title}</div><div class="chat-head-sub">${sub}</div></div>
         <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
       </div>
-      <div class="sheet-body">${body}</div>
+      <div class="sheet-body" data-key="${escapeHTML(k + '|' + (VIEW.orgSubTab||''))}">${body}</div>
     </div>
   </div>`;
 }
@@ -3951,6 +3954,14 @@ function storageBannerHTML(){
 }
 
 function render(){
+  // Les panneaux (ligue, Membres…) sont recréés à chaque rendu : on garde leur position de défilement
+  // tant qu'on reste sur le même contenu (même ligue et même onglet).
+  const sheetScroll = {};
+  document.querySelectorAll('.sheet-body[data-key]').forEach(function(el){ sheetScroll[el.getAttribute('data-key')] = el.scrollTop; });
+  renderInner();
+  document.querySelectorAll('.sheet-body[data-key]').forEach(function(el){ const k = el.getAttribute('data-key'); if(sheetScroll[k]) el.scrollTop = sheetScroll[k]; });
+}
+function renderInner(){
   applyModernNavClass();
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
   ensurePushStatusChecked();
@@ -5284,20 +5295,44 @@ async function openAdminLeague(leagueId, tab){
   }
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchToLeague(leagueId); }
   ADMIN_SUMMARY_AT = 0;
-  // Ouverte depuis l'accueil : le retour y ramène directement (pas à la page de l'organisation).
-  // Passer d'une ligue à l'autre garde l'écran d'origine.
-  const backTo = VIEW.adet ? VIEW.backTo : ((VIEW.atab === undefined || VIEW.atab === 'accueil') ? 'accueil' : null);
-  VIEW = { atab:'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm, backTo: backTo };
+  // La ligue s'ouvre dans un panneau par-dessus l'écran d'origine (Accueil ou Organisation),
+  // comme Membres / Comptes : le fermer ramène exactement où on était.
+  const fromHome = VIEW.atab === undefined || VIEW.atab === 'accueil';
+  VIEW = { atab: fromHome ? 'accueil' : 'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm };
   render();
 }
-function closeAdminLeague(){
-  if(VIEW.backTo === 'accueil'){ VIEW = { atab:'accueil', pcomm: VIEW.pcomm }; render(); return; }
-  VIEW.adet = false; render();
+function closeAdminLeague(){ VIEW.adet = false; render(); }
+// Garde l'écran d'origine et le panneau de ligue ouvert quand une action remet VIEW à zéro.
+function keepNavView(){ return { atab: VIEW.atab, adet: VIEW.adet, aorgOpen: VIEW.aorgOpen, pcomm: VIEW.pcomm, ptab: VIEW.ptab, porg: VIEW.porg, pdet: VIEW.pdet }; }
+// Panneau d'une ligue (admin) : Session · Joueurs · Historique · Rapports · Réglages.
+function adminLeagueSheetHTML(){
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  if(!VIEW.adet || !lg) return '';
+  const org = (MY_ORGANIZATIONS||[]).concat(typeof ALL_ORGANIZATIONS!=='undefined' ? (ALL_ORGANIZATIONS||[]) : []).find(o=>o.id===lg.organization_id);
+  const sections = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
+  const cur = sections.some(x=>x[0]===VIEW.tab) ? VIEW.tab : 'session';
+  let body;
+  if(cur==='session') body = adminSessionSectionHTML();
+  else if(cur==='joueurs') body = adminPlayersSectionHTML();
+  else if(cur==='historique') body = adminHistoryHTML();
+  else if(cur==='rapports') body = adminReportsSectionHTML();
+  else body = adminSettingsSectionHTML();
+  return leagueSheetHTML(lg, org ? org.name : '', 'closeAdminLeague()',
+    `<div class="acc-seg acc-seg-scroll">${sections.map(([k,l])=>`<button type="button" class="${k===cur?'on':''}" onclick="setAdminTab('${k}')">${l}</button>`).join('')}</div>`, body, cur);
 }
-// Pastilles pour passer directement d'une ligue à l'autre (sans revenir en arrière).
-function leagueSwitchHTML(list, fn, tab){
-  if(list.length < 2) return '';
-  return `<div class="ah-switch">${list.map(function(l){ return `<button type="button" class="${l.id===CURRENT_LEAGUE_ID?'on':''}" onclick="${l.id===CURRENT_LEAGUE_ID ? '' : fn + "('" + l.id + "'" + (tab ? ",'" + tab + "'" : '') + ")"}">${escapeHTML(l.name)}</button>`; }).join('')}</div>`;
+// Cadre commun du panneau de ligue (admin et joueur) : en-tête fixe, onglets, contenu qui défile.
+function leagueSheetHTML(lg, orgName, closeFn, tabsHTML, body, key){
+  const sub = [lg.schedule_label || '', orgName || ''].filter(Boolean).join(' · ');
+  return `<div class="chat-overlay lg-ov" onclick="if(event.target===this) ${closeFn}">
+    <div class="chat-sheet chat-sheet-lg lg-sheet" role="dialog" aria-label="${escapeHTML(lg.name)}">
+      <div class="chat-head">
+        <div class="chat-head-ico">${pbIcon()}</div>
+        <div class="chat-head-txt"><div class="chat-head-title">${escapeHTML(lg.name)}</div>${sub ? `<div class="chat-head-sub">${escapeHTML(sub)}</div>` : ''}</div>
+        <button type="button" class="chat-head-btn" onclick="${closeFn}" aria-label="Fermer">✕</button>
+      </div>
+      <div class="sheet-body" id="lgSheetBody" data-key="${escapeHTML(lg.id + '|' + key)}">${tabsHTML}<div style="margin-top:14px;">${body}</div></div>
+    </div>
+  </div>`;
 }
 async function pickAdminOrg(orgId){
   if(orgId !== CURRENT_ORGANIZATION_ID){ await switchToOrganization(orgId); }
@@ -5383,6 +5418,7 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
   else if(active==='comm') c.innerHTML = adminCommHTML();
   else if(active==='cal') c.innerHTML = calendarSheetHTML();
   else c.innerHTML = adminMeHTML(canViewAsPlayer, canViewAsSub);
+  if(VIEW.adet) app.insertAdjacentHTML('beforeend', adminLeagueSheetHTML());
 }
 // ---- Accueil admin ----
 let ADMIN_HOME_PRELOADED = false;
@@ -5418,22 +5454,6 @@ function adminOrgsHTML(){
   const orgs = (SUPER_ADMIN_MODE && isSuper) ? ALL_ORGANIZATIONS : MY_ORGANIZATIONS;
   const org = orgs.find(o=>o.id===CURRENT_ORGANIZATION_ID) || orgs[0];
   const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  // Détail d'une ligue : les écrans habituels, en sous-sections
-  if(VIEW.adet && lg){
-    const sections = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
-    const cur = sections.some(x=>x[0]===VIEW.tab) ? VIEW.tab : 'session';
-    let body;
-    if(cur==='session') body = adminSessionSectionHTML();
-    else if(cur==='joueurs') body = adminPlayersSectionHTML();
-    else if(cur==='historique') body = adminHistoryHTML();
-    else if(cur==='rapports') body = adminReportsSectionHTML();
-    else body = adminSettingsSectionHTML();
-    return `<button type="button" class="acc-back" onclick="closeAdminLeague()">‹ ${VIEW.backTo === 'accueil' ? 'Accueil' : escapeHTML(org ? org.name : 'Organisation')}</button>
-      <div class="acc-head2">${escapeHTML(lg.name)}${lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}</div>
-      ${leagueSwitchHTML(myOrgLeagues(), 'openAdminLeague', cur)}
-      <div class="acc-seg acc-seg-scroll">${sections.map(([k,l])=>`<button type="button" class="${k===cur?'on':''}" onclick="setAdminTab('${k}')">${l}</button>`).join('')}</div>
-      <div style="margin-top:14px;">${body}</div>`;
-  }
   const multi = orgs.length > 1;
   if(multi && !VIEW.aorgOpen){
     return `<div class="pc-list">${orgs.map(o=>orgCardHTML(o.name, o.id===CURRENT_ORGANIZATION_ID ? myOrgLeagues().length + ' ligue(s)' : 'Ouvrir', `VIEW.aorgOpen=true;pickAdminOrg('${o.id}')`)).join('')}</div>`;
@@ -6627,7 +6647,8 @@ function mlpSwapPlayers(sessionId, tieId, side, g1, p1, g2, p2){
     }
     e.preventDefault();
     ghost.style.left = e.clientX+'px'; ghost.style.top = e.clientY+'px';
-    if(e.clientY > innerHeight-110) window.scrollBy(0,14); else if(e.clientY < 90) window.scrollBy(0,-14);
+    const scroller = document.getElementById('lgSheetBody') || window;
+    if(e.clientY > innerHeight-110) scroller.scrollBy(0,14); else if(e.clientY < 90) scroller.scrollBy(0,-14);
     clearOver();
     const t = find(document.elementFromPoint(e.clientX, e.clientY), drag.kind);
     if(t && t!==drag.el && sameScope(drag.el,t,drag.kind)) t.classList.add('ss-over');
@@ -9397,7 +9418,7 @@ function autoStartNextSession(lastSessionDate){
   }
   // On bascule directement sur la nouvelle session, pour que ce soit visible
   // à l'écran tout de suite plutôt que de rester sur la session terminée.
-  VIEW = { tab:'session', sessionSubTab:'groupes' };
+  VIEW = Object.assign(keepNavView(), { tab:'session', sessionSubTab:'groupes' });
   const skipNote = result.skipped.length
     ? ` (${result.skipped.length>1 ? 'les dates suivantes étaient bloquées et ont été sautées' : 'la date '+result.skipped[0]+' était bloquée et a été sautée'} : ${result.skipped.join(', ')})`
     : '';
@@ -9823,7 +9844,7 @@ function reopenLadderSession(sessionId){
     delete s.standingsByGroup; delete s.movements; delete s.ratingDeltas; delete s.ratingGamesDeltas; delete s.preSnapshot;
     s.status = 'open';
     s.reopenedAt = new Date().toISOString();
-    VIEW = { tab:'session', sessionSubTab:'groupes' };
+    VIEW = Object.assign(keepNavView(), { tab:'session', sessionSubTab:'groupes' });
     saveAndRender();
   });
 }
@@ -11161,15 +11182,25 @@ function setPOrg(id){ VIEW.porg = id; VIEW.pdet = null; render(); }
 function setPDet(d){ VIEW.pdet = d; render(); }
 async function openMyLeague(leagueId){
   const org = (LEAGUES.find(l=>l.id===leagueId)||{}).organization_id || null;
-  const backTo = VIEW.pdet ? VIEW.pBackTo : ((VIEW.ptab === undefined || VIEW.ptab === 'accueil') ? 'accueil' : null);
+  // Panneau par-dessus l'écran d'origine (Accueil ou Organisation), comme côté admin.
+  const fromHome = VIEW.ptab === undefined || VIEW.ptab === 'accueil';
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); }
-  VIEW.ptab = 'orgs'; VIEW.porg = org; VIEW.pdet = 'group'; VIEW.pBackTo = backTo;
+  VIEW.ptab = fromHome ? 'accueil' : 'orgs'; if(!fromHome) VIEW.porg = org; VIEW.pdet = 'group'; VIEW.pBackTo = null;
   render();
 }
-// Retour depuis une ligue (joueur) : vers l'accueil si on en vient, sinon vers l'organisation.
-function closeMyLeague(){
-  if(VIEW.pBackTo === 'accueil'){ VIEW.ptab = 'accueil'; VIEW.pdet = null; VIEW.pBackTo = null; render(); return; }
-  setPDet(null);
+function closeMyLeague(){ VIEW.pdet = null; render(); }
+// Panneau d'une ligue (joueur) : Mon groupe · Statistiques · Historique.
+function playerLeagueSheetHTML(me){
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  if(!VIEW.pdet || !lg || !me) return '';
+  const org = myOrgsList().find(o=>o.leagues.some(x=>x.lg.id===lg.id));
+  const hidden = DATA.hiddenPlayerTabs || [];
+  const segs = [['group',myGroupLabel()]];
+  if(!hidden.includes('stats') && !isRecLeague()) segs.push(['stats','Statistiques']);
+  if(!hidden.includes('historique') && !isRecLeague()) segs.push(['hist','Historique']);
+  const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
+  const body = det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me);
+  return leagueSheetHTML(lg, org ? org.name : '', 'closeMyLeague()', familySwitchHTML() + (segs.length>1 ? accSeg(segs, det, 'setPDet') : ''), body, det);
 }
 function myOrgsList(){
   const map = {};
@@ -11210,10 +11241,11 @@ function renderPlayerAccount(me, drawerHTML, viewSlide){
     <div class="bottom-nav-spacer"></div>`;
   const c = document.getElementById('tabContent');
   c.innerHTML = active==='accueil' ? accountHomeHTML(me)
-    : active==='orgs' ? (accountOrgsHTML(me) + (VIEW.pdet ? '' : leagueSearchEntryHTML()))
+    : active==='orgs' ? (accountOrgsHTML(me) + leagueSearchEntryHTML())
     : active==='comm' ? accountCommHTML(me)
     : active==='cal' ? calendarSheetHTML()
     : accountMeHTML(me);
+  if(VIEW.pdet) app.insertAdjacentHTML('beforeend', playerLeagueSheetHTML(me));
 }
 
 // ---- Résumé de TOUTES les ligues du joueur (chargé en arrière-plan) ----
@@ -11462,21 +11494,6 @@ function accountOrgsHTML(me){
   const multi = orgs.length > 1;
   if(!org){
     return `<div class="pc-list">${orgs.map(o=>orgCardHTML(o.name, o.leagues.length+' ligue'+(o.leagues.length>1?'s':''), `setPOrg('${o.id}')`)).join('') || '<p class="empty">Tu n\'es dans aucune ligue pour l\'instant.</p>'}</div>`;
-  }
-  // Détail d'une ligue
-  if(VIEW.pdet){
-    const cur = org.leagues.find(x=>x.lg.id===CURRENT_LEAGUE_ID);
-    const hidden = DATA.hiddenPlayerTabs || [];
-    const segs = [['group',myGroupLabel()]];
-    if(!hidden.includes('stats') && !isRecLeague()) segs.push(['stats','Statistiques']);
-    if(!hidden.includes('historique') && !isRecLeague()) segs.push(['hist','Historique']);
-    const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
-    return `<button type="button" class="acc-back" onclick="closeMyLeague()">‹ ${VIEW.pBackTo === 'accueil' ? 'Accueil' : escapeHTML(org.name)}</button>
-      <div class="acc-head2">${escapeHTML(cur ? (cur.lg.name + (cur.lg.schedule_label ? ' — '+cur.lg.schedule_label : '')) : '')}</div>
-      ${leagueSwitchHTML(org.leagues.map(function(x){ return x.lg; }), 'openMyLeague')}
-      ${familySwitchHTML()}
-      ${segs.length>1 ? accSeg(segs, det, 'setPDet') : ''}
-      ${det==='stats' ? playerStatsTabHTML(me) : det==='hist' ? playerHistoryHTML(me) : playerGroupHTML(me)}`;
   }
   const back = multi ? `<button type="button" class="acc-back" onclick="setPOrg(null)">‹ Mes organisations</button>` : '';
   setTimeout(()=>refreshMySummaries(false), 0);
