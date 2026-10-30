@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 310">
+<meta name="app-build" content="Version 311">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9784,25 +9784,22 @@ function deleteSession(sessionId){
     });
     return;
   }
-  showChoice("Cette session a appliqué des montées/descentes et/ou des changements de cote. Que veux-tu faire en la supprimant ?", [
-    "Supprimer seulement l'historique (garder les joueurs et cotes où ils sont)",
-    "Supprimer et tout annuler (déplacements ET cotes, comme si cette session n'avait pas eu lieu)"
-  ], (choiceIdx)=>{
+  // Supprimer annule toujours ce que la session a appliqué (montées/descentes et cotes),
+  // comme si elle n'avait pas eu lieu.
+  showConfirm("Supprimer cette session ? Les montées, descentes et changements de cote qu'elle a appliqués seront annulés, comme si elle n'avait pas eu lieu. Cette action ne peut pas être annulée.", ()=>{
     let skipped = [];
-    if(choiceIdx === 1){
-      (s.movements||[]).forEach(m=>{
-        const pl = DATA.players.find(p=>p.id===m.playerId);
-        if(!pl) return;
-        if(pl.groupId === m.toGroupId){ pl.groupId = m.fromGroupId; }
-        else { skipped.push(pl.name); }
-      });
-      Object.keys(s.ratingDeltas||{}).forEach(pid=>{
-        const pl = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
-        if(!pl) return;
-        pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
-        pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - ((s.ratingGamesDeltas && typeof s.ratingGamesDeltas[pid]==='number') ? s.ratingGamesDeltas[pid] : 1));
-      });
-    }
+    (s.movements||[]).forEach(m=>{
+      const pl = DATA.players.find(p=>p.id===m.playerId);
+      if(!pl) return;
+      if(pl.groupId === m.toGroupId){ pl.groupId = m.fromGroupId; }
+      else { skipped.push(pl.name); }
+    });
+    Object.keys(s.ratingDeltas||{}).forEach(pid=>{
+      const pl = findRatablePerson(pid); // joueur régulier OU remplaçant du bassin
+      if(!pl) return;
+      pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
+      pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - ((s.ratingGamesDeltas && typeof s.ratingGamesDeltas[pid]==='number') ? s.ratingGamesDeltas[pid] : 1));
+    });
     DATA.sessions = DATA.sessions.filter(x=>x.id!==sessionId);
     saveAndRender();
     if(skipped.length){
