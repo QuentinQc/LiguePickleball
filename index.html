@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 304">
+<meta name="app-build" content="Version 305">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4023,15 +4023,18 @@ function navBack(){
   if(VIEW.porg && myOrgsList().length > 1){ setPOrg(null); return true; }
   return false;
 }
-let NAV_SENTINEL = false, NAV_SKIP_POP = false, NAV_LAST_DEPTH = 0;
+let NAV_SENTINEL = false, NAV_SKIP_POP = false, NAV_LAST_DEPTH = 0, NAV_LAST_SHEET = false;
 function afterRenderNav(){
   const d = navDepth();
+  const sheet = !!(VIEW.adet || VIEW.pdet);
   if(d !== NAV_LAST_DEPTH){
-    // Glisse depuis la droite en avançant, depuis la gauche en reculant.
+    // Glisse depuis la droite en avançant, depuis la gauche en reculant — sauf à l'ouverture ou
+    // la fermeture d'un panneau de ligue : la page derrière ne bouge pas (plus fluide sur iPhone).
     const el = document.getElementById('orgTabContent') || document.getElementById('tabContent');
-    if(el){ el.classList.remove('nav-fwd', 'nav-back'); void el.offsetWidth; el.classList.add(d > NAV_LAST_DEPTH ? 'nav-fwd' : 'nav-back'); }
+    if(el && !sheet && !NAV_LAST_SHEET){ el.classList.remove('nav-fwd', 'nav-back'); void el.offsetWidth; el.classList.add(d > NAV_LAST_DEPTH ? 'nav-fwd' : 'nav-back'); }
     NAV_LAST_DEPTH = d;
   }
+  NAV_LAST_SHEET = sheet;
   // Une entrée d'historique « sentinelle » tant qu'on peut revenir : le retour du système (geste
   // de Safari, bouton d'Android) la consomme et déclenche navBack au lieu de quitter l'application.
   try{
@@ -4044,57 +4047,6 @@ window.addEventListener('popstate', function(){
   NAV_SENTINEL = false;
   navBack();
 });
-// Glisser vers la droite revient en arrière, comme dans les applications iPhone/iPad : depuis le bord
-// gauche, ou n'importe où d'un geste net. Si Safari s'empare du geste de bord, il annule le nôtre
-// (touchcancel) et c'est la sentinelle d'historique qui fait le retour, une seule fois.
-(function(){
-  let sx = 0, sy = 0, dx = 0, maxDy = 0, edge = false, tracking = false;
-  // Champ de saisie ou zone qui défile à l'horizontale : le glissement lui appartient.
-  const inHScroller = function(el){
-    for(; el && el !== document.body; el = el.parentElement){
-      if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-      if(el.scrollWidth > el.clientWidth + 4){ const ox = getComputedStyle(el).overflowX; if(ox === 'auto' || ox === 'scroll') return true; }
-    }
-    return false;
-  };
-  // Élément décalé pendant le geste : la fenêtre ouverte, sinon le panneau de ligue, sinon le contenu.
-  // Jamais #app entier : un décalage sur #app déplace aussi ce qui est « fixe » (panneau, barres),
-  // ce qui faisait sauter le panneau de ligue vers le haut sur iPhone.
-  const target = function(){
-    const m = document.querySelector('#modalRoot > *'); if(m) return m;
-    const sh = document.querySelector('.lg-sheet'); if(sh) return sh;
-    return document.getElementById('tabContent') || null;
-  };
-  const reset = function(){ const t = target(); if(t){ t.style.transition = 'transform .18s ease-out'; t.style.transform = ''; } };
-  document.addEventListener('touchstart', function(e){
-    tracking = false;
-    if(!e.touches || e.touches.length !== 1 || !navCanGoBack()) return;
-    const t = e.touches[0];
-    edge = t.clientX <= 40;
-    if(!edge && inHScroller(e.target)) return;
-    sx = t.clientX; sy = t.clientY; dx = 0; maxDy = 0; tracking = true;
-  }, { passive:true });
-  document.addEventListener('touchmove', function(e){
-    if(!tracking) return;
-    const t = e.touches[0];
-    dx = t.clientX - sx;
-    const dy = Math.abs(t.clientY - sy);
-    if(dy > maxDy) maxDy = dy;
-    if(dy > 12 && dy > dx){ tracking = false; reset(); return; } // geste vertical : c'est un défilement
-    const el = target();
-    // On ne bouge l'écran qu'une fois le geste clairement horizontal.
-    if(el && dx > 10 && dx > dy * 1.5){ el.style.transition = 'none'; el.style.transform = 'translateX(' + Math.min(dx, 160) * 0.5 + 'px)'; }
-  }, { passive:true });
-  const end = function(){
-    if(!tracking) return;
-    tracking = false;
-    reset();
-    // Depuis le bord : 60 px suffisent. Ailleurs : glissement net vers la droite, peu vertical.
-    if(edge ? dx > 60 : (dx > 90 && dx > 2.5 * maxDy)) navBack();
-  };
-  document.addEventListener('touchend', end);
-  document.addEventListener('touchcancel', function(){ tracking = false; reset(); });
-})();
 
 // Le topbar de la page ne garde que le ☰ (s'il y a un tiroir) et le nom de
 // la ligue. Tout le reste — organisation, bascule de vue, Guide,
