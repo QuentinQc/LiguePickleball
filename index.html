@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 313">
+<meta name="app-build" content="Version 314">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4011,13 +4011,25 @@ function afterRenderNav(){
   NAV_LAST_SHEET = sheet;
   // Une entrée d'historique « sentinelle » tant qu'on peut revenir : le retour du système (geste
   // de Safari, bouton d'Android) la consomme et déclenche navBack au lieu de quitter l'application.
+  // Mise à jour reportée à la fin de l'action en cours : « fermer une fenêtre puis en ouvrir une autre »
+  // ne doit pas lancer un retour d'historique suivi d'un ajout (qui finissait par faire sortir de l'app).
+  if(!NAV_SYNC_QUEUED){ NAV_SYNC_QUEUED = true; setTimeout(syncNavSentinel, 0); }
+}
+let NAV_SYNC_QUEUED = false, NAV_BACK_PENDING = false;
+function syncNavSentinel(){
+  NAV_SYNC_QUEUED = false;
+  if(NAV_BACK_PENDING) return; // un retour est en cours : on attend sa fin (popstate)
   try{
     if(navCanGoBack() && !NAV_SENTINEL){ history.pushState({ dinkeoNav: 1 }, ''); NAV_SENTINEL = true; }
-    else if(!navCanGoBack() && NAV_SENTINEL){ NAV_SENTINEL = false; NAV_SKIP_POP = true; history.back(); }
+    else if(!navCanGoBack() && NAV_SENTINEL){
+      NAV_SENTINEL = false; NAV_SKIP_POP = true; NAV_BACK_PENDING = true;
+      setTimeout(function(){ if(NAV_BACK_PENDING){ NAV_BACK_PENDING = false; NAV_SKIP_POP = false; } }, 1500); // filet si popstate n'arrive pas
+      history.back();
+    }
   }catch(e){}
 }
 window.addEventListener('popstate', function(){
-  if(NAV_SKIP_POP){ NAV_SKIP_POP = false; return; }
+  if(NAV_SKIP_POP){ NAV_SKIP_POP = false; NAV_BACK_PENDING = false; syncNavSentinel(); return; }
   NAV_SENTINEL = false;
   navBack();
 });
@@ -5047,7 +5059,8 @@ function openInviteCodePrompt(){
   });
 }
 function renderPending(){
-  const canCreateOrg = CURRENT_PROFILE && !CURRENT_PROFILE.organization_id;
+  // Création d'organisation réservée aux super admins pour l'instant (les autres passent par eux).
+  const canCreateOrg = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin && !CURRENT_PROFILE.organization_id;
   app.innerHTML = `
     ${topbarHTML('Compte en attente')}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
@@ -5066,6 +5079,7 @@ function renderPending(){
     </details>` : ''}`;
 }
 async function onCreateMyOwnOrganization(){
+  if(!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin)){ showAlert("La création d'une organisation passe par l'équipe Dinkeo. Contacte-nous pour démarrer ta ligue."); return; }
   showPrompt("Nom de ton organisation (ex: ton nom, ton club) :", '', async (name)=>{
     if(!name || !name.trim()) return;
     const { error } = await sb.rpc('create_my_organization', { p_name: name.trim() });
@@ -5077,6 +5091,7 @@ async function onCreateMyOwnOrganization(){
 // Un admin déjà en poste crée une organisation supplémentaire (et y reste
 // admin en plus de ses organisations actuelles).
 async function onCreateOrganization(){
+  if(!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin)){ showAlert("La création d'une organisation passe par l'équipe Dinkeo."); return; }
   showPrompt("Nom de la nouvelle organisation :", '', async (name)=>{
     if(!name || !name.trim()) return;
     const { data: org, error } = await sb.from('organizations').insert({ name: name.trim() }).select().single();
@@ -10131,9 +10146,9 @@ function organizationGeneralHTML(){
     settingsRow('👤', 'Une personne précise', "Ouvre sa fiche dans Membres et touche « Inviter » : son compte sera relié sans approbation", go('membres')),
     settingsRow('🎟️', 'Tout le monde', "Partage le lien d'une ligue (centre, groupe Facebook…) : chaque personne apparaît dans « À approuver »", go('comptes'))
   ]);
-  html += stGroup('Autres organisations', [
-    settingsRow('➕', 'Créer une nouvelle organisation', 'Séparée de celle-ci : ses propres ligues, joueurs et admins', 'onCreateOrganization()'),
-    (CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) ? settingsRow('🔗', 'Lien pour démarrer une organisation', 'Super admin : à envoyer à quelqu\'un qui démarre sa propre organisation', 'copyAppLink()') : ''
+  // Créer une organisation : réservé aux super admins pour l'instant.
+  if(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) html += stGroup('Autres organisations (super admin)', [
+    settingsRow('➕', 'Créer une nouvelle organisation', 'Séparée de celle-ci : ses propres ligues, joueurs et admins', 'onCreateOrganization()')
   ]);
   html += canDelete
     ? `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteOrganization()"><span class="t">Supprimer cette organisation</span></button></div>
@@ -10821,16 +10836,6 @@ function settingsGuideHTML(){
     </div>`;
 }
 
-function copyAppLink(){
-  const url = window.location.origin + window.location.pathname;
-  const done = ()=> showAlert("Lien copié dans le presse-papier :\n" + url);
-  const fallback = ()=> showAlert("Impossible de copier automatiquement. Voici le lien à copier toi-même :\n" + url);
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(done).catch(fallback);
-  } else {
-    fallback();
-  }
-}
 // Garde le nom/l'étiquette jour-heure de la ligue (table leagues, utilisés
 // dans les boutons de sélection) synchronisés avec les réglages.
 async function updateCurrentLeagueMeta(name, scheduleLabel){
