@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 305">
+<meta name="app-build" content="Version 306">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -339,7 +339,12 @@ tr.me{background:rgba(207,234,92,0.1);}
 .wz-member input{width:20px;height:20px;flex:0 0 auto;}
 
 @media (max-width:640px){.chat-sheet-lg{height:96vh;height:96dvh;}}
-.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.sheet-body{flex:1;min-height:0;overflow-y:auto;padding:14px 14px calc(14px + env(safe-area-inset-bottom));overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+/* Panneaux : jamais sous l'heure / l'encoche de l'iPhone (l'app s'affiche sous la barre d'état). */
+:root{--sat:env(safe-area-inset-top, 0px);}
+.chat-overlay{padding-top:max(16px, calc(var(--sat) + 10px));}
+.chat-overlay > .chat-sheet{max-height:100%;}
+@media (max-width:640px){ .chat-overlay{padding-top:calc(var(--sat) + 10px);} }
 .chat-overlay{overscroll-behavior:contain;touch-action:pan-y;}
 .sheet-body > .card:last-child{margin-bottom:0;}
 .addtab-bar{display:flex;gap:4px;padding:4px;background:var(--court-elevated-2);border-radius:999px;margin-bottom:14px;}
