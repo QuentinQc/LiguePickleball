@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 302">
+<meta name="app-build" content="Version 303">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5172,8 +5172,10 @@ function renderAdmin(){
   }
   if(DATA.leagueFormat === 'mlp'){ renderMlpAdmin(); return; }
   const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['session','Session','📅'],['historique','Historique','📜'],['rapports','Rapports','📊'],['reglages','Réglages','⚙️']];
-  const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
-  const canViewAsSub = MY_LINK_IN_CURRENT_LEAGUE && MY_LINK_IN_CURRENT_LEAGUE.substitute_id && (DATA.substitutePool||[]).some(s=>s.id===MY_LINK_IN_CURRENT_LEAGUE.substitute_id);
+  // Le sélecteur Admin/Joueur ne dépend plus de la ligue ouverte : il suffit d'être joueur
+  // (ou remplaçant) dans n'importe quelle ligue.
+  const canViewAsPlayer = !!adminOwnLink('player');
+  const canViewAsSub = !canViewAsPlayer && !!adminOwnLink('substitute');
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
     ...(canViewAsPlayer ? [{label:'Joueur', active:false, onclick:'toggleAdminPlayerView()'}] : []),
@@ -5520,7 +5522,7 @@ function meRow(ico, title, sub, onclick){
 function renderMlpAdmin(){
   processPendingRegen();
   const tabs = [['joueurs','Joueurs','🧑\u200d🤝\u200d🧑'],['equipes','Équipes','👥'],['sessions','Sessions','📅'],['classement','Classement','📊'],['reglages','Réglages','⚙️']];
-  const canViewAsPlayer = MY_LINK_IN_CURRENT_LEAGUE && DATA.players.some(p=>p.id===MY_LINK_IN_CURRENT_LEAGUE.player_id);
+  const canViewAsPlayer = !!adminOwnLink('player');
   const viewSlide = viewSlideHTML([
     {label:'Admin', active:true, onclick:''},
     ...(canViewAsPlayer ? [{label:'Joueur', active:false, onclick:'toggleAdminPlayerView()'}] : []),
@@ -11593,8 +11595,35 @@ function mlpPlayerTeamHTML(me){
   }
   return html;
 }
-function toggleAdminPlayerView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'player' ? null : 'player'; VIEW = { tab: ADMIN_VIEWING_AS ? (DATA.leagueFormat==='mlp' ? 'equipe' : 'classement') : (DATA.leagueFormat==='mlp' ? 'equipes' : 'groupes') }; render(); }
-function toggleAdminSubView(){ ADMIN_VIEWING_AS = ADMIN_VIEWING_AS === 'substitute' ? null : 'substitute'; VIEW = { tab: ADMIN_VIEWING_AS ? 'dispo' : (DATA.leagueFormat==='mlp' ? 'equipes' : 'groupes') }; render(); }
+// Lien joueur (ou remplaçant) de l'admin : celui de la ligue ouverte d'abord, sinon sa première ligue.
+function adminOwnLink(kind){
+  const has = function(l){ return l && (kind==='substitute' ? !!l.substitute_id : !!l.player_id); };
+  if(has(MY_LINK_IN_CURRENT_LEAGUE)) return MY_LINK_IN_CURRENT_LEAGUE;
+  return (MY_LEAGUE_LINKS||[]).find(has) || null;
+}
+// Bascule Admin ⇄ Joueur/Remplaçant. Si la ligue ouverte n'est pas une des siennes, on charge
+// une ligue où il joue ; au retour en Admin, on revient à la ligue et à l'écran d'avant.
+let ADMIN_RETURN = null;
+async function switchAdminView(kind){
+  if(ADMIN_VIEWING_AS){
+    const back = ADMIN_RETURN; ADMIN_RETURN = null;
+    ADMIN_VIEWING_AS = null;
+    if(back && back.league && back.league !== CURRENT_LEAGUE_ID && LEAGUES.some(l=>l.id===back.league)){ await switchToLeague(back.league); }
+    VIEW = back ? back.view : { atab:'accueil' };
+    render();
+    return;
+  }
+  const link = adminOwnLink(kind);
+  if(!link) return;
+  ADMIN_RETURN = { league: CURRENT_LEAGUE_ID, view: VIEW };
+  if(link.league_id !== CURRENT_LEAGUE_ID){ await switchMyLeague(link.league_id); return; } // règle déjà la vue joueur
+  MY_LINK_IN_CURRENT_LEAGUE = link;
+  ADMIN_VIEWING_AS = link.substitute_id && !link.player_id ? 'substitute' : 'player';
+  VIEW = { tab: ADMIN_VIEWING_AS === 'substitute' ? 'dispo' : (DATA.leagueFormat==='mlp' ? 'equipe' : 'classement') };
+  render();
+}
+function toggleAdminPlayerView(){ switchAdminView('player'); }
+function toggleAdminSubView(){ switchAdminView('substitute'); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
 function playerGuideHTML(){
   if(isRecLeague()) return `
