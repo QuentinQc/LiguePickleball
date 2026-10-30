@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 308">
+<meta name="app-build" content="Version 309">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3879,60 +3879,6 @@ function applyRatingUpdates(session){
     session.ratingGamesDeltas[pid] = played;
   });
 }
-// ---- Recalcul de toutes les cotes avec la formule v2, depuis l'historique ----
-function ratingKey(pid){ return isSubPoolId(pid) ? pid.slice(5) : pid; }
-function recalcAllRatings(){
-  const closed = DATA.sessions.filter(x=>x.status==='closed' && Array.isArray(x.groupsData));
-  if(!closed.length){ showAlert("Aucune session terminée à rejouer."); return; }
-  showConfirm("Recalculer la cote de tous les joueurs avec la nouvelle formule ?\n\n• " + closed.length + " session(s) terminée(s) seront rejouées dans l'ordre.\n• Le point de départ de chaque joueur est sa cote avant sa première session.\n• Une copie de tes cotes actuelles est gardée : tu pourras revenir en arrière.", doRecalcAllRatings);
-}
-function doRecalcAllRatings(){
-  const closed = DATA.sessions.filter(x=>x.status==='closed' && Array.isArray(x.groupsData))
-    .slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
-  const people = (DATA.players||[]).concat(DATA.substitutePool||[]);
-  // copie de sécurité
-  const backup = { at:new Date().toISOString(), people:{}, sessions:{} };
-  people.forEach(pl=>{ backup.people[pl.id] = { rating: pl.rating, ratingGames: pl.ratingGames }; });
-  closed.forEach(x=>{ backup.sessions[x.id] = { ratingDeltas: x.ratingDeltas ? Object.assign({}, x.ratingDeltas) : null, ratingGamesDeltas: x.ratingGamesDeltas ? Object.assign({}, x.ratingGamesDeltas) : null }; });
-  // point de départ de chaque joueur : cote actuelle moins ce que ces sessions lui ont apporté
-  const sum = {}, cnt = {};
-  closed.forEach(x=>Object.keys(x.ratingDeltas||{}).forEach(pid=>{ const k = ratingKey(pid); sum[k] = (sum[k]||0) + x.ratingDeltas[pid]; cnt[k] = (cnt[k]||0) + ((x.ratingGamesDeltas && typeof x.ratingGamesDeltas[pid]==='number') ? 0 : 1); }));
-  const before = {};
-  people.forEach(pl=>{
-    const cur = typeof pl.rating==='number' ? pl.rating : RATING_DEFAULT;
-    before[pl.id] = cur;
-    pl.rating = Math.round((cur - (sum[pl.id]||0)) * 1000) / 1000;
-    const prevGames = typeof pl.ratingGames==='number' ? pl.ratingGames : 0;
-    pl.ratingGames = Math.max(0, prevGames - (cnt[pl.id]||0));
-    // sessions déjà converties (ratingGamesDeltas) : on retire aussi leurs matchs
-    closed.forEach(x=>{ if(x.ratingGamesDeltas){ Object.keys(x.ratingGamesDeltas).forEach(pid=>{ if(ratingKey(pid)===pl.id) pl.ratingGames = Math.max(0, pl.ratingGames - x.ratingGamesDeltas[pid]); }); } });
-  });
-  closed.forEach(x=>{ delete x.ratingDeltas; delete x.ratingGamesDeltas; applyRatingUpdates(x); });
-  DATA.ratingBackup = backup;
-  DATA.ratingModel = 2;
-  DATA.ratingRecalcAt = new Date().toISOString();
-  const diffs = people.map(pl=>({ name:pl.name, before:before[pl.id], after:pl.rating })).filter(d=>Math.abs(d.after-d.before)>=0.005);
-  diffs.sort((a,b)=>Math.abs(b.after-b.before)-Math.abs(a.after-a.before));
-  const top = diffs.slice(0,6).map(d=>`• ${d.name} : ${d.before.toFixed(2)} → ${d.after.toFixed(2)}`).join('\n');
-  saveAndRender();
-  showAlert("Cotes recalculées (" + closed.length + " session(s) rejouées, " + diffs.length + " joueur(s) modifié(s))." + (top ? "\n\nPlus gros changements :\n" + top : ""));
-}
-function restoreRatingBackup(){
-  const b = DATA.ratingBackup;
-  if(!b){ showAlert("Aucune copie à restaurer."); return; }
-  showConfirm("Revenir aux cotes d'avant le recalcul ?", ()=>{
-    const people = (DATA.players||[]).concat(DATA.substitutePool||[]);
-    people.forEach(pl=>{ const o = b.people[pl.id]; if(o){ pl.rating = o.rating; pl.ratingGames = o.ratingGames; } });
-    DATA.sessions.forEach(x=>{
-      const o = b.sessions[x.id];
-      if(!o) return;
-      if(o.ratingDeltas) x.ratingDeltas = o.ratingDeltas; else delete x.ratingDeltas;
-      if(o.ratingGamesDeltas) x.ratingGamesDeltas = o.ratingGamesDeltas; else delete x.ratingGamesDeltas;
-    });
-    delete DATA.ratingBackup; delete DATA.ratingModel; delete DATA.ratingRecalcAt;
-    saveAndRender();
-  });
-}
 
 // ---------- render ----------
 const app = document.getElementById('app');
@@ -3948,7 +3894,7 @@ function storageBannerHTML(){
   if(STORAGE_OK === false){
     return `<div class="card" style="border-color:var(--danger);background:rgba(233,85,107,0.12);">
       <strong style="color:var(--danger);">Connexion à la base de données indisponible</strong>
-      <p class="small">Impossible de joindre le serveur (Supabase). Vérifie ta connexion internet, ou réessaie dans un instant. Utilise l'export manuel pour ne rien perdre : va dans <strong>Réglages → Sauvegarde manuelle</strong>.</p>
+      <p class="small">Impossible de joindre le serveur (Supabase). Vérifie ta connexion internet, ou réessaie dans un instant.${SESSION_USER && SESSION_USER.role==='admin' ? ' Tu peux exporter une copie des données de la ligue avec le bouton ci-dessous.' : ''}</p>
       ${SESSION_USER && SESSION_USER.role==='admin' ? `<button class="btn btn-secondary" onclick="exportData()">Exporter maintenant</button>` : ''}
     </div>`;
   }
@@ -9985,17 +9931,10 @@ function adminSettingsSectionHTML(){
     vue.push(settingsRow('📜', 'Journal des scores', `${(DATA.scoreLog||[]).length} changement${(DATA.scoreLog||[]).length>1?'s':''} enregistré${(DATA.scoreLog||[]).length>1?'s':''}`, 'openScoreLogModal()'));
   }
   html += stGroup('Ce que voient les joueurs', vue);
-  const lastRecalc = DATA.ratingRecalcAt ? new Date(DATA.ratingRecalcAt).toLocaleDateString('fr-CA') : null;
   html += stGroup('Avancé', [
     settingsRow('📖', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()'),
-    rec ? '' : settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé · ${DATA.testMatches4||2} / ${DATA.testMatches5||3} matchs` : 'Désactivé', 'openTestModeModal()'),
-    settingsRow('⬇️', 'Exporter les données', 'Fichier de sauvegarde', 'exportData()'),
-    settingsRow('⬆️', 'Importer une sauvegarde', 'Remplace les données de la ligue', 'triggerImport()'),
-    (mlp || rec) ? '' : settingsRow('📊', 'Recalculer les cotes', DATA.ratingModel===2 ? 'Formule v2' + (lastRecalc ? ' · ' + lastRecalc : '') : '⚠️ Anciennes cotes : à recalculer une fois', 'recalcAllRatings()'),
-    (mlp || rec || !DATA.ratingBackup) ? '' : settingsRow('↩️', 'Annuler le dernier recalcul', '', 'restoreRatingBackup()'),
-    settingsRow('➕', 'Créer une nouvelle ligue', 'Dans cette organisation', 'onCreateLeague()')
+    rec ? '' : settingsRow('🧪', 'Mode test', DATA.testMode ? `Activé · ${DATA.testMatches4||2} / ${DATA.testMatches5||3} matchs` : 'Désactivé', 'openTestModeModal()')
   ]);
-  html += `<input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(this)">`;
   html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
     <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs sont conservés.</p>`;
   return html;
@@ -12209,36 +12148,6 @@ function exportData(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-function triggerImport(){
-  document.getElementById('importFileInput').click();
-}
-function handleImportFile(input){
-  const file = input.files && input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const parsed = JSON.parse(e.target.result);
-      if(!parsed || !Array.isArray(parsed.players) || !Array.isArray(parsed.groups)){
-        showAlert("Ce fichier ne semble pas être une sauvegarde valide de la ligue.");
-        return;
-      }
-      showConfirm("Importer cette sauvegarde va remplacer toutes les données actuelles. Continuer ?", ()=>{
-        if(parsed.matchesPerSession === undefined) parsed.matchesPerSession = 10;
-        if(parsed.testMode === undefined) parsed.testMode = false;
-        if(parsed.swapCount === undefined) parsed.swapCount = 1;
-        (parsed.sessions||[]).forEach(s=>{ if(s.published === undefined) s.published = true; });
-        DATA = parsed;
-        saveAndRender();
-        showAlert("Sauvegarde importée avec succès.");
-      });
-    }catch(err){
-      showAlert("Impossible de lire ce fichier : " + err.message);
-    }
-  };
-  reader.readAsText(file);
-  input.value = '';
 }
 
 function migrateData(){
