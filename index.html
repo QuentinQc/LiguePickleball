@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 297">
+<meta name="app-build" content="Version 298">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1619,15 +1619,34 @@ async function togglePushNotifications(){
   else await subscribeToPush();
   render();
 }
+// État de l'autorisation des notifications dans ce navigateur : 'granted', 'denied', 'default' ou '' (inconnu).
+function notifPermission(){ try{ return (window.Notification && Notification.permission) || ''; }catch(e){ return ''; } }
+// Marche à suivre pour débloquer, selon l'appareil et le navigateur.
+function notifBlockedSteps(){
+  const ua = navigator.userAgent || '';
+  if(isIOSDevice()) return "Ouvre Réglages › Notifications › Dinkeo et active « Autoriser les notifications ».";
+  if(/Android/i.test(ua)) return "Touche le cadenas à gauche de l'adresse › Autorisations › Notifications › Autoriser. Vérifie aussi que les notifications de ton navigateur sont permises dans les réglages d'Android.";
+  if(/Firefox\//.test(ua)) return "Clique sur le cadenas à gauche de l'adresse, retire le blocage des notifications, puis recharge la page.";
+  const edge = /Edg\//.test(ua);
+  const win = /Windows/i.test(ua);
+  return "Clique sur le cadenas (ou l'icône de réglages) à gauche de l'adresse dinkeo.ca › « Notifications » › choisis « Autoriser », puis recharge la page."
+    + (win ? " Si ça ne fonctionne toujours pas : dans Windows, ouvre Paramètres › Système › Notifications et vérifie que " + (edge ? "Microsoft Edge" : "ton navigateur") + " a le droit d'envoyer des notifications." : "");
+}
+function showNotifBlockedHelp(){
+  showAlert("Les notifications sont bloquées pour Dinkeo dans ce navigateur, qui ne redemande plus l'autorisation. Pour les débloquer : " + notifBlockedSteps());
+}
 async function subscribeToPush(){
+  // Déjà bloqué : le navigateur ne redemande jamais, il faut débloquer à la main.
+  if(notifPermission() === 'denied'){ showNotifBlockedHelp(); return; }
   if(!CURRENT_PROFILE){
     showAlert("Impossible d'activer les notifications : ton profil n'est pas encore chargé. Réessaie dans quelques secondes.");
     return;
   }
   try{
     const permission = await Notification.requestPermission();
+    if(permission === 'denied'){ showNotifBlockedHelp(); render(); return; }
     if(permission !== 'granted'){
-      showAlert("Les notifications ont été refusées. Tu peux les réactiver dans les réglages de notifications de ton navigateur ou de ton téléphone.");
+      showAlert("La demande d'autorisation a été fermée sans réponse. Réessaie et choisis « Autoriser ». Si rien ne s'affiche, cherche une petite cloche barrée à droite de la barre d'adresse et clique dessus.");
       return;
     }
     const reg = await registerServiceWorkerForPush();
@@ -1683,6 +1702,13 @@ function pushPromoBannerHTML(){
   if(PUSH_SUBSCRIBED) return '';
   const iosNotStandalone = isIOSDevice() && !isRunningStandalone();
   if(!PUSH_SUPPORTED && !iosNotStandalone) return ''; // rien à proposer ici
+  if(!iosNotStandalone && notifPermission() === 'denied'){
+    return `<div class="card" style="position:relative;border-color:#FF9F0A;background:rgba(255,159,10,0.10);">
+    <button onclick="dismissPushPromo()" aria-label="Fermer" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;line-height:1;">✕</button>
+    <strong style="color:#FF9F0A;">🔕 Notifications bloquées</strong>
+    <p class="small" style="margin:6px 0 0;padding-right:20px;">Ce navigateur bloque les notifications de Dinkeo. ${escapeHTML(notifBlockedSteps())}</p>
+  </div>`;
+  }
   const text = iosNotStandalone
     ? "Ajoute Dinkeo à ton écran d'accueil (Safari → Partager → « Sur l'écran d'accueil »), puis ouvre l'app depuis cette icône pour activer les notifications — sessions, résultats et annonces, même app fermée."
     : "Active les notifications pour être averti(e) des nouvelles sessions, des résultats et des annonces, même quand l'app est fermée.";
