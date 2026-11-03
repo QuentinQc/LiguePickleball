@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 335">
+<meta name="app-build" content="Version 336">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2365,7 +2365,7 @@ function partnerAudienceTag(p){
     const t = Array.isArray(p.target_profiles) ? p.target_profiles : [];
     const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
     if(mine){ const names = t.map(orgPersonName).filter(Boolean); return '👥 Pour ' + (names.length ? names.slice(0,3).join(', ') + (names.length>3 ? ' +' + (names.length-3) : '') : t.length + ' joueur' + (t.length>1?'s':'')); }
-    return t.length > 1 ? '👥 Pour toi et ' + (t.length-1) + ' autre' + (t.length>2?'s':'') : '👥 Pour toi';
+    return t.length > 1 ? '👥 Annonce ciblée · ' + t.length + ' joueurs' : '👥 Annonce personnelle';
   }
   return '🏢 Toute l\'organisation';
 }
@@ -2490,6 +2490,11 @@ function partnerRelTime(iso){
   if(hrs<24) return `il y a ${hrs} h`;
   return `il y a ${Math.round(hrs/24)} j`;
 }
+// Participants d'une annonce : l'auteur (il participe d'office), puis les personnes partantes.
+function partnerParticipants(p){
+  const list = Array.isArray(p.interested) ? p.interested : [];
+  return [{ profile_id: p.profile_id, name: p.author_name, avatar_url: p.avatar_url }].concat(list.filter(x=>x.profile_id !== p.profile_id));
+}
 function sortedPartnerPosts(){
   return (PARTNER_POSTS||[]).slice().sort((a,b)=>{
     if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
@@ -2506,11 +2511,12 @@ function partnerPostsListHTML(){
     const closed = p.status !== 'open';
     const interested = Array.isArray(p.interested) ? p.interested : [];
     const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+    const nIn = partnerParticipants(p).length;
     const when = p.play_date ? `<div class="pc-when">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : '';
     const act = (!closed && !mine)
       ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'} pc-join" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e)' : '🙋 Je suis partant(e)'}</button>`
       : '';
-    const cnt = interested.length ? `<span class="pc-count">${interested.length} partant${interested.length>1?'s':''}</span>` : '';
+    const cnt = `<span class="pc-count">${nIn} partant${nIn>1?'s':''}</span>`;
     return `<div class="pc-card${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
       <div class="pc-head">
         ${avatarHTML('partner-pill-avatar', partnerInitials(p.author_name), p.avatar_url)}
@@ -2541,8 +2547,9 @@ function partnerPostDetailInnerHTML(id){
   const interested = Array.isArray(p.interested) ? p.interested : [];
   const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
   const closed = p.status !== 'open';
-  const shown = interested.slice(0,8);
-  const extra = interested.length - shown.length;
+  const all = partnerParticipants(p);
+  const shown = all.slice(0,8);
+  const extra = all.length - shown.length;
   return `
     <div class="row" style="align-items:center;gap:10px;">
       ${avatarHTML('wall-avatar', partnerInitials(p.author_name), p.avatar_url, 'width:34px;height:34px;font-size:13px;')}
@@ -2555,12 +2562,12 @@ function partnerPostDetailInnerHTML(id){
     <div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>
     ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
-    ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
+    ${all.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
       <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', partnerInitials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
-      <span class="small" style="color:var(--muted);">${interested.length} partant(e)${interested.length>1?'s':''}</span>
+      <span class="small" style="color:var(--muted);">${all.length} partant(e)${all.length>1?'s':''}</span>
     </div>` : ''}
     <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-      ${!closed ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
+      ${!closed && !mine ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
       ${canManage ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
       ${canManage ? `<button class="btn-ghost-danger" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
     </div>`;
@@ -2712,7 +2719,12 @@ async function saveSocialEvent(id, btn){
     ({ error } = await sb.from('social_events').update(payload).eq('id', id));
   } else {
     payload.created_by = CURRENT_PROFILE.id;
-    ({ error } = await sb.from('social_events').insert(payload));
+    let created = null;
+    ({ data: created, error } = await sb.from('social_events').insert(payload).select('id').single());
+    // Celui qui crée l'événement y participe : sa réponse « Je viens » est enregistrée d'office.
+    if(!error && created && created.id){
+      try{ await sb.from('social_event_rsvps').upsert({ event_id: created.id, profile_id: CURRENT_PROFILE.id, name: myDisplayName(), status: 'going' }, { onConflict: 'event_id,profile_id' }); }catch(e){ console.error('rsvp auteur', e); }
+    }
   }
   if(error){ console.error('social_events', error); if(btn){ btn.disabled=false; btn.textContent='Enregistrer'; } fail("Impossible d'enregistrer : " + (error.message||'erreur inconnue') + '.'); return; }
   closeModal();
