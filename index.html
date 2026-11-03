@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 324">
+<meta name="app-build" content="Version 325">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5166,7 +5166,7 @@ async function onAuthResolved(user){
       let msg = null;
       if(r && r.data){
         if(r.data.ok && r.data.pending) notifyAdminsJoinRequest(r.data.league_id, null, 'join');
-        if(r.data.ok) msg = r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : "Invitation acceptée ✅ Bienvenue dans la ligue !";
+        if(r.data.ok) msg = r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : inviteAcceptedMsg(r.data);
         else msg = r.data.error || null;
       } else if(r && r.error){ msg = "Invitation : " + r.error.message; }
       const again = await sb.from('profiles').select('*').eq('id', user.id).single();
@@ -5309,9 +5309,13 @@ async function inviteForEntry(id, kind, renew, leagueId){
   const code = data && data.code ? String(data.code) : '';
   const exp = data && data.expires_at ? new Date(data.expires_at).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }) : '';
   const url = window.location.origin + window.location.pathname;
+  // Même personne inscrite dans d'autres ligues de l'organisation : le code la reliera aussi là.
+  let others = [];
+  try{ const o = await sb.rpc('invitation_other_leagues', { p_league_id: leagueId, p_key: id }); if(o && !o.error && Array.isArray(o.data)) others = o.data.map(function(x){ return typeof x === 'string' ? x : (x && x.invitation_other_leagues); }).filter(Boolean); }catch(e){}
   showContentModal("Invitation", `
     <p class="small">Envoie ce code <strong>seulement à cette personne</strong>. Il ne fonctionne qu'une fois${exp ? ' et expire le ' + escapeHTML(exp) : ''}.</p>
     <div style="font-family:Oswald,sans-serif;font-size:34px;letter-spacing:3px;text-align:center;margin:16px 0;color:var(--ball);">${escapeHTML(code)}</div>
+    ${others.length ? `<div class="pf-list" style="margin-bottom:14px;"><div class="pf-row" style="cursor:default;"><span class="ic">🔗</span><span class="t">Relie aussi à : ${escapeHTML(others.join(', '))}<small>Même personne inscrite dans ${others.length>1?'ces ligues':'cette ligue'} : un seul code suffit. Reconnue par sa fiche de membre ou par son nom : vérifie que c'est bien la même personne.</small></span></div></div>` : ''}
     <button class="btn btn-primary" onclick="copyInviteLink('${escapeHTML(code)}')">Copier le lien d'invitation</button>
     <p class="small" style="margin-top:12px;">Avec le lien, la personne crée son compte (ou se connecte) et l'invitation s'applique toute seule. Sinon, elle peut ouvrir <strong>${escapeHTML(url)}</strong> et entrer le code (« J'ai un code d'invitation »).</p>
     <button class="btn btn-secondary" style="margin-top:8px;" onclick="inviteForEntry('${id}','${kind}',true,'${leagueId}')">Générer un nouveau code (annule celui-ci)</button>`);
@@ -5358,6 +5362,12 @@ function inviteOrgMember(idx){
   const r = e.rows.filter(function(x){ return x.type==='joueur'; })[0] || e.rows[0];
   inviteForEntry(r.refId, r.type==='remplaçant' ? 's' : 'p', false, r.leagueId);
 }
+// « Invitation acceptée » : nomme toutes les ligues rejointes (la même personne peut être reliée à plusieurs ligues d'un coup).
+function inviteAcceptedMsg(d){
+  const names = [d && d.league_name].concat((d && d.also) || []).filter(Boolean);
+  if(names.length > 1) return "Invitation acceptée ✅ Tu as rejoint " + names.slice(0,-1).join(', ') + ' et ' + names[names.length-1] + ' !';
+  return "Invitation acceptée ✅ Bienvenue dans " + (names[0] ? names[0] : 'la ligue') + ' !';
+}
 function openInviteCodePrompt(){
   showPrompt("Entre ton code d'invitation :", '', async (code)=>{
     if(!code || !code.trim()) return;
@@ -5367,7 +5377,7 @@ function openInviteCodePrompt(){
     if(data.pending){ notifyAdminsJoinRequest(data.league_id, null, 'join'); showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
-    showAlert("Invitation acceptée ✅ Bienvenue dans la ligue !");
+    showAlert(inviteAcceptedMsg(data));
   });
 }
 function renderPending(){
