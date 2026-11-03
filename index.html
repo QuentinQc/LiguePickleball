@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 340">
+<meta name="app-build" content="Version 341">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -368,6 +368,9 @@ td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
 .avatar-stack-item:first-child{margin-left:0;}
 .avatar-stack-more{background:rgba(255,255,255,0.12);color:var(--muted);}
 .member-name-link{cursor:pointer;}
+.member-row-tap{cursor:pointer;}
+.member-row-tap:hover{background:rgba(207,234,92,.06);border-color:var(--line-soft-strong);}
+.member-row-tap:active{background:rgba(207,234,92,.10);}
 .member-name-link:hover{color:var(--ball);text-decoration:underline;text-decoration-color:rgba(255,255,255,0.3);text-underline-offset:3px;}
 .member-leagues{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
 .member-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
@@ -11194,15 +11197,15 @@ function orgMembersBodyHTML(){
   const initialsOf = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   setTimeout(()=>orgUpdateCount(list.length, entries.length), 0);
   return `<div class="member-list">
-    ${list.map(({e,i})=>`<div class="member-row">
+    ${list.map(({e,i})=>`<div class="member-row member-row-tap" role="button" tabindex="0" onclick="openOrgMemberDetailModal(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOrgMemberDetailModal(${i});}">
       ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
       <div class="member-info">
-        <div class="member-name member-name-link" onclick="openOrgMemberDetailModal(${i})">${escapeHTML(e.name)} ${memberAccountStatus(e).tag}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+        <div class="member-name">${escapeHTML(e.name)} ${memberAccountStatus(e).tag}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
         ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
         <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?' 🔄':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
       </div>
       <div class="member-actions">
-        ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
+        ${(e.orgMemberId && !e.rows.length) ? `<button class="btn-ghost-danger" onclick="event.stopPropagation();confirmDeleteOrgMember(${i})">🗑️</button>` : ''}
       </div>
     </div>`).join('')}
     ${entries.length===0 ? `<p class="empty">Aucun membre pour l'instant</p>` : (list.length===0 ? `<p class="empty">Aucun résultat avec ces filtres</p>` : '')}
