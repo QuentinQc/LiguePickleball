@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 332">
+<meta name="app-build" content="Version 333">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -191,7 +191,7 @@ th{text-align:left;font-family:var(--font-display);font-size:11px;letter-spacing
 th.sortable{cursor:pointer;user-select:none;}
 th.sortable:hover{color:var(--ball);}
 td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
-tr.me{background:rgba(207,234,92,0.1);}
+
 .tag{display:inline-block;font-family:var(--font-body);font-weight:600;font-size:11px;padding:4px 10px;border-radius:999px;letter-spacing:0.03em;text-transform:uppercase;}
 .tag-up{background:rgba(207,234,92,0.18);color:var(--ball);}
 .tag-down{background:rgba(233,85,107,0.15);color:var(--danger);}
@@ -1006,7 +1006,7 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .pc-sec{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 2px 8px;}
 .pc-list{display:flex;flex-direction:column;gap:10px;}
 .pc-card{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;}
-.pc-card.mine{border-color:rgba(207,234,92,.45);}
+
 .pc-card.closed{opacity:.55;}
 .pc-head{display:flex;align-items:center;gap:12px;}
 .pc-who{flex:1;min-width:0;}
@@ -1115,11 +1115,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rs-sit{font-size:13px;color:var(--muted);padding:8px 14px 10px;border-top:1px solid var(--line-soft);}
 .rs-tag{font-size:11px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;vertical-align:middle;}
 .rs-acts{margin-top:4px;}
-.rs-m.me{border-color:rgba(207,234,92,.55);box-shadow:0 0 0 1px rgba(207,234,92,.25);}
+
 .rs-m.ro.todo:not(.me){border-color:var(--line-soft);}
 .rs-sc{flex:none;width:64px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;font-family:var(--font-display);border-radius:12px;background:rgba(0,0,0,.25);}
 .rs-m.wa .rs-line.a .rs-sc,.rs-m.wb .rs-line.b .rs-sc{color:var(--ball);}
-.rs-tag.me{background:rgba(207,234,92,.16);color:var(--ball);}
+
 .hs-card{padding:0;overflow:hidden;}
 .hs-sum{list-style:none;display:flex;align-items:center;gap:10px;padding:16px;cursor:pointer;}
 .hs-sum::-webkit-details-marker{display:none;}
@@ -2514,7 +2514,7 @@ function partnerPostsListHTML(){
     return `<div class="pc-card${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
       <div class="pc-head">
         ${avatarHTML('partner-pill-avatar', partnerInitials(p.author_name), p.avatar_url)}
-        <div class="pc-who"><div class="pc-name">${escapeHTML(p.author_name)}${mine?' <span class="small">(toi)</span>':''}</div><div class="small">${partnerRelTime(p.created_at)}</div></div>
+        <div class="pc-who"><div class="pc-name">${escapeHTML(p.author_name)}</div><div class="small">${partnerRelTime(p.created_at)}</div></div>
         <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
       </div>
       <div class="pc-aud-tag">${escapeHTML(partnerAudienceTag(p))}</div>
@@ -7647,7 +7647,7 @@ function mlpStandingsHTML(me){
     <h2>Classement de la saison</h2>
     <p class="small">3 pts pour une victoire en règle, 2 pts pour une victoire au DreamBreaker, 1 pt pour une défaite au DreamBreaker, 0 pt pour une défaite en règle.</p>
     <table><tr><th>#</th><th>Équipe</th><th>J</th><th>V-D</th><th>Points</th></tr>
-    ${rows.map((r,i)=>`<tr class="${myTeam&&myTeam.id===r.teamId?'me':''}"><td>${medal(i)}</td><td>${escapeHTML(r.name)}${myTeam&&myTeam.id===r.teamId?' <span class="small">(toi)</span>':''}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td><strong>${r.points}</strong></td></tr>`).join('')}
+    ${rows.map((r,i)=>`<tr><td>${medal(i)}</td><td>${escapeHTML(r.name)}</td><td>${r.played}</td><td>${r.wins}-${r.losses}</td><td><strong>${r.points}</strong></td></tr>`).join('')}
     </table>
   </div>`;
 }
@@ -11725,7 +11725,7 @@ function substituteAvailabilityHTML(sub){
     if(mine.length){
       html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Mes matchs</div></div>`;
       mine.forEach(({m,mi})=>{
-        const team = t=> t.map(id=>escapeHTML(playerName(id)) + (id===enc ? ' <span class="rs-tag me">toi</span>' : '')).join('<br>');
+        const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
         const sc = v => (v===null || v==='' || v===undefined) ? '—' : v;
         html += `<div class="rs-m me ro ${rsDone(m) ? rsClass(m) : ''}">
           <div class="rs-mh"><b>Match ${mi+1}</b>${rsDone(m) ? '<span class="rs-state">✓</span>' : ''}</div>
@@ -12286,7 +12286,7 @@ function mlpPlayerTeamHTML(me){
     <h2>${escapeHTML(team.name)}</h2>
     <table>
       <tr><th>Coéquipiers</th></tr>
-      ${team.memberIds.map(id=>`<tr class="${id===me.id?'me':''}"><td>${escapeHTML(playerName(id))}${id===me.id?' <span class="small">(toi)</span>':''}</td></tr>`).join('')}
+      ${team.memberIds.map(id=>`<tr><td>${escapeHTML(playerName(id))}</td></tr>`).join('')}
     </table>
   </div>`;
   const open = (DATA.mlpSessions||[]).find(s=>s.status==='open');
@@ -12818,9 +12818,9 @@ function playerGroupHTML(me){
     ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${groupMembers.map(p=>{
         const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
         const ini = (p.name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-        return `<div class="pf-row" style="cursor:default;${p.id===me.id?'background:rgba(207,234,92,.08);':''}">
+        return `<div class="pf-row" style="cursor:default;">
           <span class="member-avatar">${escapeHTML(ini)}</span>
-          <span class="t">${escapeHTML(p.name)}${p.id===me.id?' <span class="pf-chip on" style="margin-left:6px;">toi</span>':''}</span>
+          <span class="t">${escapeHTML(p.name)}</span>
           ${DATA.showRatingToPlayers ? `<span style="font-family:var(--font-display);font-size:18px;color:var(--ball);">${rating.toFixed(2)}</span>` : ''}
         </div>`;
       }).join('')}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
@@ -12852,9 +12852,9 @@ function playerGroupHTML(me){
         const cell = (side, val) => social ? '' : editable
           ? `<input class="pill-input rs-in" type="number" min="0" inputmode="numeric" aria-label="Score de l'équipe ${side==='A'?1:2}" id="sc_${me.groupId}_${mi}_${side}" value="${val===null?'':val}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)">`
           : `<div class="rs-sc">${val==null||val===''?'—':val}</div>`;
-        const team = t=> t.map(id=>escapeHTML(playerName(id)) + (id===me.id ? ' <span class="rs-tag me">toi</span>' : '')).join('<br>');
+        const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
         const st = done ? '✓' : (editable ? 'À saisir' : '');
-        html += `<div class="rs-m ${social ? '' : rsClass(m)}${mine?' me':''}${editable?'':' ro'}" id="rsm_${me.groupId}_${mi}" data-edit="${editable?1:0}">
+        html += `<div class="rs-m ${social ? '' : rsClass(m)}${editable?'':' ro'}" id="rsm_${me.groupId}_${mi}" data-edit="${editable?1:0}">
           <div class="rs-mh"><b>Match ${mi+1}</b>${social ? '' : scoreMarkHTML('ladder', me.groupId, mi, m, false, true)}${st ? `<span class="rs-state">${st}</span>` : ''}</div>
           <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${cell('A', m.scoreA)}</div>
           <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${cell('B', m.scoreB)}</div>
