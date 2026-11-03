@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 326">
+<meta name="app-build" content="Version 327">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1982,27 +1982,78 @@ function notifyAdminsSubAvailable(subName, sessionDate){
     url: '/'
   });
 }
-// Annonce libre écrite par l'admin, envoyée à tous les joueurs/remplaçants
-// de la ligue actuellement affichée.
-function notifyCustomAnnouncement(message){
-  if(!CURRENT_LEAGUE_ID || !message) return;
-  invokeSendNotification({
-    league_id: CURRENT_LEAGUE_ID, category: 'league_announce',
-    title: '📣 ' + currentLeagueLabel(),
-    body: message,
-    url: '/'
-  });
-}
+// Annonce libre écrite par l'admin : à toute l'organisation, à une ligue, ou à des joueurs choisis.
+// La fenêtre change de section sans se redessiner (le message tapé reste en place).
+let ANN_AUD = { kind:'league', league:null, people:[] };
 function openSendAnnouncementModal(){
-  showFormModal('Envoyer une annonce', `
-    <p class="small" style="margin-bottom:10px;">Envoyée par notification push à tous les joueurs et remplaçants de « ${escapeHTML(currentLeagueLabel())} » qui ont activé les notifications.</p>
-    <div class="field"><label>Message</label><textarea id="announcementText" rows="4" placeholder="Ex : La session de ce soir est déplacée à 19h."></textarea></div>
-  `, ()=>{
-    const text = (document.getElementById('announcementText').value || '').trim();
+  const org = partnerOrgId();
+  const leagues = LEAGUES.filter(l=>l.organization_id===org);
+  ANN_AUD = { kind:'league', league: (leagues.find(l=>l.id===CURRENT_LEAGUE_ID) || leagues[0] || {}).id || null, people:[], text:'' };
+  const seg = [['org','Organisation'],['league','Une ligue'],['people','Des joueurs']];
+  // Contenu recalculé à chaque affichage à partir d'ANN_AUD : un rafraîchissement de l'écran garde le message et les choix.
+  showFormModal('Envoyer une annonce', function(){ const a = ANN_AUD; return `
+    <div class="field"><label>Message</label><textarea id="announcementText" rows="4" placeholder="Ex : La session de ce soir est déplacée à 19h." oninput="ANN_AUD.text=this.value">${escapeHTML(a.text||'')}</textarea></div>
+    <div class="pc-aud" style="margin-top:4px;">
+      <span class="pc-aud-l">Pour qui ?</span>
+      <div class="ah-switch pc-aud-sw pc-aud-seg" id="annSeg">${seg.map(([k,l])=>`<button type="button" data-k="${k}" class="${k===a.kind?'on':''}" onclick="setAnnAudience('${k}')">${l}</button>`).join('')}</div>
+      <div id="annSec_org" style="${a.kind==='org'?'':'display:none;'}"><div class="pc-aud-note">Tous les joueurs et remplaçants de l'organisation qui ont activé les notifications.</div></div>
+      <div id="annSec_league" style="${a.kind==='league'?'':'display:none;'}">${leagues.length ? `<div class="ah-switch pc-aud-sw" id="annLeagues">${leagues.map(l=>`<button type="button" data-id="${l.id}" class="${l.id===a.league?'on':''}" onclick="setAnnLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>` : ''}<div class="pc-aud-note">Les joueurs et remplaçants de cette ligue qui ont activé les notifications.</div></div>
+      <div id="annSec_people" style="${a.kind==='people'?'':'display:none;'}">
+        <input type="search" class="pp-search" placeholder="Rechercher un nom…" oninput="filterAnnPeople(this.value)" autocomplete="off">
+        <div class="pf-list pp-list" id="annPeople">${ORG_PEOPLE[org] ? annPeopleListHTML(ORG_PEOPLE[org]) : '<p class="ah-meta" style="padding:10px;">Chargement…</p>'}</div>
+        <div class="pc-aud-note" id="annPeopleN" style="margin-top:6px;">${annPeopleCountText()}</div>
+      </div>
+    </div>`; }, ()=>{
+    const ta = document.getElementById('announcementText');
+    const text = ((ta ? ta.value : ANN_AUD.text) || '').trim();
     if(!text){ showAlert('Écris un message avant d\'envoyer.'); return false; }
-    notifyCustomAnnouncement(text);
-    showAlert('📣 Annonce envoyée.');
+    const a = ANN_AUD;
+    if(a.kind === 'league' && !a.league){ showAlert('Choisis la ligue.'); return false; }
+    if(a.kind === 'people' && !a.people.length){ showAlert('Choisis au moins un joueur.'); return false; }
+    const lg = LEAGUES.find(l=>l.id===a.league);
+    const orgName = (lg && lg.organizations && lg.organizations.name) || ((LEAGUES.find(l=>l.organization_id===org) || {}).organizations || {}).name || 'Annonce';
+    const payload = a.kind === 'league'
+      ? { league_id: a.league, category:'league_announce', title: '📣 ' + ((lg && (lg.schedule_label || lg.name)) || currentLeagueLabel()), body: text, url:'/' }
+      : { organization_id: org, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: '📣 ' + orgName, body: text, url:'/' };
+    sb.functions.invoke('send-session-notification', { body: payload }).then(function(r){
+      const d = r && r.data;
+      if(r && r.error){ showAlert("L'annonce n'a pas pu être envoyée : " + (r.error.message || 'erreur inconnue')); return; }
+      showAlert('📣 Annonce envoyée' + (d && typeof d.sent === 'number' ? ' (' + d.sent + ' appareil' + (d.sent>1?'s':'') + ' averti' + (d.sent>1?'s':'') + ').' : '.'));
+    }, function(){ showAlert("L'annonce n'a pas pu être envoyée. Vérifie ta connexion."); });
   });
+  if(MODAL && MODAL.kind === 'form'){ MODAL.saveLabel = 'Envoyer'; render(); }
+}
+function setAnnAudience(k){
+  ANN_AUD.kind = k;
+  document.querySelectorAll('#annSeg button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-k') === k); });
+  ['org','league','people'].forEach(function(x){ const el = document.getElementById('annSec_' + x); if(el) el.style.display = x === k ? '' : 'none'; });
+  if(k === 'people') loadOrgPeople().then(renderAnnPeople);
+}
+function setAnnLeague(id){
+  ANN_AUD.league = id;
+  document.querySelectorAll('#annLeagues button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-id') === id); });
+}
+function renderAnnPeople(list){
+  const box = document.getElementById('annPeople'); if(box) box.innerHTML = annPeopleListHTML(list);
+}
+function annPeopleCountText(){ const n = ANN_AUD.people.length; return n ? n + ' personne' + (n>1?'s':'') + ' choisie' + (n>1?'s':'') + '.' : 'Aucune personne choisie.'; }
+function annPeopleListHTML(list){
+  const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  return (list && list.length) ? list.map(p=>`<label class="pf-row pp-row" data-n="${escapeHTML(String(p.name||'').toLowerCase())}">
+      <span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}</span>
+      <input type="checkbox" class="pp-chk" ${ANN_AUD.people.indexOf(p.id)!==-1?'checked':''} onchange="toggleAnnPerson('${p.id}', this.checked)"></label>`).join('')
+    : `<p class="ah-meta" style="padding:10px;">Personne n'a encore de compte dans cette organisation.</p>`;
+}
+function filterAnnPeople(q){
+  q = String(q||'').toLowerCase().trim();
+  document.querySelectorAll('#annPeople .pp-row').forEach(function(r){ r.style.display = (!q || r.getAttribute('data-n').indexOf(q) !== -1) ? '' : 'none'; });
+}
+function toggleAnnPerson(id, on){
+  const i = ANN_AUD.people.indexOf(id);
+  if(on && i === -1) ANN_AUD.people.push(id);
+  if(!on && i !== -1) ANN_AUD.people.splice(i, 1);
+  const n = document.getElementById('annPeopleN');
+  if(n) n.textContent = annPeopleCountText();
 }
 // ==================== FIN NOTIFICATIONS PUSH ====================
 // Les enregistrements partent l'un après l'autre : deux clics rapides ne doivent pas se
@@ -5911,7 +5962,7 @@ function adminOrgsHTML(){
 }
 // ---- Communauté admin ----
 function adminCommHTML(){
-  const ann = (PUSH_SUPPORTED || isIOSDevice()) ? `<button class="btn btn-secondary acc-btn" style="margin-bottom:12px;" onclick="openSendAnnouncementModal()">📣 Envoyer une annonce aux joueurs</button>` : '';
+  const ann = (PUSH_SUPPORTED || isIOSDevice()) ? `<button class="btn btn-secondary acc-btn" style="margin-bottom:12px;" onclick="openSendAnnouncementModal()">📣 Envoyer une annonce</button>` : '';
   return ann + accountCommHTML(null);
 }
 // ---- Moi admin ----
@@ -12802,7 +12853,7 @@ function modalHTML(){
       ${bodyHtml}
       ${MODAL.kind==='form' ? `<div class="row" style="justify-content:flex-end;margin-top:14px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
-        <button class="btn btn-primary" onclick="modalFormSaveClick()">Enregistrer</button>
+        <button class="btn btn-primary" onclick="modalFormSaveClick()">${escapeHTML(MODAL.saveLabel || 'Enregistrer')}</button>
       </div>` : ''}`;
     return `<div class="m-ov" style="${overlay}" onclick="if(event.target===this) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}</div></div>`;
   }
