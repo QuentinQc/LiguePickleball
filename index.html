@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 328">
+<meta name="app-build" content="Version 329">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5391,13 +5391,28 @@ async function onSignUp(){
   if(!email){ VIEW.error = { text: 'Entre ton courriel.' }; render(); return; }
   if(password.length < 6){ VIEW.error = { text: 'Le mot de passe doit contenir au moins 6 caractères.' }; render(); return; }
   VIEW.error = null; A.busy = true; render();
-  const { error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined, pending_code: PENDING_CODE || undefined }, emailRedirectTo: window.location.origin + window.location.pathname + (PENDING_CODE ? '?code=' + encodeURIComponent(PENDING_CODE) : '') } });
+  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { display_name: name, organization_id: SIGNUP_ORG_ID || undefined, pending_code: PENDING_CODE || undefined }, emailRedirectTo: window.location.origin + window.location.pathname + (PENDING_CODE ? '?code=' + encodeURIComponent(PENDING_CODE) : '') } });
   A.busy = false;
-  if(error){ VIEW.error = authErrorFR(error); render(); return; }
+  if(error){
+    const e = authErrorFR(error);
+    if(e && e.toSignin){ showSigninForExisting(email); return; }
+    VIEW.error = e; render(); return;
+  }
+  // Courriel déjà inscrit (et confirmé) : Supabase ne renvoie pas d'erreur, mais un compte sans
+  // « identité ». Au lieu d'annoncer un courriel de confirmation qui n'arrivera jamais, on passe
+  // à la connexion avec le courriel (et le mot de passe tapé) déjà remplis.
+  if(data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0){ showSigninForExisting(email); return; }
   A.password = '';
   try{ localStorage.setItem('dinkeo_last_email', email); }catch(e){}
   VIEW.loginMode = 'sent-signup'; VIEW.info = null;
   render();
+}
+function showSigninForExisting(email){
+  try{ localStorage.setItem('dinkeo_last_email', email); }catch(e){}
+  VIEW.loginMode = 'signin'; VIEW.error = null;
+  VIEW.info = "Un compte existe déjà avec " + email + ". Connecte-toi avec ton mot de passe, ou touche « Mot de passe oublié » si tu ne t'en souviens plus.";
+  render();
+  setTimeout(function(){ const el = document.querySelector('.au-box input[type=password]'); if(el) el.focus(); }, 50);
 }
 function lastLoginEmail(){ try{ return localStorage.getItem('dinkeo_last_email') || ''; }catch(e){ return ''; } }
 async function onSignIn(){
