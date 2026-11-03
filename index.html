@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 322">
+<meta name="app-build" content="Version 323">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1143,6 +1143,48 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sb-tile{background:rgba(0,0,0,.2);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;}
 .sb-tile b{font-family:var(--font-display);font-size:22px;color:var(--ball);line-height:1;}
 .sb-tile span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+.st-chart{position:relative;height:150px;margin:12px 0 8px;touch-action:pan-y;cursor:crosshair;}
+.st-chart svg{position:absolute;left:0;top:0;width:100%;height:150px;overflow:visible;}
+.st-grid{stroke:rgba(237,237,234,.08);stroke-width:1;vector-effect:non-scaling-stroke;}
+.st-yl{position:absolute;left:0;width:28px;text-align:right;transform:translateY(-50%);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;}
+.st-line{fill:none;stroke:var(--ball);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;}
+.st-dot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--ball);box-shadow:0 0 0 2px var(--court-light);pointer-events:none;}
+.st-chart .st-dot{top:0;}
+.st-hov,.st-cross,.st-tip{display:none;}
+.st-cross{position:absolute;top:0;height:126px;width:1px;background:rgba(237,237,234,.25);pointer-events:none;}
+.st-tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:#0A1F1C;border:1px solid var(--line-soft-strong);border-radius:10px;padding:6px 10px;font-size:13px;white-space:nowrap;pointer-events:none;z-index:2;}
+.st-tip b{font-family:var(--font-display);font-size:16px;color:var(--text);}
+.st-tip small{display:block;color:var(--muted);font-size:12px;}
+.st-xl{position:absolute;left:34px;right:10px;bottom:0;display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+.st-mm{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;color:var(--muted);margin-top:6px;}
+.st-mm b{color:var(--text);font-weight:700;margin-left:4px;}
+.st-link{margin-left:auto;background:none;border:0;color:var(--ball);font:inherit;font-weight:600;cursor:pointer;padding:4px 0;}
+.st-form{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
+.st-fs{background:rgba(0,0,0,.2);border-radius:14px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;min-width:0;}
+.st-fs small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0;white-space:nowrap;}
+.st-fs b{font-family:var(--font-display);font-size:22px;line-height:1;color:var(--text);}
+.st-fs b i{font-style:normal;font-size:13px;color:var(--muted);}
+.st-fs.top b{color:var(--ball);}
+.st-fs span{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;}
+.st-fs em{font-style:normal;font-size:11px;letter-spacing:-.01em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.st-fs em.up{color:var(--ball);} .st-fs em.dn{color:#ff8a80;}
+.st-fs.off{opacity:.6;}
+.st-wl{font-family:var(--font-display);font-size:18px;color:var(--text);flex:0 0 auto;font-variant-numeric:tabular-nums;}
+.bh-sess{margin-top:14px;display:flex;flex-direction:column;gap:10px;}
+.bh-s{display:grid;grid-template-columns:62px 1fr 44px;grid-template-rows:auto auto;column-gap:10px;align-items:center;}
+.bh-d{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;}
+.bh-bar{height:8px;}
+.bh-v{font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;}
+.bh-n{grid-column:2 / 4;font-size:12px;color:var(--muted);margin-top:2px;}
+.bh-warn{color:#FF9F0A !important;}
+.bh-u{font-family:Inter,system-ui,sans-serif;font-size:12px;color:var(--muted);}
+.bh-more{margin-top:12px;}
+.bh-more summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ball);padding:6px 2px;list-style:none;}
+.bh-more summary::-webkit-details-marker{display:none;}
+.bh-more summary:before{content:'▸ ';}
+.bh-more[open] summary:before{content:'▾ ';}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
+@media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
 .rp-sort button{font-size:13px;padding:6px 12px;}
 .rp-v{font-family:var(--font-display);font-size:18px;color:var(--ball);flex:0 0 auto;}
@@ -9698,13 +9740,154 @@ function computePlayerReports(){
     };
   });
 }
+// ---------- Bilan de santé de la ligue (Rapports › Bilan) ----------
+// Calculé à partir des sessions terminées. Seul le nombre de comptes avec notifications
+// demande une lecture de plus (fonction league_push_profiles, réservée aux admins de la ligue).
+let ADOPTION_CACHE = {}; // { [leagueId]: { ids: [profile_id…] | null, loading: bool } }
+function loadLeagueAdoption(leagueId){
+  if(!leagueId || ADOPTION_CACHE[leagueId]) return;
+  ADOPTION_CACHE[leagueId] = { ids:null, loading:true };
+  sb.rpc('league_push_profiles', { p_league_id: leagueId }).then(function(r){
+    ADOPTION_CACHE[leagueId] = { ids: (r && !r.error && Array.isArray(r.data)) ? r.data.map(function(x){ return typeof x === 'string' ? x : (x && (x.profile_id || x.league_push_profiles)); }).filter(Boolean) : null, loading:false };
+    if(VIEW.reportsSubTab === undefined || VIEW.reportsSubTab === 'bilan') render();
+  }, function(){ ADOPTION_CACHE[leagueId] = { ids:null, loading:false }; });
+}
+function sessionPresence(s){
+  const ids = new Set((DATA.players||[]).map(p=>p.id));
+  const absent = (s.absences||[]).filter(id=>ids.has(id) && !(s.loans && s.loans[id]));
+  let filled = 0;
+  absent.forEach(id=>{ if((s.groupsData||[]).some(gd=>gd.substitutes && gd.substitutes[id])) filled++; });
+  const seen = new Set();
+  Object.keys(s.standingsByGroup||{}).forEach(k=>{ (s.standingsByGroup[k]||[]).forEach(r=>{ if(ids.has(r.playerId) && absent.indexOf(r.playerId) === -1) seen.add(r.playerId); }); });
+  const present = seen.size || Math.max(0, ids.size - absent.length - (DATA.players||[]).filter(p=>p.injured).length);
+  const total = present + absent.length;
+  return { date:s.date, present:present, absent:absent.length, filled:filled, empty:absent.length-filled, rate: total ? present/total : null };
+}
+function computeLeagueHealth(){
+  const closed = stClosedSessions();
+  const recent = closed.slice(-6);
+  const pres = recent.map(sessionPresence);
+  const avg = a=>{ const v = a.filter(x=>x.rate!==null); return v.length ? v.reduce((t,x)=>t+x.rate,0)/v.length : null; };
+  const last3 = avg(pres.slice(-3)), prev3 = pres.length >= 6 ? avg(pres.slice(0,3)) : null;
+  // À relancer : absent(e) aux 3 dernières sessions terminées.
+  const tail = closed.slice(-3);
+  const absentStreak = tail.length === 3 ? (DATA.players||[]).filter(p=>!p.injured && tail.every(s=>isTrulyAbsent(s, p.id))) : [];
+  // Équilibre : écart de points moyen par groupe sur les 4 dernières sessions terminées.
+  const balance = {};
+  closed.slice(-4).forEach(s=>{
+    (s.groupsData||[]).forEach(gd=>{
+      (gd.matches||[]).forEach(m=>{
+        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB===''||m.scoreA===undefined||m.scoreB===undefined) return;
+        const a = Number(m.scoreA), b = Number(m.scoreB); if(a===b) return;
+        const o = balance[gd.groupId] || (balance[gd.groupId] = { n:0, diff:0, win:0 });
+        o.n++; o.diff += Math.abs(a-b); o.win += Math.max(a,b);
+      });
+    });
+  });
+  // Remplaçants : disponibilités indiquées et placements (à la place d'un absent ou en renfort).
+  const subs = (DATA.substitutePool||[]).map(sp=>{
+    const enc = 'sub::' + sp.id;
+    let dispo = 0, placed = 0, last = null;
+    (DATA.sessions||[]).forEach(s=>{
+      if((s.availableSubs||[]).indexOf(sp.id) !== -1) dispo++;
+      const here = (s.groupsData||[]).some(gd=>Object.keys(gd.substitutes||{}).some(k=>gd.substitutes[k]===enc) || (gd.extras||[]).indexOf(enc) !== -1);
+      if(here){ placed++; if(!last || String(s.date) > String(last)) last = s.date; }
+    });
+    return { sub:sp, dispo:dispo, placed:placed, last:last };
+  });
+  return { closedN:closed.length, pres:pres, last3:last3, prev3:prev3, absentStreak:absentStreak, balance:balance, subs:subs };
+}
+function reportsHealthHTML(){
+  const h = computeLeagueHealth();
+  const pct = x=> x===null ? '—' : Math.round(x*100)+'%';
+  const row = (ic, t, sub, right)=> `<div class="pf-row" style="cursor:default;"><span class="ic">${ic}</span><span class="t">${t}<small>${sub}</small></span>${right||''}</div>`;
+  let html = '';
+  if(!h.closedN){
+    html += `<div class="card"><p class="empty">Le bilan apparaîtra après la première session terminée.</p></div>`;
+  } else {
+    // Présence
+    const tot = h.pres.reduce((t,x)=>({ a:t.a+x.absent, f:t.f+x.filled, e:t.e+x.empty }), { a:0, f:0, e:0 });
+    let trend = '';
+    if(h.last3 !== null && h.prev3 !== null){
+      const d = Math.round((h.last3 - h.prev3)*100);
+      trend = Math.abs(d) < 3 ? '<span class="pf-chip acc">Stable</span>' : (d > 0 ? `<span class="pf-chip on">En hausse de ${d} %</span>` : `<span class="pf-chip warn">En baisse de ${-d} %</span>`);
+    }
+    html += `<div class="card">
+      <div class="rs-top"><div class="pf-sec" style="margin:0;">Présence</div>${trend}</div>
+      <div class="sb-tiles" style="margin-top:10px;">
+        <div class="sb-tile"><b>${pct(h.last3)}</b><span>Présence</span></div>
+        <div class="sb-tile"><b>${tot.a}</b><span>Absence${tot.a>1?'s':''}</span></div>
+        <div class="sb-tile"><b>${tot.f}</b><span>Comblée${tot.f>1?'s':''}</span></div>
+        <div class="sb-tile"><b class="${tot.e?'bh-warn':''}">${tot.e}</b><span>Vide${tot.e>1?'s':''}</span></div>
+      </div>
+      <div class="bh-sess">${h.pres.slice().reverse().map(x=>`<div class="bh-s">
+        <span class="bh-d">${escapeHTML(stShortDate(x.date))}</span>
+        <span class="ah-bar bh-bar"><i style="width:${x.rate===null?0:Math.round(x.rate*100)}%"></i></span>
+        <span class="bh-v">${x.present}/${x.present+x.absent}</span>
+        <span class="bh-n">${x.absent ? (x.filled ? x.filled+' comblée'+(x.filled>1?'s':'') : '') + (x.filled && x.empty ? ' · ' : '') + (x.empty ? x.empty+' vide'+(x.empty>1?'s':'') : '') : 'Complet'}</span>
+      </div>`).join('')}</div>
+      <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Présence moyenne des 3 dernières sessions${h.prev3!==null ? ', comparée aux 3 précédentes' : ''}. Une absence « comblée » a eu un remplaçant ; une place « vide » non.</div>
+    </div>`;
+
+    // Joueurs à relancer
+    const links = (ALL_PROFILE_PLAYERS||[]).filter(l=>l.league_id===CURRENT_LEAGUE_ID);
+    const linksKnown = (ALL_PROFILE_PLAYERS||[]).length > 0;
+    const withAccount = new Set(links.filter(l=>l.player_id).map(l=>l.player_id));
+    const noAccount = linksKnown ? (DATA.players||[]).filter(p=>!withAccount.has(p.id)) : [];
+    const rel = h.absentStreak.map(p=>`<button class="pf-row" onclick="openPlayerDetailModal('${p.id}')"><span class="ic">📭</span><span class="t">${escapeHTML(p.name)}<small>Absent(e) aux 3 dernières sessions</small></span><span class="ch">›</span></button>`);
+    html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Joueurs à relancer</div>
+      ${rel.length ? `<div class="pf-list">${rel.join('')}</div>` : `<div class="ah-meta">✅ Personne n'a manqué les 3 dernières sessions.</div>`}
+      ${noAccount.length ? `<details class="bh-more"><summary>${noAccount.length} joueur${noAccount.length>1?'s':''} sans compte dans l'app</summary><div class="pf-list" style="margin-top:8px;">${noAccount.map(p=>`<button class="pf-row" onclick="openPlayerDetailModal('${p.id}')"><span class="ic">👤</span><span class="t">${escapeHTML(p.name)}<small>Pas de compte lié : ne reçoit ni notification ni rappel</small></span><span class="ch">›</span></button>`).join('')}</div></details>` : ''}
+    </div>`;
+
+    // Équilibre des groupes
+    const gids = Object.keys(h.balance).filter(k=>h.balance[k].n >= 3);
+    if(gids.length && !isRecLeague()){
+      const gs = gids.map(k=>({ g:groupById(k), b:h.balance[k] })).filter(x=>x.g).sort((a,b)=>a.g.order-b.g.order);
+      html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Équilibre des ${escapeHTML(grpWord(true,false))}</div><div class="pf-list">${gs.map(x=>{
+        const avgDiff = x.b.diff/x.b.n, ratio = x.b.win ? x.b.diff/x.b.win : 0;
+        const st = ratio < 0.35 ? ['on','Équilibré'] : (ratio < 0.55 ? ['wait','Quelques écarts'] : ['done','Déséquilibré']);
+        return row('⚖️', escapeHTML(x.g.name), avgDiff.toFixed(1).replace('.',',') + ' pts d\u2019écart en moyenne', `<span class="ah-st ${st[0]}">${st[1]}</span>`);
+      }).join('')}</div><div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Sur les 4 dernières sessions. De grands écarts dans un ${escapeHTML(grpWord(false,false))} veulent dire que les niveaux y sont trop différents.</div></div>`;
+    }
+  }
+
+  // Remplaçants
+  if(h.subs.length){
+    const list = h.subs.slice().sort((a,b)=>b.placed-a.placed || b.dispo-a.dispo || a.sub.name.localeCompare(b.sub.name));
+    html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Remplaçants</div><div class="pf-list">${list.map(x=>row(x.placed ? '🙋' : '👤', escapeHTML(x.sub.name), 'Disponible ' + x.dispo + ' fois' + (x.last ? ' · dernière fois placé(e) le ' + escapeHTML(stShortDate(x.last)) : ''), `<span class="st-wl">${x.placed}<small class="bh-u"> placé${x.placed>1?'s':''}</small></span>`)).join('')}</div>
+      <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">« Disponible » : nombre de sessions où le remplaçant a dit qu'il pouvait jouer. « Placé » : sessions où il a remplacé un absent ou servi de renfort.</div></div>`;
+  }
+
+  // Adoption de l'app
+  const links = (ALL_PROFILE_PLAYERS||[]).filter(l=>l.league_id===CURRENT_LEAGUE_ID);
+  if((ALL_PROFILE_PLAYERS||[]).length){
+    const nP = (DATA.players||[]).length, nS = (DATA.substitutePool||[]).length;
+    const pIds = new Set((DATA.players||[]).map(p=>p.id)), sIds = new Set((DATA.substitutePool||[]).map(x=>x.id));
+    const pAcc = new Set(links.filter(l=>l.player_id && pIds.has(l.player_id)).map(l=>l.player_id)).size;
+    const sAcc = new Set(links.filter(l=>l.substitute_id && sIds.has(l.substitute_id)).map(l=>l.substitute_id)).size;
+    loadLeagueAdoption(CURRENT_LEAGUE_ID);
+    const ad = ADOPTION_CACHE[CURRENT_LEAGUE_ID] || {};
+    const profIds = new Set(links.map(l=>l.profile_id));
+    const nNotif = ad.ids ? ad.ids.filter(id=>profIds.has(id)).length : null;
+    html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Utilisation de l'app</div>
+      <div class="sb-tiles">
+        <div class="sb-tile"><b>${pAcc}/${nP}</b><span>Joueurs</span></div>
+        ${nS ? `<div class="sb-tile"><b>${sAcc}/${nS}</b><span>Rempl.</span></div>` : ''}
+        <div class="sb-tile"><b>${nNotif===null ? (ad.loading ? '…' : '—') : nNotif+'/'+profIds.size}</b><span>Notifs</span></div>
+      </div>
+      <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Joueurs et remplaçants qui ont un compte lié à cette ligue, et comptes qui reçoivent les notifications sur au moins un appareil.${nNotif===null && !ad.loading ? ' (Le nombre de notifications n’est pas encore disponible.)' : ''}</div>
+    </div>`;
+  }
+  return html;
+}
 // Onglet « Rapports » unifié : sous-onglets Liste (joueurs/remplaçants) et
 // Rapport de session (stats calculées à partir de l'historique).
 function adminReportsSectionHTML(){
-  const sub = VIEW.reportsSubTab || 'liste';
-  const subTabs = [['liste','Liste'],['session','Rapport de session']];
+  const sub = VIEW.reportsSubTab || 'bilan';
+  const subTabs = [['bilan','Bilan'],['liste','Liste'],['session','Rapport de session']];
   let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
-  html += sub === 'session' ? reportsSessionHTML() : reportsListHTML();
+  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : reportsHealthHTML());
   return html;
 }
 function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
@@ -12009,20 +12192,198 @@ async function applyMyGender(nextGender){
   openMyProfileModal();
   if(hadError) showAlert("Le genre n'a pas pu être mis à jour. Vérifie ta connexion et réessaie — si ça persiste, assure-toi que la fonction set_my_gender a bien été créée dans Supabase.");
 }
-// ---------- Statistiques amusantes/encourageantes pour un joueur ----------
-// Reconstitue une estimation de l'historique de cote (à partir des
-// ajustements enregistrés par session) pour trouver le plus haut/bas atteint.
-function computePlayerRatingHistory(pid){
-  const closed = DATA.sessions.filter(s=>s.status==='closed');
-  let running = RATING_DEFAULT;
-  const history = [running];
+// ---------- Statistiques du joueur ----------
+// Tout est calculé à partir des sessions terminées déjà en mémoire (scores, classements,
+// mouvements, variations de cote) : rien de plus n'est lu ni enregistré.
+function stShortDate(str){
+  const p = frDateParts(str); if(!p.d) return String(str||'');
+  const mois = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  return p.d.getDate() + ' ' + mois[p.d.getMonth()];
+}
+function stClosedSessions(){
+  return (DATA.sessions||[]).filter(s=>s.status==='closed' && s.date).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+}
+// Courbe de cote : on part de la cote actuelle et on remonte les variations de chaque
+// session, pour que la courbe finisse exactement sur la cote affichée.
+function computePlayerRatingSeries(me){
+  const closed = stClosedSessions().filter(s=>s.ratingDeltas && typeof s.ratingDeltas[me.id] === 'number');
+  const current = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+  let total = 0; closed.forEach(s=>{ total += s.ratingDeltas[me.id]; });
+  let run = current - total;
+  const pts = [{ label:'Départ', v:run }];
+  closed.forEach(s=>{ run += s.ratingDeltas[me.id]; pts.push({ label:stShortDate(s.date), v:run, d:s.ratingDeltas[me.id] }); });
+  return pts;
+}
+function computePlayerSeasonStats(pid){
+  const closed = stClosedSessions();
+  const sessions = []; // une entrée par session terminée où le joueur faisait partie de la ligue
+  const partners = {}, opponents = {};
+  const timeline = [];
+  let close = 0, closeWon = 0, diffSum = 0, nMatches = 0;
   closed.forEach(s=>{
-    if(s.ratingDeltas && typeof s.ratingDeltas[pid] === 'number'){
-      running += s.ratingDeltas[pid];
-      history.push(running);
-    }
+    let row = null, gid = null, rank = 0, size = 0;
+    Object.keys(s.standingsByGroup||{}).forEach(k=>{
+      const rows = s.standingsByGroup[k] || [];
+      const i = rows.findIndex(r=>r.playerId===pid);
+      if(i !== -1){ row = rows[i]; gid = k; rank = i+1; size = rows.length; }
+    });
+    const absent = isTrulyAbsent(s, pid);
+    let move = 0;
+    (s.movements||[]).forEach(m=>{
+      if(m.playerId!==pid) return;
+      const f = groupById(m.fromGroupId), t = groupById(m.toGroupId);
+      if(f && t) move = t.order < f.order ? 1 : -1;
+    });
+    if(row || absent) sessions.push({ date:s.date, row:row, gid:gid, rank:rank, size:size, absent:absent && !row, move:move });
+    (s.groupsData||[]).forEach(gd=>{
+      (gd.matches||[]).forEach(m=>{
+        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB===''||m.scoreA===undefined||m.scoreB===undefined) return;
+        const sa = Number(m.scoreA), sb2 = Number(m.scoreB);
+        if(sa===sb2) return;
+        const inA = m.teamA.indexOf(pid) !== -1, inB = m.teamB.indexOf(pid) !== -1;
+        if(!inA && !inB) return;
+        const mine = inA ? sa : sb2, theirs = inA ? sb2 : sa, won = mine > theirs;
+        nMatches++; diffSum += mine - theirs;
+        if(Math.abs(mine-theirs) <= 2){ close++; if(won) closeWon++; }
+        timeline.push(won);
+        (inA ? m.teamA : m.teamB).forEach(id=>{ if(id===pid || isGuestOrSubId(id)) return; const o = partners[id] || (partners[id] = { w:0, l:0 }); if(won) o.w++; else o.l++; });
+        (inA ? m.teamB : m.teamA).forEach(id=>{ if(isGuestOrSubId(id)) return; const o = opponents[id] || (opponents[id] = { w:0, l:0 }); if(won) o.w++; else o.l++; });
+      });
+    });
   });
-  return history;
+  let cur = 0, best = 0, run = 0;
+  timeline.forEach(w=>{ run = w ? run+1 : 0; if(run > best) best = run; });
+  if(timeline.length){ const last = timeline[timeline.length-1]; for(let i=timeline.length-1;i>=0 && timeline[i]===last;i--) cur++; if(!last) cur = -cur; }
+  let presStreak = 0;
+  for(let i=sessions.length-1;i>=0 && !sessions[i].absent;i--) presStreak++;
+  const list = (o)=> Object.keys(o).map(id=>({ id:id, w:o[id].w, l:o[id].l, n:o[id].w+o[id].l, rate:(o[id].w+1)/(o[id].w+o[id].l+2) })).filter(x=>x.n>=2);
+  return { sessions:sessions, partners:list(partners), opponents:list(opponents), nMatches:nMatches, avgDiff: nMatches ? diffSum/nMatches : null, close:close, closeWon:closeWon, streak:cur, bestStreak:best, presStreak:presStreak };
+}
+// Petit graphique en ligne (SVG) : une seule série, couleur de la marque, survol et toucher
+// affichent la valeur de chaque session.
+function stRatingChartHTML(pts){
+  const W = 320, H = 150, L = 34, R = 10, T = 12, B = 24;
+  const vals = pts.map(p=>p.v);
+  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if(hi - lo < 0.1){ const m = (hi+lo)/2; lo = m - 0.05; hi = m + 0.05; }
+  const pad = (hi-lo)*0.12; lo -= pad; hi += pad;
+  const x = i=> L + (pts.length===1 ? (W-L-R)/2 : i*(W-L-R)/(pts.length-1));
+  const y = v=> T + (hi - v)*(H-T-B)/(hi-lo);
+  const ticks = [lo + (hi-lo)*0.15, (lo+hi)/2, hi - (hi-lo)*0.15];
+  const grid = ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="st-grid"/>`).join('');
+  const yl = ticks.map(v=>`<span class="st-yl" style="top:${(y(v)/H*100).toFixed(2)}%">${v.toFixed(2)}</span>`).join('');
+  const path = pts.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.v).toFixed(1)).join(' ');
+  const area = path + ` L${x(pts.length-1).toFixed(1)} ${H-B} L${x(0).toFixed(1)} ${H-B} Z`;
+  const last = pts.length-1;
+  const data = escapeHTML(JSON.stringify(pts.map((p,i)=>({ x:+(x(i)/W*100).toFixed(2), y:+(y(p.v)/H*100).toFixed(2), l:p.label, v:p.v.toFixed(2), d: typeof p.d==='number' ? (p.d>=0?'+':'')+p.d.toFixed(3) : '' }))));
+  return `<div class="st-chart" data-pts="${data}" onpointermove="stChartHover(event,this)" onpointerdown="stChartHover(event,this)" onpointerleave="stChartLeave(this)">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="stFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#CFEA5C" stop-opacity=".22"/><stop offset="1" stop-color="#CFEA5C" stop-opacity="0"/></linearGradient></defs>
+      ${grid}
+      <path d="${area}" fill="url(#stFill)"/>
+      <path d="${path}" class="st-line"/>
+    </svg>
+    <i class="st-dot" style="left:${(x(last)/W*100).toFixed(2)}%;top:${(y(pts[last].v)/H*100).toFixed(2)}%"></i>
+    ${yl}<i class="st-cross"></i><i class="st-dot st-hov"></i><div class="st-tip"></div>
+    <div class="st-xl"><span>${escapeHTML(pts[0].label)}</span><span>${escapeHTML(pts[last].label)}</span></div>
+  </div>
+  <table class="sr-only"><caption>Évolution de ta cote</caption>${pts.map(p=>`<tr><td>${escapeHTML(p.label)}</td><td>${p.v.toFixed(2)}</td></tr>`).join('')}</table>`;
+}
+function stChartHover(ev, el){
+  let pts; try{ pts = JSON.parse(el.getAttribute('data-pts')); }catch(e){ return; }
+  if(!pts || !pts.length) return;
+  const r = el.getBoundingClientRect(); const px = (ev.clientX - r.left) / r.width * 100;
+  let best = 0; pts.forEach(function(p,i){ if(Math.abs(p.x-px) < Math.abs(pts[best].x-px)) best = i; });
+  const p = pts[best];
+  const cross = el.querySelector('.st-cross'), dot = el.querySelector('.st-hov'), tip = el.querySelector('.st-tip');
+  cross.style.left = p.x + '%'; cross.style.display = 'block';
+  dot.style.left = p.x + '%'; dot.style.top = p.y + '%'; dot.style.display = 'block';
+  tip.innerHTML = '<b>' + p.v + '</b>' + (p.d ? ' <span class="hs-d ' + (p.d.charAt(0)==='-'?'n':'p') + '">' + p.d + '</span>' : '') + '<small>' + escapeHTML(p.l) + '</small>';
+  tip.style.display = 'block';
+  tip.style.left = Math.min(Math.max(p.x, 18), 82) + '%';
+}
+function stChartLeave(el){ ['.st-cross','.st-hov','.st-tip'].forEach(function(s){ const n = el.querySelector(s); if(n) n.style.display = 'none'; }); }
+function playerStatsTabHTML(me){
+  const st = computePlayerSeasonStats(me.id);
+  const played = st.sessions.filter(x=>!x.absent);
+  const r = (computePlayerReports().find(x=>x.player.id===me.id)) || null;
+  const pct = x=> (x===null||x===undefined) ? '—' : Math.round(x*100)+'%';
+  if(!st.sessions.length){
+    return `<div class="card"><div class="pf-sec" style="margin-top:0;">Ma saison</div><p class="ah-meta" style="margin:0;">Tes statistiques apparaîtront après ta première session terminée. Bon match ! 🏓</p></div>`;
+  }
+  const wins = r ? r.wins : 0, losses = r ? r.losses : 0;
+  let html = `<div class="card">
+    <div class="pf-sec" style="margin-top:0;">Ma saison</div>
+    <div class="sb-tiles">
+      <div class="sb-tile"><b>${wins}-${losses}</b><span>V-D</span></div>
+      <div class="sb-tile"><b>${pct(r ? r.winRate : null)}</b><span>Victoires</span></div>
+      <div class="sb-tile"><b>${played.length}</b><span>Session${played.length>1?'s':''}</span></div>
+      ${DATA.showRatingToPlayers ? `<div class="sb-tile"><b>${(typeof me.rating==='number'?me.rating:RATING_DEFAULT).toFixed(2)}</b><span>Cote</span></div>` : ''}
+    </div>
+  </div>`;
+
+  if(DATA.showRatingToPlayers){
+    const pts = computePlayerRatingSeries(me);
+    if(pts.length >= 2){
+      const diff = pts[pts.length-1].v - pts[0].v;
+      const vals = pts.map(p=>p.v);
+      html += `<div class="card">
+        <div class="rs-top"><div class="pf-sec" style="margin:0;">Évolution de ma cote</div><span class="hs-d ${diff>=0?'p':'n'}">${diff>=0?'+':''}${diff.toFixed(2)} cette saison</span></div>
+        ${stRatingChartHTML(pts)}
+        <div class="st-mm"><span>Plus haute <b>${Math.max.apply(null, vals).toFixed(2)}</b></span><span>Plus basse <b>${Math.min.apply(null, vals).toFixed(2)}</b></span><button class="st-link" onclick="showRatingExplanationModal()">Comment ça marche ?</button></div>
+      </div>`;
+    }
+  }
+
+  const recent = st.sessions.slice(-5).reverse();
+  html += `<div class="card">
+    <div class="pf-sec" style="margin-top:0;">Ma forme récente</div>
+    <div class="st-form">${recent.map(x=>{
+      if(x.absent) return `<div class="st-fs off"><small>${escapeHTML(stShortDate(x.date))}</small><b>—</b><span>Absence</span></div>`;
+      const g = groupById(x.gid);
+      const rk = x.rank===1 ? '1er' : x.rank+'e';
+      return `<div class="st-fs${x.rank===1?' top':''}"><small>${escapeHTML(stShortDate(x.date))}</small><b>${rk}<i>/${x.size}</i></b><span>${x.row.wins||0}-${x.row.losses||0}</span>${x.move ? `<em class="${x.move>0?'up':'dn'}">${x.move>0?'▲ Monte':'▼ Descend'}</em>` : (g ? `<em>${escapeHTML(g.name)}</em>` : '')}</div>`;
+    }).join('')}</div>
+  </div>`;
+
+  const facts = [];
+  if(st.streak >= 2) facts.push(['🔥', st.streak + ' victoires de suite', 'Série en cours']);
+  else if(st.streak <= -2) facts.push(['💪', 'La prochaine est pour toi', (-st.streak) + ' défaites de suite']);
+  if(st.bestStreak >= 2) facts.push(['🏅', st.bestStreak + ' victoires de suite', 'Ta meilleure série']);
+  if(st.close) facts.push(['⚖️', st.closeWon + ' sur ' + st.close, 'Matchs serrés gagnés (2 points ou moins)']);
+  if(st.avgDiff !== null) facts.push(['📏', (st.avgDiff>=0?'+':'') + st.avgDiff.toFixed(1) + ' pts', 'Écart moyen par match']);
+  const absN = st.sessions.length - played.length;
+  facts.push(['📅', played.length + ' sur ' + st.sessions.length, 'Sessions jouées' + (absN ? ' · ' + absN + ' absence' + (absN>1?'s':'') : ' · aucune absence')]);
+  if(st.presStreak >= 2) facts.push(['✅', st.presStreak + ' sessions de suite', 'Présent(e) sans manquer']);
+  html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Mon jeu en chiffres</div><div class="pf-list">${facts.map(f=>`<div class="pf-row" style="cursor:default;"><span class="ic">${f[0]}</span><span class="t">${escapeHTML(f[1])}<small>${escapeHTML(f[2])}</small></span></div>`).join('')}</div></div>`;
+
+  const partners = st.partners.slice().sort((a,b)=>b.rate-a.rate || b.w-a.w).slice(0,3);
+  const opp = st.opponents.slice();
+  const target = opp.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.w-a.w)[0];
+  const nemesis = opp.filter(o=>o.rate<0.5).sort((a,b)=>a.rate-b.rate || b.l-a.l)[0];
+  const pRow = (ic, id, sub, o)=> `<div class="pf-row" style="cursor:default;"><span class="ic">${ic}</span><span class="t">${escapeHTML(playerName(id))}<small>${escapeHTML(sub)}</small></span><span class="st-wl">${o.w}-${o.l}</span></div>`;
+  if(partners.length || target || nemesis){
+    html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Partenaires et adversaires</div><div class="pf-list">
+      ${partners.map((p,i)=>pRow(i===0 && p.rate>0.5 ? '🤝' : '👥', p.id, i===0 && p.rate>0.5 ? 'Ton meilleur allié' : 'En équipe', p)).join('')}
+      ${target ? pRow('🎯', target.id, 'Contre qui tu gagnes le plus', target) : ''}
+      ${nemesis ? pRow('😤', nemesis.id, 'Ta bête noire', nemesis) : ''}
+    </div><div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Victoires-défaites, à partir de 2 matchs ensemble ou l'un contre l'autre.</div></div>`;
+  }
+
+  if(r){
+    const cg = groupById(me.groupId), bg = computePlayerBestGroup(me.id);
+    html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Mon parcours</div>
+      <div class="sb-tiles">
+        <div class="sb-tile"><b>${r.promotions}</b><span>Montée${r.promotions>1?'s':''}</span></div>
+        <div class="sb-tile"><b>${r.relegations}</b><span>Descente${r.relegations>1?'s':''}</span></div>
+        ${r.subCount ? `<div class="sb-tile"><b>${r.subCount}</b><span>Prêt${r.subCount>1?'s':''}</span></div>` : ''}
+      </div>
+      <div class="pf-list" style="margin-top:12px;">
+        <div class="pf-row" style="cursor:default;"><span class="ic">📍</span><span class="t">${escapeHTML(cg ? cg.name : '—')}<small>${escapeHTML(grpWord(false,true))} actuel</small></span></div>
+        <div class="pf-row" style="cursor:default;"><span class="ic">⭐</span><span class="t">${escapeHTML(bg ? bg.name : '—')}<small>Meilleur ${escapeHTML(grpWord(false,false))} atteint</small></span></div>
+      </div></div>`;
+  }
+  return html;
 }
 // Le meilleur (plus haut) groupe atteint par un joueur, selon l'historique des sessions.
 function computePlayerBestGroup(pid){
@@ -12037,126 +12398,6 @@ function computePlayerBestGroup(pid){
     });
   });
   return best;
-}
-function playerStatsTabHTML(me){
-  const pct = (x)=> (x===null||x===undefined) ? '—' : Math.round(x*100)+'%';
-  const funHTML = playerFunStatsHTML(me);
-  const reports = computePlayerReports();
-  const r = reports.find(x=>x.player.id===me.id);
-  const ratingHistory = computePlayerRatingHistory(me.id);
-  const bestGroup = computePlayerBestGroup(me.id);
-  const currentGroup = groupById(me.groupId);
-
-  let html = funHTML || `<div class="card"><p class="small">Continue à jouer pour débloquer tes statistiques de rivalité — reviens ici après quelques matchs !</p></div>`;
-
-  html += DATA.showRatingToPlayers ? `<div class="card">
-    <h3>Ta cote</h3>
-    <table>
-      <tr><td class="small">Cote actuelle</td><td><strong>${(typeof me.rating==='number'?me.rating:RATING_DEFAULT).toFixed(2)}</strong></td></tr>
-      <tr><td class="small">Plus haute atteinte</td><td>${Math.max(...ratingHistory).toFixed(2)}</td></tr>
-      <tr><td class="small">Plus basse atteinte</td><td>${Math.min(...ratingHistory).toFixed(2)}</td></tr>
-      <tr><td class="small">Matchs comptés vers ta cote</td><td>${typeof me.ratingGames==='number'?me.ratingGames:0}</td></tr>
-    </table>
-  </div>` : '';
-
-  if(r){
-    html += `<div class="card">
-      <h3>Bilan global</h3>
-      <table>
-        <tr><td class="small">Victoires</td><td>${r.wins}</td></tr>
-        <tr><td class="small">Défaites</td><td>${r.losses}</td></tr>
-        <tr><td class="small">Taux de victoire</td><td>${pct(r.winRate)}</td></tr>
-        <tr><td class="small">Matchs joués</td><td>${r.played} / ${r.scheduled}</td></tr>
-        <tr><td class="small">Taux d'absence</td><td>${pct(r.absenceRate)}</td></tr>
-      </table>
-    </div>
-    <div class="card">
-      <h3>Ton parcours dans l'échelle</h3>
-      <table>
-        <tr><td class="small">Groupe actuel</td><td>${escapeHTML(currentGroup?currentGroup.name:'—')}</td></tr>
-        <tr><td class="small">Meilleur groupe atteint</td><td>${bestGroup?escapeHTML(bestGroup.name):'—'}</td></tr>
-        <tr><td class="small">Montées</td><td>${r.promotions}</td></tr>
-        <tr><td class="small">Descentes</td><td>${r.relegations}</td></tr>
-        <tr><td class="small">Fois remplaçant(e) dans un autre groupe</td><td>${r.subCount}</td></tr>
-      </table>
-    </div>`;
-  } else {
-    html += `<div class="card"><p class="small">Pas encore de session terminée pour calculer ton bilan global.</p></div>`;
-  }
-  return html;
-}
-function computePlayerFunStats(pid){
-  const closed = DATA.sessions.filter(s=>s.status==='closed');
-  const headToHead = {}; // adversaireId -> {wins, losses} (de mon point de vue)
-  const partnerStats = {}; // partenaireId -> {wins, losses}
-  const timeline = []; // 'W'/'L' dans l'ordre chronologique
-  closed.forEach(s=>{
-    (s.groupsData||[]).forEach(gd=>{
-      (gd.matches||[]).forEach(m=>{
-        if(m.scoreA===null||m.scoreB===null||m.scoreA===''||m.scoreB==='') return;
-        const sa=Number(m.scoreA), sb=Number(m.scoreB);
-        if(sa===sb) return;
-        const inA = m.teamA.includes(pid), inB = m.teamB.includes(pid);
-        if(!inA && !inB) return;
-        const myTeam = inA ? m.teamA : m.teamB;
-        const oppTeam = inA ? m.teamB : m.teamA;
-        const won = inA ? sa>sb : sb>sa;
-        oppTeam.forEach(oppId=>{
-          if(isGuestOrSubId(oppId)) return;
-          if(!headToHead[oppId]) headToHead[oppId] = {wins:0, losses:0};
-          if(won) headToHead[oppId].wins++; else headToHead[oppId].losses++;
-        });
-        myTeam.forEach(partnerId=>{
-          if(partnerId===pid || isGuestOrSubId(partnerId)) return;
-          if(!partnerStats[partnerId]) partnerStats[partnerId] = {wins:0, losses:0};
-          if(won) partnerStats[partnerId].wins++; else partnerStats[partnerId].losses++;
-        });
-        timeline.push(won ? 'W' : 'L');
-      });
-    });
-  });
-  return { headToHead, partnerStats, timeline };
-}
-function playerFunStatsHTML(me){
-  const { headToHead, partnerStats, timeline } = computePlayerFunStats(me.id);
-  const MIN_COUNT = 2;
-  const sameGroup = (id)=>{ const p = DATA.players.find(x=>x.id===id); return p && p.groupId === me.groupId; };
-  const opponents = Object.keys(headToHead)
-    .filter(sameGroup)
-    .map(id=>{ const s=headToHead[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
-    .filter(o=>o.total>=MIN_COUNT);
-  const partners = Object.keys(partnerStats)
-    .filter(sameGroup)
-    .map(id=>{ const s=partnerStats[id]; const total=s.wins+s.losses; return { id, wins:s.wins, losses:s.losses, total, rate: total>0?s.wins/total:0 }; })
-    .filter(o=>o.total>=MIN_COUNT);
-
-  const facts = [];
-  const nemesis = opponents.filter(o=>o.rate<0.5).sort((a,b)=>a.rate-b.rate || b.losses-a.losses)[0];
-  if(nemesis) facts.push(`🎯 <strong>Ta bête noire</strong> — ${escapeHTML(playerName(nemesis.id))}. Vous vous êtes affrontés ${nemesis.total} fois, il/elle en a gagné ${nemesis.losses}. Il va falloir un plan de match !`);
-
-  const favorite = opponents.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.wins-a.wins)[0];
-  if(favorite) facts.push(`🔥 <strong>Ta cible favorite</strong> — ${escapeHTML(playerName(favorite.id))}. ${favorite.wins} victoires sur ${favorite.total} face à lui/elle. Tu sais comment le/la jouer !`);
-
-  const closest = opponents.filter(o=>o.id!==(nemesis&&nemesis.id) && o.id!==(favorite&&favorite.id))
-    .sort((a,b)=>Math.abs(a.rate-0.5)-Math.abs(b.rate-0.5))[0];
-  if(closest) facts.push(`⚔️ <strong>Ton duel le plus serré</strong> — contre ${escapeHTML(playerName(closest.id))}, c'est presque du 50/50 (${closest.wins} victoires, ${closest.losses} défaites). Chaque match compte double !`);
-
-  const bestPartner = partners.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.wins-a.wins)[0];
-  if(bestPartner) facts.push(`🤝 <strong>Ton meilleur allié</strong> — en équipe avec ${escapeHTML(playerName(bestPartner.id))}, vous gagnez ${bestPartner.wins} fois sur ${bestPartner.total}. Une paire à ne pas séparer !`);
-
-  if(timeline.length>=MIN_COUNT){
-    const last = timeline[timeline.length-1];
-    let streak = 0;
-    for(let i=timeline.length-1;i>=0 && timeline[i]===last;i--) streak++;
-    if(streak>=MIN_COUNT){
-      facts.push(last==='W'
-        ? `🔥 <strong>En feu</strong> — ${streak} victoires de suite !`
-        : `💪 <strong>Ça va revenir</strong> — après ${streak} défaites d'affilée, la prochaine est pour toi.`);
-    }
-  }
-
-  if(facts.length===0) return '';
-  return `<div class="card"><h3>Tes stats</h3>${facts.map(f=>`<p>${f}</p>`).join('')}</div>`;
 }
 // ======================= PALMARÈS =======================
 // Tout est calculé à partir de l'historique (sessions closes) déjà en mémoire.
