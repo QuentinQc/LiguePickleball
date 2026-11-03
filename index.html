@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 321">
+<meta name="app-build" content="Version 322">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1634,7 +1634,7 @@ async function registerServiceWorkerForPush(){
 // Vérifie une seule fois par session si cet appareil est déjà abonné, pour
 // que le bouton du tiroir affiche le bon état dès l'ouverture de l'app.
 function ensurePushStatusChecked(){
-  if(PUSH_STATUS_CHECKED || !PUSH_SUPPORTED || !SESSION_USER) return;
+  if(PUSH_STATUS_CHECKED || !PUSH_SUPPORTED || !SESSION_USER || !CURRENT_PROFILE) return;
   PUSH_STATUS_CHECKED = true;
   refreshPushSubscriptionStatus().then(render);
 }
@@ -1644,7 +1644,21 @@ async function refreshPushSubscriptionStatus(){
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = reg ? await reg.pushManager.getSubscription() : null;
     PUSH_SUBSCRIBED = !!sub;
+    // Réenregistre l'abonnement de cet appareil pour le compte connecté : l'app peut se
+    // croire abonnée alors que Supabase ne l'a plus (autre compte, abonnement renouvelé
+    // par le navigateur, ligne retirée) — et rien n'arriverait.
+    if(sub && CURRENT_PROFILE && notifPermission() === 'granted') savePushSubscription(sub);
   }catch(e){ PUSH_SUBSCRIBED = false; }
+}
+function savePushSubscription(sub){
+  const json = sub.toJSON();
+  if(!json || !json.endpoint || !json.keys) return Promise.resolve({ error: null });
+  return sb.from('push_subscriptions').upsert({
+    profile_id: CURRENT_PROFILE.id,
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth
+  }, { onConflict: 'endpoint' }).then(function(r){ if(r && r.error) console.error('Abonnement push non enregistré', r.error); return r; });
 }
 function isRunningStandalone(){
   try{
@@ -1721,13 +1735,7 @@ async function subscribeToPush(){
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
-    const json = sub.toJSON();
-    const { error } = await sb.from('push_subscriptions').upsert({
-      profile_id: CURRENT_PROFILE.id,
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth
-    }, { onConflict: 'endpoint' });
+    const { error } = await savePushSubscription(sub);
     if(error){ showAlert("Erreur lors de l'activation des notifications : " + error.message); return; }
     PUSH_SUBSCRIBED = true;
     showAlert("🔔 Notifications activées sur cet appareil.");
