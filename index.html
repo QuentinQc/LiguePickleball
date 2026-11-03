@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 329">
+<meta name="app-build" content="Version 330">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1127,7 +1127,6 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .hs-t b{font-size:17px;}
 .hs-chips{display:flex;gap:6px;flex-wrap:wrap;}
 .hs-chips .pf-chip:before{display:none;}
-.hs-row .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hs-ch{color:var(--muted);font-size:22px;transition:transform .15s;}
 .hs-card[open] .hs-ch{transform:rotate(90deg);}
 .hs-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
@@ -1247,6 +1246,17 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .an-done-ic.err{background:#FF9F0A;}
 .an-done-t{font-family:var(--font-display);font-size:24px;font-weight:700;text-transform:uppercase;margin-top:14px;}
 .an-done-s{font-size:14px;color:var(--muted);margin-top:6px;max-width:360px;}
+.hs-row .t small{white-space:normal;}
+.hs-rk{position:relative;}
+.hs-rk.up{background:rgba(207,234,92,.18);color:var(--ball);}
+.hs-rk.down{background:rgba(255,159,10,.18);color:#FF9F0A;}
+.hs-mvt{font-weight:700;} .hs-mvt.up{color:var(--ball);} .hs-mvt.down{color:#FF9F0A;}
+.hs-rt{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+.hs-rt b{font-family:var(--font-display);font-size:20px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums;}
+.hs-dp{font-size:13px;font-weight:700;padding:2px 8px;border-radius:999px;font-variant-numeric:tabular-nums;}
+.hs-dp.p{background:rgba(207,234,92,.16);color:var(--ball);}
+.hs-dp.n{background:rgba(255,107,107,.16);color:#ff8a80;}
+@media (max-width:640px){ .hs-body{padding:0 10px 12px;} .hs-row{gap:10px;padding:12px;} }
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -10663,18 +10673,20 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
       const mv = mvs.find(m=>m.playerId===r.playerId && m.fromGroupId===g.id);
-      const move = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? `<span class="hs-mv up" title="Monte">▲</span>` : `<span class="hs-mv down" title="Descend">▼</span>`) : '';
       const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
       const played = r.played || 0, scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
       const tags = (isGuest ? ' <span class="rs-tag">invité</span>' : '') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '') + (r.playerId===viewerPlayerId ? ' <span class="rs-tag me">toi</span>' : '');
       const sub = `${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}${incomplete ? ` · <span style="color:var(--paddle);">${played}/${scheduled} joués</span>` : ''}`;
-      const right = (showRating && typeof delta === 'number') ? `<span class="hs-d ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span>` : '';
+      const after = (showRating && typeof delta === 'number') ? ratingAfterSession(r.playerId, s) : null;
+      const right = (showRating && typeof delta === 'number')
+        ? `<span class="hs-rt">${after !== null ? `<b>${after.toFixed(2)}</b>` : ''}<span class="hs-dp ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span></span>` : '';
+      const mvCls = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? ' up' : ' down') : '';
       body += `<div class="pf-row hs-row${r.playerId===viewerPlayerId?' me':''}" style="cursor:default;">
-        <span class="hs-rk">${i+1}</span>
-        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}</small></span>
-        ${right}${move}
+        <span class="hs-rk${mvCls}">${i+1}</span>
+        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${mvCls ? `<span class="hs-mvt${mvCls}">${mvCls===' up'?'▲ Monte':'▼ Descend'}</span> · ` : ''}${sub}</small></span>
+        ${right}
       </div>`;
     });
     body += `</div>`;
@@ -10696,6 +10708,21 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
     <summary class="hs-sum"><span class="hs-t"><b>${escapeHTML(frDateLong(s.date))}</b>${chips.length ? `<span class="hs-chips">${chips.join('')}</span>` : ''}</span><span class="hs-ch">›</span></summary>
     <div class="hs-body">${body}</div>
   </details>`;
+}
+// Cote d'une personne juste après une session : sa cote actuelle moins les variations des sessions suivantes.
+function ratingAfterSession(pid, session){
+  let cur = null;
+  if(isSubPoolId(pid)){ const x = (DATA.substitutePool||[]).find(y=>y.id===pid.slice(5)); if(x && typeof x.rating === 'number') cur = x.rating; }
+  else if(!isGuestId(pid)){ const p = DATA.players.find(y=>y.id===pid); if(p) cur = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT; }
+  if(cur === null) return null;
+  const key = isSubPoolId(pid) ? pid : pid;
+  (DATA.sessions||[]).forEach(function(x){
+    if(x.status !== 'closed' || x === session || !x.ratingDeltas) return;
+    if(String(x.date) > String(session.date) || (String(x.date) === String(session.date) && DATA.sessions.indexOf(x) > DATA.sessions.indexOf(session))){
+      const d = x.ratingDeltas[key]; if(typeof d === 'number') cur -= d;
+    }
+  });
+  return cur;
 }
 function groupAbove(gid){
   const sorted = groupsSorted();
