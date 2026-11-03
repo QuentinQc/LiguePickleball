@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 323">
+<meta name="app-build" content="Version 324">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1183,6 +1183,15 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .bh-more summary::-webkit-details-marker{display:none;}
 .bh-more summary:before{content:'▸ ';}
 .bh-more[open] summary:before{content:'▾ ';}
+.upd-banner{position:fixed;z-index:1200;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));width:min(520px,calc(100% - 28px));display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-radius:18px;background:rgba(20,60,55,.96);border:1px solid rgba(207,234,92,.35);box-shadow:0 14px 40px rgba(0,0,0,.5);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);color:var(--text);animation:updIn .3s ease;}
+@keyframes updIn{from{opacity:0;transform:translate(-50%,16px);}to{opacity:1;transform:translate(-50%,0);}}
+.upd-ic{font-size:20px;flex:0 0 auto;}
+.upd-t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:14px;}
+.upd-t small{font-size:12px;color:var(--muted);}
+.upd-go{flex:0 0 auto;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:700;font-size:14px;padding:9px 14px;cursor:pointer;white-space:nowrap;}
+.upd-banner.busy .upd-go{opacity:.6;pointer-events:none;}
+.upd-x{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:14px;cursor:pointer;}
+@media (prefers-reduced-motion:reduce){ .upd-banner{animation:none;} }
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -4185,11 +4194,51 @@ window.addEventListener('popstate', function(){
 // ---- Retour dans l'app : iPhone et Android la gardent en mémoire sans la relancer. Après plus de
 // 2 minutes d'absence, on vérifie s'il existe une nouvelle version, puis on recharge les données
 // affichées — jamais pendant une saisie (champ actif, formulaire ou confirmation ouverts).
-let APP_HIDDEN_AT = 0, APP_RESUMING = false;
+// Si l'app ne peut pas recharger seule (saisie en cours, app restée affichée, retour rapide),
+// un bandeau propose « Mettre à jour » : un toucher recharge, après la fin de l'enregistrement en cours.
+let APP_HIDDEN_AT = 0, APP_RESUMING = false, UPDATE_READY = false, UPDATE_DISMISSED = false, UPDATE_CHECK_AT = 0;
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'hidden'){ APP_HIDDEN_AT = Date.now(); return; }
   if(APP_HIDDEN_AT && Date.now() - APP_HIDDEN_AT > 120000) onAppResume();
+  else checkForUpdate(false);
 });
+// Vérification toutes les 30 minutes tant que l'app est affichée (ex. tablette au terrain).
+setInterval(function(){ if(document.visibilityState === 'visible') checkForUpdate(false); }, 30*60*1000);
+// Renvoie vrai si une version plus récente est en ligne. autoReload : recharger tout de suite si
+// personne n'est en train de saisir ; sinon (ou si autoReload est faux) on montre le bandeau.
+async function checkForUpdate(autoReload){
+  if(UPDATE_READY){ showUpdateBanner(); return true; }
+  if(!autoReload && Date.now() - UPDATE_CHECK_AT < 60000) return false;
+  UPDATE_CHECK_AT = Date.now();
+  try{
+    const cur = document.querySelector('meta[name="app-build"]').content;
+    const html = await fetch(location.pathname + '?_probe=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.text(); });
+    const m = html.match(/<meta name="app-build" content="([^"]+)">/);
+    if(!(m && m[1] && m[1] !== cur)) return false;
+  }catch(e){ return false; } // pas de réseau : on garde la version actuelle
+  UPDATE_READY = true;
+  if(autoReload && !appBusyEditing()){ applyUpdate(); return true; }
+  showUpdateBanner();
+  return true;
+}
+async function applyUpdate(){
+  const b = document.getElementById('updBanner'); if(b) b.classList.add('busy');
+  try{ await SAVE_CHAIN; }catch(e){}
+  location.replace(location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now());
+}
+function dismissUpdateBanner(){
+  UPDATE_DISMISSED = true;
+  const b = document.getElementById('updBanner'); if(b) b.remove();
+}
+function showUpdateBanner(){
+  if(UPDATE_DISMISSED || document.getElementById('updBanner')) return;
+  const b = document.createElement('div');
+  b.id = 'updBanner'; b.className = 'upd-banner'; b.setAttribute('role', 'status');
+  b.innerHTML = '<span class="upd-ic">✨</span><span class="upd-t"><b>Nouvelle version de Dinkeo</b><small>Prête à installer en un toucher.</small></span>'
+    + '<button type="button" class="upd-go" onclick="applyUpdate()">Mettre à jour</button>'
+    + '<button type="button" class="upd-x" aria-label="Plus tard" onclick="dismissUpdateBanner()">✕</button>';
+  document.body.appendChild(b);
+}
 function appBusyEditing(){
   const a = document.activeElement;
   if(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return true;
@@ -4199,17 +4248,9 @@ async function onAppResume(){
   if(APP_RESUMING) return;
   APP_RESUMING = true;
   try{
-    // 1) Nouvelle version publiée : on recharge la page (même logique qu'au lancement).
-    try{
-      const cur = document.querySelector('meta[name="app-build"]').content;
-      const html = await fetch(location.pathname + '?_probe=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.text(); });
-      const m = html.match(/<meta name="app-build" content="([^"]+)">/);
-      if(m && m[1] && m[1] !== cur && !appBusyEditing()){
-        try{ await SAVE_CHAIN; }catch(e){}
-        location.replace(location.pathname + location.search + (location.search ? '&' : '?') + '_v=' + Date.now());
-        return;
-      }
-    }catch(e){ /* pas de réseau : on garde la version actuelle */ }
+    // 1) Nouvelle version publiée : on recharge la page (même logique qu'au lancement),
+    //    ou, si une saisie est en cours, on propose le bandeau « Mettre à jour ».
+    if(await checkForUpdate(true) && !appBusyEditing()) return;
     // 2) Données de la ligue affichée et résumés de l'accueil.
     if(!SESSION_USER || !CURRENT_LEAGUE_ID || appBusyEditing()) return;
     try{ await SAVE_CHAIN; }catch(e){}
