@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 330">
+<meta name="app-build" content="Version 331">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1248,9 +1248,12 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .an-done-s{font-size:14px;color:var(--muted);margin-top:6px;max-width:360px;}
 .hs-row .t small{white-space:normal;}
 .hs-rk{position:relative;}
-.hs-rk.up{background:rgba(207,234,92,.18);color:var(--ball);}
-.hs-rk.down{background:rgba(255,159,10,.18);color:#FF9F0A;}
-.hs-mvt{font-weight:700;} .hs-mvt.up{color:var(--ball);} .hs-mvt.down{color:#FF9F0A;}
+.hs-rk.up{background:rgba(255,214,10,.2);color:#FFD60A;}
+.hs-rk.down{background:rgba(255,107,107,.2);color:#ff8a80;}
+.hs-row.mv{position:relative;}
+.hs-row.mv:before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.hs-row.mv.up{background:rgba(255,214,10,.16);} .hs-row.mv.up:before{background:#FFD60A;}
+.hs-row.mv.down{background:rgba(255,80,80,.2);} .hs-row.mv.down:before{background:#ff6b6b;}
 .hs-rt{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
 .hs-rt b{font-family:var(--font-display);font-size:20px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums;}
 .hs-dp{font-size:13px;font-weight:700;padding:2px 8px;border-radius:999px;font-variant-numeric:tabular-nums;}
@@ -10683,9 +10686,9 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const right = (showRating && typeof delta === 'number')
         ? `<span class="hs-rt">${after !== null ? `<b>${after.toFixed(2)}</b>` : ''}<span class="hs-dp ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span></span>` : '';
       const mvCls = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? ' up' : ' down') : '';
-      body += `<div class="pf-row hs-row${r.playerId===viewerPlayerId?' me':''}" style="cursor:default;">
+      body += `<div class="pf-row hs-row${r.playerId===viewerPlayerId?' me':''}${mvCls ? ' mv' + mvCls : ''}" style="cursor:default;">
         <span class="hs-rk${mvCls}">${i+1}</span>
-        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${mvCls ? `<span class="hs-mvt${mvCls}">${mvCls===' up'?'▲ Monte':'▼ Descend'}</span> · ` : ''}${sub}</small></span>
+        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}</small></span>
         ${right}
       </div>`;
     });
