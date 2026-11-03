@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 333">
+<meta name="app-build" content="Version 334">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1940,14 +1940,14 @@ function notifySessionPublished(session){
     body: isRecLeague()
       ? `${leagueLabel} — soirée du ${fdl(session.date)}. Ton terrain est prêt. Indique dès maintenant si tu es absent(e).`
       : `${leagueLabel} — session du ${fdl(session.date)}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group')
   });
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
     audience: 'substitutes', category: 'league_sessions',
     title: '📅 Nouvelle session publiée',
     body: `${leagueLabel} — une session est prévue le ${fdl(session.date)}. Indique ta disponibilité si tu peux remplacer.`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group')
   });
 }
 // Appelé quand l'admin finalise une session (montées/descentes appliquées) —
@@ -1960,7 +1960,7 @@ function notifySessionResultsPublished(finishedDate, corrected){
     body: corrected
       ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores, classement et cotes sont mis à jour : jette un œil à ta position.`
       : `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} sont disponibles.`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':hist')
   });
 }
 // Appelé quand un admin lie un compte en attente à un joueur d'une ligue —
@@ -1971,7 +1971,7 @@ function notifyAccountApproved(profileId, leagueLabel){
     profile_id: profileId,
     title: '✅ Compte approuvé',
     body: `Ton compte a été approuvé${leagueLabel ? ' pour '+leagueLabel : ''}. Tu peux maintenant accéder à ton espace joueur.`,
-    url: '/'
+    url: goUrl('accueil')
   });
 }
 // Un joueur régulier s'indique absent lui-même — prévient les admins de
@@ -1984,7 +1984,7 @@ function notifyAdminsPlayerAbsent(playerName, sessionDate){
     audience: 'admins', category: 'admin_alerts',
     title: '🚫 Absence signalée',
     body: `${playerName || 'Un joueur'} a indiqué être absent(e) pour la session du ${sessionDate} (${currentLeagueLabel()}).`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':session')
   });
 }
 // Un joueur se déclare blessé lui-même — prévient les admins de cette ligue.
@@ -1995,7 +1995,7 @@ function notifyAdminsPlayerInjured(playerName){
     audience: 'admins', category: 'admin_alerts',
     title: '🤕 Blessure signalée',
     body: `${playerName || 'Un joueur'} s'est déclaré(e) blessé(e) (${currentLeagueLabel()}). Il/elle reste hors ${isRecLeague() ? 'des terrains' : 'de son groupe'} jusqu'à sa réintégration par un admin.`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':joueurs')
   });
 }
 // Un joueur déclare une absence prolongée (plage de dates) lui-même —
@@ -2008,7 +2008,7 @@ function notifyAdminsPlannedAbsence(playerName, startDate, endDate){
     audience: 'admins', category: 'admin_alerts',
     title: '🌴 Absence prolongée signalée',
     body: `${playerName || 'Un joueur'} a indiqué être absent(e) ${range} (${currentLeagueLabel()}).`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':session')
   });
 }
 // Un remplaçant s'indique disponible lui-même — prévient les admins de
@@ -2022,7 +2022,7 @@ function notifyAdminsJoinRequest(leagueId, leagueName, kind){
     audience: 'admins', category: 'admin_alerts',
     title: kind === 'interest' ? '⭐ Nouvel intérêt' : "🙋 Nouvelle demande d'adhésion",
     body: `${who} ${kind === 'interest' ? 'aimerait jouer dans' : 'demande à rejoindre'} ${leagueName || 'ta ligue'}. À traiter dans Organisation › Comptes.`,
-    url: '/'
+    url: goUrl('comptes')
   });
 }
 function notifyAdminsSubAvailable(subName, sessionDate){
@@ -2032,7 +2032,7 @@ function notifyAdminsSubAvailable(subName, sessionDate){
     audience: 'admins', category: 'admin_alerts',
     title: '🙋 Remplaçant disponible',
     body: `${subName || 'Un remplaçant'} a indiqué être disponible pour la session du ${sessionDate} (${currentLeagueLabel()}).`,
-    url: '/'
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':session')
   });
 }
 // Annonce libre écrite par l'admin : à toute l'organisation, à une ligue, ou à des joueurs choisis.
@@ -2172,8 +2172,8 @@ function sendAnnouncement(){
   if(a.kind === 'people' && !a.people.length) return;
   const org = partnerOrgId();
   const payload = a.kind === 'league'
-    ? { league_id: a.league, category:'league_announce', title: annTitle(), body: text, url:'/' }
-    : { organization_id: org, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url:'/' };
+    ? { league_id: a.league, category:'league_announce', title: annTitle(), body: text, url: goUrl('league:' + a.league + ':group') }
+    : { organization_id: org, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('accueil') };
   a.sending = true; render();
   sb.functions.invoke('send-session-notification', { body: payload }).then(function(r){
     a.sending = false;
@@ -3807,7 +3807,7 @@ function notifySocialRedraw(session){
   invokeSendNotification({ league_id: CURRENT_LEAGUE_ID, audience:'players', category:'league_sessions',
     title: '🎲 Terrains refaits',
     body: `${currentLeagueLabel()} — soirée du ${fdl(session.date)} : les terrains ont été refaits à la suite d'une absence. Vérifie ton terrain.`,
-    url: '/' });
+    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group') });
 }
 // Absence déclarée par le joueur lui-même : le serveur l'enregistre sans toucher aux terrains.
 // Son application calcule la mise à jour et l'envoie (social_apply_draw vérifie qu'elle est valable).
@@ -4115,7 +4115,7 @@ async function notifySubPlaced(enc, groupName, replacedName){
     const when = open ? fdl(open.date) : 'la prochaine session';
     profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: CURRENT_LEAGUE_ID, category:'league_sessions',
       title: '🎾 Tu joues ' + (open ? 'le ' + when : 'bientôt') + ' !',
-      body: (replacedName ? 'Tu remplaces ' + replacedName : 'Tu viens en renfort') + (groupName ? ' dans le ' + groupName : '') + ' (' + currentLeagueLabel() + ').', url:'/' }));
+      body: (replacedName ? 'Tu remplaces ' + replacedName : 'Tu viens en renfort') + (groupName ? ' dans le ' + groupName : '') + ' (' + currentLeagueLabel() + ').', url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group') }));
   }catch(e){ console.error(e); }
 }
 
@@ -4393,6 +4393,7 @@ function render(){
 }
 function renderInner(){
   applyModernNavClass();
+  if(PENDING_GO && !GO_RUNNING && SESSION_USER && SESSION_USER.role !== 'pending' && CURRENT_PROFILE) setTimeout(applyPendingGo, 250);
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
   if(!INSTALL_PROMPT_SCHEDULED && SESSION_USER && SESSION_USER.role !== 'pending'){ INSTALL_PROMPT_SCHEDULED = true; setTimeout(maybeShowInstallPrompt, 4000); }
   ensurePushStatusChecked();
@@ -4812,14 +4813,47 @@ function notifSettingsHTML(){
     <div class="row" style="gap:8px;align-items:center;margin-top:8px;"><span class="small">De</span>${hours(p.quiet_start == null ? 22 : p.quiet_start,'quiet_start')}<span class="small">à</span>${hours(p.quiet_end == null ? 7 : p.quiet_end,'quiet_end')}</div>
 `;
 }
-// ---- Ouverture directe depuis une notification (?go=partenaire ou evenements) ----
-let PENDING_GO = null;
+// ---- Ouverture directe depuis une notification : ?go=<destination> ----
+// league:<id>:group|hist|stats|session|joueurs · partenaire[:<annonce>] · evenements[:<événement>] · comptes · accueil
+let PENDING_GO = null, GO_RUNNING = false;
+function goUrl(go){ return '/?go=' + encodeURIComponent(go); }
 function handleGo(go){ PENDING_GO = go; applyPendingGo(); }
-function applyPendingGo(){
-  if(!PENDING_GO || !SESSION_USER || !DATA || !CURRENT_PROFILE) return;
-  const go = PENDING_GO;
-  PENDING_GO = null;
-  if(go==='partenaire' || go==='evenements') openQuickView(go);
+async function applyPendingGo(){
+  if(!PENDING_GO || GO_RUNNING || !SESSION_USER || SESSION_USER.role === 'pending' || !CURRENT_PROFILE || !DATA) return;
+  const go = String(PENDING_GO); PENDING_GO = null; GO_RUNNING = true;
+  const parts = go.split(':'), k = parts[0], id = parts[1] || null;
+  const asAdmin = SESSION_USER.role === 'admin' && !(ADMIN_VIEWING_AS === 'player' || ADMIN_VIEWING_AS === 'substitute');
+  try{
+    if(k === 'partenaire' || k === 'evenements'){
+      MODAL = null; MODAL_UNDER = null;
+      openQuickView(k);
+      if(id && k === 'partenaire'){
+        if(!(PARTNER_POSTS||[]).some(p=>p.id===id)) await loadPartnerPosts(CURRENT_LEAGUE_ID);
+        if((PARTNER_POSTS||[]).some(p=>p.id===id)) openPartnerPostDetail(id);
+      } else if(id && k === 'evenements'){
+        if(!(SOCIAL_EVENTS||[]).some(e=>e.id===id) && typeof loadSocialEvents === 'function') await loadSocialEvents();
+        if((SOCIAL_EVENTS||[]).some(e=>e.id===id)) openEventDetail(id);
+      }
+    } else if(k === 'league' && id && LEAGUES.some(l=>l.id===id)){
+      const sec = parts[2] || 'group';
+      MODAL = null; MODAL_UNDER = null;
+      if(asAdmin){
+        const tab = { group:'session', session:'session', hist:'historique', joueurs:'joueurs', stats:'rapports' }[sec] || 'session';
+        await openAdminLeague(id, tab);
+      } else if((MY_LEAGUE_LINKS||[]).some(l=>l.league_id===id)){
+        await openMyLeague(id);
+        if(sec === 'hist' || sec === 'stats'){ VIEW.pdet = sec; render(); }
+      }
+    } else if(k === 'comptes' && asAdmin){
+      MODAL = null; MODAL_UNDER = null;
+      openOrgSheet('comptes');
+    } else if(k === 'accueil'){
+      MODAL = null; MODAL_UNDER = null;
+      if(asAdmin){ VIEW = { atab:'accueil' }; } else { VIEW = { ptab:'accueil' }; }
+      render();
+    }
+  }catch(e){ console.error('Ouverture depuis la notification', e); }
+  GO_RUNNING = false;
 }
 try{
   const goParam = new URLSearchParams(location.search).get('go');
