@@ -10,11 +10,25 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 320">
+<meta name="app-build" content="Version 321">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"></noscript>
+<script>
+// Lien d'un courriel (« ?token_hash=…&type=… ») : on retire le jeton de l'adresse TOUT DE SUITE et on le
+// garde pour cet onglet. Sinon, en installant l'app juste après, l'icône pouvait garder ce jeton (à usage
+// unique) dans son adresse, et chaque ouverture affichait « lien expiré ».
+(function(){
+  try{
+    var q = new URLSearchParams(location.search), th = q.get('token_hash'), tt = q.get('type');
+    if(th && tt){ sessionStorage.setItem('dinkeo_otp', JSON.stringify({ th: th, tt: tt })); q.delete('token_hash'); q.delete('type'); }
+    if(q.has('_v')) q.delete('_v');
+    var rest = q.toString(), clean = location.pathname + (rest ? '?' + rest : '') + location.hash;
+    if(clean !== location.pathname + location.search + location.hash) history.replaceState(null, '', clean);
+  }catch(e){}
+})();
+</script>
 <script>
 // iOS garde parfois un "instantané" figé de la page pour une app ajoutée à
 // l'écran d'accueil, sans jamais refaire de vraie requête réseau au
@@ -5033,7 +5047,16 @@ async function onResetPassword(){
   render();
 }
 async function onAuthResolved(user){
-  if(!user){ SESSION_USER = null; CURRENT_PROFILE = null; render(); if(PENDING_CODE && !MODAL) openLoginModal('signup'); return; }
+  if(!user){
+    SESSION_USER = null; CURRENT_PROFILE = null; render();
+    if(PENDING_CODE && !MODAL) openLoginModal('signup');
+    else if(isRunningStandalone() && !MODAL && !PASSWORD_RECOVERY_MODE){
+      // L'app installée ne partage pas la connexion du navigateur (iPhone surtout) : on l'explique.
+      VIEW.info = "Bienvenue dans l'app Dinkeo ! Connecte-toi une première fois ici : l'app installée garde sa propre connexion, séparée de ton navigateur.";
+      openLoginModal('signin');
+    }
+    return;
+  }
 
   let { data: profile, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
   // Code d'invitation gardé dans le compte à l'inscription : retrouvé même si le lien de
@@ -12501,22 +12524,44 @@ async function boot(){
   // dinkeo.ca plutôt que vers supabase.co. On valide le jeton ici, ce qui ouvre la session.
   let linkError = null;
   try{
-    const qs = new URLSearchParams(window.location.search);
-    const th = qs.get('token_hash'), tt = qs.get('type');
-    if(th && tt){
+    let otp = null;
+    try{ otp = JSON.parse(sessionStorage.getItem('dinkeo_otp') || 'null'); sessionStorage.removeItem('dinkeo_otp'); }catch(e){}
+    if(!otp){ // repli : jeton encore dans l'adresse
+      const qs = new URLSearchParams(window.location.search);
+      if(qs.get('token_hash') && qs.get('type')) otp = { th: qs.get('token_hash'), tt: qs.get('type') };
       try{ window.history.replaceState(null, '', window.location.pathname + window.location.hash); }catch(e){}
-      const { error } = await sb.auth.verifyOtp({ token_hash: th, type: tt });
-      if(error) linkError = "Ce lien est expiré ou a déjà été utilisé. Connecte-toi, ou redemande un nouveau lien.";
-      else if(tt === 'recovery') PASSWORD_RECOVERY_MODE = true;
+    }
+    if(otp && otp.th && otp.tt){
+      let used = [];
+      try{ used = JSON.parse(localStorage.getItem('dinkeo_used_links') || '[]') || []; }catch(e){}
+      const cur = (await sb.auth.getSession()).data.session;
+      // Lien déjà utilisé sur cet appareil, ou personne déjà connectée : on l'ignore sans message
+      // (sauf un lien « nouveau mot de passe », qui doit toujours ouvrir l'écran prévu).
+      const skip = otp.tt !== 'recovery' && ((cur && cur.user) || used.indexOf(otp.th) !== -1);
+      if(!skip){
+        const { error } = await sb.auth.verifyOtp({ token_hash: otp.th, type: otp.tt });
+        try{ used.push(otp.th); localStorage.setItem('dinkeo_used_links', JSON.stringify(used.slice(-10))); }catch(e){}
+        const after = (await sb.auth.getSession()).data.session;
+        if(error && !(after && after.user)) linkError = otp.tt === 'recovery'
+          ? "Ce lien pour changer ton mot de passe est expiré ou a déjà servi. Redemande un nouveau lien depuis « Mot de passe oublié »."
+          : "Ce lien a déjà servi ou est expiré. Pas de souci : connecte-toi avec ton courriel et ton mot de passe.";
+        else if(!error && otp.tt === 'recovery') PASSWORD_RECOVERY_MODE = true;
+      }
     }
   }catch(e){ console.error('lien du courriel', e); }
-  if(linkError) setTimeout(function(){ showAlert(linkError); }, 400);
   const { data: { session } } = await sb.auth.getSession();
+  const appWelcome = !(session && session.user) && isRunningStandalone() && !PASSWORD_RECOVERY_MODE && !PENDING_CODE;
+  if(linkError && !appWelcome) setTimeout(function(){ showAlert(linkError); }, 400);
   if(PASSWORD_RECOVERY_MODE){ render(); return; } // déjà intercepté par l'événement ci-dessus
   if(session && session.user){
     await onAuthResolved(session.user);
   } else {
     render();
+    if(appWelcome && !MODAL){
+      // App installée pas encore connectée : on ouvre la connexion avec une explication (et le message du lien, s'il y en a un).
+      VIEW.info = (linkError ? linkError + ' ' : '') + "L'app installée garde sa propre connexion, séparée de ton navigateur : connecte-toi une première fois ici.";
+      openLoginModal('signin');
+    }
   }
 }
 boot();
