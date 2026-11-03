@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 325">
+<meta name="app-build" content="Version 326">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1192,6 +1192,21 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .upd-banner.busy .upd-go{opacity:.6;pointer-events:none;}
 .upd-x{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--muted);font-size:14px;cursor:pointer;}
 @media (prefers-reduced-motion:reduce){ .upd-banner{animation:none;} }
+.pc-aud{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+.pc-aud-l{font-size:13px;color:var(--muted);font-weight:600;}
+.pc-aud-sw{margin:0;padding:0;flex-wrap:wrap;overflow:visible;}
+.pc-aud-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.pc-aud-seg button{padding:8px 4px;font-size:13px;text-align:center;}
+.pc-aud-note{font-size:12px;color:var(--muted);}
+.pc-people{display:flex;flex-wrap:wrap;gap:6px;}
+.pc-person{display:inline-flex;align-items:center;gap:6px;background:rgba(207,234,92,.14);color:var(--ball);border-radius:999px;padding:6px 6px 6px 12px;font-size:14px;font-weight:600;}
+.pc-person button{border:0;background:rgba(0,0,0,.25);color:var(--text);width:22px;height:22px;border-radius:50%;font-size:11px;cursor:pointer;}
+.pc-person-add{border:1px dashed var(--line-soft-strong);background:transparent;color:var(--text);border-radius:999px;padding:6px 12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;}
+.pc-aud-tag{font-size:12px;font-weight:700;color:var(--muted);margin:2px 0 4px;}
+.pp-search{width:100%;margin-bottom:10px;}
+.pp-list{max-height:50vh;overflow-y:auto;}
+.pp-row{cursor:pointer;}
+.pp-chk{width:22px;height:22px;flex:0 0 auto;accent-color:var(--ball);}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -2068,10 +2083,18 @@ function sheetModalHTML(){
 // table dédiée `partner_posts`. "interested" est une liste jsonb de
 // {profile_id, name} plutôt qu'une table séparée, vu le petit volume attendu
 // et pour garder la lecture/écriture en une seule requête. ----
+// Les annonces appartiennent à l'ORGANISATION de la ligue affichée ; Supabase ne renvoie que
+// celles que la personne a le droit de voir (toute l'organisation, sa ligue, ou ciblées vers elle).
+function partnerOrgId(leagueId){
+  const lg = LEAGUES.find(l=>l.id===(leagueId || CURRENT_LEAGUE_ID));
+  return (lg && lg.organization_id) || CURRENT_ORGANIZATION_ID || null;
+}
 async function loadPartnerPosts(leagueId){
-  if(!leagueId){ PARTNER_POSTS = []; return; }
-  await cleanupExpiredPartnerPosts(leagueId);
-  const { data, error } = await sb.from('partner_posts').select('*').eq('league_id', leagueId).order('created_at', { ascending:false }).limit(100);
+  const org = partnerOrgId(leagueId);
+  if(!org){ PARTNER_POSTS = []; return; }
+  await cleanupExpiredPartnerPosts(org);
+  let { data, error } = await sb.from('partner_posts').select('*').eq('organization_id', org).order('created_at', { ascending:false }).limit(100);
+  if(error && leagueId) ({ data, error } = await sb.from('partner_posts').select('*').eq('league_id', leagueId).order('created_at', { ascending:false }).limit(100));
   PARTNER_POSTS = error ? [] : (data || []);
 }
 // Supprime automatiquement les annonces "comblées" depuis plus de 24h. L'appli
@@ -2080,10 +2103,92 @@ async function loadPartnerPosts(leagueId){
 // annonce, etc.), ce qui suffit en pratique puisque quelqu'un consulte
 // généralement le babillard bien avant/après l'échéance des 24h — et le
 // temps réel propage la suppression aux autres personnes déjà sur l'écran.
-async function cleanupExpiredPartnerPosts(leagueId){
-  if(!leagueId) return;
+async function cleanupExpiredPartnerPosts(orgId){
+  if(!orgId) return;
   const cutoff = new Date(Date.now() - 24*60*60*1000).toISOString();
-  await sb.from('partner_posts').delete().eq('league_id', leagueId).eq('status', 'closed').lt('closed_at', cutoff);
+  await sb.from('partner_posts').delete().eq('organization_id', orgId).eq('status', 'closed').lt('closed_at', cutoff);
+}
+// ---- Public d'une annonce : toute l'organisation, une ligue, ou des joueurs choisis ----
+let PARTNER_AUD = { kind:'org', league:null, people:[] };
+let PARTNER_DRAFT = { message:'', date:'', time:'' };
+let ORG_PEOPLE = {}; // { [orgId]: [{ id, name, avatar_url }] } — personnes de l'organisation qu'on peut viser
+function partnerLeagueChoices(){
+  const org = partnerOrgId();
+  const ids = (SESSION_USER && SESSION_USER.role === 'admin')
+    ? LEAGUES.filter(l=>l.organization_id===org).map(l=>l.id)
+    : (MY_LEAGUE_LINKS||[]).map(l=>l.league_id).filter(function(id){ const lg = LEAGUES.find(x=>x.id===id); return lg && lg.organization_id===org; });
+  const seen = {};
+  return ids.filter(function(id){ if(seen[id]) return false; seen[id] = true; return true; }).map(id=>LEAGUES.find(l=>l.id===id)).filter(Boolean);
+}
+async function loadOrgPeople(force){
+  const org = partnerOrgId(); if(!org) return [];
+  if(ORG_PEOPLE[org] && !force) return ORG_PEOPLE[org];
+  const { data, error } = await sb.rpc('org_people', { p_org: org });
+  ORG_PEOPLE[org] = (!error && Array.isArray(data)) ? data.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name), 'fr')) : [];
+  return ORG_PEOPLE[org];
+}
+function orgPersonName(id){
+  const list = ORG_PEOPLE[partnerOrgId()] || [];
+  const x = list.find(p=>p.id===id); return x ? x.name : null;
+}
+function savePartnerDraft(){
+  const g = id=>{ const el = document.getElementById(id); return el ? el.value : ''; };
+  PARTNER_DRAFT = { message:g('partnerMessageInput'), date:g('partnerDateInput'), time:g('partnerTimeInput') };
+}
+function setPartnerAudience(k){
+  savePartnerDraft();
+  PARTNER_AUD.kind = k;
+  if(k === 'league' && !PARTNER_AUD.league){ const ch = partnerLeagueChoices(); const cur = ch.find(l=>l.id===CURRENT_LEAGUE_ID) || ch[0]; PARTNER_AUD.league = cur ? cur.id : null; }
+  if(k === 'people'){ loadOrgPeople().then(function(){ render(); }); if(!PARTNER_AUD.people.length){ render(); openPartnerPeoplePicker(); return; } }
+  render();
+}
+function setPartnerLeague(id){ savePartnerDraft(); PARTNER_AUD.league = id; render(); }
+function removePartnerPerson(id){ savePartnerDraft(); PARTNER_AUD.people = PARTNER_AUD.people.filter(x=>x!==id); render(); }
+async function openPartnerPeoplePicker(){
+  savePartnerDraft();
+  const list = await loadOrgPeople();
+  const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
+  showContentModal('Pour qui ?', `
+    <input type="search" class="pp-search" placeholder="Rechercher un nom…" oninput="filterPartnerPeople(this.value)" autocomplete="off">
+    ${list.length ? `<div class="pf-list pp-list" id="ppList">${list.map(p=>`<label class="pf-row pp-row" data-n="${escapeHTML(String(p.name||'').toLowerCase())}">
+      <span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}</span>
+      <input type="checkbox" class="pp-chk" ${PARTNER_AUD.people.indexOf(p.id)!==-1?'checked':''} onchange="togglePartnerPerson('${p.id}', this.checked)"></label>`).join('')}</div>`
+      : `<p class="empty">Personne d'autre n'a encore de compte dans cette organisation.</p>`}
+    <button class="btn btn-primary" style="width:100%;margin-top:14px;" onclick="closeModal()">OK</button>`);
+}
+function filterPartnerPeople(q){
+  q = String(q||'').toLowerCase().trim();
+  document.querySelectorAll('#ppList .pp-row').forEach(function(r){ r.style.display = (!q || r.getAttribute('data-n').indexOf(q) !== -1) ? '' : 'none'; });
+}
+function togglePartnerPerson(id, on){
+  const i = PARTNER_AUD.people.indexOf(id);
+  if(on && i === -1) PARTNER_AUD.people.push(id);
+  if(!on && i !== -1) PARTNER_AUD.people.splice(i, 1);
+}
+function partnerAudienceHTML(){
+  const a = PARTNER_AUD, leagues = partnerLeagueChoices();
+  const seg = [['org','Organisation'],['league','Une ligue'],['people','Des joueurs']];
+  let h = `<div class="pc-aud"><span class="pc-aud-l">Pour qui ?</span><div class="ah-switch pc-aud-sw pc-aud-seg">${seg.map(([k,l])=>`<button type="button" class="${a.kind===k?'on':''}" onclick="setPartnerAudience('${k}')">${l}</button>`).join('')}</div>`;
+  if(a.kind === 'org') h += `<div class="pc-aud-note">Visible par tous les membres de l'organisation.</div>`;
+  if(a.kind === 'league'){
+    h += leagues.length ? `<div class="ah-switch pc-aud-sw">${leagues.map(l=>`<button type="button" class="${a.league===l.id?'on':''}" onclick="setPartnerLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div><div class="pc-aud-note">Visible seulement par les membres de cette ligue.</div>`
+      : `<div class="pc-aud-note">Aucune ligue disponible.</div>`;
+  }
+  if(a.kind === 'people'){
+    h += `<div class="pc-people">${a.people.map(id=>`<span class="pc-person">${escapeHTML(orgPersonName(id) || '…')}<button type="button" aria-label="Retirer" onclick="removePartnerPerson('${id}')">✕</button></span>`).join('')}<button type="button" class="pc-person-add" onclick="openPartnerPeoplePicker()">${a.people.length ? '+ Ajouter' : '+ Choisir des joueurs'}</button></div><div class="pc-aud-note">Seules ces personnes verront l'annonce et seront averties.</div>`;
+  }
+  return h + `</div>`;
+}
+function partnerAudienceTag(p){
+  const aud = p.audience || (p.league_id ? 'league' : 'org');
+  if(aud === 'league'){ const lg = LEAGUES.find(l=>l.id===p.league_id); return '🏓 ' + (lg ? lg.name : 'Ligue'); }
+  if(aud === 'people'){
+    const t = Array.isArray(p.target_profiles) ? p.target_profiles : [];
+    const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
+    if(mine){ const names = t.map(orgPersonName).filter(Boolean); return '👥 Pour ' + (names.length ? names.slice(0,3).join(', ') + (names.length>3 ? ' +' + (names.length-3) : '') : t.length + ' joueur' + (t.length>1?'s':'')); }
+    return t.length > 1 ? '👥 Pour toi et ' + (t.length-1) + ' autre' + (t.length>2?'s':'') : '👥 Pour toi';
+  }
+  return '🏢 Toute l\'organisation';
 }
 function partnerStatus(msg, kind){
   const el = document.getElementById('partnerStatus');
@@ -2100,11 +2205,15 @@ async function createPartnerPost(btn){
   const message = msgEl ? msgEl.value.trim() : '';
   if(!message){ partnerStatus("Écris d'abord ton annonce.", 'err'); if(msgEl) msgEl.focus(); return; }
   if(!CURRENT_PROFILE){ partnerStatus("Connexion requise pour publier.", 'err'); return; }
-  if(!CURRENT_LEAGUE_ID){ partnerStatus("Aucune ligue sélectionnée.", 'err'); return; }
+  const org = partnerOrgId();
+  if(!org){ partnerStatus("Aucune organisation sélectionnée.", 'err'); return; }
+  const aud = PARTNER_AUD.kind;
+  if(aud === 'league' && !PARTNER_AUD.league){ partnerStatus("Choisis la ligue.", 'err'); return; }
+  if(aud === 'people' && !PARTNER_AUD.people.length){ partnerStatus("Choisis au moins un joueur.", 'err'); return; }
   const author_name = myDisplayName();
   const play_date = (dateEl && dateEl.value) ? dateEl.value : null;
   const play_time = (play_date && timeEl && timeEl.value) ? timeEl.value : null;
-  const row = { league_id: CURRENT_LEAGUE_ID, profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date };
+  const row = { organization_id: org, audience: aud, league_id: aud === 'league' ? PARTNER_AUD.league : null, target_profiles: aud === 'people' ? PARTNER_AUD.people.slice() : [], profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date };
   if(play_time) row.play_time = play_time;
   PARTNER_BUSY = true;
   if(btn){ btn.disabled = true; btn.textContent = 'Publication…'; }
@@ -2126,6 +2235,8 @@ async function createPartnerPost(btn){
   }
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   PARTNER_FLASH = true;
+  PARTNER_DRAFT = { message:'', date:'', time:'' };
+  PARTNER_AUD.people = [];
   render();
 }
 let PARTNER_FLASH = false;
@@ -2164,19 +2275,25 @@ function deletePartnerPost(id){
 }
 function partnerBoardHTML(){
   const today = fmtDate(new Date());
+  // Noms des personnes visées par MES annonces ciblées : chargés une fois, puis seule la liste est rafraîchie.
+  const porg = partnerOrgId();
+  if(porg && !ORG_PEOPLE[porg] && (PARTNER_POSTS||[]).some(x=>x.audience==='people' && CURRENT_PROFILE && x.profile_id===CURRENT_PROFILE.id)){
+    loadOrgPeople().then(function(){ const c = document.getElementById('partnerPostsList'); if(c) c.innerHTML = partnerPostsListHTML(); });
+  }
   const flash = PARTNER_FLASH; PARTNER_FLASH = false;
   return `
     <div class="compose-box pc">
       <div class="pc-title">Nouvelle annonce</div>
-      <textarea id="partnerMessageInput" rows="3" maxlength="300" placeholder="Ex. : Cherche un partenaire samedi matin, niveau intermédiaire."></textarea>
+      <textarea id="partnerMessageInput" rows="3" maxlength="300" oninput="savePartnerDraft()" placeholder="Ex. : Cherche un partenaire samedi matin, niveau intermédiaire.">${escapeHTML(PARTNER_DRAFT.message)}</textarea>
       <div class="pc-row">
-        <label class="pc-field"><span>📅 Date</span><input type="date" id="partnerDateInput" min="${today}"></label>
-        <label class="pc-field"><span>🕖 Heure</span><input type="time" id="partnerTimeInput"></label>
+        <label class="pc-field"><span>📅 Date</span><input type="date" id="partnerDateInput" min="${today}" onchange="savePartnerDraft()" value="${escapeHTML(PARTNER_DRAFT.date)}"></label>
+        <label class="pc-field"><span>🕖 Heure</span><input type="time" id="partnerTimeInput" onchange="savePartnerDraft()" value="${escapeHTML(PARTNER_DRAFT.time)}"></label>
       </div>
+      ${partnerAudienceHTML()}
       <button class="btn btn-primary pc-send" onclick="createPartnerPost(this)">Publier</button>
       <div id="partnerStatus" class="pc-status${flash?' show ok':''}">${flash?'✅ Annonce publiée.':''}</div>
     </div>
-    <div class="pc-sec">Annonces de la ligue</div>
+    <div class="pc-sec">Annonces</div>
     <div id="partnerPostsList" class="pc-list">
       ${partnerPostsListHTML()}
     </div>`;
@@ -2221,6 +2338,7 @@ function partnerPostsListHTML(){
         <div class="pc-who"><div class="pc-name">${escapeHTML(p.author_name)}${mine?' <span class="small">(toi)</span>':''}</div><div class="small">${partnerRelTime(p.created_at)}</div></div>
         <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
       </div>
+      <div class="pc-aud-tag">${escapeHTML(partnerAudienceTag(p))}</div>
       ${when}
       <div class="pc-msg">${escapeHTML(p.message)}</div>
       ${(act||cnt) ? `<div class="pc-foot">${act}${cnt}</div>` : ''}
@@ -2255,6 +2373,7 @@ function partnerPostDetailInnerHTML(id){
       </div>
       <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
     </div>
+    <div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>
     ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
     ${interested.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
@@ -2293,9 +2412,10 @@ function teardownRealtimeChannels(){
 }
 function setupRealtimeChannels(){
   teardownRealtimeChannels();
-  if(CURRENT_LEAGUE_ID){
-    PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${CURRENT_LEAGUE_ID}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`league_id=eq.${CURRENT_LEAGUE_ID}` }, () => onPartnerRealtimeChange())
+  const porg = partnerOrgId();
+  if(porg){
+    PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${porg}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`organization_id=eq.${porg}` }, () => onPartnerRealtimeChange())
       .subscribe();
   }
   loadNotifPrefs();
