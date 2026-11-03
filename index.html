@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 337">
+<meta name="app-build" content="Version 338">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -12829,14 +12829,14 @@ function playerStatsTabHTML(me){
   if(st.presStreak >= 2) facts.push(['✅', st.presStreak + ' sessions de suite', 'Présent(e) sans manquer']);
   html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Mon jeu en chiffres</div><div class="pf-list">${facts.map(f=>`<div class="pf-row" style="cursor:default;"><span class="ic">${f[0]}</span><span class="t">${escapeHTML(f[1])}<small>${escapeHTML(f[2])}</small></span></div>`).join('')}</div></div>`;
 
-  const partners = st.partners.slice().sort((a,b)=>b.rate-a.rate || b.w-a.w).slice(0,3);
+  const ally = st.partners.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.w-a.w)[0];
   const opp = st.opponents.slice();
   const target = opp.filter(o=>o.rate>0.5).sort((a,b)=>b.rate-a.rate || b.w-a.w)[0];
   const nemesis = opp.filter(o=>o.rate<0.5).sort((a,b)=>a.rate-b.rate || b.l-a.l)[0];
   const pRow = (ic, id, sub, o)=> `<div class="pf-row" style="cursor:default;"><span class="ic">${ic}</span><span class="t">${escapeHTML(playerName(id))}<small>${escapeHTML(sub)}</small></span><span class="st-wl">${o.w}-${o.l}</span></div>`;
-  if(partners.length || target || nemesis){
+  if(ally || target || nemesis){
     html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Partenaires et adversaires</div><div class="pf-list">
-      ${partners.map((p,i)=>pRow(i===0 && p.rate>0.5 ? '🤝' : '👥', p.id, i===0 && p.rate>0.5 ? 'Ton meilleur allié' : 'En équipe', p)).join('')}
+      ${ally ? pRow('🤝', ally.id, 'Ton meilleur allié', ally) : ''}
       ${target ? pRow('🎯', target.id, 'Contre qui tu gagnes le plus', target) : ''}
       ${nemesis ? pRow('😤', nemesis.id, 'Ta bête noire', nemesis) : ''}
     </div><div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Victoires-défaites, à partir de 2 matchs ensemble ou l'un contre l'autre.</div></div>`;
