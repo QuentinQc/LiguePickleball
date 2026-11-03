@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 331">
+<meta name="app-build" content="Version 332">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1132,7 +1132,7 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .hs-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
 .hs-g{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 2px 0;}
 .hs-rk{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:14px;flex:0 0 auto;}
-.hs-row.me{background:rgba(207,234,92,.08);}
+
 .hs-mv{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto;}
 .hs-mv.up{background:rgba(207,234,92,.16);color:var(--ball);} .hs-mv.down{background:rgba(255,159,10,.18);color:#FF9F0A;}
 .hs-d{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;} .hs-d.p{color:var(--ball);} .hs-d.n{color:#ff6b6b;}
@@ -10680,13 +10680,13 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const played = r.played || 0, scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
-      const tags = (isGuest ? ' <span class="rs-tag">invité</span>' : '') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '') + (r.playerId===viewerPlayerId ? ' <span class="rs-tag me">toi</span>' : '');
+      const tags = (isGuest ? ' <span class="rs-tag">invité</span>' : '') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '');
       const sub = `${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}${incomplete ? ` · <span style="color:var(--paddle);">${played}/${scheduled} joués</span>` : ''}`;
       const after = (showRating && typeof delta === 'number') ? ratingAfterSession(r.playerId, s) : null;
       const right = (showRating && typeof delta === 'number')
         ? `<span class="hs-rt">${after !== null ? `<b>${after.toFixed(2)}</b>` : ''}<span class="hs-dp ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span></span>` : '';
       const mvCls = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? ' up' : ' down') : '';
-      body += `<div class="pf-row hs-row${r.playerId===viewerPlayerId?' me':''}${mvCls ? ' mv' + mvCls : ''}" style="cursor:default;">
+      body += `<div class="pf-row hs-row${mvCls ? ' mv' + mvCls : ''}" style="cursor:default;">
         <span class="hs-rk${mvCls}">${i+1}</span>
         <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}</small></span>
         ${right}
