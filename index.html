@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 319">
+<meta name="app-build" content="Version 320">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -82,47 +82,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Pickleball">
+<meta name="apple-mobile-web-app-title" content="Dinkeo">
 <meta name="theme-color" content="#0C2622">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="icon" type="image/png" href="assets/icon-180.png">
 <title>Ligue de Pickleball</title>
-<script>
-// Génère un manifeste PWA (Progressive Web App) à la volée à partir de l'icône
-// du site (assets/), pour que l'ajout à l'écran d'accueil (Android/Chrome) lance
-// l'app en mode "standalone" (plein écran, sans barre d'adresse). Sur iOS,
-// c'est surtout la balise apple-mobile-web-app-capable ci-dessus qui compte —
-// mais un lien "Ajouter à l'écran d'accueil" existant doit être retiré puis
-// ré-ajouté pour prendre en compte ce changement (iOS fige le mode au moment
-// de l'ajout, pas dynamiquement).
-(function(){
-  try{
-    var iconLink = document.querySelector('link[rel="apple-touch-icon"]');
-    var icon = iconLink ? new URL(iconLink.getAttribute('href'), location.href).href : ''; // adresse complète : le manifeste est un blob
-    var manifest = {
-      name: "Dinkeo — Ligue de Pickleball",
-      short_name: "Dinkeo",
-      description: "Gestion de ligue de pickleball format échelle, double.",
-      start_url: ".",
-      scope: ".",
-      display: "standalone",
-      orientation: "portrait",
-      background_color: "#0F3B3F",
-      theme_color: "#0F3B3F",
-      icons: icon ? [
-        { src: icon, sizes: "180x180", type: "image/png", purpose: "any" },
-        { src: icon, sizes: "180x180", type: "image/png", purpose: "maskable" }
-      ] : []
-    };
-    var blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = url;
-    document.head.appendChild(link);
-  }catch(e){ /* pas bloquant si indisponible */ }
-})();
-</script>
+<link rel="manifest" href="manifest.webmanifest">
 <style>
 :root{
   --court: #0C2622;
@@ -1210,6 +1175,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .au-card{max-width:440px;margin:24px auto;}
 .rf-card{margin-top:10px;padding:12px 14px;border-radius:16px;background:rgba(207,234,92,.08);border:1px solid rgba(207,234,92,.3);}
 .rf-t{font-weight:700;}
+.in-why{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;}
+.in-why span{font-size:13px;font-weight:600;background:rgba(255,255,255,.07);border-radius:999px;padding:6px 10px;}
+.in-step{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);margin-bottom:8px;font-size:15px;line-height:1.4;}
+.in-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--ball);color:var(--court);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.in-ic{display:inline-block;padding:0 4px;border-radius:6px;background:rgba(255,255,255,.08);}
 .pf-bio{font-size:14px;color:var(--muted);margin:0 2px 14px;line-height:1.5;}
 .pf-sec{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin:16px 2px 8px;}
 .pf-seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.25);border-radius:14px;padding:4px;gap:4px;}
@@ -4052,6 +4022,7 @@ function render(){
 function renderInner(){
   applyModernNavClass();
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
+  if(!INSTALL_PROMPT_SCHEDULED && SESSION_USER && SESSION_USER.role !== 'pending'){ INSTALL_PROMPT_SCHEDULED = true; setTimeout(maybeShowInstallPrompt, 4000); }
   ensurePushStatusChecked();
   if(PASSWORD_RECOVERY_MODE){ renderSetNewPassword(); }
   else if(!SESSION_USER){ renderLogin(); }
@@ -4301,6 +4272,74 @@ function quickUnread(){
 }
 
 // Pop-up d'ouverture : nouveautés (événements / recherches de partenaire) non consultées depuis la dernière ouverture.
+// ---------- Installer l'app sur l'écran d'accueil ----------
+// Android / Chrome / Edge : le navigateur propose son propre bouton « Installer » (beforeinstallprompt).
+// iPhone / iPad : pas de bouton possible, on explique les 3 étapes de Safari.
+let DEFERRED_INSTALL = null, INSTALL_PROMPT_SCHEDULED = false;
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRED_INSTALL = e; });
+window.addEventListener('appinstalled', function(){ DEFERRED_INSTALL = null; installPromptState({ installed: true }); if(MODAL && MODAL.install) closeModal(); });
+try{ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){}); }catch(e){}
+function installPromptState(patch){
+  let st = {};
+  try{ st = JSON.parse(localStorage.getItem('dinkeo_install') || '{}') || {}; }catch(e){}
+  if(patch){ st = Object.assign(st, patch); try{ localStorage.setItem('dinkeo_install', JSON.stringify(st)); }catch(e){} }
+  return st;
+}
+function installPlatform(){
+  const ua = navigator.userAgent || '';
+  if(isRunningStandalone()) return 'installed';
+  const ios = isIOSDevice();
+  if(/FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|MicroMessenger|GSA\/|; wv\)/.test(ua) || (ios && !/Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua))) return 'inapp';
+  if(ios) return 'ios';
+  if(/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+function maybeShowInstallPrompt(){
+  if(!SESSION_USER || SESSION_USER.role === 'pending' || MODAL) return;
+  const plat = installPlatform();
+  if(plat === 'installed' || (plat === 'desktop' && !DEFERRED_INSTALL)) return; // ordinateur : seulement si le navigateur sait installer
+  const st = installPromptState();
+  if(st.installed || (st.n || 0) >= 3 || (st.at && Date.now() - st.at < 3*24*3600*1000)) return;
+  installPromptState({ n: (st.n || 0) + 1, at: Date.now() });
+  openInstallGuide();
+}
+function installGuideHTML(){
+  const plat = installPlatform();
+  const step = (n, t)=>`<div class="in-step"><span class="in-n">${n}</span><span>${t}</span></div>`;
+  let how = '';
+  if(plat === 'installed') how = `<div class="au-note">✅ Tu utilises déjà l'app installée.</div>`;
+  else if(plat === 'inapp') how = `<div class="au-note">Tu es dans le navigateur d'une autre app (courriel, Facebook…), qui ne permet pas d'installer.</div>
+      ${step(1, 'Touche le menu <b>⋯</b> ou <b>⋮</b> de cette fenêtre')}
+      ${step(2, 'Choisis <b>« Ouvrir dans Safari »</b> ou <b>« Ouvrir dans le navigateur »</b>')}
+      ${step(3, 'Connecte-toi, puis installe l\'app depuis là')}
+      <button type="button" class="btn btn-secondary au-btn" onclick="copyInstallLink()">Copier le lien de Dinkeo</button>`;
+  else if(plat === 'ios') how = `${step(1, 'Touche le bouton <b>Partager</b> <span class="in-ic">⬆️</span> (en bas de Safari, ou en haut sur iPad)')}
+      ${step(2, 'Fais défiler et choisis <b>« Sur l\'écran d\'accueil »</b> <span class="in-ic">➕</span>')}
+      ${step(3, 'Touche <b>« Ajouter »</b>, puis ouvre Dinkeo depuis sa nouvelle icône')}`;
+  else if(DEFERRED_INSTALL) how = `<button type="button" class="btn btn-primary au-btn" onclick="runInstall()">📲 Installer l'app</button>`;
+  else if(plat === 'android') how = `${step(1, 'Touche le menu <b>⋮</b> du navigateur (en haut à droite)')}
+      ${step(2, 'Choisis <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>')}
+      ${step(3, 'Ouvre Dinkeo depuis sa nouvelle icône')}`;
+  else how = `${step(1, 'Dans Chrome ou Edge : touche l\'icône d\'installation <span class="in-ic">⊕</span> dans la barre d\'adresse, ou le menu <b>⋮</b> → <b>« Installer Dinkeo »</b>')}
+      ${step(2, 'Sur Mac avec Safari : menu <b>Fichier</b> → <b>« Ajouter au Dock »</b>')}`;
+  return `<div class="au-hero"><img src="${LOGO_DATA_URI}" alt=""><div><div class="au-t">Installe l'app</div><div class="au-s">Dinkeo sur ton écran d'accueil, comme une vraie app.</div></div></div>
+    <div class="in-why"><span>📲 Ouvre-la en un toucher</span><span>🔔 Reçois les notifications</span><span>⛶ Plein écran</span></div>
+    ${how}
+    ${plat === 'installed' ? '' : `<div style="text-align:center;margin-top:8px;"><button type="button" class="au-link" onclick="closeModal()">Plus tard</button></div>`}`;
+}
+function openInstallGuide(){ setModal({ kind:'content', title:'', htmlContent: installGuideHTML, install: true }); render(); }
+async function runInstall(){
+  if(!DEFERRED_INSTALL){ render(); return; }
+  const ev = DEFERRED_INSTALL; DEFERRED_INSTALL = null;
+  try{ ev.prompt(); const r = await ev.userChoice; if(r && r.outcome === 'accepted'){ installPromptState({ installed: true }); closeModal(); return; } }catch(e){}
+  render();
+}
+function copyInstallLink(){
+  const url = location.origin + location.pathname;
+  const done = function(){ showAlert('Lien copié. Colle-le dans Safari ou Chrome.'); };
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done, function(){ showAlert('Le lien : ' + url); }); return; } }catch(e){}
+  showAlert('Le lien : ' + url);
+}
 let NEWS_POPUP_DONE = false;
 function maybeShowNewsPopup(){
   if(NEWS_POPUP_DONE || MODAL || !NOTIF_PREFS || !CURRENT_PROFILE || !SESSION_USER) return;
@@ -5646,6 +5685,7 @@ function adminMeHTML(canViewAsPlayer, canViewAsSub){
     <div class="pf-list">
       ${meRow('👤', 'Mon profil', 'Photo et présentation', `openMyProfileModal()`)}
       ${meRow('🔔', 'Notifications', '', `openNotifSettings()`)}
+      ${isRunningStandalone() ? '' : meRow('📲', "Installer l'app", "Sur l'écran d'accueil de ton téléphone", `openInstallGuide()`)}
       ${isSuper ? meRow('🔐', 'Empreinte de la bibliothèque', 'Vérification de sécurité', `showLibHashes()`) : ''}
       ${isSuper ? meRow('🛡️', SUPER_ADMIN_MODE ? 'Revenir à mes organisations' : 'Voir toutes les organisations', 'Super admin', `toggleSuperAdminOrgView()`) : ''}
     </div>
@@ -11593,6 +11633,7 @@ function accountMeHTML(me){
     <div class="pf-list">
       ${meRow('👤', 'Mon profil', 'Nom, photo, courriel', `openMyProfileModal()`)}
       ${meRow('🔔', 'Notifications', '', `openNotifSettings()`)}
+      ${isRunningStandalone() ? '' : meRow('📲', "Installer l'app", "Sur l'écran d'accueil de ton téléphone", `openInstallGuide()`)}
       ${meRow('🎟️', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
     </div>
     <div class="pf-sec">Aide</div>
