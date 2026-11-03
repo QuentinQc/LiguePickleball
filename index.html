@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 334">
+<meta name="app-build" content="Version 335">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2565,29 +2565,56 @@ function partnerPostDetailInnerHTML(id){
       ${canManage ? `<button class="btn-ghost-danger" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="deletePartnerPost('${p.id}')">🗑️ Supprimer</button>` : ''}
     </div>`;
 }
-// ---- Temps réel : toute création/modification/suppression d'annonce par
-// quelqu'un d'autre rafraîchit SEULEMENT #partnerPostsList, pas le formulaire
-// de nouvelle annonce au-dessus (évite d'effacer ce que la personne tape).
-function onPartnerRealtimeChange(){
-  const container = document.getElementById('partnerPostsList');
-  if(!container) return;
-  loadPartnerPosts(CURRENT_LEAGUE_ID).then(()=>{
-    const c = document.getElementById('partnerPostsList');
-    if(c) c.innerHTML = partnerPostsListHTML();
-    // Si le détail d'une annonce est ouvert en modale, on le repatche aussi
-    // (interessé(e)s, statut) sans fermer la modale sous le nez de la personne.
-    if(PARTNER_DETAIL_MODAL_ID){
-      const d = document.getElementById('partnerDetailBody');
-      if(d) d.innerHTML = partnerPostDetailInnerHTML(PARTNER_DETAIL_MODAL_ID);
-    }
-  });
+// ---- Temps réel : annonces de partenaire et événements ----
+// Un changement fait par quelqu'un d'autre recharge la liste tout de suite, même si l'écran
+// n'est pas ouvert (pastilles de nouveautés, accueil). Si la liste est affichée, seule elle est
+// repatchée (le formulaire en cours de saisie n'est pas touché) ; sinon on redessine l'écran,
+// sauf pendant une saisie.
+let PARTNER_RT_TIMER = null, EVENTS_RT_TIMER = null, EVENTS_REALTIME_CHANNEL = null;
+function realtimeSoftRender(){
+  if(appBusyEditing()) return;
+  render();
 }
-// ---- Mise en place / démontage de l'abonnement temps réel (partenaire).
-// Appelé à chaque changement de ligue/organisation : on retire l'ancien
-// abonnement (s'il existe) avant d'en ouvrir un nouveau, pour ne jamais
-// accumuler des canaux qui pointent vers une ligue/organisation périmée.
+function onPartnerRealtimeChange(){
+  clearTimeout(PARTNER_RT_TIMER);
+  PARTNER_RT_TIMER = setTimeout(function(){
+    loadPartnerPosts(CURRENT_LEAGUE_ID).then(()=>{
+      const c = document.getElementById('partnerPostsList');
+      if(c){
+        c.innerHTML = partnerPostsListHTML();
+        // Détail d'une annonce ouvert : repatché aussi (intéressé(e)s, statut) sans fermer la fenêtre.
+        if(PARTNER_DETAIL_MODAL_ID){
+          const d = document.getElementById('partnerDetailBody');
+          if(d) d.innerHTML = partnerPostDetailInnerHTML(PARTNER_DETAIL_MODAL_ID);
+        }
+      } else realtimeSoftRender();
+    }).catch(function(e){ console.error('temps réel partenaire', e); });
+  }, 300);
+}
+function onEventsRealtimeChange(){
+  clearTimeout(EVENTS_RT_TIMER);
+  EVENTS_RT_TIMER = setTimeout(function(){
+    loadSocialEvents().then(realtimeSoftRender).catch(function(e){ console.error('temps réel événements', e); });
+  }, 300);
+}
+// Organisations dont la personne voit les événements (mêmes règles que loadSocialEvents).
+function eventOrgIds(){
+  const orgId = currentLeagueOrgId(); if(!orgId) return [];
+  const ids = [orgId];
+  if(!(CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin')){
+    (MY_LEAGUE_LINKS||[]).forEach(function(k){
+      const lg = (LEAGUES||[]).find(function(x){ return x.id === k.league_id; });
+      if(lg && lg.organization_id && ids.indexOf(lg.organization_id) === -1) ids.push(lg.organization_id);
+    });
+  }
+  return ids;
+}
+// ---- Mise en place / démontage des abonnements temps réel.
+// Appelé à chaque changement de ligue/organisation : on retire les anciens abonnements avant
+// d'en ouvrir de nouveaux, pour ne jamais garder des canaux vers une organisation périmée.
 function teardownRealtimeChannels(){
   if(PARTNER_REALTIME_CHANNEL){ sb.removeChannel(PARTNER_REALTIME_CHANNEL); PARTNER_REALTIME_CHANNEL = null; }
+  if(EVENTS_REALTIME_CHANNEL){ sb.removeChannel(EVENTS_REALTIME_CHANNEL); EVENTS_REALTIME_CHANNEL = null; }
 }
 function setupRealtimeChannels(){
   teardownRealtimeChannels();
@@ -2596,6 +2623,19 @@ function setupRealtimeChannels(){
     PARTNER_REALTIME_CHANNEL = sb.channel(`partner_posts_${porg}`)
       .on('postgres_changes', { event:'*', schema:'public', table:'partner_posts', filter:`organization_id=eq.${porg}` }, () => onPartnerRealtimeChange())
       .subscribe();
+  }
+  const eorgs = eventOrgIds();
+  if(eorgs.length){
+    let ch = sb.channel('social_events_' + eorgs.join('_'));
+    eorgs.forEach(function(o){
+      ch = ch.on('postgres_changes', { event:'*', schema:'public', table:'social_events', filter:`organization_id=eq.${o}` }, () => onEventsRealtimeChange());
+    });
+    // Réponses (je participe / peut-être) : la table n'a pas l'organisation, on garde celles de nos événements.
+    ch = ch.on('postgres_changes', { event:'*', schema:'public', table:'social_event_rsvps' }, function(payload){
+      const r = (payload && (payload.new && payload.new.event_id ? payload.new : payload.old)) || {};
+      if(!r.event_id || (SOCIAL_EVENTS||[]).some(function(e){ return e.id === r.event_id; })) onEventsRealtimeChange();
+    });
+    EVENTS_REALTIME_CHANNEL = ch.subscribe();
   }
   loadNotifPrefs();
 }
@@ -4557,6 +4597,7 @@ async function onAppResume(){
     const id = CURRENT_LEAGUE_ID;
     const fresh = await loadData(id);
     if(fresh && id === CURRENT_LEAGUE_ID && !appBusyEditing()){ DATA = fresh; migrateData(); }
+    try{ await Promise.all([loadPartnerPosts(CURRENT_LEAGUE_ID), loadSocialEvents()]); }catch(e){}
     ADMIN_SUMMARY_AT = 0; MY_SUMMARY_AT = 0;
     if(!appBusyEditing()) render();
   }finally{ APP_RESUMING = false; }
