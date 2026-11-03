@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 336">
+<meta name="app-build" content="Version 337">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1018,7 +1018,7 @@ table tr:not(:first-child) td:last-child{border-radius:0 12px 12px 0;padding-rig
 .pc-card .event-pill-date{width:52px;height:52px;flex:none;}
 .pc-card .event-pill-date .d{font-size:20px;line-height:1;}
 .pc-card .event-pill-date .m{font-size:11px;}
-.pc-count{font-size:14px;color:var(--muted);}
+.pc-count{font-size:14px;color:var(--muted);min-width:0;flex:1;line-height:1.35;}
 
 /* v211 : vue joueur « compte d'abord » */
 .acc-card{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:10px;}
@@ -2495,6 +2495,13 @@ function partnerParticipants(p){
   const list = Array.isArray(p.interested) ? p.interested : [];
   return [{ profile_id: p.profile_id, name: p.author_name, avatar_url: p.avatar_url }].concat(list.filter(x=>x.profile_id !== p.profile_id));
 }
+// « Luc Roy, Hugo Caron et 2 autres » : qui participe, lisible d'un coup d'œil sur la carte.
+function partnerNamesLine(p){
+  const names = partnerParticipants(p).map(x=>String(x.name || 'Membre').trim());
+  if(names.length === 1) return '🙋 ' + names[0];
+  if(names.length <= 3) return '🙋 ' + names.slice(0,-1).join(', ') + ' et ' + names[names.length-1];
+  return '🙋 ' + names.slice(0,2).join(', ') + ' et ' + (names.length-2) + ' autres';
+}
 function sortedPartnerPosts(){
   return (PARTNER_POSTS||[]).slice().sort((a,b)=>{
     if((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
@@ -2516,7 +2523,7 @@ function partnerPostsListHTML(){
     const act = (!closed && !mine)
       ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'} pc-join" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e)' : '🙋 Je suis partant(e)'}</button>`
       : '';
-    const cnt = `<span class="pc-count">${nIn} partant${nIn>1?'s':''}</span>`;
+    const cnt = `<span class="pc-count">${escapeHTML(partnerNamesLine(p))}</span>`;
     return `<div class="pc-card${closed?' closed':''}${mine?' mine':''}" onclick="openPartnerPostDetail('${p.id}')">
       <div class="pc-head">
         ${avatarHTML('partner-pill-avatar', partnerInitials(p.author_name), p.avatar_url)}
@@ -2548,8 +2555,6 @@ function partnerPostDetailInnerHTML(id){
   const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
   const closed = p.status !== 'open';
   const all = partnerParticipants(p);
-  const shown = all.slice(0,8);
-  const extra = all.length - shown.length;
   return `
     <div class="row" style="align-items:center;gap:10px;">
       ${avatarHTML('wall-avatar', partnerInitials(p.author_name), p.avatar_url, 'width:34px;height:34px;font-size:13px;')}
@@ -2562,10 +2567,8 @@ function partnerPostDetailInnerHTML(id){
     <div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>
     ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
-    ${all.length ? `<div class="row" style="align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;">
-      <div class="avatar-stack">${shown.map(x=>avatarHTML('avatar-stack-item', partnerInitials(x.name), x.avatar_url)).join('')}${extra>0?`<div class="avatar-stack-item avatar-stack-more">+${extra}</div>`:''}</div>
-      <span class="small" style="color:var(--muted);">${all.length} partant(e)${all.length>1?'s':''}</span>
-    </div>` : ''}
+    <div class="pf-sec" style="margin:16px 2px 8px;">Partants (${all.length})</div>
+    <div class="pf-list pc-people-list">${all.map((x,i)=>`<div class="pf-row" style="cursor:default;">${avatarHTML('member-avatar', partnerInitials(x.name), x.avatar_url)}<span class="t">${escapeHTML(x.name || 'Membre')}</span>${i===0 ? '<span class="pf-chip acc">Organise</span>' : ''}</div>`).join('')}</div>
     <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
       ${!closed && !mine ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
       ${canManage ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
