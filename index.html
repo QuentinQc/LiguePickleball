@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 338">
+<meta name="app-build" content="Version 339">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1260,6 +1260,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .hs-dp.p{background:rgba(207,234,92,.16);color:var(--ball);}
 .hs-dp.n{background:rgba(255,107,107,.16);color:#ff8a80;}
 @media (max-width:640px){ .hs-body{padding:0 10px 12px;} .hs-row{gap:10px;padding:12px;} }
+.lg-rating{display:none;width:100%;align-items:center;gap:10px;margin-top:4px;padding-top:10px;border-top:1px solid var(--line-soft);cursor:default;}
+.lg-tile.on .lg-rating{display:flex;}
+.lg-rating span{font-size:14px;font-weight:600;color:var(--muted);flex:0 0 auto;}
+.lg-rating input{width:92px;flex:0 0 auto;text-align:center;font-family:var(--font-display);font-size:18px;padding:8px 10px;border-radius:12px;}
+.lg-rating small{font-size:12px;color:var(--muted);}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -8359,7 +8364,8 @@ function organizationRosterEntries(){
 // ligue donnée (pas nécessairement la ligue actuellement affichée) — même
 // logique que le formulaire « Ajouter une personne », généralisée à
 // n'importe quelle ligue de l'organisation.
-async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
+async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId, rating){
+  const startRating = (typeof rating === 'number' && isFinite(rating)) ? Math.round(rating*100)/100 : null;
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
@@ -8372,7 +8378,7 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
   if(type==='remplacant'){
     leagueData.substitutePool = leagueData.substitutePool || [];
     const finalName = uniquePlayerName(name, leagueData.substitutePool);
-    const entry = { id: uid('sub'), name: finalName, rating: RATING_DEFAULT, ratingGames: 0 };
+    const entry = { id: uid('sub'), name: finalName, rating: startRating !== null ? startRating : RATING_DEFAULT, ratingGames: 0 };
     if(email) entry.email = email;
     if(orgMemberId) entry.orgMemberId = orgMemberId;
     leagueData.substitutePool.push(entry);
@@ -8386,6 +8392,7 @@ async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId){
     if(place.waiting) newPlayer.status = 'new'; // aucun groupe avec de la place : en attente d'assignation
     if(email) newPlayer.email = email;
     if(orgMemberId) newPlayer.orgMemberId = orgMemberId;
+    if(startRating !== null){ newPlayer.rating = startRating; newPlayer.ratingGames = 0; }
     leagueData.players.push(newPlayer);
     createdId = newPlayer.id;
   }
@@ -8410,7 +8417,7 @@ async function refreshAfterOrgRosterChange(affectedLeagueIds){
 // type (joueur/remplaçant) — une même personne peut très bien être régulière
 // dans une ligue et remplaçante dans une autre, donc le type ne peut pas être
 // un seul choix global appliqué à toutes les ligues cochées à la fois.
-function leagueTypeRowHTML(l, checkboxClass, defaultType){
+function leagueTypeRowHTML(l, checkboxClass, defaultType, withRating){
   const rem = defaultType==='remplacant';
   return `<div class="lg-tile" onclick="toggleLgTile(this)">
     <input type="checkbox" class="${checkboxClass}" value="${l.id}">
@@ -8424,6 +8431,7 @@ function leagueTypeRowHTML(l, checkboxClass, defaultType){
       <option value="joueur" ${rem?'':'selected'}>Joueur</option>
       <option value="remplacant" ${rem?'selected':''}>Remplaçant</option>
     </select>
+    ${withRating ? `<label class="lg-rating" onclick="event.stopPropagation()"><span>Cote de départ</span><input type="text" inputmode="decimal" class="${checkboxClass}Rating" data-league-id="${l.id}" placeholder="${RATING_DEFAULT.toFixed(2)}" autocomplete="off"><small>Vide = ${RATING_DEFAULT.toFixed(2)}</small></label>` : ''}
   </div>`;
 }
 function toggleLgTile(tile){
@@ -8445,7 +8453,10 @@ function updateNpAvatar(v){
 function readPerLeagueTypes(checkboxClass){
   return Array.from(document.querySelectorAll('.'+checkboxClass+':checked')).map(el=>{
     const sel = document.querySelector(`.${checkboxClass}Type[data-league-id="${el.value}"]`);
-    return { leagueId: el.value, type: sel ? sel.value : 'joueur' };
+    const rt = document.querySelector(`.${checkboxClass}Rating[data-league-id="${el.value}"]`);
+    const raw = rt ? String(rt.value||'').trim().replace(',', '.') : '';
+    const rating = raw === '' ? null : parseFloat(raw);
+    return { leagueId: el.value, type: sel ? sel.value : 'joueur', rating: (rating !== null && isFinite(rating)) ? rating : null, ratingRaw: raw };
   });
 }
 function openAddOrgMemberModal(){
@@ -8455,7 +8466,7 @@ function openAddOrgMemberModal(){
     <div class="field"><label>Nom</label><input id="orgMemberName" placeholder="Prénom Nom" autocomplete="off" autocapitalize="words" oninput="updateNpAvatar(this.value)"></div>
     <div class="field"><label>Courriel <span class="small">(optionnel)</span></label><input id="orgMemberEmail" type="email" inputmode="email" autocapitalize="none" placeholder="nom@exemple.com"></div>
     <div class="np-section">Ajouter à une ligue <span class="small">(optionnel — tu peux aussi le faire plus tard)</span></div>
-    <div class="lg-list">${leagues.map(l=>leagueTypeRowHTML(l, 'orgMemberLeague', 'joueur')).join('')}</div>
+    <div class="lg-list">${leagues.map(l=>leagueTypeRowHTML(l, 'orgMemberLeague', 'joueur', true)).join('')}</div>
   </div>`;
   showFormModal('Nouvelle personne', html, saveAddOrgMemberForm);
 }
@@ -8472,8 +8483,10 @@ function saveAddOrgMemberForm(){
     showAlert(`« ${known.name} » existe déjà dans l'organisation. Ouvre sa fiche (Membres) pour l'ajouter à une ligue. Si c'est une autre personne, précise le nom (ex. initiale).`);
     return false;
   }
-  ORG_ADD_BUSY = true;
   const picks = readPerLeagueTypes('orgMemberLeague');
+  const badRating = picks.find(p=>p.ratingRaw !== '' && (p.rating === null || p.rating < 1 || p.rating > 8));
+  if(badRating){ showAlert("La cote doit être un nombre entre 1 et 8 (ex. 3.75). Laisse vide pour " + RATING_DEFAULT.toFixed(2) + "."); return false; }
+  ORG_ADD_BUSY = true;
   (async ()=>{
     // La personne est d'abord créée une fois pour toutes dans org_members —
     // c'est SON identifiant qui sera repris dans chaque ligue cochée, plutôt
@@ -8481,7 +8494,7 @@ function saveAddOrgMemberForm(){
     try{
       const member = await createOrgMember(name, email, null, null);
       if(!member) return;
-      for(const { leagueId, type } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id); }
+      for(const { leagueId, type, rating } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id, rating); }
       await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
     } finally { ORG_ADD_BUSY = false; }
   })();
