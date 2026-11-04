@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 345">
+<meta name="app-build" content="Version 346">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -74,7 +74,8 @@
     else if(delta > 6) document.body.classList.add('nav-hidden');
     else if(delta < -6) document.body.classList.remove('nav-hidden');
     var topbar = document.querySelector('.topbar');
-    if(!topbar){ lastY = y; ticking = false; return; }
+    // Nouvelle navigation : la barre du haut est une pastille flottante toujours visible.
+    if(!topbar || document.body.classList.contains('modern-nav')){ if(topbar) topbar.classList.remove('topbar-hidden'); lastY = y; ticking = false; return; }
     if(y < 40){
       topbar.classList.remove('topbar-hidden');
     } else if(delta > 6){
@@ -440,9 +441,7 @@ body.nav-hidden .bottom-nav{transform:translateY(calc(100% + 40px));}
 body.modern-nav .topbar{transition:top .25s ease, background-color .2s ease, box-shadow .2s ease, padding .2s ease;}
 /* Retour dans l'app (iPhone/iPad) : on remet l'en-tête d'un coup, sans animation, pour qu'il ne reste pas figé à mi-chemin (flou). */
 body.no-anim .topbar, body.no-anim .bottom-nav{transition:none !important;}
-body.modern-nav.scrolled .topbar{background:rgba(18,58,52,.95);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.4);border-radius:999px;padding:6px 10px 6px 6px;top:calc(8px + env(safe-area-inset-top));}
-body.modern-nav.scrolled .shell-title{font-size:20px;}
-body.modern-nav.scrolled .shell-me .shell-me-av{width:34px;height:34px;font-size:13px;}
+
 .topbar-main{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 .topbar-main-3col{display:grid;grid-template-columns:auto 1fr auto;}
 .topbar-center-info{display:none;align-items:center;gap:8px;}
@@ -695,7 +694,11 @@ body.modern-nav .topbar-ico.active{color:var(--court);}
   body.modern-nav .bottom-nav-spacer{height:96px;}
   body.modern-nav .bottom-nav{z-index:900;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));padding:7px;border-radius:999px;background:rgba(18,58,52,.74);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 40px rgba(0,0,0,.45);justify-content:space-between;gap:2px;overflow:visible;}
 }
-body.modern-nav .topbar{background:transparent;border:0;box-shadow:none;padding-left:2px;padding-right:2px;}
+body.modern-nav .topbar{background:rgba(18,58,52,.97);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.4);border-radius:999px;padding:6px 10px 6px 6px;top:calc(8px + env(safe-area-inset-top));transition:none;}
+body.modern-nav .topbar.topbar-hidden{top:calc(8px + env(safe-area-inset-top)) !important;opacity:1;box-shadow:0 10px 30px rgba(0,0,0,.4) !important;}
+body.modern-nav .shell-top{padding:0;}
+body.modern-nav .shell-title{font-size:20px;}
+body.modern-nav .shell-me .shell-me-av{width:36px;height:36px;font-size:13px;}
 .dk{border:0;background:none;color:var(--muted);height:48px;min-width:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 13px;font:700 14px var(--font-body);cursor:pointer;transition:background .25s,color .25s;}
 .dk span{max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:max-width .25s,opacity .25s;}
 .dk.active{background:var(--ball);color:var(--court);}
