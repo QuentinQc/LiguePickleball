@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 343">
+<meta name="app-build" content="Version 344">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -91,6 +91,20 @@
       ticking = true;
     }
   }, {passive:true});
+  // Safari (iPhone/iPad) peut figer une animation en cours quand l'app passe en arrière-plan :
+  // au retour, on réapplique l'état de l'en-tête et de la barre sans animation.
+  function settleBars(){
+    document.body.classList.add('no-anim');
+    lastY = window.scrollY || 0;
+    var topbar = document.querySelector('.topbar');
+    if(topbar && lastY < 40) topbar.classList.remove('topbar-hidden');
+    if(lastY < 40) document.body.classList.remove('nav-hidden');
+    document.body.classList.toggle('scrolled', lastY >= 40);
+    void document.body.offsetHeight;
+    setTimeout(function(){ document.body.classList.remove('no-anim'); }, 60);
+  }
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') settleBars(); });
+  window.addEventListener('pageshow', settleBars);
 })();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -421,7 +435,9 @@ body.nav-hidden .bottom-nav{transform:translateY(calc(100% + 40px));}
 @media (min-width:641px){ body.modern-nav.nav-hidden .bottom-nav{transform:translate(-50%, calc(100% + 40px));} }
 @media (prefers-reduced-motion:reduce){ .bottom-nav{transition:none;} }
 /* Barre du haut flottante (avatar, titre, Admin/Joueur) quand elle réapparaît en cours de page */
-body.modern-nav .topbar{transition:transform .25s ease, background-color .2s ease, box-shadow .2s ease, padding .2s ease, opacity .2s ease;}
+body.modern-nav .topbar{transition:transform .25s ease, background-color .2s ease, box-shadow .2s ease, padding .2s ease;}
+/* Retour dans l'app (iPhone/iPad) : on remet l'en-tête d'un coup, sans animation, pour qu'il ne reste pas figé à mi-chemin (flou). */
+body.no-anim .topbar, body.no-anim .bottom-nav{transition:none !important;}
 body.modern-nav.scrolled .topbar{background:rgba(18,58,52,.95);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.4);border-radius:999px;padding:6px 10px 6px 6px;top:calc(8px + env(safe-area-inset-top));}
 body.modern-nav.scrolled .shell-title{font-size:20px;}
 body.modern-nav.scrolled .shell-me .shell-me-av{width:34px;height:34px;font-size:13px;}
