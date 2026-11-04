@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 342">
+<meta name="app-build" content="Version 343">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5587,8 +5587,9 @@ async function onAuthResolved(user){
       const r = await sb.rpc('redeem_invitation', { p_code: code });
       let msg = null;
       if(r && r.data){
-        if(r.data.ok && r.data.pending) notifyAdminsJoinRequest(r.data.league_id, null, 'join');
-        if(r.data.ok) msg = r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : inviteAcceptedMsg(r.data);
+        if(r.data.ok && r.data.org_pending) notifyAdminsOrgJoin(r.data.organization_id);
+        else if(r.data.ok && r.data.pending) notifyAdminsJoinRequest(r.data.league_id, null, 'join');
+        if(r.data.ok) msg = r.data.org_pending ? orgPendingMsg(r.data) : (r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : inviteAcceptedMsg(r.data));
         else msg = r.data.error || null;
       } else if(r && r.error){ msg = "Invitation : " + r.error.message; }
       const again = await sb.from('profiles').select('*').eq('id', user.id).single();
@@ -5784,6 +5785,15 @@ function inviteOrgMember(idx){
   const r = e.rows.filter(function(x){ return x.type==='joueur'; })[0] || e.rows[0];
   inviteForEntry(r.refId, r.type==='remplaçant' ? 's' : 'p', false, r.leagueId);
 }
+function orgPendingMsg(d){
+  return "Bienvenue ✅ Ton compte est rattaché à " + ((d && d.organization_name) || "l'organisation") + ". Un administrateur va te placer dans ta ligue : tu seras averti(e) dès que ce sera fait.";
+}
+function notifyAdminsOrgJoin(orgId){
+  if(!orgId) return;
+  const who = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || CURRENT_PROFILE.email)) || "Quelqu'un";
+  invokeSendNotification({ organization_id: orgId, audience: 'admins', category: 'admin_alerts',
+    title: "🙋 Nouvelle inscription", body: who + " s'est inscrit(e) avec le lien de l'organisation. Place-le ou la dans sa ligue (Comptes).", url: goUrl('comptes') });
+}
 // « Invitation acceptée » : nomme toutes les ligues rejointes (la même personne peut être reliée à plusieurs ligues d'un coup).
 function inviteAcceptedMsg(d){
   const names = [d && d.league_name].concat((d && d.also) || []).filter(Boolean);
@@ -5796,13 +5806,21 @@ function openInviteCodePrompt(){
     const { data, error } = await sb.rpc('redeem_invitation', { p_code: code.trim() });
     if(error){ showAlert("Erreur : " + error.message); return; }
     if(!data || !data.ok){ showAlert((data && data.error) || 'Code invalide ou expiré.'); return; }
+    if(data.org_pending){ notifyAdminsOrgJoin(data.organization_id); const { data: { user } } = await sb.auth.getUser(); await onAuthResolved(user); showAlert(orgPendingMsg(data)); return; }
     if(data.pending){ notifyAdminsJoinRequest(data.league_id, null, 'join'); showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
     showAlert(inviteAcceptedMsg(data));
   });
 }
+let PENDING_ORG_NAME = null;
 function renderPending(){
+  // Rattaché à une organisation par son lien, mais pas encore placé dans une ligue.
+  const pendingOrgId = CURRENT_PROFILE && CURRENT_PROFILE.organization_id && !CURRENT_PROFILE.is_super_admin ? CURRENT_PROFILE.organization_id : null;
+  if(pendingOrgId && PENDING_ORG_NAME === null){
+    PENDING_ORG_NAME = '';
+    sb.rpc('org_signup_name', { p_id: pendingOrgId }).then(function(r){ if(r && !r.error && r.data){ PENDING_ORG_NAME = r.data; render(); } }, function(){});
+  }
   // Création d'organisation réservée aux super admins pour l'instant (les autres passent par eux).
   const canCreateOrg = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin && !CURRENT_PROFILE.organization_id;
   app.innerHTML = `
@@ -5810,9 +5828,10 @@ function renderPending(){
     ${storageBannerHTML()}${pushPromoBannerHTML()}
     <div class="card">
       <h2>Compte créé ✅</h2>
-      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton administrateur t'a remis un code d'invitation, entre-le ici. Sinon, cherche une ligue et demande à la rejoindre.</p>
-      <button class="btn btn-primary" onclick="openInviteCodePrompt()">🎟️ J'ai un code d'invitation</button>
-      <button class="btn btn-secondary" onclick="openLeagueSearch()" style="margin-top:8px;">🔍 Trouver une ligue près de chez moi</button>
+      ${pendingOrgId ? `<p class="small">Ton compte est rattaché à <strong>${escapeHTML(PENDING_ORG_NAME || "ton organisation")}</strong>. Un administrateur va te placer dans ta ligue : tu recevras une notification dès que ce sera fait. Tu n'as rien d'autre à faire.</p>`
+        : `<p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton administrateur t'a remis un code d'invitation, entre-le ici. Sinon, cherche une ligue et demande à la rejoindre.</p>`}
+      ${pendingOrgId ? `<button class="btn btn-secondary" onclick="openInviteCodePrompt()">🎟️ J'ai reçu un code personnel</button>` : `<button class="btn btn-primary" onclick="openInviteCodePrompt()">🎟️ J'ai un code d'invitation</button>
+      <button class="btn btn-secondary" onclick="openLeagueSearch()" style="margin-top:8px;">🔍 Trouver une ligue près de chez moi</button>`}
       <button class="btn btn-secondary" onclick="logout()" style="margin-top:8px;">Déconnexion</button>
     </div>
     ${canCreateOrg ? `
@@ -8231,6 +8250,7 @@ function confirmDeleteOrgMember(idx){
 }
 let ALL_JOIN_REQUESTS = [];   // demandes d'adhésion en attente (codes de ligue)
 let ALL_JOIN_CODES = [];       // codes d'adhésion des ligues de l'organisation
+let ORG_JOIN_CODES = [];       // lien d'invitation de l'organisation (un par organisation)
 async function loadAllProfiles(){
   const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending:true });
   ALL_PROFILES = error ? [] : (data || []);
@@ -8241,6 +8261,8 @@ async function loadAllProfiles(){
     ALL_JOIN_REQUESTS = jr.error ? [] : (jr.data || []);
     const jc = await sb.from('league_join_codes').select('*');
     ALL_JOIN_CODES = jc.error ? [] : (jc.data || []);
+    const oc = await sb.from('org_join_codes').select('*');
+    ORG_JOIN_CODES = oc.error ? [] : (oc.data || []);
   }catch(e){ ALL_JOIN_REQUESTS = []; ALL_JOIN_CODES = []; }
 }
 async function loadAllProfilePlayers(){
@@ -9008,7 +9030,7 @@ function organizationAccountsHTML(){
     });
     const m = bestApprovalMatch(cands, pr.email, pr.display_name);
     const cur = m ? m.value : (orgLeagues.length===1 ? orgLeagues[0].id + '::j::__new__' : '');
-    return { name: pr.display_name || '—', badge: pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : '', email: pr.email || '', label: initialsOf(pr.display_name||pr.email), source: 'Inscrit sans code de ligue',
+    return { name: pr.display_name || '—', badge: pr.role==='admin' ? ' <span class="tag tag-up">👑 Admin</span>' : '', email: pr.email || '', label: initialsOf(pr.display_name||pr.email), source: 'À placer dans une ligue',
       select: `<select id="linkSelect_${pr.id}"><option value="">— choisir une ligue et un joueur —</option>${optionsFor(pr, cur)}</select>`, note: matchNote(m),
       buttons: `<button class="btn btn-primary" style="flex:1;" onclick="linkAccount('${pr.id}')">Approuver</button>`, admin: `<div style="margin-top:6px;">${roleButton(pr)}</div>` };
   }));
@@ -9043,7 +9065,7 @@ function organizationAccountsHTML(){
       </div>`).join('')}
       ${(list.length===0 && emptyText) ? `<p class="empty">${emptyText}</p>` : ''}
     </div>`; }
-  const codeHTML = `<div class="card">
+  const codeHTML = orgJoinCardHTML() + `<div class="card">
     <div class="section-heading"><span class="icon-badge">🎟️</span><h3 style="margin:0;">Invitations par ligue</h3></div>
     <p class="small" style="margin:8px 0 4px;">Un lien d'invitation par ligue (centre, groupe Facebook…). Il ne donne aucun accès : chaque personne apparaît dans « À approuver » ci-dessus. Pour inviter un joueur précis, ouvre sa fiche.</p>
     ${orgLeagues.map(l=>{
@@ -9125,6 +9147,32 @@ function setAccountRole(profileId, newRole){
     render();
   });
 }
+async function manageOrgJoinCode(action){
+  if(!CURRENT_ORGANIZATION_ID) return;
+  const { error } = await sb.rpc('manage_org_join_code', { p_org: CURRENT_ORGANIZATION_ID, p_action: action });
+  if(error){ showAlert("Erreur : " + error.message); return; }
+  await loadAllProfiles();
+  render();
+}
+// Encadré « Lien de l'organisation » (Comptes) : un seul lien pour tout le monde, la personne
+// arrive dans « À approuver » et l'admin choisit sa ou ses ligues.
+function orgJoinCardHTML(){
+  const c = (ORG_JOIN_CODES||[]).find(x=>x.organization_id===CURRENT_ORGANIZATION_ID);
+  const live = c && c.active && new Date(c.expires_at) > new Date();
+  return `<div class="card">
+    <div class="section-heading"><span class="icon-badge">🔗</span><h3 style="margin:0;">Lien de l'organisation</h3></div>
+    <p class="small" style="margin:8px 0 10px;">Un seul lien pour tout le monde (Messenger, Facebook, courriel). La personne crée son compte et apparaît dans « À approuver » : tu choisis sa ligue, et elle est reliée à toutes ses ligues d'un coup.</p>
+    ${live ? `<div style="font-family:Oswald,sans-serif;font-size:24px;letter-spacing:2px;color:var(--ball);">${escapeHTML(c.code)}</div>
+      <div class="small" style="color:var(--muted);margin:2px 0 12px;">${c.uses} inscription${c.uses>1?'s':''} · valide jusqu'au ${escapeHTML(new Date(c.expires_at).toLocaleDateString('fr-CA',{day:'numeric',month:'long',year:'numeric'}))}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" style="width:auto;min-height:44px;padding:8px 16px;" onclick="copyInviteLink('${escapeHTML(c.code)}')">Copier le lien</button>
+        <button class="btn-ghost" onclick="showConfirm('Créer un nouveau lien ? L\'ancien ne fonctionnera plus.', function(){ manageOrgJoinCode('create'); })">Nouveau lien</button>
+        <button class="btn-ghost-danger" onclick="showConfirm('Désactiver le lien de l\'organisation ?', function(){ manageOrgJoinCode('disable'); })">Désactiver</button>
+      </div>`
+    : `<div class="small" style="color:var(--muted);margin-bottom:10px;">${c ? 'Lien désactivé ou expiré.' : 'Aucun lien pour l\'instant.'}</div>
+      <button class="btn btn-primary" style="width:auto;min-height:44px;padding:8px 16px;" onclick="manageOrgJoinCode('create')">Créer le lien de l'organisation</button>`}
+  </div>`;
+}
 async function manageJoinCode(leagueId, action){
   const { error } = await sb.rpc('manage_join_code', { p_league_id: leagueId, p_action: action, p_max_uses: 500, p_days: 30 });
   if(error){ showAlert("Erreur : " + error.message); return; }
@@ -9143,9 +9191,18 @@ async function approveJoinRequest(reqId){
   const { error } = await sb.rpc('approve_join_request', { p_request_id: reqId, p_player_id: kind==='j' ? val : null, p_substitute_id: kind==='s' ? val : null });
   if(error){ showAlert("Erreur lors de l'approbation : " + error.message); return; }
   if(kind === 'j'){ try{ await migratePlayerNotesToProfile(r.league_id, val, r.profile_id); }catch(e){} }
+  if(parts[1] !== '__new__') await linkSamePersonElsewhere(r.profile_id, r.league_id, val);
   const lm = LEAGUES.find(l=>l.id===r.league_id);
   try{ notifyAccountApproved(r.profile_id, lm && (lm.schedule_label || lm.name)); }catch(e){}
   await refreshAfterAccountChange(r.profile_id, r.league_id);
+}
+// Même personne inscrite dans d'autres ligues de l'organisation : reliée en même temps.
+async function linkSamePersonElsewhere(profileId, leagueId, key){
+  try{
+    const { data } = await sb.rpc('admin_link_other_leagues', { p_profile: profileId, p_league: leagueId, p_key: key });
+    const also = (data && data.also) || [];
+    if(also.length) setTimeout(function(){ showAlert('✅ Relié(e) aussi à : ' + also.join(', ') + ' (même personne).'); }, 300);
+  }catch(e){ console.error('autres ligues', e); }
 }
 function rejectJoinRequest(reqId){
   showConfirm("Refuser cette demande ?", async ()=>{
@@ -9229,6 +9286,7 @@ async function linkAccount(profileId){
     if(error){ showAlert("Erreur lors de la liaison : " + error.message); return; }
     await migratePlayerNotesToProfile(leagueId, playerId, profileId);
   }
+  if(val !== '__new__') await linkSamePersonElsewhere(profileId, leagueId, val);
   if(wasPending){
     const leagueMeta = LEAGUES.find(l=>l.id===leagueId);
     notifyAccountApproved(profileId, leagueMeta && (leagueMeta.schedule_label || leagueMeta.name));
@@ -11082,7 +11140,8 @@ function organizationGeneralHTML(){
   ]);
   html += stGroup('Inviter des joueurs', [
     settingsRow('👤', 'Une personne précise', "Ouvre sa fiche dans Membres et touche « Inviter » : son compte sera relié sans approbation", go('membres')),
-    settingsRow('🎟️', 'Tout le monde', "Partage le lien d'une ligue (centre, groupe Facebook…) : chaque personne apparaît dans « À approuver »", go('comptes'))
+    settingsRow('🔗', "Lien de l'organisation", "Un seul lien pour tout le monde (Messenger, Facebook…) : chaque personne apparaît dans « À approuver »", go('comptes')),
+    settingsRow('🎟️', 'Lien d\'une ligue', "Un lien par ligue, si tu préfères que la ligue soit déjà choisie", go('comptes'))
   ]);
   // Créer une organisation : réservé aux super admins pour l'instant.
   if(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin) html += stGroup('Autres organisations (super admin)', [
