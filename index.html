@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 341">
+<meta name="app-build" content="Version 342">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3647,13 +3647,21 @@ function fmtDate(d){
   const dd = String(d.getDate()).padStart(2,'0');
   return `${yyyy}-${mm}-${dd}`;
 }
+// Prochaine date de jeu proposée : à partir d'aujourd'hui, ou du début de saison s'il est plus tard
+// (une saison qui commence le 16 novembre ne propose pas le lundi 9).
 function nextSessionDate(){
-  if(typeof DATA.playDayOfWeek !== 'number') return fmtDate(new Date());
-  const now = new Date();
-  const diff = (DATA.playDayOfWeek - now.getDay() + 7) % 7;
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
-  return fmtDate(d);
+  const today = fmtDate(new Date());
+  const from = (DATA.seasonStartDate && DATA.seasonStartDate > today) ? DATA.seasonStartDate : today;
+  return playDayOnOrAfter(from);
 }
+// Premier jour de jeu (jour de la semaine réglé) à cette date ou après ; la date elle-même si aucun jour n'est réglé.
+function playDayOnOrAfter(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  if(typeof DATA.playDayOfWeek !== 'number') return fmtDate(d);
+  const diff = (DATA.playDayOfWeek - d.getDay() + 7) % 7;
+  return fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff));
+}
+function seasonNotStarted(){ return !!(DATA.seasonStartDate && fmtDate(new Date()) < DATA.seasonStartDate); }
 // Calcule la prochaine date de jeu valide à partir d'une date donnée (incluse),
 // en sautant les dates bloquées du calendrier de saison. Retourne
 // { date, skipped } où skipped liste les dates bloquées sautées en chemin,
@@ -3663,6 +3671,8 @@ function nextValidSessionDate(fromDateStr){
   const seasonEnd = DATA.seasonEndDate || null;
   let d = new Date(fromDateStr + 'T00:00:00');
   const skipped = [];
+  // Jamais avant le début de saison : on part du premier jour de jeu de la saison.
+  if(DATA.seasonStartDate && fmtDate(d) < DATA.seasonStartDate) d = new Date(playDayOnOrAfter(DATA.seasonStartDate) + 'T00:00:00');
   for(let i=0;i<52;i++){ // garde-fou : au plus un an de sauts
     const ds = fmtDate(d);
     if(seasonEnd && ds > seasonEnd) return { date: null, skipped };
@@ -9635,7 +9645,7 @@ function stepRow(state, title, sub, btn){
 function launchSessionHTML(){
   const c = launchChecks();
   const now = new Date();
-  const isPlayDay = typeof DATA.playDayOfWeek === 'number' && now.getDay() === DATA.playDayOfWeek;
+  const isPlayDay = typeof DATA.playDayOfWeek === 'number' && now.getDay() === DATA.playDayOfWeek && !seasonNotStarted();
   const baseDate = nextSessionDate();
   const blocked = new Set(DATA.blockedDates || []);
   const seasonEnd = DATA.seasonEndDate || null;
@@ -9662,7 +9672,7 @@ function launchSessionHTML(){
     hero = `<div class="lnc-card${warn?' warn':''}">
       <div class="lnc-eyebrow">Prochaine session</div>
       <div class="lnc-date">${escapeHTML(p.day.charAt(0).toUpperCase()+p.day.slice(1))}<br>${escapeHTML(p.rest)}</div>
-      ${warn ? `<div class="lnc-warn"><div class="stp-ic warn" style="background:#E9C23C;color:#0C2622;">!</div><div>${warn}</div></div>` : `<div class="lnc-sub">${escapeHTML(dleft)}${when}</div>`}
+      ${warn ? `<div class="lnc-warn"><div class="stp-ic warn" style="background:#E9C23C;color:#0C2622;">!</div><div>${warn}</div></div>` : `<div class="lnc-sub">${escapeHTML(dleft)}${when}${seasonNotStarted() && baseDate === playDayOnOrAfter(DATA.seasonStartDate) ? ' · Début de la saison' : ''}</div>`}
       ${warn && valid ? `<button class="lnc-main" onclick="checkAndStartSession('${valid}')">Prendre le ${escapeHTML(frDateLong(valid).toLowerCase())}</button><div style="text-align:center;font-size:14px;color:var(--muted);">Prochaine date libre</div><button class="lnc-alt line" onclick="checkAndStartSession('${baseDate}')">Démarrer quand même le ${escapeHTML(p.rest)}</button>`
         : `<button class="lnc-main" onclick="checkAndStartSession('${baseDate}')">Démarrer la session</button>`}
       <button class="lnc-alt" onclick="openPickSessionDate()">Choisir une autre date</button>
