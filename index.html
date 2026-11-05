@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 346">
+<meta name="app-build" content="Version 347">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1289,6 +1289,46 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .lg-rating span{font-size:14px;font-weight:600;color:var(--muted);flex:0 0 auto;}
 .lg-rating input{width:92px;flex:0 0 auto;text-align:center;font-family:var(--font-display);font-size:18px;padding:8px 10px;border-radius:12px;}
 .lg-rating small{font-size:12px;color:var(--muted);}
+.cm-top{display:flex;align-items:center;gap:10px;margin:2px 0 14px;}
+.cm-chips{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
+.cm-chips::-webkit-scrollbar{display:none;}
+.cm-chips button{flex:0 0 auto;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
+.cm-chips button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
+.cm-pub{flex:0 0 auto;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:14px;padding:9px 16px;cursor:pointer;white-space:nowrap;box-shadow:0 6px 18px rgba(207,234,92,.18);}
+.cm-list{display:flex;flex-direction:column;gap:10px;}
+@media (max-width:640px){ .cm-pub-top{width:42px;height:42px;padding:0;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;} .cm-pub-top span{display:none;} }
+.cm-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:20px;background:var(--court-elevated-2);border:1px solid var(--line-soft);cursor:pointer;transition:border-color .15s,background .15s;}
+.cm-card:hover{border-color:var(--line-soft-strong);}
+.cm-card:active{background:rgba(207,234,92,.06);}
+.cm-card.past{opacity:.6;}
+.cm-date{width:52px;height:56px;flex:none;border-radius:14px;background:linear-gradient(160deg,var(--ball),#9FBF3A);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
+.cm-date b{font-family:var(--font-display);font-size:22px;}
+.cm-date span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+.cm-date.soft{background:rgba(207,234,92,.14);color:var(--ball);}
+.cm-date-av{background:none !important;}
+.cm-date-av .cm-av{width:48px;height:48px;border-radius:50%;font-size:16px;}
+.cm-body{flex:1;min-width:0;}
+.cm-kind{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cm-kind .tag{font-size:11px;}
+.cm-t{font-size:16px;font-weight:700;line-height:1.3;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
+.cm-meta{font-size:13px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cm-foot{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.cm-avs{display:flex;flex:none;}
+.cm-avs-i,.cm-av{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;flex:none;}
+.cm-avs-i{width:24px;height:24px;border-radius:50%;font-size:10px;box-shadow:0 0 0 2px var(--court-elevated-2);}
+.cm-avs-i + .cm-avs-i{margin-left:-7px;}
+.cm-ppl{flex:1;min-width:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cm-act{flex:none;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:14px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
+.cm-act.on{background:rgba(207,234,92,.16);color:var(--ball);}
+.cm-tag{flex:none;font-size:12px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border-radius:999px;padding:4px 10px;}
+.cm-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:28px 16px;border-radius:20px;border:1.5px dashed var(--line-soft-strong);}
+.cm-empty-ic{font-size:34px;}
+.cm-empty span{font-size:14px;color:var(--muted);margin-bottom:8px;}
+.cm-old{margin-top:16px;}
+.cm-old summary{cursor:pointer;list-style:none;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 2px 10px;}
+.cm-old summary::-webkit-details-marker{display:none;}
+.cm-old summary:before{content:'▸ ';}
+.cm-old[open] summary:before{content:'▾ ';}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -2269,6 +2309,7 @@ function myDisplayName(){
 function sheetModalHTML(){
   if(MODAL.sheet === 'wizard') return wizardSheetHTML();
   if(MODAL.sheet === 'annonce') return annSheetHTML();
+  if(MODAL.sheet === 'pcompose') return partnerComposerSheetHTML();
   const k = MODAL.sheet;
   const ORGS = { 'org-membres':['👥','Membres','Joueurs et invitations'], 'org-comptes':['🔑','Comptes','Approbations et accès'], 'org-rapport':['📊','Rapport','Qui joue où'], 'org-general':['⚙️','Paramètres','Nom et lien d\'invitation'] };
   const og = ORGS[k];
@@ -2445,6 +2486,7 @@ async function createPartnerPost(btn){
   PARTNER_FLASH = true;
   PARTNER_DRAFT = { message:'', date:'', time:'' };
   PARTNER_AUD.people = [];
+  if(MODAL && MODAL.sheet === 'pcompose'){ MODAL_UNDER = null; MODAL = null; }
   render();
 }
 let PARTNER_FLASH = false;
@@ -2481,7 +2523,126 @@ function deletePartnerPost(id){
     render();
   });
 }
-function partnerBoardHTML(){
+// ======================= COMMUNAUTÉ : un seul fil =======================
+// Événements et recherches de partenaire réunis dans un fil trié par date, avec un seul
+// bouton « + Publier ». Les éléments passés ou comblés sont repliés en bas.
+function cmNamesLine(names){
+  names = names.map(n=>String(n || 'Membre').trim()).filter(Boolean);
+  // Plusieurs personnes : prénoms seulement, pour que la ligne tienne sur un téléphone.
+  if(names.length > 1) names = names.map(n=>n.split(' ')[0]);
+  if(!names.length) return '';
+  if(names.length === 1) return names[0];
+  if(names.length <= 3) return names.slice(0,-1).join(', ') + ' et ' + names[names.length-1];
+  return names.slice(0,2).join(', ') + ' et ' + (names.length-2) + ' autres';
+}
+function cmAvatarsHTML(people){
+  const shown = people.slice(0,3);
+  return shown.length ? `<span class="cm-avs">${shown.map(x=>avatarHTML('cm-avs-i', partnerInitials(x.name), x.avatar_url)).join('')}</span>` : '';
+}
+function cmDateHTML(dateStr, soft){
+  return `<div class="cm-date${soft?' soft':''}"><b>${eventDayNum(dateStr)}</b><span>${escapeHTML(eventMonthAbbr(dateStr))}</span></div>`;
+}
+function cmEventCardHTML(e, showKind){
+  const todayStr = fmtDate(new Date());
+  const past = (e.event_date || '') < todayStr;
+  const rsvps = (SOCIAL_EVENT_RSVPS && SOCIAL_EVENT_RSVPS[e.id]) || [];
+  const going = rsvps.filter(r=>r.status==='going');
+  const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
+  const iGo = !!(mine && mine.status==='going');
+  const meta = [e.event_time ? '🕖 ' + fmtHM(e.event_time) : '', e.location ? '📍 ' + e.location : ''].filter(Boolean).join(' · ');
+  const act = past ? '' : `<button type="button" class="cm-act${iGo?' on':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${iGo?'✓ Je viens':'Je viens'}</button>`;
+  return `<div class="cm-card${past?' past':''}" onclick="openEventDetail('${e.id}')">
+    ${cmDateHTML(e.event_date)}
+    <div class="cm-body">
+      ${showKind ? `<div class="cm-kind">🎉 Événement${eventOrgTagHTML(e)}</div>` : ''}
+      <div class="cm-t">${escapeHTML(e.title)}</div>
+      ${meta ? `<div class="cm-meta">${escapeHTML(meta)}</div>` : ''}
+      <div class="cm-foot">${going.length ? cmAvatarsHTML(going) + `<span class="cm-ppl">${escapeHTML(cmNamesLine(going.map(r=>r.name)))}</span>` : `<span class="cm-ppl">Sois le premier !</span>`}${act}</div>
+    </div>
+  </div>`;
+}
+function cmPartnerCardHTML(p, showKind){
+  const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
+  const closed = p.status !== 'open';
+  const interested = Array.isArray(p.interested) ? p.interested : [];
+  const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+  const people = partnerParticipants(p);
+  const meta = [p.play_time ? '🕖 ' + fmtHM(p.play_time) : '', partnerAudienceTag(p)].filter(Boolean).join(' · ');
+  const act = (closed || mine) ? (closed ? '<span class="cm-tag">Comblé</span>' : '') : `<button type="button" class="cm-act${iAmIn?' on':''}" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn?'✓ Partant(e)':'Partant(e)'}</button>`;
+  return `<div class="cm-card${closed?' past':''}" onclick="openPartnerPostDetail('${p.id}')">
+    ${p.play_date ? cmDateHTML(p.play_date, true) : `<div class="cm-date soft cm-date-av">${avatarHTML('cm-av', partnerInitials(p.author_name), p.avatar_url)}</div>`}
+    <div class="cm-body">
+      <div class="cm-kind">${showKind ? '🤝 Partenaire · ' : ''}${escapeHTML(p.author_name || '')} · ${partnerRelTime(p.created_at)}</div>
+      <div class="cm-t">${escapeHTML(p.message)}</div>
+      ${meta ? `<div class="cm-meta">${escapeHTML(meta)}</div>` : ''}
+      <div class="cm-foot">${people.length > 1 ? cmAvatarsHTML(people) + `<span class="cm-ppl">${escapeHTML(cmNamesLine(people.map(x=>x.name)))}</span>` : `<span class="cm-ppl">${mine ? 'Personne n\'a encore répondu' : 'Sois le premier !'}</span>`}${act}</div>
+    </div>
+  </div>`;
+}
+// filter : 'tout' | 'evenements' | 'partenaire' ; inSheet : affiché dans un panneau (pas de pastilles de filtre).
+function communityFeedHTML(filter, inSheet){
+  if(['tout','evenements','partenaire'].indexOf(filter) === -1) filter = 'tout';
+  const today = fmtDate(new Date());
+  // Noms des personnes visées par MES annonces ciblées : chargés une fois.
+  const porg = partnerOrgId();
+  if(porg && !ORG_PEOPLE[porg] && (PARTNER_POSTS||[]).some(x=>x.audience==='people' && CURRENT_PROFILE && x.profile_id===CURRENT_PROFILE.id)){
+    loadOrgPeople().then(function(){ realtimeSoftRender(); });
+  }
+  const items = [];
+  if(filter !== 'partenaire') (SOCIAL_EVENTS||[]).forEach(e=>items.push({ kind:'ev', key:e.event_date || '', past:(e.event_date || '') < today, x:e }));
+  if(filter !== 'evenements') (PARTNER_POSTS||[]).forEach(p=>items.push({ kind:'pt', key:p.play_date || String(p.created_at || '').slice(0,10), past: p.status !== 'open' || !!(p.play_date && p.play_date < today), x:p }));
+  const up = items.filter(i=>!i.past).sort((a,b)=>String(a.key).localeCompare(String(b.key)));
+  const old = items.filter(i=>i.past).sort((a,b)=>String(b.key).localeCompare(String(a.key)));
+  const showKind = filter === 'tout';
+  const card = i=> i.kind === 'ev' ? cmEventCardHTML(i.x, showKind) : cmPartnerCardHTML(i.x, showKind);
+  const chips = [['tout','Tout'],['evenements','Événements'],['partenaire','Partenaires']];
+  let h = `<div class="cm-top">
+    ${inSheet ? '<span style="flex:1;"></span>' : `<div class="cm-chips">${chips.map(([k,l])=>`<button type="button" class="${filter===k?'on':''}" onclick="setPComm('${k}')">${l}</button>`).join('')}</div>`}
+    <button type="button" class="cm-pub cm-pub-top" onclick="openPublishMenu()" aria-label="Publier">＋<span> Publier</span></button>
+  </div>`;
+  h += up.length ? `<div class="cm-list">${up.map(card).join('')}</div>`
+    : `<div class="cm-empty"><div class="cm-empty-ic">🎉</div><b>Rien de prévu pour l'instant</b><span>Lance quelque chose : une partie, une sortie, un tournoi…</span><button type="button" class="cm-pub" onclick="openPublishMenu()">＋ Publier</button></div>`;
+  if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="cm-list">${old.map(card).join('')}</div></details>`;
+  return h;
+}
+function openPublishMenu(){
+  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const row = (ic, t, sub, fn)=>`<button type="button" class="pf-row" onclick="${fn}"><span class="ic">${ic}</span><span class="t">${t}<small>${sub}</small></span><span class="ch">›</span></button>`;
+  showContentModal('Publier', `<div class="pf-list">
+    ${row('🤝', 'Chercher un partenaire', 'Une partie, un match amical, un remplaçant…', 'openPartnerComposer()')}
+    ${isAdmin ? row('🎉', 'Organiser un événement', 'Soirée, tournoi, rencontre de l\'organisation', 'openNewSocialEventModal()') : ''}
+    ${isAdmin && (PUSH_SUPPORTED || isIOSDevice()) ? row('📣', 'Envoyer une annonce', 'Notification à l\'organisation, une ligue ou des joueurs', 'openSendAnnouncementModal()') : ''}
+  </div>`);
+}
+function openPartnerComposer(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); }
+function partnerComposerSheetHTML(){
+  const today = fmtDate(new Date());
+  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="chat-sheet an-sheet">
+      <div class="chat-head">
+        <div class="chat-head-ico">🤝</div>
+        <div class="chat-head-txt"><div class="chat-head-title">Chercher un partenaire</div><div class="chat-head-sub">Une partie, un match amical, un remplaçant…</div></div>
+        <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
+      </div>
+      <div class="sheet-body" data-key="pcompose">
+        <div class="compose-box pc" style="border:0;padding:0;background:none;box-shadow:none;">
+          <div class="an-sec" style="margin-top:2px;">Message</div>
+          <textarea id="partnerMessageInput" rows="4" maxlength="300" oninput="savePartnerDraft()" placeholder="Ex. : Cherche un partenaire samedi matin, niveau intermédiaire.">${escapeHTML(PARTNER_DRAFT.message)}</textarea>
+          <div class="pc-row">
+            <label class="pc-field"><span>📅 Date (facultatif)</span><input type="date" id="partnerDateInput" min="${today}" onchange="savePartnerDraft()" value="${escapeHTML(PARTNER_DRAFT.date)}"></label>
+            <label class="pc-field"><span>🕖 Heure</span><input type="time" id="partnerTimeInput" onchange="savePartnerDraft()" value="${escapeHTML(PARTNER_DRAFT.time)}"></label>
+          </div>
+          ${partnerAudienceHTML()}
+          <button class="btn btn-primary pc-send" onclick="createPartnerPost(this)">Publier</button>
+          <div id="partnerStatus" class="pc-status"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+// Anciens points d'entrée (panneaux Partenaire / Événements, ouverture depuis une notification) : le même fil, filtré.
+function partnerBoardHTML(){ return communityFeedHTML('partenaire', true); }
+function partnerBoardHTML_legacy(){
   const today = fmtDate(new Date());
   // Noms des personnes visées par MES annonces ciblées : chargés une fois, puis seule la liste est rafraîchie.
   const porg = partnerOrgId();
@@ -2782,7 +2943,8 @@ async function setMyRsvp(eventId, status){
 function eventDayNum(s){ const d = new Date(s+'T00:00:00'); return d.getDate(); }
 function eventMonthAbbr(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { month:'short' }).toUpperCase().replace('.',''); }
 function eventDateLabel(s){ const d = new Date(s+'T00:00:00'); return d.toLocaleDateString('fr-CA', { weekday:'long', day:'numeric', month:'long' }); }
-function socialEventsHTML(){
+function socialEventsHTML(){ return communityFeedHTML('evenements', true); }
+function socialEventsHTML_legacy(){
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
   return `${isAdmin ? `<div class="compose-box pc">
       <div class="pc-title">Nouvel événement</div>
@@ -6253,8 +6415,8 @@ function adminOrgsHTML(){
 }
 // ---- Communauté admin ----
 function adminCommHTML(){
-  const ann = `<div class="pf-list" style="margin-bottom:14px;"><button class="pf-row an-entry" onclick="openSendAnnouncementModal()"><span class="ic">📣</span><span class="t">Nouvelle annonce<small>Notifier l'organisation, une ligue ou des joueurs</small></span><span class="ch">›</span></button></div>`;
-  return ann + accountCommHTML(null);
+  // L'annonce de l'admin passe par « + Publier » (même menu que les joueurs, avec les choix admin en plus).
+  return accountCommHTML(null);
 }
 // ---- Moi admin ----
 function adminMeHTML(canViewAsPlayer, canViewAsSub){
@@ -12102,6 +12264,7 @@ function setPAcc(t){
 function setPComm(k){
   VIEW.pcomm = k;
   if(k==='calendrier'){ CAL_MONTH=null; CAL_SEL=null; CAL_LEAGUES=null; setTimeout(loadCalLeagues,0); }
+  else if(k==='tout'){ markQuickSeen('partenaire'); markQuickSeen('evenements'); }
   else markQuickSeen(k==='partenaire' ? 'partenaire' : 'evenements');
   render();
 }
@@ -12433,9 +12596,7 @@ function accountOrgsHTML(me){
 }
 // ---- Communauté ----
 function accountCommHTML(me){
-  const segs = [['evenements','Événements'],['partenaire','Partenaire']];
-  const k = segs.some(x=>x[0]===VIEW.pcomm) ? VIEW.pcomm : 'evenements';
-  return `${accSeg(segs, k, 'setPComm')}<div style="margin-top:14px;">${k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML()}</div>`;
+  return communityFeedHTML(VIEW.pcomm || 'tout', false);
 }
 // ---- Moi ----
 function accountMeHTML(me){
