@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 347">
+<meta name="app-build" content="Version 348">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1289,46 +1289,35 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .lg-rating span{font-size:14px;font-weight:600;color:var(--muted);flex:0 0 auto;}
 .lg-rating input{width:92px;flex:0 0 auto;text-align:center;font-family:var(--font-display);font-size:18px;padding:8px 10px;border-radius:12px;}
 .lg-rating small{font-size:12px;color:var(--muted);}
-.cm-top{display:flex;align-items:center;gap:10px;margin:2px 0 14px;}
-.cm-chips{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;}
-.cm-chips::-webkit-scrollbar{display:none;}
-.cm-chips button{flex:0 0 auto;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
-.cm-chips button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
-.cm-pub{flex:0 0 auto;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:14px;padding:9px 16px;cursor:pointer;white-space:nowrap;box-shadow:0 6px 18px rgba(207,234,92,.18);}
-.cm-list{display:flex;flex-direction:column;gap:10px;}
-@media (max-width:640px){ .cm-pub-top{width:42px;height:42px;padding:0;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;} .cm-pub-top span{display:none;} }
-.cm-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:20px;background:var(--court-elevated-2);border:1px solid var(--line-soft);cursor:pointer;transition:border-color .15s,background .15s;}
+.cm-top{display:flex;align-items:center;gap:10px;margin:2px 0 6px;}
+.cm-seg{flex:1;min-width:0;margin:0;}
+.cm-seg button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:700;border-radius:999px;padding:10px 8px;cursor:pointer;transition:background .2s,color .2s;white-space:nowrap;}
+.cm-seg button.on{background:var(--ball);color:var(--court);}
+.cm-pub{flex:0 0 auto;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:15px;padding:11px 18px;cursor:pointer;white-space:nowrap;box-shadow:0 8px 22px rgba(207,234,92,.22);transition:transform .15s;}
+.cm-pub:active{transform:scale(.96);}
+@media (max-width:640px){ .cm-pub{width:46px;height:46px;padding:0;font-size:24px;line-height:1;display:flex;align-items:center;justify-content:center;} .cm-pub span{display:none;} }
+.cm-grid{margin-bottom:4px;}
+.cm-card{transition:transform .15s ease, border-color .15s ease;}
 .cm-card:hover{border-color:var(--line-soft-strong);}
-.cm-card:active{background:rgba(207,234,92,.06);}
-.cm-card.past{opacity:.6;}
-.cm-date{width:52px;height:56px;flex:none;border-radius:14px;background:linear-gradient(160deg,var(--ball),#9FBF3A);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
-.cm-date b{font-family:var(--font-display);font-size:22px;}
-.cm-date span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
-.cm-date.soft{background:rgba(207,234,92,.14);color:var(--ball);}
-.cm-date-av{background:none !important;}
-.cm-date-av .cm-av{width:48px;height:48px;border-radius:50%;font-size:16px;}
-.cm-body{flex:1;min-width:0;}
-.cm-kind{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cm-kind .tag{font-size:11px;}
-.cm-t{font-size:16px;font-weight:700;line-height:1.3;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
-.cm-meta{font-size:13px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cm-foot{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.cm-card:active{transform:scale(.985);}
+.cm-card.past{opacity:.55;}
+.cm-card .ah-cta{transition:transform .12s ease, background .2s ease;}
+.cm-card .ah-cta:active{transform:scale(.95);}
+.cm-msg{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;flex:1;min-width:0;}
+.cm-ppl-row{display:flex;align-items:center;gap:8px;min-height:24px;}
 .cm-avs{display:flex;flex:none;}
-.cm-avs-i,.cm-av{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;flex:none;}
-.cm-avs-i{width:24px;height:24px;border-radius:50%;font-size:10px;box-shadow:0 0 0 2px var(--court-elevated-2);}
+.cm-avs-i{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;flex:none;width:24px;height:24px;border-radius:50%;font-size:10px;box-shadow:0 0 0 2px var(--court-elevated-2);}
 .cm-avs-i + .cm-avs-i{margin-left:-7px;}
 .cm-ppl{flex:1;min-width:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cm-act{flex:none;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:14px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
-.cm-act.on{background:rgba(207,234,92,.16);color:var(--ball);}
-.cm-tag{flex:none;font-size:12px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border-radius:999px;padding:4px 10px;}
-.cm-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:28px 16px;border-radius:20px;border:1.5px dashed var(--line-soft-strong);}
+.cm-empty{align-items:center;text-align:center;}
 .cm-empty-ic{font-size:34px;}
-.cm-empty span{font-size:14px;color:var(--muted);margin-bottom:8px;}
-.cm-old{margin-top:16px;}
-.cm-old summary{cursor:pointer;list-style:none;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 2px 10px;}
+.cm-empty span{font-size:14px;color:var(--muted);}
+.cm-empty .ah-cta{align-self:center;border:0;cursor:pointer;font-family:inherit;}
+.cm-old{margin-top:14px;}
+.cm-old summary{cursor:pointer;list-style:none;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 2px 8px;}
 .cm-old summary::-webkit-details-marker{display:none;}
-.cm-old summary:before{content:'▸ ';}
-.cm-old[open] summary:before{content:'▾ ';}
+.cm-old summary:after{content:' ›';display:inline-block;transition:transform .2s;}
+.cm-old[open] summary:after{transform:rotate(90deg);}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -2501,9 +2490,12 @@ async function togglePartnerInterest(id){
   const list = Array.isArray(post.interested) ? post.interested.slice() : [];
   const already = list.some(x=>x.profile_id===CURRENT_PROFILE.id);
   const next = already ? list.filter(x=>x.profile_id!==CURRENT_PROFILE.id) : [...list, { profile_id: CURRENT_PROFILE.id, name: myDisplayName(), avatar_url: CURRENT_PROFILE.avatar_url || null }];
-  await sb.from('partner_posts').update({ interested: next }).eq('id', id);
+  const before = post.interested;
+  post.interested = next; render(); // tout de suite à l'écran
+  const { error } = await sb.from('partner_posts').update({ interested: next }).eq('id', id);
+  if(error){ post.interested = before; render(); showAlert("Ta réponse n'a pas pu être enregistrée. Réessaie."); return; }
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
-  render();
+  realtimeSoftRender();
 }
 async function togglePartnerStatus(id){
   const post = PARTNER_POSTS.find(p=>p.id===id);
@@ -2539,45 +2531,64 @@ function cmAvatarsHTML(people){
   const shown = people.slice(0,3);
   return shown.length ? `<span class="cm-avs">${shown.map(x=>avatarHTML('cm-avs-i', partnerInitials(x.name), x.avatar_url)).join('')}</span>` : '';
 }
-function cmDateHTML(dateStr, soft){
-  return `<div class="cm-date${soft?' soft':''}"><b>${eventDayNum(dateStr)}</b><span>${escapeHTML(eventMonthAbbr(dateStr))}</span></div>`;
+// Bloc date : exactement celui des cartes de ligue de l'Accueil (jour · numéro · mois).
+function cmDateHTML(dateStr){
+  const p = dateStr ? frDateParts(dateStr) : null;
+  if(!p || !p.d) return `<div class="ah-d off"><span>Date</span><b>—</b><span>libre</span></div>`;
+  return `<div class="ah-d"><span>${escapeHTML(p.day.slice(0,3))}</span><b>${p.d.getDate()}</b><span>${escapeHTML(FR_MONTHS_SHORT[p.d.getMonth()])}</span></div>`;
 }
-function cmEventCardHTML(e, showKind){
+function cmPeopleHTML(people, emptyText){
+  return people.length
+    ? `<div class="cm-ppl-row">${cmAvatarsHTML(people)}<span class="cm-ppl">${escapeHTML(cmNamesLine(people.map(x=>x.name)))}</span></div>`
+    : `<div class="cm-ppl-row"><span class="cm-ppl">${escapeHTML(emptyText)}</span></div>`;
+}
+function cmEventCardHTML(e){
   const todayStr = fmtDate(new Date());
   const past = (e.event_date || '') < todayStr;
   const rsvps = (SOCIAL_EVENT_RSVPS && SOCIAL_EVENT_RSVPS[e.id]) || [];
   const going = rsvps.filter(r=>r.status==='going');
   const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
   const iGo = !!(mine && mine.status==='going');
-  const meta = [e.event_time ? '🕖 ' + fmtHM(e.event_time) : '', e.location ? '📍 ' + e.location : ''].filter(Boolean).join(' · ');
-  const act = past ? '' : `<button type="button" class="cm-act${iGo?' on':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${iGo?'✓ Je viens':'Je viens'}</button>`;
-  return `<div class="cm-card${past?' past':''}" onclick="openEventDetail('${e.id}')">
+  const st = past ? { cls:'off', label:'Terminé' } : (iGo ? { cls:'on', label:'Inscrit(e)' } : { cls:'wait', label:'Événement' });
+  const meta = [e.event_time ? fmtHM(e.event_time) : '', e.location || ''].filter(Boolean).join(' · ');
+  const cta = past ? '' : `<button type="button" class="ah-cta${iGo?' ghost':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${iGo?'Je ne viens plus':'Je viens'}</button>`;
+  return `<div class="ah-lg cm-card${past?' past':''}" onclick="openEventDetail('${e.id}')">
     ${cmDateHTML(e.event_date)}
-    <div class="cm-body">
-      ${showKind ? `<div class="cm-kind">🎉 Événement${eventOrgTagHTML(e)}</div>` : ''}
-      <div class="cm-t">${escapeHTML(e.title)}</div>
-      ${meta ? `<div class="cm-meta">${escapeHTML(meta)}</div>` : ''}
-      <div class="cm-foot">${going.length ? cmAvatarsHTML(going) + `<span class="cm-ppl">${escapeHTML(cmNamesLine(going.map(r=>r.name)))}</span>` : `<span class="cm-ppl">Sois le premier !</span>`}${act}</div>
+    <div class="ah-b">
+      <div class="ah-top"><b>${escapeHTML(e.title)}</b><span class="ah-st ${st.cls}">${st.label}</span></div>
+      ${meta ? `<div class="ah-meta">🎉 ${escapeHTML(meta)}${eventOrgTagHTML(e)}</div>` : `<div class="ah-meta">🎉 Événement de l'organisation${eventOrgTagHTML(e)}</div>`}
+      ${cmPeopleHTML(going, 'Sois le premier !')}
+      ${cta}
     </div>
   </div>`;
 }
-function cmPartnerCardHTML(p, showKind){
+function cmPartnerCardHTML(p){
   const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
   const closed = p.status !== 'open';
   const interested = Array.isArray(p.interested) ? p.interested : [];
-  const iAmIn = CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id);
+  const iAmIn = !!(CURRENT_PROFILE && interested.some(x=>x.profile_id===CURRENT_PROFILE.id));
   const people = partnerParticipants(p);
-  const meta = [p.play_time ? '🕖 ' + fmtHM(p.play_time) : '', partnerAudienceTag(p)].filter(Boolean).join(' · ');
-  const act = (closed || mine) ? (closed ? '<span class="cm-tag">Comblé</span>' : '') : `<button type="button" class="cm-act${iAmIn?' on':''}" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn?'✓ Partant(e)':'Partant(e)'}</button>`;
-  return `<div class="cm-card${closed?' past':''}" onclick="openPartnerPostDetail('${p.id}')">
-    ${p.play_date ? cmDateHTML(p.play_date, true) : `<div class="cm-date soft cm-date-av">${avatarHTML('cm-av', partnerInitials(p.author_name), p.avatar_url)}</div>`}
-    <div class="cm-body">
-      <div class="cm-kind">${showKind ? '🤝 Partenaire · ' : ''}${escapeHTML(p.author_name || '')} · ${partnerRelTime(p.created_at)}</div>
-      <div class="cm-t">${escapeHTML(p.message)}</div>
-      ${meta ? `<div class="cm-meta">${escapeHTML(meta)}</div>` : ''}
-      <div class="cm-foot">${people.length > 1 ? cmAvatarsHTML(people) + `<span class="cm-ppl">${escapeHTML(cmNamesLine(people.map(x=>x.name)))}</span>` : `<span class="cm-ppl">${mine ? 'Personne n\'a encore répondu' : 'Sois le premier !'}</span>`}${act}</div>
+  const st = closed ? { cls:'off', label:'Comblé' } : (mine ? { cls:'off', label:'Mon annonce' } : (iAmIn ? { cls:'on', label:'Partant(e)' } : { cls:'wait', label:'Partenaire' }));
+  const meta = ['🤝 ' + (p.author_name || ''), p.play_time ? fmtHM(p.play_time) : '', partnerAudienceTag(p)].filter(Boolean).join(' · ');
+  const cta = (closed || mine) ? '' : `<button type="button" class="ah-cta${iAmIn?' ghost':''}" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn?'Je me retire':'Je suis partant(e)'}</button>`;
+  return `<div class="ah-lg cm-card${closed?' past':''}" onclick="openPartnerPostDetail('${p.id}')">
+    ${cmDateHTML(p.play_date)}
+    <div class="ah-b">
+      <div class="ah-top"><b class="cm-msg">${escapeHTML(p.message)}</b><span class="ah-st ${st.cls}">${st.label}</span></div>
+      <div class="ah-meta">${escapeHTML(meta)}</div>
+      ${people.length > 1 ? cmPeopleHTML(people, '') : cmPeopleHTML([], mine ? "Personne n'a encore répondu" : 'Sois le premier !')}
+      ${cta}
     </div>
   </div>`;
+}
+// Regroupe le fil comme un agenda : Cette semaine · Plus tard · Sans date.
+function cmGroupLabel(key, hasDate, today){
+  if(!hasDate) return 'Sans date';
+  const d0 = new Date(today + 'T00:00:00'), d = new Date(key + 'T00:00:00');
+  const days = Math.round((d - d0) / 86400000);
+  if(days <= 0) return "Aujourd'hui";
+  if(days < 7) return 'Cette semaine';
+  return 'Plus tard';
 }
 // filter : 'tout' | 'evenements' | 'partenaire' ; inSheet : affiché dans un panneau (pas de pastilles de filtre).
 function communityFeedHTML(filter, inSheet){
@@ -2589,20 +2600,28 @@ function communityFeedHTML(filter, inSheet){
     loadOrgPeople().then(function(){ realtimeSoftRender(); });
   }
   const items = [];
-  if(filter !== 'partenaire') (SOCIAL_EVENTS||[]).forEach(e=>items.push({ kind:'ev', key:e.event_date || '', past:(e.event_date || '') < today, x:e }));
-  if(filter !== 'evenements') (PARTNER_POSTS||[]).forEach(p=>items.push({ kind:'pt', key:p.play_date || String(p.created_at || '').slice(0,10), past: p.status !== 'open' || !!(p.play_date && p.play_date < today), x:p }));
-  const up = items.filter(i=>!i.past).sort((a,b)=>String(a.key).localeCompare(String(b.key)));
+  if(filter !== 'partenaire') (SOCIAL_EVENTS||[]).forEach(e=>items.push({ kind:'ev', key:e.event_date || '', dated:true, past:(e.event_date || '') < today, x:e }));
+  if(filter !== 'evenements') (PARTNER_POSTS||[]).forEach(p=>items.push({ kind:'pt', key:p.play_date || '', dated:!!p.play_date, past: p.status !== 'open' || !!(p.play_date && p.play_date < today), x:p }));
+  const up = items.filter(i=>!i.past).sort((a,b)=> (a.dated===b.dated ? String(a.key).localeCompare(String(b.key)) : (a.dated ? -1 : 1)));
   const old = items.filter(i=>i.past).sort((a,b)=>String(b.key).localeCompare(String(a.key)));
-  const showKind = filter === 'tout';
-  const card = i=> i.kind === 'ev' ? cmEventCardHTML(i.x, showKind) : cmPartnerCardHTML(i.x, showKind);
-  const chips = [['tout','Tout'],['evenements','Événements'],['partenaire','Partenaires']];
+  const card = i=> i.kind === 'ev' ? cmEventCardHTML(i.x) : cmPartnerCardHTML(i.x);
+  const segs = [['tout','Tout'],['evenements','Événements'],['partenaire','Partenaires']];
   let h = `<div class="cm-top">
-    ${inSheet ? '<span style="flex:1;"></span>' : `<div class="cm-chips">${chips.map(([k,l])=>`<button type="button" class="${filter===k?'on':''}" onclick="setPComm('${k}')">${l}</button>`).join('')}</div>`}
-    <button type="button" class="cm-pub cm-pub-top" onclick="openPublishMenu()" aria-label="Publier">＋<span> Publier</span></button>
+    ${inSheet ? '<span style="flex:1;"></span>' : `<div class="acc-seg cm-seg">${segs.map(([k,l])=>`<button type="button" class="${filter===k?'on':''}" onclick="setPComm('${k}')">${l}</button>`).join('')}</div>`}
+    <button type="button" class="cm-pub" onclick="openPublishMenu()" aria-label="Publier">＋<span> Publier</span></button>
   </div>`;
-  h += up.length ? `<div class="cm-list">${up.map(card).join('')}</div>`
-    : `<div class="cm-empty"><div class="cm-empty-ic">🎉</div><b>Rien de prévu pour l'instant</b><span>Lance quelque chose : une partie, une sortie, un tournoi…</span><button type="button" class="cm-pub" onclick="openPublishMenu()">＋ Publier</button></div>`;
-  if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="cm-list">${old.map(card).join('')}</div></details>`;
+  if(up.length){
+    let cur = null, buf = '';
+    up.forEach(i=>{
+      const g = cmGroupLabel(i.key, i.dated, today);
+      if(g !== cur){ if(cur !== null) buf += `</div>`; buf += `<div class="pc-sec">${g}</div><div class="ah-grid cm-grid">`; cur = g; }
+      buf += card(i);
+    });
+    h += buf + `</div>`;
+  } else {
+    h += `<div class="acc-card cm-empty"><div class="cm-empty-ic">🎉</div><b>Rien de prévu pour l'instant</b><span>Lance quelque chose : une partie, une sortie, un tournoi…</span><button type="button" class="ah-cta" onclick="openPublishMenu()">＋ Publier</button></div>`;
+  }
+  if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="ah-grid cm-grid">${old.map(card).join('')}</div></details>`;
   return h;
 }
 function openPublishMenu(){
@@ -2935,9 +2954,16 @@ function deleteSocialEvent(id){
 async function setMyRsvp(eventId, status){
   if(!CURRENT_PROFILE) return;
   const name = myDisplayName();
-  await sb.from('social_event_rsvps').upsert({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }, { onConflict: 'event_id,profile_id' });
+  // Tout de suite à l'écran, puis enregistrement (retour en arrière si ça échoue).
+  const list = (SOCIAL_EVENT_RSVPS[eventId] || []).slice();
+  const before = list.slice();
+  const i = list.findIndex(r=>r.profile_id===CURRENT_PROFILE.id);
+  if(i === -1) list.push({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }); else list[i] = Object.assign({}, list[i], { status });
+  SOCIAL_EVENT_RSVPS[eventId] = list; render();
+  const { error } = await sb.from('social_event_rsvps').upsert({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }, { onConflict: 'event_id,profile_id' });
+  if(error){ SOCIAL_EVENT_RSVPS[eventId] = before; render(); showAlert("Ta réponse n'a pas pu être enregistrée. Réessaie."); return; }
   await loadSocialEvents();
-  render();
+  realtimeSoftRender();
 }
 // Petits formatteurs partagés entre la liste de pastilles et le détail en modale.
 function eventDayNum(s){ const d = new Date(s+'T00:00:00'); return d.getDate(); }
