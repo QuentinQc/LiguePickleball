@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 352">
+<meta name="app-build" content="Version 353">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2053,6 +2053,9 @@ function notifySessionPublished(session){
       : `${leagueLabel} — session du ${fdl(session.date)}. Tes groupes et matchs sont prêts. Indique dès maintenant si tu es absent(e).`,
     url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group')
   });
+  // Remplaçants déjà prévenus à la création de la session : pas de deuxième message à la publication.
+  if(session.subsNotified) return;
+  session.subsNotified = true;
   invokeSendNotification({
     league_id: CURRENT_LEAGUE_ID,
     audience: 'substitutes', category: 'league_sessions',
@@ -2060,6 +2063,25 @@ function notifySessionPublished(session){
     body: `${leagueLabel} — une session est prévue le ${fdl(session.date)}. Indique ta disponibilité si tu peux remplacer.`,
     url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group')
   });
+}
+// Dès qu'une session est créée (avant la publication des groupes), les remplaçants sont invités
+// à indiquer leur disponibilité : l'admin en a besoin pour compléter les groupes.
+// Envoyé une fois la session enregistrée, pour qu'elle soit bien là quand on ouvre la notification.
+function notifySubsAfterSave(session){
+  if(!session || !CURRENT_LEAGUE_ID || DATA.testMode || DATA.leagueFormat === 'mlp' || !(DATA.substitutePool||[]).length) return;
+  session.subsNotified = true;
+  const leagueId = CURRENT_LEAGUE_ID, leagueLabel = currentLeagueLabel(), w = isRecLeague() ? 'soirée' : 'session';
+  setTimeout(function(){
+    SAVE_CHAIN.then(function(){
+      invokeSendNotification({
+        league_id: leagueId,
+        audience: 'substitutes', category: 'league_sessions',
+        title: '📅 Nouvelle session — es-tu disponible ?',
+        body: `${leagueLabel} — ${w} du ${fdl(session.date)}. Es-tu disponible pour remplacer ? Indique-le dans l'app.`,
+        url: goUrl('league:' + leagueId + ':group')
+      });
+    });
+  }, 0);
 }
 // Appelé quand l'admin finalise une session (montées/descentes appliquées) —
 // prévient les joueurs que les résultats/le classement sont à jour.
@@ -10076,12 +10098,12 @@ function checkAndStartSession(explicitDate){
   if(seasonEnd && date > seasonEnd) warnings.push(`le ${date} dépasse la fin de saison configurée (${seasonEnd})`);
   if(warnings.length){
     showConfirm(`Attention : ${warnings.join(' et ')}. Créer quand même une session pour cette date ?`, ()=>{
-      startNewSession(date);
+      notifySubsAfterSave(startNewSession(date));
       saveAndRender();
     });
     return;
   }
-  startNewSession(date);
+  notifySubsAfterSave(startNewSession(date));
   saveAndRender();
 }
 // ---------- Lancement d'une session : présentation simplifiée ----------
@@ -10659,6 +10681,8 @@ function autoStartNextSession(lastSessionDate){
   if(DATA.autoPublishSessions){
     session.published = true;
     notifySessionPublished(session);
+  } else {
+    notifySubsAfterSave(session);
   }
   // On bascule directement sur la nouvelle session, pour que ce soit visible
   // à l'écran tout de suite plutôt que de rester sur la session terminée.
@@ -12267,45 +12291,75 @@ async function updateCurrentLeagueMeta(name, scheduleLabel){
 function renderSubstitute(subId){
   const sub = (DATA.substitutePool||[]).find(s=>s.id===subId);
   if(!sub){
-    app.innerHTML = `${topbarHTML('Remplaçant')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
+    app.innerHTML = `${shellTopbarHTML('Remplaçant', '', false, '')}<div class="card"><p class="empty">Profil de remplaçant introuvable — contacte un administrateur.</p></div>`;
     return;
   }
-  const rawTabs = [['dispo','Disponibilité','🗓️'],['historique','Historique','📜']];
-  const tabs = filterTabs(rawTabs, DATA.hiddenSubTabs);
-  const activeTab = tabs.some(t=>t[0]===VIEW.tab) ? VIEW.tab : tabs[0][0];
+  // Même cadre que la vue joueur : Accueil · Organisations · Calendrier · Communauté, et « Moi » par l'avatar.
   const viewSlide = SESSION_USER.role === 'admin' ? viewSlideHTML([
     {label:'Admin', active:false, onclick:'toggleAdminSubView()'},
     {label:'Remplaçant', active:true, onclick:''},
   ]) : '';
-  const allLinks = MY_LEAGUE_LINKS;
-  const orgCount = new Set(allLinks.map(l=>{ const lg=LEAGUES.find(x=>x.id===l.league_id); return lg && lg.organization_id; }).filter(Boolean)).size;
-  const leagueSwitcher = allLinks.length > 1 ? `
-    <div class="drawer-extra-block">
-      <label style="display:block;margin-bottom:6px;">Ma ligue</label>
-      <div class="row" style="gap:6px;">
-        ${allLinks.map(l=>{
-          const lg = LEAGUES.find(x=>x.id===l.league_id);
-          const active = l.league_id===CURRENT_LEAGUE_ID;
-          return `<button class="${active?'btn btn-primary':'btn btn-secondary'}" style="display:flex;flex-direction:column;align-items:center;line-height:1.35;" onclick="switchMyLeague('${l.league_id}')">
-            <span>${escapeHTML(lg ? lg.name : '?')}${lg && lg.schedule_label ? ' — '+escapeHTML(lg.schedule_label) : ''}${l.substitute_id ? ' 🔄' : ''}</span>
-            ${orgCount>1 && lg && lg.organizations ? `<span class="small" style="opacity:0.75;">${escapeHTML(lg.organizations.name)}</span>` : ''}
-          </button>`;
-        }).join('')}
-      </div>
-    </div>` : '';
-  const drawerSettings = `<div class="drawer-extra-block">
-      <button class="btn-ghost" style="width:100%;text-align:left;" onclick="openMyProfileModal()">✏️ Mon profil</button>
-      ${(PUSH_SUPPORTED || isIOSDevice()) ? notificationDrawerButtonHTML() : ''}
-    </div>`;
+  const tabs = [['accueil','Accueil','🏠'],['orgs','Organisations','🏢'],['cal','Calendrier','📅'],['comm','Communauté','👥']];
+  const active = (tabs.some(t=>t[0]===VIEW.ptab) || VIEW.ptab==='moi') ? VIEW.ptab : 'accueil';
+  const firstName = String(sub.name||'').split(' ')[0];
+  const titles = { accueil: 'Bonjour ' + firstName, orgs: 'Organisations', cal: 'Calendrier', comm: 'Communauté', moi: 'Moi' };
+  NAV_NO_MORE = true;
+  const bar = tabsBarHTML(tabs, active, 'setPAcc');
+  NAV_NO_MORE = false;
   app.innerHTML = `
-    ${topbarHTML('Bonjour ' + escapeHTML(sub.name) + ' (remplaçant)', leagueSwitcher + drawerSettings, '', viewSlide, null, null, 'member')}
+    ${shellTopbarHTML(titles[active], viewSlide, false, shellMeBtnHTML(sub.name, 'setPAcc', active==='moi'))}
     ${storageBannerHTML()}${pushPromoBannerHTML()}
-    ${tabsBarHTML(tabs, activeTab, 'setSubstituteTab')}
+    ${bar}
     <div id="tabContent"></div>
-    <div class="bottom-nav-spacer"></div>
-  `;
+    <div class="bottom-nav-spacer"></div>`;
   const c = document.getElementById('tabContent');
-  c.innerHTML = activeTab==='historique' ? substituteHistoryHTML(sub) : (activeTab==='partenaire' ? partnerBoardHTML() : (activeTab==='evenements' ? socialEventsHTML() : substituteAvailabilityHTML(sub)));
+  c.innerHTML = active==='accueil' ? (accHomeLeaguesHTML() + accUpcomingHTML())
+    : active==='orgs' ? (accountOrgsHTML(sub) + leagueSearchEntryHTML())
+    : active==='comm' ? accountCommHTML(sub)
+    : active==='cal' ? calendarSheetHTML()
+    : substituteMeHTML(sub);
+  if(VIEW.pdet) app.insertAdjacentHTML('beforeend', substituteLeagueSheetHTML(sub));
+}
+// Panneau de la ligue (remplaçant) : Disponibilité · Historique.
+function substituteLeagueSheetHTML(sub){
+  const lg = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
+  if(!VIEW.pdet || !lg) return '';
+  const org = myOrgsList().find(o=>o.leagues.some(x=>x.lg.id===lg.id));
+  const segs = [['group','Disponibilité']];
+  if(!(DATA.hiddenSubTabs||[]).includes('historique')) segs.push(['hist','Historique']);
+  const det = segs.some(x=>x[0]===VIEW.pdet) ? VIEW.pdet : 'group';
+  const body = det==='hist' ? substituteHistoryHTML(sub) : substituteAvailabilityHTML(sub);
+  return leagueSheetHTML(lg, org ? org.name : '', 'closeMyLeague()', (segs.length>1 ? lgNavHTML(segs, det, 'setPDet') : '') + familySwitchHTML(), body, det);
+}
+function substituteMeHTML(sub){
+  const nLeagues = MY_LEAGUE_LINKS.length, nOrgs = myOrgsList().length;
+  return meHeroHTML(sub.name, `<span class="pf-chip on">🔄 Remplaçant</span><span class="pf-chip acc">${nOrgs} organisation${nOrgs>1?'s':''}</span><span class="pf-chip acc">${nLeagues} ligue${nLeagues>1?'s':''}</span>`)
+    + `<div class="pf-sec">Mon jeu</div>
+    <div class="pf-list">
+      ${meRow('🗓️', 'Mes disponibilités', 'Indiquer si je peux dépanner', `openMyLeague('${CURRENT_LEAGUE_ID}')`)}
+      ${meRow('📜', 'Sessions dépannées', 'Mon historique comme remplaçant', `openMyLeague('${CURRENT_LEAGUE_ID}');setPDet('hist')`)}
+      ${meRow('📅', 'Mon agenda', 'Ajouter les sessions à mon calendrier', `openCalSubscribe()`)}
+    </div>
+    <div class="pf-sec">Compte</div>
+    <div class="pf-list">
+      ${meRow('👤', 'Mon profil', 'Nom, photo, courriel', `openMyProfileModal()`)}
+      ${meRow('🔔', 'Notifications', 'Être prévenu de chaque nouvelle session', `openNotifSettings()`)}
+      ${isRunningStandalone() ? '' : meRow('📲', "Installer l'app", "Sur l'écran d'accueil de ton téléphone", `openInstallGuide()`)}
+      ${meRow('🎟️', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
+    </div>
+    <div class="pf-sec">Aide</div>
+    <div class="pf-list">
+      ${meRow('📋', 'Règles de la ligue', '', `showLeagueRulesModal()`)}
+    </div>
+    <div class="pf-list pf-danger">${meRow('', 'Déconnexion', '', `logout()`)}</div>`;
+}
+// Bouton « Je suis disponible » directement depuis la carte de l'accueil.
+async function subAvailFromHome(leagueId){
+  const link = MY_LEAGUE_LINKS.find(l=>l.league_id===leagueId && l.substitute_id);
+  if(!link) return;
+  if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); VIEW.ptab = 'accueil'; VIEW.pdet = null; }
+  MY_SUMMARY_AT = 0;
+  toggleSubAvailability(link.substitute_id);
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
 function substituteAvailabilityHTML(sub){
@@ -12326,7 +12380,7 @@ function substituteAvailabilityHTML(sub){
     });
   }
   const placedG = placedGd ? groupById(placedGd.groupId) : null;
-  const chip = placedGd ? `<span class="pf-chip on">${gw(sub,'Placé','Placée','Placé(e)')}</span>` : (available ? `<span class="pf-chip on">${gw(sub,'Disponible','Disponible','Disponible')}</span>` : `<span class="pf-chip acc">Non indiqué</span>`);
+  const chip = placedGd ? `<span class="pf-chip on">${gw(sub,'Placé','Placée','Placé(e)')}</span>` : (available ? `<span class="pf-chip on">${gw(sub,'Disponible','Disponible','Disponible')}</span>` : `<span class="pf-chip acc">À indiquer</span>`);
   let html = `<div class="card"><div class="pf-hero">
       <div class="pf-sec" style="margin:0 0 4px;">Prochaine ${rec?'soirée':'session'}</div>
       <div class="pf-name">${escapeHTML(frDateLong(open.date))}</div>
@@ -12584,6 +12638,24 @@ function summarizeLeagueData(data, link, leagueId){
     out.playDay = typeof data.playDayOfWeek === 'number' ? data.playDayOfWeek : null;
     out.playTime = data.playTime || '';
   }
+  if(data && out.isSub){
+    const sub = (data.substitutePool||[]).find(x=>x.id===link.substitute_id);
+    out.meName = sub ? sub.name : null;
+    const so = (data.sessions||[]).find(x=>x.status==='open');
+    if(so){
+      const enc = 'sub::' + link.substitute_id;
+      let placed = null;
+      if(so.published){
+        (so.groupsData||[]).forEach(gd=>{
+          const subs = gd.substitutes || {};
+          const inIt = Object.keys(subs).some(k=>subs[k]===enc || subs[k]===link.substitute_id) || (gd.extras||[]).indexOf(enc) !== -1;
+          if(inIt && !placed){ const g = (data.groups||[]).find(x=>x.id===gd.groupId); placed = g ? g.name : (isRecLeague(data) ? 'Terrain' : 'Groupe'); }
+        });
+      }
+      out.open = { date: so.date, published: !!so.published, rec: isRecLeague(data), visible: !!so.published, available: (so.availableSubs||[]).indexOf(link.substitute_id) !== -1, placed: placed };
+    }
+    return out;
+  }
   if(!data || out.isSub) return out;
   const me = (data.players||[]).find(x=>x.id===link.player_id);
   if(!me) return out;
@@ -12670,7 +12742,17 @@ function accountHomeHTML(me){
   if(me.injured){
     html += `<div class="acc-card"><div class="acc-eyebrow">Statut</div><div class="acc-big">🤕 Blessé(e)</div><button class="btn btn-secondary acc-btn" onclick="openAbsenceHub('${me.id}')">Gérer mon statut</button></div>`;
   }
-  // Même présentation que l'accueil admin : une section par organisation, une carte par ligue.
+  html += accHomeLeaguesHTML();
+  html += accUpcomingHTML();
+  if(DATA.showRatingToPlayers && MY_LEAGUE_LINKS.length <= 1){
+    const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
+    html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
+  }
+  return html;
+}
+// Une section par organisation, une carte par ligue (joueur ou remplaçant) : même présentation que l'accueil admin.
+function accHomeLeaguesHTML(){
+  let html = '';
   const orgs = myOrgsList();
   orgs.forEach(function(o, i){
     const items = o.leagues.map(function(x){ return { lg: x.lg, link: x.link, sum: leagueSummaryFor(x.lg.id) }; });
@@ -12684,11 +12766,6 @@ function accountHomeHTML(me){
   });
   if(!orgs.length) html += `<p class="empty">Tu n'es dans aucune ligue pour l'instant.</p>${leagueSearchEntryHTML()}`;
   setTimeout(()=>refreshMySummaries(false), 0);
-  html += accUpcomingHTML();
-  if(DATA.showRatingToPlayers && MY_LEAGUE_LINKS.length <= 1){
-    const r = typeof me.rating === 'number' ? me.rating : RATING_DEFAULT;
-    html += `<button type="button" class="acc-row" style="margin-top:14px;" onclick="showRatingExplanationModal()"><span class="acc-row-t"><small>Ma cote</small><b style="font-family:var(--font-display);font-size:28px;">${r.toFixed(2)}</b></span><span class="acc-chev">›</span></button>`;
-  }
   return html;
 }
 // Carte d'une ligue sur l'accueil joueur : même modèle que adminLeagueCardHTML.
@@ -12699,7 +12776,12 @@ function playerLeagueCardHTML(it){
   const absentBtn = function(primary){ return `<button type="button" class="ah-cta${primary ? '' : ' ghost'}" onclick="event.stopPropagation();absenceFromHome('${id}')">${o && o.absent ? 'Modifier mon absence' : 'Je serai absent(e)'}</button>`; };
   let st, ctas = '';
   if(!sum) st = { label:'…', cls:'off' };
-  else if(sum.isSub){ st = { label:'Remplaçant', cls:'off' }; ctas = `<span class="ah-cta ghost">Mes disponibilités</span>`; }
+  else if(sum.isSub){
+    if(!o) st = { label: sum.rec ? 'Aucune soirée' : 'Aucune session', cls:'off' };
+    else if(o.placed){ st = { label:'Placé(e)', cls:'on' }; ctas = `<button type="button" class="ah-cta" onclick="event.stopPropagation();openMyLeague('${id}')">${sum.rec ? 'Voir mon terrain' : 'Voir mes matchs'}</button>`; }
+    else if(o.available){ st = { label:'Disponible', cls:'on' }; ctas = `<button type="button" class="ah-cta ghost" onclick="event.stopPropagation();subAvailFromHome('${id}')">Je ne suis plus disponible</button>`; }
+    else { st = { label:'À indiquer', cls:'wait' }; ctas = `<button type="button" class="ah-cta" onclick="event.stopPropagation();subAvailFromHome('${id}')">Je suis disponible</button>`; }
+  }
   else if(sum.injured){ st = { label:'Blessé(e)', cls:'done' }; ctas = `<span class="ah-cta ghost">Gérer mon statut</span>`; }
   else if(!o) st = { label: sum.rec ? 'Aucune soirée' : 'Aucune session', cls:'off' };
   else if(o.absent){ st = { label:'Absent(e)', cls:'done' }; ctas = absentBtn(false); }
@@ -12722,6 +12804,7 @@ function playerLeagueCardHTML(it){
     const pn = fd ? ((fd.players || []).concat(fd.substitutePool || []).find(function(y){ return y.id === pid; }) || {}).name : (sum && sum.meName);
     if(pn) meta.unshift('👤 ' + escapeHTML(String(pn).split(' ')[0]));
   }
+  if(sum && sum.isSub) meta.push('🔄 Remplaçant' + (o && o.placed ? ' · ' + escapeHTML(o.placed) : ''));
   if(o && o.visible && !o.absent && sum.groupName) meta.push(escapeHTML(sum.groupName));
   if(sum && sum.showRating && !sum.rec && !sum.isSub && typeof sum.rating === 'number') meta.push('Cote ' + sum.rating.toFixed(2));
   return `<div class="ah-lg" onclick="openMyLeague('${id}')">
