@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 355">
+<meta name="app-build" content="Version 356">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2628,10 +2628,16 @@ function cmEventCardHTML(e){
   const rsvps = (SOCIAL_EVENT_RSVPS && SOCIAL_EVENT_RSVPS[e.id]) || [];
   const going = rsvps.filter(r=>r.status==='going');
   const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
-  const iGo = !!(mine && mine.status==='going');
-  const st = past ? { cls:'off', label:'Terminé' } : (iGo ? { cls:'on', label:'Inscrit(e)' } : { cls:'wait', label:'Événement' });
+  const my = mine ? mine.status : null, iGo = my === 'going';
+  // La pastille dit TA réponse ; le bouton propose de la changer (jamais l'inverse, pour éviter la confusion).
+  const st = past ? { cls:'off', label:'Terminé' }
+    : iGo ? { cls:'on', label:'✓ Je viens' }
+    : my === 'maybe' ? { cls:'wait', label:'Peut-être' }
+    : my === 'not_going' ? { cls:'done', label:'Je ne viens pas' }
+    : { cls:'wait', label:'Événement' };
   const meta = [e.event_time ? fmtHM(e.event_time) : '', e.location || ''].filter(Boolean).join(' · ');
-  const cta = past ? '' : `<button type="button" class="ah-cta${iGo?' ghost':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${iGo?'Je ne viens plus':'Je viens'}</button>`;
+  const ctaLabel = iGo ? 'Je ne viens plus' : (my ? 'Finalement, je viens' : 'Je viens');
+  const cta = past ? '' : `<button type="button" class="ah-cta${iGo?' ghost':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${ctaLabel}</button>`;
   return `<div class="ah-lg cm-card${past?' past':''}" onclick="openEventDetail('${e.id}')">
     ${cmDateHTML(e.event_date)}
     <div class="ah-b">
@@ -3238,6 +3244,7 @@ function eventDetailInnerHTML(id){
   const maybe = rsvps.filter(r=>r.status==='maybe');
   const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
   const myStatus = mine ? mine.status : null;
+  const myLine = past ? '' : `<div class="ah-meta" style="margin-top:14px;">Ta réponse : <b style="color:var(--text);">${myStatus==='going' ? '✅ Je viens' : myStatus==='maybe' ? '🤔 Peut-être' : myStatus==='not_going' ? '❌ Je ne viens pas' : 'pas encore répondu'}</b></div>`;
   return `
     <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
       <strong style="font-size:16px;">${escapeHTML(e.title)}</strong>
@@ -3246,7 +3253,8 @@ function eventDetailInnerHTML(id){
     <div class="small" style="margin-top:6px;"><span class="tag">📅 ${escapeHTML(eventDateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${eventOrgTagHTML(e)}${past?' <span class="tag">Terminé</span>':''}</div>
     ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:10px;">${escapeHTML(e.description)}</div>` : ''}
     ${(going.length||maybe.length) ? `<p class="small" style="margin-top:10px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
-    ${!past ? `<div class="row" style="gap:6px;margin-top:14px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+    ${myLine}
+    ${!past ? `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
       <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
       <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
       <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
