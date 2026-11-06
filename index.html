@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 353">
+<meta name="app-build" content="Version 354">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4486,6 +4486,8 @@ function setSubstitute(gid, absentId, subId){
 
   groupsToRefresh.forEach(gId2=>regenerateGroupMatches(open, gId2));
   saveAndRender();
+  // Remplaçant retiré de cette place (ou remplacé par quelqu'un d'autre) : on le prévient.
+  if(oldSub && oldSub !== subId && isSubPoolId(oldSub) && !subsUsedInSession(open).has(oldSub)) notifySubRemoved(oldSub);
 }
 function onSubSelect(gid, absentId, value){
   if(value === '__guest__'){
@@ -4571,21 +4573,40 @@ function addReinforcement(gid, enc){
 function removeReinforcement(gid, enc){
   const open = currentOpenSession(); if(!open) return;
   const gd = open.groupsData.find(x=>x.groupId===gid); if(!gd) return;
-  const go = function(){ gd.extras = (gd.extras || []).filter(x=>x!==enc); regenerateGroupMatches(open, gid); saveAndRender(); };
+  const go = function(){ gd.extras = (gd.extras || []).filter(x=>x!==enc); regenerateGroupMatches(open, gid); saveAndRender(); if(!subsUsedInSession(open).has(enc)) notifySubRemoved(enc); };
   if(groupHasScores(gd)) showConfirm("Des scores sont déjà entrés dans ce " + grpWord() + ". Retirer le renfort refera les matchs et effacera ces scores. Continuer ?", go);
   else go();
 }
 // Avertit le remplaçant (son compte) qu'il a été placé dans un groupe pour la session.
+// Comptes liés à ce remplaçant du bassin dans la ligue courante.
+async function subProfileIds(subId){
+  if(!ALL_PROFILE_PLAYERS.length) await loadAllProfilePlayers();
+  return Array.from(new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.league_id===CURRENT_LEAGUE_ID && pp.substitute_id===subId).map(pp=>pp.profile_id)));
+}
+// Convocation : toujours envoyée (pas filtrée par le réglage « Nouvelles sessions »),
+// et seulement une fois la session enregistrée, pour que la personne se voie placée en ouvrant l'app.
 async function notifySubPlaced(enc, groupName, replacedName){
   try{
     if(!isSubPoolId(enc) || !CURRENT_LEAGUE_ID) return;
-    const subId = enc.slice(5), open = currentOpenSession();
-    if(!ALL_PROFILE_PLAYERS.length) await loadAllProfilePlayers();
-    const profs = new Set(ALL_PROFILE_PLAYERS.filter(pp=>pp.league_id===CURRENT_LEAGUE_ID && pp.substitute_id===subId).map(pp=>pp.profile_id));
+    const subId = enc.slice(5), open = currentOpenSession(), leagueId = CURRENT_LEAGUE_ID, label = currentLeagueLabel();
     const when = open ? fdl(open.date) : 'la prochaine session';
-    profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: CURRENT_LEAGUE_ID, category:'league_sessions',
+    const profs = await subProfileIds(subId);
+    await SAVE_CHAIN;
+    profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: leagueId,
       title: '🎾 Tu joues ' + (open ? 'le ' + when : 'bientôt') + ' !',
-      body: (replacedName ? 'Tu remplaces ' + replacedName : 'Tu viens en renfort') + (groupName ? ' dans le ' + groupName : '') + ' (' + currentLeagueLabel() + ').', url: goUrl('league:' + CURRENT_LEAGUE_ID + ':group') }));
+      body: (replacedName ? 'Tu remplaces ' + replacedName : 'Tu viens en renfort') + (groupName ? ' dans le ' + groupName : '') + ' (' + label + ').', url: goUrl('league:' + leagueId + ':group') }));
+  }catch(e){ console.error(e); }
+}
+// Le remplaçant n'est plus placé pour cette session (retiré ou remplacé par quelqu'un d'autre).
+async function notifySubRemoved(enc){
+  try{
+    if(!isSubPoolId(enc) || !CURRENT_LEAGUE_ID) return;
+    const subId = enc.slice(5), open = currentOpenSession(), leagueId = CURRENT_LEAGUE_ID, label = currentLeagueLabel();
+    const profs = await subProfileIds(subId);
+    await SAVE_CHAIN;
+    profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: leagueId,
+      title: '↩️ Changement : tu ne joues plus' + (open ? ' le ' + fdl(open.date) : ''),
+      body: "L'organisateur a modifié les groupes (" + label + "). Tu restes sur la liste des remplaçants : merci pour ta disponibilité !", url: goUrl('league:' + leagueId + ':group') }));
   }catch(e){ console.error(e); }
 }
 
