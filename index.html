@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 349">
+<meta name="app-build" content="Version 350">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1333,6 +1333,17 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .cmp-body input[type=text],.cmp-body textarea,.cmp-body input[type=date],.cmp-body input[type=time]{width:100%;box-sizing:border-box;}
 .cmp-body textarea{min-height:96px;border-radius:16px;}
 .cmp-body .an-msg textarea{min-height:110px;}
+.pend-card{align-items:center;text-align:center;gap:12px;margin-top:6px;}
+.pend-ic{width:72px;height:72px;border-radius:50%;background:rgba(255,214,10,.14);display:flex;align-items:center;justify-content:center;font-size:34px;}
+.pend-t{margin:0;font-size:16px;line-height:1.5;color:var(--text);max-width:460px;}
+.pend-steps{width:100%;text-align:left;display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.pend-steps .stp-ic.run{background:rgba(255,214,10,.16);border-color:transparent;}
+.pend-steps .stp-ic.run:after{content:'⏳';font-size:14px;}
+.pend-card{margin-top:calc(10px + env(safe-area-inset-top));}
+#app > .card:first-child{margin-top:calc(10px + env(safe-area-inset-top));}
+.pend-note{margin:0;font-size:13px;color:var(--muted);}
+.pend-links{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:14px;}
+.pend-link{background:none;border:0;color:var(--muted);font:inherit;font-size:14px;text-decoration:underline;text-underline-offset:3px;padding:8px;cursor:pointer;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
 .rp-sort{margin:10px -16px 10px;}
@@ -5791,7 +5802,7 @@ function loginFormInnerHTML(){
       <button type="button" class="${mode==='signup'?'on':''}" onclick="setLoginMode('signup')">Créer un compte</button>
     </div>`;
   if(mode === 'signup'){
-    const invite = PENDING_CODE ? `<div class="au-note">🎟️ Tu as été invité(e) : ton invitation sera appliquée dès que ton compte sera créé.</div>`
+    const invite = PENDING_CODE ? `<div class="au-note">✅ Lien d'invitation reconnu. Crée simplement ton compte : <b>tu n'auras aucun code à entrer</b>, tout se fait automatiquement.</div>`
       : SIGNUP_ORG_NAME ? `<div class="au-note">🏢 Organisation : <b>${escapeHTML(SIGNUP_ORG_NAME)}</b></div>`
       : `<div class="au-note">🎟️ Après ta connexion, entre le code d'invitation de ta ligue ou cherche une ligue près de chez toi.</div>`;
     return `${hero('Bienvenue 👋', 'Crée ton compte en quelques secondes.')}${seg}${invite}
@@ -5925,7 +5936,7 @@ async function onAuthResolved(user){
       let msg = null;
       if(r && r.data){
         if(r.data.ok && r.data.org_pending) notifyAdminsOrgJoin(r.data.organization_id);
-        else if(r.data.ok && r.data.pending) notifyAdminsJoinRequest(r.data.league_id, null, 'join');
+        else if(r.data.ok && r.data.pending){ notifyAdminsJoinRequest(r.data.league_id, null, 'join'); rememberJoinPending(r.data.league_id); }
         if(r.data.ok) msg = r.data.org_pending ? orgPendingMsg(r.data) : (r.data.pending ? "Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : inviteAcceptedMsg(r.data));
         else msg = r.data.error || null;
       } else if(r && r.error){ msg = "Invitation : " + r.error.message; }
@@ -6123,7 +6134,7 @@ function inviteOrgMember(idx){
   inviteForEntry(r.refId, r.type==='remplaçant' ? 's' : 'p', false, r.leagueId);
 }
 function orgPendingMsg(d){
-  return "Bienvenue ✅ Ton compte est rattaché à " + ((d && d.organization_name) || "l'organisation") + ". Un administrateur va te placer dans ta ligue : tu seras averti(e) dès que ce sera fait.";
+  return "Inscription reçue ✅ " + ((d && d.organization_name) || "L'organisateur") + " va te placer dans ta ligue. Tu n'as rien d'autre à faire : tu seras averti(e) dès que ce sera fait.";
 }
 function notifyAdminsOrgJoin(orgId){
   if(!orgId) return;
@@ -6144,33 +6155,52 @@ function openInviteCodePrompt(){
     if(error){ showAlert("Erreur : " + error.message); return; }
     if(!data || !data.ok){ showAlert((data && data.error) || 'Code invalide ou expiré.'); return; }
     if(data.org_pending){ notifyAdminsOrgJoin(data.organization_id); const { data: { user } } = await sb.auth.getUser(); await onAuthResolved(user); showAlert(orgPendingMsg(data)); return; }
-    if(data.pending){ notifyAdminsJoinRequest(data.league_id, null, 'join'); showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
+    if(data.pending){ notifyAdminsJoinRequest(data.league_id, null, 'join'); rememberJoinPending(data.league_id); render(); showAlert("Demande envoyée ✅ Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
     const { data: { user } } = await sb.auth.getUser();
     await onAuthResolved(user);
     showAlert(inviteAcceptedMsg(data));
   });
 }
 let PENDING_ORG_NAME = null;
+// Demande envoyée par le lien d'une ligue : gardée sur l'appareil pour afficher « en attente » plutôt que « entre un code ».
+function rememberJoinPending(leagueId){ try{ localStorage.setItem('dinkeo_join_pending', JSON.stringify({ league: leagueId || null, at: Date.now() })); }catch(e){} }
+function joinPendingInfo(){ try{ const j = JSON.parse(localStorage.getItem('dinkeo_join_pending') || 'null'); return (j && Date.now() - j.at < 60*86400000) ? j : null; }catch(e){ return null; } }
 function renderPending(){
-  // Rattaché à une organisation par son lien, mais pas encore placé dans une ligue.
+  // Rattaché à une organisation par son lien, ou demande envoyée par le lien d'une ligue : en attente de l'organisateur.
   const pendingOrgId = CURRENT_PROFILE && CURRENT_PROFILE.organization_id && !CURRENT_PROFILE.is_super_admin ? CURRENT_PROFILE.organization_id : null;
   if(pendingOrgId && PENDING_ORG_NAME === null){
     PENDING_ORG_NAME = '';
     sb.rpc('org_signup_name', { p_id: pendingOrgId }).then(function(r){ if(r && !r.error && r.data){ PENDING_ORG_NAME = r.data; render(); } }, function(){});
   }
+  const waiting = !!(pendingOrgId || joinPendingInfo());
   // Création d'organisation réservée aux super admins pour l'instant (les autres passent par eux).
   const canCreateOrg = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin && !CURRENT_PROFILE.organization_id;
+  const who = PENDING_ORG_NAME || "L'organisateur";
+  const notifOn = PUSH_SUBSCRIBED;
   app.innerHTML = `
-    ${topbarHTML('Compte en attente')}
-    ${storageBannerHTML()}${pushPromoBannerHTML()}
-    <div class="card">
-      <h2>Compte créé ✅</h2>
-      ${pendingOrgId ? `<p class="small">Ton compte est rattaché à <strong>${escapeHTML(PENDING_ORG_NAME || "ton organisation")}</strong>. Un administrateur va te placer dans ta ligue : tu recevras une notification dès que ce sera fait. Tu n'as rien d'autre à faire.</p>`
-        : `<p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton administrateur t'a remis un code d'invitation, entre-le ici. Sinon, cherche une ligue et demande à la rejoindre.</p>`}
-      ${pendingOrgId ? `<button class="btn btn-secondary" onclick="openInviteCodePrompt()">🎟️ J'ai reçu un code personnel</button>` : `<button class="btn btn-primary" onclick="openInviteCodePrompt()">🎟️ J'ai un code d'invitation</button>
-      <button class="btn btn-secondary" onclick="openLeagueSearch()" style="margin-top:8px;">🔍 Trouver une ligue près de chez moi</button>`}
-      <button class="btn btn-secondary" onclick="logout()" style="margin-top:8px;">Déconnexion</button>
+    ${storageBannerHTML()}
+    ${waiting ? `<div class="acc-card pend-card">
+      <div class="pend-ic">⏳</div>
+      <div class="acc-big" style="font-size:28px;">Inscription reçue</div>
+      <p class="pend-t"><b>${escapeHTML(who)}</b> va te placer dans ta ligue. <b>Tu n'as rien d'autre à faire</b> : pas de code à entrer.</p>
+      <div class="pend-steps">
+        ${stepRow('ok', 'Compte créé', escapeHTML(SESSION_USER.email || ''))}
+        ${stepRow('run', "L'organisateur te place dans ta ligue", 'En général dans la journée')}
+        ${stepRow(notifOn ? 'ok' : 'todo', 'Tu reçois une notification', notifOn ? 'Notifications activées ✅' : 'Active-les pour être averti(e) tout de suite', (!notifOn && (PUSH_SUPPORTED || isIOSDevice())) ? `<button class="btn-ghost" onclick="togglePushNotifications()">Activer</button>` : '')}
+      </div>
+      <p class="pend-note">Tu peux fermer l'app : ton accès apparaîtra ici dès que tu seras placé(e).</p>
     </div>
+    <div class="pend-links">
+      <button type="button" class="pend-link" onclick="openInviteCodePrompt()">Ton organisateur t'a envoyé un code personnel ? L'entrer</button>
+      <button type="button" class="pend-link" onclick="logout()">Déconnexion</button>
+    </div>`
+    : `${pushPromoBannerHTML()}<div class="card">
+      <h2>Compte créé ✅</h2>
+      <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton organisateur t'a envoyé un lien ou un code d'invitation, utilise-le. Sinon, cherche une ligue et demande à la rejoindre.</p>
+      <button class="btn btn-primary" onclick="openInviteCodePrompt()">🎟️ J'ai un code d'invitation</button>
+      <button class="btn btn-secondary" onclick="openLeagueSearch()" style="margin-top:8px;">🔍 Trouver une ligue près de chez moi</button>
+      <button class="btn btn-secondary" onclick="logout()" style="margin-top:8px;">Déconnexion</button>
+    </div>`}
     ${canCreateOrg ? `
     <details class="card">
       <summary style="cursor:pointer;font-weight:600;">Tu démarres ta propre ligue ?</summary>
