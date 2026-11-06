@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 351">
+<meta name="app-build" content="Version 352">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1831,7 +1831,17 @@ async function registerServiceWorkerForPush(){
     // register() peut se résoudre avant que le service worker soit "actif" —
     // s'abonner aux push trop tôt cause "no active Service Worker". On attend
     // donc que le navigateur confirme qu'il est prêt (actif et en contrôle).
-    return await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.ready;
+    // Première ouverture après l'installation : la page n'est pas encore « contrôlée »
+    // par le service worker. On lui laisse quelques secondes pour en prendre le contrôle
+    // avant de s'abonner, sinon certains appareils ne livrent rien avant un redémarrage.
+    if(!navigator.serviceWorker.controller){
+      await new Promise(function(resolve){
+        const t = setTimeout(resolve, 3000);
+        navigator.serviceWorker.addEventListener('controllerchange', function(){ clearTimeout(t); resolve(); }, { once: true });
+      });
+    }
+    return reg;
   }catch(e){ console.error("Erreur d'enregistrement du service worker", e); return null; }
 }
 // Vérifie une seule fois par session si cet appareil est déjà abonné, pour
@@ -1941,7 +1951,7 @@ async function subscribeToPush(){
     const { error } = await savePushSubscription(sub);
     if(error){ showAlert("Erreur lors de l'activation des notifications : " + error.message); return; }
     PUSH_SUBSCRIBED = true;
-    showAlert("🔔 Notifications activées sur cet appareil.");
+    sendTestPush(true);
   }catch(e){
     console.error("Erreur d'abonnement aux notifications", e);
     showAlert("Impossible d'activer les notifications sur cet appareil : " + (e && e.message ? e.message : String(e)));
@@ -2004,6 +2014,23 @@ function pushPromoBannerHTML(){
 // best-effort, ne bloque jamais l'action qui l'a déclenché (publication,
 // finalisation, approbation, annonce...). payload = { league_id? ou
 // profile_id?, title, body, url? }.
+// Notification de test vers ses propres appareils : confirme que tout le chemin fonctionne
+// (au premier lancement après l'installation, iOS ne livre parfois rien avant un redémarrage).
+async function sendTestPush(justActivated){
+  if(!CURRENT_PROFILE) return;
+  const head = justActivated ? "🔔 Notifications activées sur cet appareil." : "🔔 Notification de test envoyée.";
+  const tail = "\n\nUne notification de test arrive dans quelques secondes. Si rien n'apparaît, ferme complètement l'app (balaye-la vers le haut) et rouvre-la depuis son icône : c'est souvent nécessaire juste après l'installation. Ensuite, utilise « Tester » dans Paramètres › Notifications.";
+  showAlert(head + tail);
+  try{
+    const res = await sb.functions.invoke('send-session-notification', { body: {
+      profile_id: CURRENT_PROFILE.id,
+      title: '🔔 Ça fonctionne !',
+      body: "Les notifications Dinkeo sont bien reçues sur cet appareil.",
+      url: goUrl('accueil')
+    }});
+    if(res && res.error) console.error('Notification de test', res.error);
+  }catch(e){ console.error('Notification de test', e); }
+}
 function invokeSendNotification(payload){
   sb.functions.invoke('send-session-notification', { body: payload })
     .catch(e=>console.error("Erreur d'envoi des notifications", e));
@@ -5229,7 +5256,7 @@ function notifDeviceBlockHTML(){
   let sub, btn = '';
   if(iosNotStandalone) sub = "Ajoute Dinkeo à l'écran d'accueil (Safari › Partager › « Sur l'écran d'accueil ») et ouvre l'app depuis son icône.";
   else if(!PUSH_SUPPORTED) sub = "Ce navigateur ne prend pas en charge les notifications.";
-  else if(PUSH_SUBSCRIBED){ sub = 'Activées'; btn = `<button type="button" class="btn btn-secondary" onclick="togglePushNotifications()">Désactiver</button>`; }
+  else if(PUSH_SUBSCRIBED){ sub = 'Activées'; btn = `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button type="button" class="btn btn-secondary" onclick="sendTestPush(false)">Tester</button><button type="button" class="btn btn-secondary" onclick="togglePushNotifications()">Désactiver</button></div>`; }
   else if(notifPermission() === 'denied') sub = 'Bloquées par le navigateur. ' + notifBlockedSteps();
   else { sub = 'Désactivées'; btn = `<button type="button" class="btn btn-primary" onclick="togglePushNotifications()">Activer</button>`; }
   return `<div class="card" style="padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">
