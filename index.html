@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 356">
+<meta name="app-build" content="Version 357">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1475,6 +1475,7 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .bottom-nav.acc .dk svg{width:24px;height:24px;}
 .bottom-nav.acc .dk .mt-emoji{font-size:20px;}
 .bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
+.m-still .m-box,.m-still .m-ov{animation:none!important;}
 .dk-toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -4923,6 +4924,7 @@ function render(){
   renderInner();
   document.querySelectorAll('.sheet-body[data-key]').forEach(function(el){ const k = el.getAttribute('data-key'); if(sheetScroll[k]) el.scrollTop = sheetScroll[k]; });
 }
+let LAST_RENDERED_MODAL = null;
 function renderInner(){
   applyModernNavClass();
   if(PENDING_GO && !GO_RUNNING && SESSION_USER && SESSION_USER.role !== 'pending' && CURRENT_PROFILE) setTimeout(applyPendingGo, 250);
@@ -4943,9 +4945,12 @@ function renderInner(){
   if(MODAL){
     const div = document.createElement('div');
     div.id = 'modalRoot';
+    // Même fenêtre qu'au rendu précédent (simple mise à jour) : pas d'animation d'ouverture, sinon elle « flashe ».
+    if(MODAL === LAST_RENDERED_MODAL) div.className = 'm-still';
     div.innerHTML = modalHTML();
     document.body.appendChild(div);
   }
+  LAST_RENDERED_MODAL = MODAL;
   applyQuickView();
   modernizeSubtabs();
   if(PENDING_GO) setTimeout(applyPendingGo, 0);
