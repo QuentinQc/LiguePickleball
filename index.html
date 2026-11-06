@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 358">
+<meta name="app-build" content="Version 359">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2690,8 +2690,9 @@ function cmEventCardHTML(e){
     : my === 'not_going' ? { cls:'done', label:'Je ne viens pas' }
     : { cls:'wait', label:'Événement' };
   const meta = [e.event_time ? fmtHM(e.event_time) : '', e.location || ''].filter(Boolean).join(' · ');
-  const ctaLabel = iGo ? 'Je ne viens plus' : (my ? 'Finalement, je viens' : 'Je viens');
-  const cta = past ? '' : `<button type="button" class="ah-cta${iGo?' ghost':''}" onclick="event.stopPropagation();setMyRsvp('${e.id}','${iGo?'not_going':'going'}')">${ctaLabel}</button>`;
+  // Bouton seulement tant qu'on n'a pas répondu ; ensuite la pastille montre la réponse
+  // et on la change en touchant la carte (fenêtre de détail).
+  const cta = (past || my) ? '' : `<button type="button" class="ah-cta" onclick="event.stopPropagation();setMyRsvp('${e.id}','going')">Je viens</button>`;
   return `<div class="ah-lg cm-card${past?' past':''}" onclick="openEventDetail('${e.id}')">
     ${cmDateHTML(e.event_date)}
     <div class="ah-b">
@@ -2710,7 +2711,8 @@ function cmPartnerCardHTML(p){
   const people = partnerParticipants(p);
   const st = closed ? { cls:'off', label:'Comblé' } : (mine ? { cls:'off', label:'Mon annonce' } : (iAmIn ? { cls:'on', label:'Partant(e)' } : { cls:'wait', label:'Partenaire' }));
   const meta = ['🤝 ' + (p.author_name || ''), p.play_time ? fmtHM(p.play_time) : '', partnerAudienceTag(p)].filter(Boolean).join(' · ');
-  const cta = (closed || mine) ? '' : `<button type="button" class="ah-cta${iAmIn?' ghost':''}" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">${iAmIn?'Je me retire':'Je suis partant(e)'}</button>`;
+  // Même règle que les événements : le bouton disparaît une fois partant(e) ; on se retire depuis le détail.
+  const cta = (closed || mine || iAmIn) ? '' : `<button type="button" class="ah-cta" onclick="event.stopPropagation();togglePartnerInterest('${p.id}')">Je suis partant(e)</button>`;
   return `<div class="ah-lg cm-card${closed?' past':''}" onclick="openPartnerPostDetail('${p.id}')">
     ${cmDateHTML(p.play_date)}
     <div class="ah-b">
