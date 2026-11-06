@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 354">
+<meta name="app-build" content="Version 355">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1475,6 +1475,9 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .bottom-nav.acc .dk svg{width:24px;height:24px;}
 .bottom-nav.acc .dk .mt-emoji{font-size:20px;}
 .bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
+.dk-toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
+.dk-toast.show{opacity:1;transform:translate(-50%,0);}
+.dk-toast.err{background:#e5484d;color:#fff;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -3001,7 +3004,9 @@ function setupRealtimeChannels(){
 // concerne généralement tout le club, pas une seule ligue. Deux tables :
 // social_events (créés/modifiés par un admin) et social_event_rsvps (un rang
 // par personne et par événement, que n'importe quel membre peut poser). ----
+let EVENTS_LOAD_SEQ = 0, RSVP_PENDING = {};
 async function loadSocialEvents(){
+  const seq = ++EVENTS_LOAD_SEQ;
   const orgId = currentLeagueOrgId();
   if(!orgId){ SOCIAL_EVENTS = []; SOCIAL_EVENT_RSVPS = {}; return; }
   // Joueur / remplaçant : toutes les organisations où il a une ligue ; admin : l'organisation courante
@@ -3013,15 +3018,32 @@ async function loadSocialEvents(){
     });
   }
   const { data: events, error } = await sb.from('social_events').select('*').in('organization_id', orgIds).order('event_date', { ascending:true });
-  SOCIAL_EVENTS = error ? [] : (events || []);
-  const ids = SOCIAL_EVENTS.map(e=>e.id);
+  const evList = error ? [] : (events || []);
+  const ids = evList.map(e=>e.id);
+  const map = {};
   if(ids.length){
     const { data: rsvps, error: err2 } = await sb.from('social_event_rsvps').select('*').in('event_id', ids);
-    SOCIAL_EVENT_RSVPS = {};
-    if(!err2) (rsvps||[]).forEach(r=>{ (SOCIAL_EVENT_RSVPS[r.event_id] = SOCIAL_EVENT_RSVPS[r.event_id] || []).push(r); });
-  } else {
-    SOCIAL_EVENT_RSVPS = {};
+    if(!err2) (rsvps||[]).forEach(r=>{ (map[r.event_id] = map[r.event_id] || []).push(r); });
   }
+  // Une lecture plus récente a été lancée entre-temps : celle-ci est périmée (sinon l'ancien état revient à l'écran).
+  if(seq !== EVENTS_LOAD_SEQ) return;
+  // Réponse en cours d'envoi : on garde le choix affiché tant que le serveur ne l'a pas confirmé.
+  Object.keys(RSVP_PENDING).forEach(function(eid){
+    const pend = RSVP_PENDING[eid]; if(!pend || !CURRENT_PROFILE) return;
+    const list = (map[eid] = (map[eid] || []).filter(function(r){ return r.profile_id !== CURRENT_PROFILE.id; }));
+    list.push(pend);
+  });
+  SOCIAL_EVENTS = evList;
+  SOCIAL_EVENT_RSVPS = map;
+}
+function showToast(msg, isErr){
+  try{
+    let t = document.getElementById('dkToast');
+    if(!t){ t = document.createElement('div'); t.id = 'dkToast'; t.className = 'dk-toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+    t.textContent = msg; t.classList.toggle('err', !!isErr);
+    void t.offsetWidth; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }catch(e){}
 }
 function eventOrgTagHTML(e){
   const ids = {}; (SOCIAL_EVENTS||[]).forEach(function(x){ ids[x.organization_id] = 1; });
@@ -3147,9 +3169,20 @@ async function setMyRsvp(eventId, status){
   const before = list.slice();
   const i = list.findIndex(r=>r.profile_id===CURRENT_PROFILE.id);
   if(i === -1) list.push({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }); else list[i] = Object.assign({}, list[i], { status });
+  const row = { event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status };
+  RSVP_PENDING[eventId] = row;
   SOCIAL_EVENT_RSVPS[eventId] = list; render();
-  const { error } = await sb.from('social_event_rsvps').upsert({ event_id: eventId, profile_id: CURRENT_PROFILE.id, name, status }, { onConflict: 'event_id,profile_id' });
-  if(error){ SOCIAL_EVENT_RSVPS[eventId] = before; render(); showAlert("Ta réponse n'a pas pu être enregistrée. Réessaie."); return; }
+  showToast(status === 'going' ? '✅ C\'est noté : tu viens !' : status === 'maybe' ? '🤔 Noté : peut-être' : 'Noté : tu ne viens pas');
+  const { error } = await sb.from('social_event_rsvps').upsert(row, { onConflict: 'event_id,profile_id' });
+  if(RSVP_PENDING[eventId] === row) delete RSVP_PENDING[eventId];
+  if(error){
+    console.error('Réponse à l\'événement', error);
+    SOCIAL_EVENT_RSVPS[eventId] = before; render();
+    showAlert("Ta réponse n'a pas pu être enregistrée : " + (error.message || 'erreur inconnue') + ". Vérifie ta connexion et réessaie.");
+    return;
+  }
+  // Un autre clic a eu lieu pendant l'envoi : c'est lui qui rechargera.
+  if(RSVP_PENDING[eventId]) return;
   await loadSocialEvents();
   realtimeSoftRender();
 }
