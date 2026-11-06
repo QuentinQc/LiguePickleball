@@ -25,7 +25,13 @@ self.addEventListener('push', function(event){
   };
   if(data.icon) options.icon = data.icon;
   if(data.badge) options.badge = data.badge;
-  event.waitUntil(self.registration.showNotification(title, options));
+  // L'app ouverte (ou en arrière-plan) est prévenue : elle recharge les données sans attendre.
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list){
+      list.forEach(function(c){ try{ c.postMessage({ type: 'push-received', url: options.data.url }); }catch(e){} });
+    })
+  ]));
 });
 
 self.addEventListener('notificationclick', function(event){
