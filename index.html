@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 357">
+<meta name="app-build" content="Version 358">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1476,7 +1476,43 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .bottom-nav.acc .dk .mt-emoji{font-size:20px;}
 .bottom-nav.acc .dk:not(.active) span{color:var(--muted);}
 .m-still .m-box,.m-still .m-ov{animation:none!important;}
-.dk-toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
+/* Présences (événements et partenaires) */
+.att{margin-top:16px;padding:14px;border-radius:20px;background:rgba(255,255,255,.035);border:1px solid var(--line-soft);}
+.att-head{display:flex;align-items:center;gap:12px;}
+.att-n{display:flex;align-items:baseline;gap:6px;flex:1;min-width:0;}
+.att-n b{font-family:var(--font-display);font-size:30px;line-height:1;color:var(--ball);}
+.att-n span{font-size:14px;color:var(--muted);font-weight:600;}
+.att-avs{display:flex;flex:none;}
+.att-avs .att-av{width:30px;height:30px;font-size:11px;box-shadow:0 0 0 2px #0F322D;}
+.att-avs .att-av + .att-av{margin-left:-9px;}
+.att-avs .att-more{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;margin-left:-9px;background:var(--court-elevated-2);color:var(--text);font-size:11px;font-weight:700;box-shadow:0 0 0 2px #0F322D;}
+.att-bar{display:flex;height:6px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.06);margin:12px 0 4px;}
+.att-bar i{display:block;height:100%;}
+.att-bar .g{background:var(--ball);} .att-bar .m{background:#FFD60A;}
+.att-grp{display:flex;align-items:center;gap:8px;margin:14px 2px 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.att-grp .dot{width:8px;height:8px;border-radius:50%;background:var(--ball);} .att-grp .dot.m{background:#FFD60A;}
+.att-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+@media (min-width:641px){ .att-grid{grid-template-columns:repeat(3,minmax(0,1fr));} }
+.att-p{display:flex;align-items:center;gap:9px;min-width:0;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.05);}
+.att-p.maybe{opacity:.8;}
+.att-p .t{display:flex;flex-direction:column;min-width:0;}
+.att-p .t b{font-size:14px;font-weight:600;line-height:1.25;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
+.att-p .t em{font-style:normal;font-size:11px;font-weight:700;color:var(--ball);}
+.att-av{display:flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:13px;}
+.att-empty{margin:12px 2px 2px;font-size:14px;color:var(--muted);}
+.att-reply{margin-top:16px;}
+.att-reply-l{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 2px 8px;}
+.att-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:999px;background:rgba(255,255,255,.06);}
+.att-seg button{border:0;border-radius:999px;min-height:44px;padding:6px 8px;font:inherit;font-size:14px;font-weight:700;color:var(--muted);background:transparent;cursor:pointer;}
+.att-seg button.on{background:var(--ball);color:var(--court);}
+.att-seg button.on.no{background:rgba(255,159,10,.22);color:#FF9F0A;}
+.ev-hero{display:flex;gap:14px;align-items:stretch;}
+.ev-hero .ah-d{flex:none;width:68px;min-width:68px;align-self:flex-start;min-height:92px;}
+.ev-hero-t{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px;}
+.ev-hero-t b{font-family:var(--font-display);font-size:22px;line-height:1.15;color:var(--text);text-transform:uppercase;letter-spacing:.01em;}
+.ev-desc{white-space:pre-wrap;word-break:break-word;margin-top:14px;font-size:15px;line-height:1.5;}
+.ev-admin{display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line-soft);}
+.dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
 </style>
@@ -2618,6 +2654,23 @@ function cmDateHTML(dateStr){
   if(!p || !p.d) return `<div class="ah-d off"><span>Date</span><b>—</b><span>libre</span></div>`;
   return `<div class="ah-d"><span>${escapeHTML(p.day.slice(0,3))}</span><b>${p.d.getDate()}</b><span>${escapeHTML(FR_MONTHS_SHORT[p.d.getMonth()])}</span></div>`;
 }
+// Bloc « présences » des fenêtres de détail : nombre, avatars, barre, puis une tuile par personne.
+function attPersonHTML(x, badge, cls){
+  return `<div class="att-p${cls ? ' ' + cls : ''}">${avatarHTML('att-av', partnerInitials(x.name), x.avatar_url || null)}<span class="t"><b>${escapeHTML(x.name || 'Membre')}</b>${badge ? `<em>${escapeHTML(badge)}</em>` : ''}</span></div>`;
+}
+function attendanceHTML(opts){
+  const going = opts.going || [], maybe = opts.maybe || [];
+  const total = going.length + maybe.length;
+  let h = `<div class="att"><div class="att-head">
+      <div class="att-n"><b>${going.length}</b><span>${escapeHTML(going.length > 1 ? opts.plural : opts.singular)}${maybe.length ? ' · ' + maybe.length + ' peut-être' : ''}</span></div>
+    </div>`;
+  if(total && maybe.length) h += `<div class="att-bar"><i class="g" style="width:${Math.round(100*going.length/total)}%"></i><i class="m" style="width:${Math.round(100*maybe.length/total)}%"></i></div>`;
+  if(!total){ h += `<div class="att-empty">${escapeHTML(opts.empty)}</div></div>`; return h; }
+  // Titres de groupe seulement s'il y a des « peut-être » (sinon le nombre en haut suffit).
+  if(going.length) h += `${maybe.length ? `<div class="att-grp"><span class="dot"></span>${escapeHTML(opts.goingTitle)} · ${going.length}</div>` : '<div style="height:12px;"></div>'}<div class="att-grid">${going.map(x=>attPersonHTML(x, opts.badgeFor ? opts.badgeFor(x) : '')).join('')}</div>`;
+  if(maybe.length) h += `<div class="att-grp"><span class="dot m"></span>Peut-être · ${maybe.length}</div><div class="att-grid">${maybe.map(x=>attPersonHTML(x, '', 'maybe')).join('')}</div>`;
+  return h + `</div>`;
+}
 function cmPeopleHTML(people, emptyText){
   return people.length
     ? `<div class="cm-ppl-row">${cmAvatarsHTML(people)}<span class="cm-ppl">${escapeHTML(cmNamesLine(people.map(x=>x.name)))}</span></div>`
@@ -2924,8 +2977,7 @@ function partnerPostDetailInnerHTML(id){
     <div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>
     ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">📅 ${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' · 🕖 '+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
-    <div class="pf-sec" style="margin:16px 2px 8px;">Partants (${all.length})</div>
-    <div class="pf-list pc-people-list">${all.map((x,i)=>`<div class="pf-row" style="cursor:default;">${avatarHTML('member-avatar', partnerInitials(x.name), x.avatar_url)}<span class="t">${escapeHTML(x.name || 'Membre')}</span>${i===0 ? '<span class="pf-chip acc">Organise</span>' : ''}</div>`).join('')}</div>
+    ${attendanceHTML({ going: all, singular: 'partant', plural: 'partants', goingTitle: 'Partants', empty: '', badgeFor: function(x){ return x.profile_id === p.profile_id ? 'Organise' : ''; } })}
     <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
       ${!closed && !mine ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? '✅ Partant(e) — retirer' : '🙋 Je suis partant(e) !'}</button>` : ''}
       ${canManage ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="togglePartnerStatus('${p.id}')">${closed?'🔓 Rouvrir':'🔒 Marquer comblée'}</button>` : ''}
@@ -3238,28 +3290,26 @@ function eventDetailInnerHTML(id){
   const e = (SOCIAL_EVENTS||[]).find(x=>x.id===id);
   if(!e) return '<p class="empty">Cet événement a été supprimé.</p>';
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
-  const todayStr = new Date().toISOString().slice(0,10);
-  const past = e.event_date < todayStr;
+  const todayStr = fmtDate(new Date());
+  const past = (e.event_date || '') < todayStr;
   const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
   const going = rsvps.filter(r=>r.status==='going');
   const maybe = rsvps.filter(r=>r.status==='maybe');
   const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
-  const myStatus = mine ? mine.status : null;
-  const myLine = past ? '' : `<div class="ah-meta" style="margin-top:14px;">Ta réponse : <b style="color:var(--text);">${myStatus==='going' ? '✅ Je viens' : myStatus==='maybe' ? '🤔 Peut-être' : myStatus==='not_going' ? '❌ Je ne viens pas' : 'pas encore répondu'}</b></div>`;
-  return `
-    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px;">
-      <strong style="font-size:16px;">${escapeHTML(e.title)}</strong>
-      ${isAdmin ? `<div class="row" style="gap:4px;"><button class="btn-ghost" style="min-height:40px;padding:6px 12px;font-size:15px;" onclick="openEditSocialEventModal('${e.id}')">✏️</button><button class="btn-ghost-danger" style="min-height:40px;padding:6px 12px;font-size:15px;" onclick="deleteSocialEvent('${e.id}')">🗑️</button></div>` : ''}
-    </div>
-    <div class="small" style="margin-top:6px;"><span class="tag">📅 ${escapeHTML(eventDateLabel(e.event_date))}${e.event_time?' · '+escapeHTML(e.event_time):''}</span>${e.location?` <span class="tag">📍 ${escapeHTML(e.location)}</span>`:''}${eventOrgTagHTML(e)}${past?' <span class="tag">Terminé</span>':''}</div>
-    ${e.description ? `<div style="white-space:pre-wrap;word-break:break-word;margin-top:10px;">${escapeHTML(e.description)}</div>` : ''}
-    ${(going.length||maybe.length) ? `<p class="small" style="margin-top:10px;color:var(--muted);">${going.length?'Confirmé(s) : '+going.map(r=>escapeHTML(r.name)).join(', '):''}${going.length&&maybe.length?' · ':''}${maybe.length?'Peut-être : '+maybe.map(r=>escapeHTML(r.name)).join(', '):''}</p>` : ''}
-    ${myLine}
-    ${!past ? `<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
-      <button class="btn ${myStatus==='going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','going')">✅ Je viens</button>
-      <button class="btn ${myStatus==='maybe'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','maybe')">🤔 Peut-être</button>
-      <button class="btn ${myStatus==='not_going'?'btn-primary':'btn-secondary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="setMyRsvp('${e.id}','not_going')">❌ Je ne viens pas</button>
-    </div>` : ''}`;
+  const my = mine ? mine.status : null;
+  const meta = [e.event_time ? '🕖 ' + fmtHM(e.event_time) : '', e.location ? '📍 ' + e.location : ''].filter(Boolean).join(' · ');
+  const seg = (k, label, extra) => `<button type="button" class="${my===k ? 'on' + (extra||'') : ''}" onclick="setMyRsvp('${e.id}','${k}')">${label}</button>`;
+  return `<div class="ev-hero">${cmDateHTML(e.event_date)}
+      <div class="ev-hero-t"><b>${escapeHTML(e.title)}</b>
+        <div class="ah-meta">${escapeHTML(eventDateLabel(e.event_date))}${past ? ' · Terminé' : ''}</div>
+        ${meta ? `<div class="ah-meta">${escapeHTML(meta)}</div>` : ''}
+        ${eventOrgTagHTML(e) ? `<div class="ah-meta">${eventOrgTagHTML(e)}</div>` : ''}
+      </div></div>
+    ${e.description ? `<div class="ev-desc">${escapeHTML(e.description)}</div>` : ''}
+    ${!past ? `<div class="att-reply"><div class="att-reply-l">Ta réponse${my ? '' : ' · pas encore répondu'}</div>
+      <div class="att-seg">${seg('going','✅ Je viens')}${seg('maybe','🤔 Peut-être')}${seg('not_going','Non', ' no')}</div></div>` : ''}
+    ${attendanceHTML({ going: going, maybe: maybe, singular: past ? 'présent' : 'participant', plural: past ? 'présents' : 'participants', goingTitle: past ? 'Étaient là' : 'Viennent', empty: past ? 'Personne ne s\'était inscrit.' : 'Personne pour l\'instant : sois le premier !' })}
+    ${isAdmin ? `<div class="ev-admin"><button type="button" class="btn btn-secondary" style="width:auto;" onclick="openEditSocialEventModal('${e.id}')">✏️ Modifier</button><button type="button" class="btn-ghost-danger" style="min-height:44px;padding:8px 14px;" onclick="deleteSocialEvent('${e.id}')">🗑️ Supprimer</button></div>` : ''}`;
 }
 // ---- Tournois : stockés au niveau de l'ORGANISATION (comme les vidéos) —
 // un tournoi peut regrouper des participants de plusieurs ligues de
