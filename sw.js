@@ -7,6 +7,21 @@ self.addEventListener('install', function(event){
   self.skipWaiting();
 });
 
+// Ouverture de l'app : toujours la page la plus récente depuis le réseau (jamais une vieille copie
+// gardée par le téléphone). Sans réseau, on retombe sur la copie habituelle.
+self.addEventListener('fetch', function(event){
+  const req = event.request;
+  if(req.mode !== 'navigate' || req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if(url.origin !== self.location.origin) return;
+  event.respondWith(
+    fetch(req.url, { cache: 'no-store', credentials: 'same-origin' })
+      // Réponse redirigée : refusée par les navigateurs pour une ouverture de page, on laisse faire la requête normale.
+      .then(function(r){ return (r && r.ok && !r.redirected) ? r : fetch(req); })
+      .catch(function(){ return fetch(req.url, { cache: 'force-cache', credentials: 'same-origin' }).catch(function(){ return fetch(req); }); })
+  );
+});
+
 self.addEventListener('activate', function(event){
   event.waitUntil(self.clients.claim());
 });
