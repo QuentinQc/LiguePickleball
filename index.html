@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 370">
+<meta name="app-build" content="Version 371">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -74,7 +74,8 @@
     var atBottom = y + window.innerHeight >= document.documentElement.scrollHeight - 8;
     // Barre du haut : style « flottant » (fond flouté) dès qu'on a quitté le haut de page.
     document.body.classList.toggle('scrolled', y >= 40);
-    if(y < 40 || atBottom) document.body.classList.remove('nav-hidden');
+    // Nouvelle navigation : la barre du bas reste toujours en place (elle ne se cache plus en défilant).
+    if(document.body.classList.contains('modern-nav') || y < 40 || atBottom) document.body.classList.remove('nav-hidden');
     else if(delta > 6) document.body.classList.add('nav-hidden');
     else if(delta < -6) document.body.classList.remove('nav-hidden');
     var topbar = document.querySelector('.topbar');
@@ -436,8 +437,10 @@ td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
 .topbar.topbar-hidden{top:calc(-140px - env(safe-area-inset-top)) !important;box-shadow:none !important;opacity:0;}
 /* Barre flottante du bas : glisse hors de l'écran quand on descend, revient quand on remonte */
 .bottom-nav{transition:transform .25s ease;}
+body.modern-nav .bottom-nav{transition:none !important;}
+body.modern-nav.nav-hidden .bottom-nav{transform:none;}
 body.nav-hidden .bottom-nav{transform:translateY(calc(100% + 40px));}
-@media (min-width:641px){ body.modern-nav.nav-hidden .bottom-nav{transform:translate(-50%, calc(100% + 40px));} }
+@media (min-width:641px){ body.modern-nav.nav-hidden .bottom-nav{transform:translateX(-50%);} }
 @media (prefers-reduced-motion:reduce){ .bottom-nav{transition:none;} }
 /* Barre du haut flottante (avatar, titre, Admin/Joueur) quand elle réapparaît en cours de page */
 /* L'en-tête glisse en changeant « top » (pas de transform) : Safari ne le dessine pas en image séparée,
