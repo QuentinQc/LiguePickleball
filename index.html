@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 374">
+<meta name="app-build" content="Version 375">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1574,6 +1574,59 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .wl-msg{white-space:pre-wrap;word-break:break-word;font-size:16px;line-height:1.55;margin:4px 0 14px;}
 .wl-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
 .wl-acts .btn{flex:1;min-width:140px;}
+/* ===== Communauté (v375) ===== */
+.cmx-compose{display:flex;align-items:center;gap:12px;width:100%;padding:8px 8px 8px 8px;margin:2px 0 12px;border-radius:999px;border:1px solid var(--line-soft);background:var(--court-elevated-2);color:var(--muted);font:inherit;cursor:pointer;text-align:left;transition:border-color .15s, transform .12s;-webkit-tap-highlight-color:transparent;}
+.cmx-compose:hover{border-color:var(--line-soft-strong);}
+.cmx-compose:active{transform:scale(.99);}
+.cmx-compose-av{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:14px;}
+.cmx-compose-ph{flex:1;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmx-compose-go{flex:none;padding:10px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:800;font-size:14px;}
+.cmx-seg{margin:0 0 6px;}
+.cmx-seg button em{font-style:normal;font-size:12px;font-weight:800;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.10);color:inherit;}
+.cmx-seg button.on em{background:rgba(15,50,45,.18);}
+.cmx-sec{margin:20px 4px 10px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.cmx-list{display:flex;flex-direction:column;gap:10px;}
+.cmx-card{display:flex;gap:14px;padding:14px 16px;margin-bottom:10px;border-radius:22px;background:var(--court-elevated-2);border:1px solid var(--line-soft);cursor:pointer;transition:transform .12s ease, border-color .15s ease;-webkit-tap-highlight-color:transparent;}
+.cmx-card:hover{border-color:var(--line-soft-strong);}
+.cmx-card:active{transform:scale(.985);}
+.cmx-card.ev{box-shadow:inset 3px 0 0 var(--ball);}
+.cmx-card.past{opacity:.55;}
+.cmx-card.feat{padding:16px;background:linear-gradient(135deg,rgba(207,234,92,.16),rgba(207,234,92,.04) 55%),var(--court-elevated-2);border-color:rgba(207,234,92,.28);box-shadow:none;}
+.cmx-feat-d .ah-d{width:68px;min-width:68px;height:100%;min-height:96px;}
+.cmx-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+.cmx-head{display:flex;align-items:center;gap:10px;min-width:0;font-size:13px;color:var(--muted);}
+.cmx-head .tag{margin:0;}
+.cmx-head-av{width:32px;height:32px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:12px;}
+.cmx-who{display:flex;flex-direction:column;min-width:0;line-height:1.25;}
+.cmx-who b{color:var(--text);font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmx-who small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmx-kind{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ball);}
+.cmx-title{font-size:17px;font-weight:700;color:var(--text);line-height:1.3;word-break:break-word;}
+.cmx-title.msg{font-weight:600;font-size:16px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.cmx-card.feat .cmx-title{font-family:var(--font-display);font-size:22px;font-weight:600;text-transform:uppercase;letter-spacing:.01em;line-height:1.15;}
+.cmx-sub{font-size:14px;color:var(--muted);}
+.cmx-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;min-height:36px;}
+.cmx-ppl{display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
+.cmx-avs{display:flex;flex:none;}
+.cmx-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:10px;box-shadow:0 0 0 2px var(--court-elevated-2);flex:none;}
+.cmx-av + .cmx-av{margin-left:-8px;}
+.cmx-av.more{background:#2A5A52;color:var(--text);font-family:var(--font-body);font-weight:800;}
+.cmx-ppl-t{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmx-ppl-t b{color:var(--text);}
+.cmx-go{flex:none;border:0;border-radius:999px;background:var(--ball);color:var(--court);font:inherit;font-weight:800;font-size:14px;padding:9px 16px;cursor:pointer;transition:transform .12s ease;-webkit-tap-highlight-color:transparent;}
+.cmx-go:active{transform:scale(.94);}
+.cmx-st{flex:none;font-size:13px;font-weight:700;padding:7px 12px;border-radius:999px;}
+.cmx-st.on{background:rgba(207,234,92,.16);color:var(--ball);}
+.cmx-st.wait{background:rgba(255,214,10,.16);color:#FFD60A;}
+.cmx-st.done{background:rgba(255,159,10,.18);color:#FF9F0A;}
+.cmx-st.off{background:rgba(255,255,255,.07);color:var(--muted);}
+.cmx-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:34px 20px;margin-top:6px;border-radius:24px;border:1px dashed var(--line-soft-strong);}
+.cmx-empty svg{width:64px;height:64px;fill:none;stroke:var(--ball);stroke-width:2;stroke-linecap:round;opacity:.85;margin-bottom:4px;}
+.cmx-empty b{font-size:17px;}
+.cmx-empty span{font-size:14px;color:var(--muted);max-width:340px;}
+.cmx-empty .btn{width:auto;margin-top:8px;}
+.pc-preview .cmx-card{cursor:default;margin:0;}
+@media (max-width:640px){ .cmx-compose-ph{font-size:14px;} .cmx-card{padding:13px 14px;gap:12px;} .cmx-feat-d .ah-d{width:58px;min-width:58px;} }
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -2937,11 +2990,32 @@ function cmGroupLabel(key, hasDate, today){
 const CM_SEGS = [['tout','Tout'],['evenements','Événements'],['partenaire','Partenaires']];
 function communityFeedHTML(filter, inSheet){
   if(['tout','evenements','partenaire'].indexOf(filter) === -1) filter = 'tout';
-  const idx = Math.max(0, CM_SEGS.findIndex(function(x){ return x[0] === filter; }));
-  return `<div class="cm-top">
-    ${inSheet ? '<span style="flex:1;"></span>' : `<div class="acc-seg cm-seg" id="cmSeg" style="--i:${idx};"><span class="cm-seg-thumb" aria-hidden="true"></span>${CM_SEGS.map(([k,l])=>`<button type="button" class="${filter===k?'on':''}" data-k="${k}" onclick="setPComm('${k}')">${l}</button>`).join('')}</div>`}
-    <button type="button" class="cm-pub" onclick="openPublishMenu()" aria-label="Publier">＋<span> Publier</span></button>
-  </div><div id="cmFeed" class="cm-feed" data-filter="${filter}" data-sheet="${inSheet ? 1 : 0}">${cmFeedBodyHTML(filter)}</div>`;
+  const me = CURRENT_PROFILE, nm = myDisplayName();
+  const isAdmin = me && me.role === 'admin';
+  const compose = `<button type="button" class="cmx-compose" onclick="openPublishMenu()">
+      ${avatarHTML('cmx-compose-av', partnerInitials(nm), (me && me.avatar_url) || null)}
+      <span class="cmx-compose-ph">${isAdmin ? 'Proposer une partie, un événement…' : 'Proposer une partie, chercher un partenaire…'}</span>
+      <span class="cmx-compose-go">Publier</span>
+    </button>`;
+  const counts = cmxCounts();
+  const segs = inSheet ? '' : `<div class="acc-seg cm-seg cmx-seg" id="cmSeg"><span class="cm-seg-thumb" aria-hidden="true"></span>${CM_SEGS.map(([k,l])=>`<button type="button" class="${filter===k?'on':''}" data-k="${k}" onclick="setPComm('${k}')">${l}${counts[k] ? `<em>${counts[k]}</em>` : ''}</button>`).join('')}</div>`;
+  return `${compose}${segs}<div id="cmFeed" class="cm-feed" data-filter="${filter}" data-sheet="${inSheet ? 1 : 0}">${cmFeedBodyHTML(filter)}</div>`;
+}
+// Nombre d'éléments à venir par filtre (affiché dans les pastilles).
+function cmxCounts(){
+  const today = fmtDate(new Date());
+  const ev = (SOCIAL_EVENTS||[]).filter(function(e){ return (e.event_date || '') >= today; }).length;
+  const pt = (PARTNER_POSTS||[]).filter(function(p){ return p.status === 'open' && !(p.play_date && p.play_date < today); }).length;
+  return { tout: ev + pt, evenements: ev, partenaire: pt };
+}
+function cmxDayLabel(dateStr, today){
+  if(!dateStr) return 'Sans date';
+  const d0 = new Date(today + 'T00:00:00'), d = new Date(dateStr + 'T00:00:00');
+  const days = Math.round((d - d0) / 86400000);
+  if(days === 0) return "Aujourd'hui";
+  if(days === 1) return 'Demain';
+  const lbl = FR_DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + FR_MONTHS[d.getMonth()];
+  return lbl.charAt(0).toUpperCase() + lbl.slice(1);
 }
 // Met à jour seulement la liste (filtre, réponse, temps réel) : pas de redessin de tout l'écran,
 // la position de défilement est conservée.
@@ -2974,7 +3048,6 @@ function commRender(){
 }
 function cmFeedBodyHTML(filter){
   const today = fmtDate(new Date());
-  // Noms des personnes visées par MES annonces ciblées : chargés une fois.
   const porg = partnerOrgId();
   if(porg && !ORG_PEOPLE[porg] && (PARTNER_POSTS||[]).some(x=>x.audience==='people' && CURRENT_PROFILE && x.profile_id===CURRENT_PROFILE.id)){
     loadOrgPeople().then(function(){ realtimeSoftRender(); });
@@ -2982,23 +3055,86 @@ function cmFeedBodyHTML(filter){
   const items = [];
   if(filter !== 'partenaire') (SOCIAL_EVENTS||[]).forEach(e=>items.push({ kind:'ev', key:e.event_date || '', dated:true, past:(e.event_date || '') < today, x:e }));
   if(filter !== 'evenements') (PARTNER_POSTS||[]).forEach(p=>items.push({ kind:'pt', key:p.play_date || '', dated:!!p.play_date, past: p.status !== 'open' || !!(p.play_date && p.play_date < today), x:p }));
-  const up = items.filter(i=>!i.past).sort((a,b)=> (a.dated===b.dated ? String(a.key).localeCompare(String(b.key)) : (a.dated ? -1 : 1)));
+  const tm = function(i){ return String((i.kind === 'ev' ? i.x.event_time : i.x.play_time) || '99'); };
+  const up = items.filter(i=>!i.past).sort((a,b)=> (a.dated===b.dated ? (String(a.key).localeCompare(String(b.key)) || tm(a).localeCompare(tm(b))) : (a.dated ? -1 : 1)));
   const old = items.filter(i=>i.past).sort((a,b)=>String(b.key).localeCompare(String(a.key)));
-  const card = i=> i.kind === 'ev' ? cmEventCardHTML(i.x) : cmPartnerCardHTML(i.x);
   let h = '';
-  if(up.length){
-    let cur = null, buf = '';
-    up.forEach(i=>{
-      const g = cmGroupLabel(i.key, i.dated, today);
-      if(g !== cur){ if(cur !== null) buf += `</div>`; buf += `<div class="pc-sec">${g}</div><div class="ah-grid cm-grid">`; cur = g; }
-      buf += card(i);
-    });
-    h += buf + `</div>`;
+  if(!up.length){
+    h += `<div class="cmx-empty"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="24" cy="24" r="11"/><circle cx="44" cy="28" r="8"/><path d="M6 54c2-10 9-15 18-15s16 5 18 15M38 54c1-7 5-11 11-11s9 4 10 11"/></svg>
+      <b>Rien de prévu pour l'instant</b><span>Lance une partie, un match amical ou une sortie : les membres seront prévenus.</span>
+      <button type="button" class="btn btn-primary" onclick="openPublishMenu()">Publier quelque chose</button></div>`;
   } else {
-    h += `<div class="acc-card cm-empty"><div class="cm-empty-ic"></div><b>Rien de prévu pour l'instant</b><span>Lance quelque chose : une partie, une sortie, un tournoi…</span><button type="button" class="ah-cta" onclick="openPublishMenu()">＋ Publier</button></div>`;
+    // À la une : la prochaine activité datée des 7 prochains jours.
+    const d7 = fmtDate(new Date(Date.now() + 7*86400000));
+    const featIdx = up.findIndex(function(i){ return i.dated && i.key <= d7; });
+    const rest = up.slice();
+    if(featIdx !== -1){ h += `<div class="cmx-sec">Prochainement</div>` + cmxCardHTML(rest[featIdx], true); rest.splice(featIdx, 1); }
+    let cur = null;
+    rest.forEach(function(i){
+      const g = cmxDayLabel(i.dated ? i.key : '', today);
+      if(g !== cur){ h += `<div class="cmx-sec">${escapeHTML(g)}</div>`; cur = g; }
+      h += cmxCardHTML(i, false);
+    });
   }
-  if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="ah-grid cm-grid">${old.map(card).join('')}</div></details>`;
+  if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="cmx-list">${old.map(function(i){ return cmxCardHTML(i, false); }).join('')}</div></details>`;
   return h;
+}
+// Pile d'avatars + libellé (« 3 partants », « Sois le premier »).
+function cmxPeopleHTML(people, one, many, empty){
+  if(!people.length) return `<span class="cmx-ppl"><span class="cmx-ppl-t muted">${escapeHTML(empty)}</span></span>`;
+  const shown = people.slice(0, window.innerWidth <= 640 ? 3 : 4), more = people.length - shown.length;
+  return `<span class="cmx-ppl"><span class="cmx-avs">${shown.map(function(x){ return avatarHTML('cmx-av', partnerInitials(x.name), x.avatar_url || null); }).join('')}${more > 0 ? `<span class="cmx-av more">+${more}</span>` : ''}</span><span class="cmx-ppl-t"><b>${people.length}</b> ${escapeHTML(people.length > 1 ? many : one)}</span></span>`;
+}
+function cmxWhen(dateStr, timeStr){
+  const parts = [];
+  if(dateStr){ const d = new Date(dateStr + 'T00:00:00'); parts.push(FR_DAYS[d.getDay()].slice(0,3) + '. ' + d.getDate() + ' ' + FR_MONTHS_SHORT[d.getMonth()] + '.'); }
+  if(timeStr) parts.push(fmtHM(timeStr));
+  return parts.join(' · ');
+}
+// Carte du fil (événement ou partenaire). featured : grande carte « Prochainement ».
+function cmxCardHTML(i, featured){
+  const today = fmtDate(new Date()), x = i.x, preview = x.id === 'apercu';
+  const click = preview ? '' : (i.kind === 'ev' ? `openEventDetail('${x.id}')` : `openPartnerPostDetail('${x.id}')`);
+  let head, title, sub = '', people, action;
+  if(i.kind === 'ev'){
+    const past = (x.event_date || '') < today;
+    const rsvps = (SOCIAL_EVENT_RSVPS && SOCIAL_EVENT_RSVPS[x.id]) || [];
+    const going = rsvps.filter(r=>r.status==='going');
+    const mine = CURRENT_PROFILE && rsvps.find(r=>r.profile_id===CURRENT_PROFILE.id);
+    const my = mine ? mine.status : null;
+    head = `<span class="cmx-kind ev">Événement</span>${eventOrgTagHTML(x)}`;
+    title = escapeHTML(x.title || '');
+    sub = [cmxWhen(x.event_date, x.event_time), x.location || ''].filter(Boolean).join(' · ');
+    people = cmxPeopleHTML(going, 'inscrit', 'inscrits', past ? 'Personne inscrit' : 'Sois le premier');
+    action = past ? `<span class="cmx-st off">Terminé</span>`
+      : my === 'going' ? `<span class="cmx-st on">Je viens</span>`
+      : my === 'maybe' ? `<span class="cmx-st wait">Peut-être</span>`
+      : my === 'not_going' ? `<span class="cmx-st done">Je ne viens pas</span>`
+      : (preview ? `<span class="cmx-go">Je viens</span>` : `<button type="button" class="cmx-go" onclick="event.stopPropagation();setMyRsvp('${x.id}','going')">Je viens</button>`);
+  } else {
+    const mine = CURRENT_PROFILE && x.profile_id === CURRENT_PROFILE.id;
+    const closed = x.status !== 'open';
+    const interested = Array.isArray(x.interested) ? x.interested : [];
+    const iAmIn = !!(CURRENT_PROFILE && interested.some(y=>y.profile_id===CURRENT_PROFILE.id));
+    head = `${avatarHTML('cmx-head-av', partnerInitials(x.author_name), x.avatar_url || null)}<span class="cmx-who"><b>${escapeHTML(x.author_name || 'Membre')}</b><small>${escapeHTML([partnerRelTime(x.created_at), partnerAudienceTag(x)].filter(Boolean).join(' · '))}</small></span>`;
+    title = escapeHTML(x.message || '');
+    sub = x.play_date ? cmxWhen(x.play_date, x.play_time) : 'Date à convenir';
+    people = cmxPeopleHTML(partnerParticipants(x), 'partant', 'partants', '');
+    action = closed ? `<span class="cmx-st off">Comblé</span>`
+      : mine ? `<span class="cmx-st off">Mon annonce</span>`
+      : iAmIn ? `<span class="cmx-st on">Partant(e)</span>`
+      : (preview ? `<span class="cmx-go">Je suis partant(e)</span>` : `<button type="button" class="cmx-go" onclick="event.stopPropagation();togglePartnerInterest('${x.id}')">Je suis partant(e)</button>`);
+  }
+  const dateBlock = featured ? cmDateHTML(i.kind === 'ev' ? x.event_date : x.play_date) : '';
+  return `<article class="cmx-card ${i.kind}${featured ? ' feat' : ''}${i.past ? ' past' : ''}"${click ? ` onclick="${click}"` : ''}>
+    ${featured ? `<div class="cmx-feat-d">${dateBlock}</div>` : ''}
+    <div class="cmx-main">
+      <div class="cmx-head">${head}</div>
+      <div class="cmx-title${i.kind === 'pt' ? ' msg' : ''}">${title}</div>
+      ${sub ? `<div class="cmx-sub">${escapeHTML(sub)}</div>` : ''}
+      <div class="cmx-foot">${people}${action}</div>
+    </div>
+  </article>`;
 }
 function openPublishMenu(){
   if(!(CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin')){ openPartnerComposer(); return; } // une seule possibilité : on y va directement
@@ -3068,7 +3204,7 @@ function pcOnType(el){
 function pcValid(){ return !!(String(PARTNER_DRAFT.message||'').trim() && (PARTNER_AUD.kind !== 'league' || PARTNER_AUD.league) && (PARTNER_AUD.kind !== 'people' || PARTNER_AUD.people.length)); }
 function partnerPreviewHTML(){
   const fake = { id:'apercu', profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id, author_name: myDisplayName(), avatar_url: CURRENT_PROFILE && CURRENT_PROFILE.avatar_url, message: String(PARTNER_DRAFT.message||'').trim() || 'Ton message apparaîtra ici', play_date: PARTNER_DRAFT.date || null, play_time: (PARTNER_DRAFT.date && PARTNER_DRAFT.time) || null, status:'open', interested:[], audience: PARTNER_AUD.kind, league_id: PARTNER_AUD.league, target_profiles: PARTNER_AUD.people, created_at: new Date().toISOString() };
-  return cmPartnerCardHTML(fake);
+  return cmxCardHTML({ kind:'pt', dated:!!fake.play_date, past:false, x:fake }, false);
 }
 function partnerComposerSheetHTML(){
   const today = fmtDate(new Date());
@@ -3395,7 +3531,7 @@ function evOnType(){
 function evSetDate(d){ evSave(); EVENT_DRAFT.date = d; renderSheet(); }
 function eventPreviewHTML(){
   const fake = { id:'apercu', organization_id: currentLeagueOrgId(), title: String(EVENT_DRAFT.title||'').trim() || 'Titre de l\'événement', event_date: EVENT_DRAFT.date || fmtDate(new Date()), event_time: EVENT_DRAFT.time || null, location: EVENT_DRAFT.location || null };
-  return cmEventCardHTML(fake);
+  return cmxCardHTML({ kind:'ev', dated:true, past:false, x:fake }, false);
 }
 function eventComposerSheetHTML(){
   const E = EVENT_DRAFT, editing = !!E.id;
