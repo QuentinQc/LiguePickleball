@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 367">
+<meta name="app-build" content="Version 368">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -703,10 +703,12 @@ body.modern-nav .topbar.topbar-hidden{top:calc(8px + env(safe-area-inset-top)) !
 body.modern-nav .shell-top{padding:0;}
 /* Barre du haut fixée à l'écran (et non « collante ») : iPhone et iPad dessinaient la version
    collante comme une image légèrement floue. Elle est alignée sur la colonne du contenu. */
-body.modern-nav .topbar.shell-top{position:fixed;top:calc(8px + env(safe-area-inset-top));left:var(--tb-x);right:var(--tb-x);height:54px;margin:0;box-sizing:border-box;--tb-x:calc(12px + env(safe-area-inset-left));}
-body.modern-nav .shell-top-spacer{height:64px;}
+body.modern-nav .topbar.shell-top{position:fixed;top:calc(8px + env(safe-area-inset-top));left:var(--tb-x);right:var(--tb-x);height:54px;margin:0;box-sizing:border-box;--tb-x:calc(12px + env(safe-area-inset-left));
+  background:#16413A;border:1px solid rgba(255,255,255,.12);box-shadow:0 4px 12px rgba(0,0,0,.28);}
+/* Espace sous la barre = hauteur de la barre + son décalage (encoche comprise) + 14 px, moins la marge haute de la page. */
+body.modern-nav .shell-top-spacer{height:62px;}
 @media (min-width:641px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 24px);} body.modern-nav .shell-top-spacer{height:56px;} }
-@media (min-width:900px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 32px);} }
+@media (min-width:900px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 32px);} body.modern-nav .shell-top-spacer{height:calc(44px + env(safe-area-inset-top));} }
 body.modern-nav .shell-title{font-size:20px;}
 body.modern-nav .shell-me .shell-me-av{width:36px;height:36px;font-size:13px;}
 .dk{border:0;background:none;color:var(--muted);height:48px;min-width:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 13px;font:700 14px var(--font-body);cursor:pointer;transition:background .25s,color .25s;}
