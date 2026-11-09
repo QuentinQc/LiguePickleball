@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 364">
+<meta name="app-build" content="Version 365">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1522,14 +1522,18 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .shell-bell svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .shell-bell .nb{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--ball);color:var(--court);font-size:11px;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px #0F322D;}
 .ib-list{display:flex;flex-direction:column;gap:8px;}
-.ib-row{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;padding:12px 14px;border-radius:16px;border:1px solid var(--line-soft);background:rgba(255,255,255,.03);color:var(--text);font:inherit;cursor:pointer;}
+.ib-item{display:flex;align-items:stretch;gap:6px;}
+.ib-row{flex:1;min-width:0;display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px 12px;border-radius:14px;border:1px solid var(--line-soft);background:rgba(255,255,255,.03);color:var(--text);font:inherit;cursor:pointer;}
+.ib-del{flex:none;width:40px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;}
+.ib-del:hover{background:rgba(255,255,255,.06);color:var(--text);}
 .ib-row.new{background:rgba(207,234,92,.07);border-color:rgba(207,234,92,.28);}
-.ib-dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex:none;background:transparent;}
+.ib-dot{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none;background:transparent;}
 .ib-row.new .ib-dot{background:var(--ball);}
-.ib-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
-.ib-t b{font-size:15px;font-weight:700;}
-.ib-t span{font-size:14px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
-.ib-t small{font-size:12px;color:var(--muted);opacity:.85;}
+.ib-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.ib-l1{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.ib-l1 b{flex:1;min-width:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ib-l1 small{flex:none;font-size:12px;color:var(--muted);}
+.ib-t span{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ib-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 2px 12px;}
 .wl-box{padding-top:2px;}
 .wl-msg{white-space:pre-wrap;word-break:break-word;font-size:16px;line-height:1.55;margin:4px 0 14px;}
@@ -2376,6 +2380,7 @@ async function loadInbox(){
 }
 function ensureInboxLoaded(){
   if(!CURRENT_PROFILE || !SESSION_USER || SESSION_USER.role === 'pending' || INBOX_LOADED_FOR === CURRENT_PROFILE.id || INBOX_LOADING) return;
+  INBOX_LOADED_FOR = CURRENT_PROFILE.id; // une seule tentative au lancement, même en cas d'échec (sinon boucle)
   loadInbox().then(function(){ if(!appBusyEditing()) render(); });
 }
 function bellHTML(){
@@ -2387,7 +2392,7 @@ function openInbox(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'inbox
 function inboxSheetHTML(){
   const list = INBOX || [], n = inboxUnread();
   const rows = list.length ? `<div class="ib-list">${list.map(function(x){
-    return `<button type="button" class="ib-row${x.read_at ? '' : ' new'}" onclick="openInboxItem('${x.id}')"><span class="ib-dot"></span><span class="ib-t"><b>${escapeHTML(x.title || 'Dinkeo')}</b>${x.body ? `<span>${escapeHTML(x.body)}</span>` : ''}<small>${escapeHTML(partnerRelTime(x.created_at))}</small></span></button>`;
+    return `<div class="ib-item"><button type="button" class="ib-row${x.read_at ? '' : ' new'}" onclick="openInboxItem('${x.id}')"><span class="ib-dot"></span><span class="ib-t"><span class="ib-l1"><b>${escapeHTML(x.title || 'Dinkeo')}</b><small>${escapeHTML(partnerRelTime(x.created_at))}</small></span>${x.body ? `<span>${escapeHTML(x.body)}</span>` : ''}</span></button><button type="button" class="ib-del" onclick="deleteInboxItems(['${x.id}'])" aria-label="Supprimer">✕</button></div>`;
   }).join('')}</div>` : `<p class="empty" style="margin-top:8px;">Aucune notification ces 14 derniers jours.</p>`;
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet">
@@ -2396,7 +2401,7 @@ function inboxSheetHTML(){
         <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
       </div>
       <div class="sheet-body" data-key="inbox">
-        ${n ? `<div class="ib-top"><span class="ah-meta">${n} non lue${n>1?'s':''}</span><button type="button" class="btn-ghost" style="min-height:40px;padding:6px 12px;font-size:14px;" onclick="markAllInboxRead()">Tout marquer comme lu</button></div>` : ''}
+        ${list.length ? `<div class="ib-top"><span class="ah-meta">${n ? n + ' non lue' + (n>1?'s':'') : 'Tout est lu'}</span><span style="display:flex;gap:6px;">${n ? `<button type="button" class="btn-ghost" style="min-height:40px;padding:6px 12px;font-size:14px;" onclick="markAllInboxRead()">Tout lu</button>` : ''}<button type="button" class="btn-ghost" style="min-height:40px;padding:6px 12px;font-size:14px;" onclick="deleteInboxItems(null)">Tout effacer</button></span></div>` : ''}
         ${rows}
       </div>
     </div>
@@ -2408,10 +2413,43 @@ function markInboxRead(ids){
   INBOX.forEach(function(x){ if(ids.indexOf(x.id) !== -1 && !x.read_at) x.read_at = now; });
   sb.from('notif_inbox').update({ read_at: now }).in('id', ids).eq('profile_id', CURRENT_PROFILE.id).then(function(){}, function(){});
 }
+function deleteInboxItems(ids){
+  if(!CURRENT_PROFILE) return;
+  const all = ids === null;
+  const go = function(){
+    const del = all ? INBOX.map(function(x){ return x.id; }) : ids;
+    INBOX = INBOX.filter(function(x){ return del.indexOf(x.id) === -1; });
+    if(all) MODAL = { kind:'content', sheet:'inbox', title:'' };
+    render();
+    if(del.length) sb.from('notif_inbox').delete().in('id', del).eq('profile_id', CURRENT_PROFILE.id).then(function(r){ if(r && r.error) console.error('cloche', r.error); }, function(){});
+  };
+  if(all) showConfirm('Effacer toutes les notifications de la cloche ?', go); else go();
+}
+// Annonce : on affiche le message lui-même (avec Plus tard / Ne plus afficher si c'est une annonce d'accueil).
+async function openAnnouncementItem(x){
+  if(!x) return;
+  WELCOME_CHECKED = true;
+  try{
+    const { data } = await sb.from('welcome_announcements').select('*').gt('expires_at', new Date().toISOString()).eq('body', x.body || '').contains('target_profiles', [CURRENT_PROFILE.id]).order('created_at', { ascending:false }).limit(1);
+    const a = data && data[0];
+    if(a){
+      const { data: seen } = await sb.from('welcome_dismissals').select('announcement_id').eq('announcement_id', a.id).eq('profile_id', CURRENT_PROFILE.id).maybeSingle();
+      if(!seen){ showContentModal('Annonce', function(){ return welcomeHTML(a); }); return; }
+    }
+  }catch(e){}
+  showContentModal('Annonce', function(){ return welcomeHTML({ id:'', created_at:x.created_at, title:x.title, body:x.body }, true); });
+}
+async function openLatestAnnouncement(){
+  await loadInbox();
+  const x = (INBOX||[]).find(function(n){ return n.kind === 'league_announce'; });
+  if(x){ markInboxRead([x.id]); await openAnnouncementItem(x); }
+  else openInbox();
+}
 function markAllInboxRead(){ markInboxRead(INBOX.filter(function(x){ return !x.read_at; }).map(function(x){ return x.id; })); render(); }
 function openInboxItem(id){
   const x = (INBOX||[]).find(function(n){ return n.id === id; });
   markInboxRead([id]);
+  if(x && x.kind === 'league_announce'){ closeModal(); openAnnouncementItem(x); return; }
   let g = null;
   try{ if(x && x.url) g = new URL(x.url, location.origin).searchParams.get('go'); }catch(e){}
   closeModal();
@@ -2436,15 +2474,15 @@ async function maybeShowWelcome(){
     show();
   }catch(e){}
 }
-function welcomeHTML(a){
+function welcomeHTML(a, readOnly){
   const when = a.created_at ? new Date(a.created_at).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }) : '';
   return `<div class="wl-box">
-    <div class="ah-meta" style="margin:0 0 8px;">${escapeHTML([a.author_name, when].filter(Boolean).join(' · '))}</div>
+    ${when ? `<div class="ah-meta" style="margin:0 0 8px;">${escapeHTML(when)}</div>` : ''}
     ${a.title && a.title !== 'Annonce' ? `<div style="font-family:var(--font-display);font-size:20px;text-transform:uppercase;margin:0 0 8px;">${escapeHTML(a.title)}</div>` : ''}
     <div class="wl-msg">${escapeHTML(a.body || '')}</div>
-    <div class="wl-acts">
+    <div class="wl-acts">${readOnly ? `<button type="button" class="btn btn-primary" onclick="closeModal()">Fermer</button>` : `
       <button type="button" class="btn btn-secondary" onclick="welcomeLater('${a.id}')">Plus tard</button>
-      <button type="button" class="btn btn-primary" onclick="welcomeDismiss('${a.id}')">Ne plus afficher</button>
+      <button type="button" class="btn btn-primary" onclick="welcomeDismiss('${a.id}')">Ne plus afficher</button>`}
     </div>
   </div>`;
 }
@@ -2461,8 +2499,8 @@ function sendAnnouncement(){
   if(a.kind === 'people' && !a.people.length) return;
   const org = partnerOrgId();
   const payload = a.kind === 'league'
-    ? { league_id: a.league, category:'league_announce', title: annTitle(), body: text, url: goUrl('league:' + a.league + ':group'), welcome: !!a.welcome }
-    : { organization_id: org, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('accueil'), welcome: !!a.welcome };
+    ? { league_id: a.league, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome }
+    : { organization_id: org, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome };
   a.sending = true; render();
   sb.functions.invoke('send-session-notification', { body: payload }).then(function(r){
     a.sending = false;
@@ -5575,6 +5613,9 @@ async function applyPendingGo(){
         await openMyLeague(id);
         if(sec === 'hist' || sec === 'stats'){ VIEW.pdet = sec; render(); }
       }
+    } else if(k === 'annonce'){
+      MODAL = null; MODAL_UNDER = null;
+      await openLatestAnnouncement();
     } else if(k === 'comptes' && asAdmin){
       MODAL = null; MODAL_UNDER = null;
       openOrgSheet('comptes');
