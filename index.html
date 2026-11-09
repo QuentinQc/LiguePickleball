@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 371">
+<meta name="app-build" content="Version 372">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -706,16 +706,25 @@ body.modern-nav .topbar.topbar-hidden{top:calc(8px + env(safe-area-inset-top)) !
 body.modern-nav .shell-top{padding:0;}
 /* Barre du haut fixée à l'écran (et non « collante ») : iPhone et iPad dessinaient la version
    collante comme une image légèrement floue. Elle est alignée sur la colonne du contenu. */
-body.modern-nav .topbar.shell-top{position:fixed;top:calc(var(--tb-gap) + env(safe-area-inset-top));left:var(--tb-x);right:var(--tb-x);height:54px;margin:0;box-sizing:border-box;--tb-x:calc(12px + env(safe-area-inset-left));
+body.modern-nav .topbar.shell-top{position:fixed;top:calc(var(--tb-gap) + env(safe-area-inset-top));left:var(--tb-x);right:var(--tb-x);height:56px;padding:7px;gap:10px;margin:0;box-sizing:border-box;--tb-x:calc(12px + env(safe-area-inset-left));
   background:#16413A;border:1px solid rgba(255,255,255,.12);box-shadow:0 4px 12px rgba(0,0,0,.28);}
 /* Espace sous la barre = hauteur de la barre + son décalage (encoche comprise) + 14 px, moins la marge haute de la page. */
 body.modern-nav{--tb-gap:18px;}
 /* Écrans tactiles (iPhone, iPad) : le système floute le haut de l'écran sous l'heure et la batterie ;
    la barre descend sous cette zone pour rester nette. */
 @media (hover:none) and (pointer:coarse){ body.modern-nav{--tb-gap:46px;} }
-body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 54px);}
-@media (min-width:641px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 24px);} body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 48px);} }
-@media (min-width:900px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 32px);} body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 36px + env(safe-area-inset-top));} }
+body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 56px);}
+/* Éléments de la barre : même hauteur (40 px), mêmes marges, même style de pastille */
+body.modern-nav .topbar.shell-top .shell-me .shell-me-av{width:40px;height:40px;font-size:14px;}
+body.modern-nav .topbar.shell-top .shell-me.on{box-shadow:0 0 0 2px #16413A, 0 0 0 4px var(--ball);}
+body.modern-nav .topbar.shell-top .shell-title{font-size:19px;letter-spacing:.04em;padding-left:2px;}
+body.modern-nav .topbar.shell-top .shell-right{gap:8px;}
+body.modern-nav .topbar.shell-top .view-slide{height:40px;padding:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);box-sizing:border-box;align-items:center;}
+body.modern-nav .topbar.shell-top .view-slide-thumb{top:3px;bottom:3px;left:3px;}
+body.modern-nav .topbar.shell-top .view-slide button{height:100%;padding:0 14px;font-size:12px;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;}
+body.modern-nav .topbar.shell-top .shell-bell{width:40px;height:40px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);}
+@media (min-width:641px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 24px);} body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 50px);} }
+@media (min-width:900px){ body.modern-nav .topbar.shell-top{--tb-x:calc(max(0px, (100% - 760px) / 2) + 32px);} body.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 38px + env(safe-area-inset-top));} }
 body.modern-nav .shell-title{font-size:20px;}
 body.modern-nav .shell-me .shell-me-av{width:36px;height:36px;font-size:13px;}
 .dk{border:0;background:none;color:var(--muted);height:48px;min-width:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 13px;font:700 14px var(--font-body);cursor:pointer;transition:background .25s,color .25s;}
