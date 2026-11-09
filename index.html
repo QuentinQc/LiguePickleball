@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 373">
+<meta name="app-build" content="Version 374">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2424,8 +2424,9 @@ async function loadInbox(){
 function ensureInboxLoaded(){
   if(!CURRENT_PROFILE || !SESSION_USER || SESSION_USER.role === 'pending' || INBOX_LOADED_FOR === CURRENT_PROFILE.id || INBOX_LOADING) return;
   INBOX_LOADED_FOR = CURRENT_PROFILE.id; // une seule tentative au lancement, même en cas d'échec (sinon boucle)
-  loadInbox().then(function(){ if(!appBusyEditing()) render(); });
+  loadInbox().then(refreshBell);
 }
+function refreshBell(){ const b = document.querySelector('.shell-bell'); if(b) b.outerHTML = bellHTML(); else if(!MODAL && !appBusyEditing()) render(); }
 function bellHTML(){
   if(!CURRENT_PROFILE) return '';
   const n = inboxUnread();
@@ -2792,6 +2793,8 @@ async function createPartnerPost(btn){
   PARTNER_AUD.people = [];
   if(MODAL && MODAL.sheet === 'pcompose'){ MODAL_UNDER = null; MODAL = null; }
   render();
+  const f = document.getElementById('cmFeed'); if(f){ f.classList.remove('cm-in'); void f.offsetWidth; f.classList.add('cm-in'); }
+  showToast('Annonce publiée');
 }
 let PARTNER_FLASH = false;
 // Ajoute/retire la personne connectée de la liste des intéressés d'une
@@ -2959,7 +2962,16 @@ function placeCmThumb(animate){
   t.style.transform = 'translateX(' + b.offsetLeft + 'px)';
 }
 window.addEventListener('resize', function(){ placeCmThumb(false); });
-function commRender(){ if(!MODAL && patchCommFeed()) return; render(); }
+function commRender(){
+  const patched = patchCommFeed(); // la liste sous la fenêtre est toujours mise à jour
+  if(MODAL){
+    // Formulaire en cours (annonce, événement, partenaire) : on n'y touche pas.
+    if(MODAL.sheet && /^(pcompose|ecompose|annonce|publier|wizard)$/.test(MODAL.sheet)) return;
+    renderSheet(); // fiche ouverte (détail d'un événement…) : mise à jour de la fenêtre seule
+    return;
+  }
+  if(!patched) render();
+}
 function cmFeedBodyHTML(filter){
   const today = fmtDate(new Date());
   // Noms des personnes visées par MES annonces ciblées : chargés une fois.
@@ -2988,7 +3000,10 @@ function cmFeedBodyHTML(filter){
   if(old.length) h += `<details class="cm-old"><summary>Passés et comblés (${old.length})</summary><div class="ah-grid cm-grid">${old.map(card).join('')}</div></details>`;
   return h;
 }
-function openPublishMenu(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'publier', title:'' }; render(); }
+function openPublishMenu(){
+  if(!(CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin')){ openPartnerComposer(); return; } // une seule possibilité : on y va directement
+  MODAL_UNDER = null; MODAL = { kind:'content', sheet:'publier', title:'' }; render();
+}
 function publishSheetHTML(){
   const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
   const tiles = [['', 'Chercher un partenaire', 'Une partie, un match amical, un remplaçant', 'openPartnerComposer()']];
@@ -3007,7 +3022,23 @@ function publishSheetHTML(){
     </div>
   </div>`;
 }
-function openPartnerComposer(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); }
+// Redessine seulement la fenêtre ouverte (choix d'une date, d'un public…) : le reste de l'écran
+// ne bouge pas, la position dans la fenêtre et le champ en cours de saisie sont conservés.
+function renderSheet(){
+  const root = document.getElementById('modalRoot');
+  if(!root || !MODAL){ render(); return; }
+  const body = root.querySelector('.sheet-body'), sc = body ? body.scrollTop : 0;
+  const ae = document.activeElement, keep = ae && root.contains(ae) && ae.id && /^(TEXTAREA|INPUT)$/.test(ae.tagName) && ae.type !== 'date' && ae.type !== 'time';
+  const aid = keep ? ae.id : null, ss = keep ? ae.selectionStart : null, se = keep ? ae.selectionEnd : null;
+  root.className = 'm-still';
+  root.innerHTML = modalHTML();
+  const nb = root.querySelector('.sheet-body'); if(nb) nb.scrollTop = sc;
+  if(aid){ const el = document.getElementById(aid); if(el){ try{ el.focus({ preventScroll:true }); if(ss !== null) el.setSelectionRange(ss, se); }catch(e){} } }
+  LAST_RENDERED_MODAL = MODAL;
+}
+// À l'ouverture d'un formulaire sur ordinateur, le curseur est déjà dans le premier champ.
+function focusComposer(id){ try{ if(window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) setTimeout(function(){ const el = document.getElementById(id); if(el) el.focus({ preventScroll:true }); }, 60); }catch(e){} }
+function openPartnerComposer(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput'); }
 // Dates rapides : aujourd'hui, demain, prochain samedi, prochain dimanche.
 function quickDates(){
   const t = new Date(), mk = d=>fmtDate(d), add = n=>new Date(t.getFullYear(), t.getMonth(), t.getDate()+n);
@@ -3017,17 +3048,17 @@ function quickDates(){
   if(sun > 1) out.push([mk(add(sun)), 'Dimanche']);
   return out;
 }
-function pcSetDate(d){ savePartnerDraft(); PARTNER_DRAFT.date = d; PARTNER_DRAFT.other = false; render(); }
-function pcOtherDate(){ savePartnerDraft(); PARTNER_DRAFT.other = true; render(); setTimeout(function(){ const el = document.getElementById('partnerDateInput'); if(el){ try{ el.showPicker && el.showPicker(); }catch(e){} el.focus(); } }, 60); }
+function pcSetDate(d){ savePartnerDraft(); PARTNER_DRAFT.date = d; PARTNER_DRAFT.other = false; renderSheet(); }
+function pcOtherDate(){ savePartnerDraft(); PARTNER_DRAFT.other = true; renderSheet(); setTimeout(function(){ const el = document.getElementById('partnerDateInput'); if(el){ try{ el.showPicker && el.showPicker(); }catch(e){} el.focus(); } }, 60); }
 function pcSetAud(k){
   savePartnerDraft();
   PARTNER_AUD.kind = k;
   if(k === 'league' && !PARTNER_AUD.league){ const ch = partnerLeagueChoices(); const cur = ch.find(l=>l.id===CURRENT_LEAGUE_ID) || ch[0]; PARTNER_AUD.league = cur ? cur.id : null; }
-  if(k === 'people' && !ORG_PEOPLE[partnerOrgId()]) loadOrgPeople().then(function(){ if(MODAL && MODAL.sheet === 'pcompose') render(); });
-  render();
+  if(k === 'people' && !ORG_PEOPLE[partnerOrgId()]) loadOrgPeople().then(function(){ if(MODAL && MODAL.sheet === 'pcompose') renderSheet(); });
+  renderSheet();
 }
-function pcSetLeague(id){ savePartnerDraft(); PARTNER_AUD.league = id; render(); }
-function pcTogglePerson(id){ savePartnerDraft(); const i = PARTNER_AUD.people.indexOf(id); if(i === -1) PARTNER_AUD.people.push(id); else PARTNER_AUD.people.splice(i, 1); render(); }
+function pcSetLeague(id){ savePartnerDraft(); PARTNER_AUD.league = id; renderSheet(); }
+function pcTogglePerson(id){ savePartnerDraft(); const i = PARTNER_AUD.people.indexOf(id); if(i === -1) PARTNER_AUD.people.push(id); else PARTNER_AUD.people.splice(i, 1); renderSheet(); }
 function pcOnType(el){
   savePartnerDraft();
   const c = document.getElementById('pcCount'); if(c) c.textContent = el.value.length + '/300';
@@ -3067,7 +3098,7 @@ function partnerComposerSheetHTML(){
         <div class="an-sec">Quand ?</div>
         <div class="an-chips" style="margin-top:0;">${qd.map(x=>`<button type="button" class="an-chip ${(!D.other && (D.date||'')===x[0])?'on':''}" onclick="pcSetDate('${x[0]}')">${x[1]}</button>`).join('')}<button type="button" class="an-chip ${(D.other || !isQuick)?'on':''}" onclick="pcOtherDate()">Autre date</button></div>
         ${(D.other || !isQuick || D.date) ? `<div class="pc-row">
-          ${(D.other || !isQuick) ? `<label class="pc-field"><span>Date</span><input type="date" id="partnerDateInput" min="${today}" onchange="savePartnerDraft();render()" value="${escapeHTML(D.date||'')}"></label>` : `<input type="hidden" id="partnerDateInput" value="${escapeHTML(D.date||'')}">`}
+          ${(D.other || !isQuick) ? `<label class="pc-field"><span>Date</span><input type="date" id="partnerDateInput" min="${today}" onchange="savePartnerDraft();renderSheet()" value="${escapeHTML(D.date||'')}"></label>` : `<input type="hidden" id="partnerDateInput" value="${escapeHTML(D.date||'')}">`}
           ${D.date ? `<label class="pc-field"><span>Heure (facultatif)</span><input type="time" id="partnerTimeInput" onchange="savePartnerDraft();pcOnType(document.getElementById('partnerMessageInput'))" value="${escapeHTML(D.time||'')}"></label>` : ''}
         </div>` : `<input type="hidden" id="partnerDateInput" value="">`}
         <div class="an-sec">Pour qui ?</div>
@@ -3351,7 +3382,7 @@ function socialEventFormHTML(e){
     </div>`;
 }
 let EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'' };
-function openNewSocialEventModal(){ EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'' }; MODAL_UNDER = null; MODAL = { kind:'content', sheet:'ecompose', title:'' }; render(); }
+function openNewSocialEventModal(){ EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'' }; MODAL_UNDER = null; MODAL = { kind:'content', sheet:'ecompose', title:'' }; render(); focusComposer('eventTitleInput'); }
 function evSave(){
   const g = (id, k)=>{ const el = document.getElementById(id); if(el) EVENT_DRAFT[k] = el.value; };
   g('eventTitleInput','title'); g('eventDescInput','description'); g('eventDateInput','date'); g('eventTimeInput','time'); g('eventLocationInput','location');
@@ -3361,7 +3392,7 @@ function evOnType(){
   const pv = document.getElementById('evPreview'); if(pv) pv.innerHTML = eventPreviewHTML();
   const b = document.getElementById('evSend'); if(b) b.disabled = !(String(EVENT_DRAFT.title||'').trim() && EVENT_DRAFT.date);
 }
-function evSetDate(d){ evSave(); EVENT_DRAFT.date = d; render(); }
+function evSetDate(d){ evSave(); EVENT_DRAFT.date = d; renderSheet(); }
 function eventPreviewHTML(){
   const fake = { id:'apercu', organization_id: currentLeagueOrgId(), title: String(EVENT_DRAFT.title||'').trim() || 'Titre de l\'événement', event_date: EVENT_DRAFT.date || fmtDate(new Date()), event_time: EVENT_DRAFT.time || null, location: EVENT_DRAFT.location || null };
   return cmEventCardHTML(fake);
@@ -3382,7 +3413,7 @@ function eventComposerSheetHTML(){
         <div class="an-sec">Quand ?</div>
         <div class="an-chips" style="margin-top:0;">${qd.map(x=>`<button type="button" class="an-chip ${E.date===x[0]?'on':''}" onclick="evSetDate('${x[0]}')">${x[1]}</button>`).join('')}</div>
         <div class="pc-row">
-          <label class="pc-field"><span>Date</span><input type="date" id="eventDateInput" value="${escapeHTML(E.date||'')}" onchange="evOnType();render()"></label>
+          <label class="pc-field"><span>Date</span><input type="date" id="eventDateInput" value="${escapeHTML(E.date||'')}" onchange="evOnType();renderSheet()"></label>
           <label class="pc-field"><span>Heure</span><input type="time" id="eventTimeInput" value="${escapeHTML(E.time||'')}" onchange="evOnType()"></label>
         </div>
         <div class="an-sec">Où ?</div>
@@ -3435,6 +3466,8 @@ async function saveSocialEvent(id, btn){
   closeModal();
   await loadSocialEvents();
   render();
+  const f = document.getElementById('cmFeed'); if(f){ f.classList.remove('cm-in'); void f.offsetWidth; f.classList.add('cm-in'); }
+  showToast(id ? 'Événement modifié' : 'Événement publié');
 }
 function deleteSocialEvent(id){
   showConfirm('Supprimer cet événement ?', async ()=>{
@@ -5715,7 +5748,8 @@ function enhanceTextarea(t){
   t.style.height = 'auto';
   t.style.height = Math.min(Math.max(t.scrollHeight, 48), 240) + 'px';
   const max = parseInt(t.getAttribute('maxlength'),10);
-  if(max){
+  // Zones qui ont déjà leur propre compteur (annonce, partenaire) : pas de second compteur.
+  if(max && !(t.parentNode && t.parentNode.querySelector('.an-count'))){
     let c = t.nextElementSibling;
     if(!c || !c.classList.contains('ta-counter')){
       c = document.createElement('div'); c.className = 'ta-counter';
