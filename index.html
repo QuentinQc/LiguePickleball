@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 385">
+<meta name="app-build" content="Version 386">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1659,6 +1659,26 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rl-check{display:flex;align-items:center;gap:10px;margin:14px 2px 6px;font-size:15px;font-weight:600;cursor:pointer;}
 .rl-check input{width:22px;height:22px;flex:none;accent-color:var(--ball);}
 .rl-ok{margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.12);color:var(--ball);font-weight:700;font-size:14px;}
+.sd-dock{position:sticky;top:calc(var(--tb-gap, 18px) + 64px + env(safe-area-inset-top));z-index:4;border:1px solid rgba(207,234,92,.30) !important;background:linear-gradient(135deg,rgba(207,234,92,.10),rgba(207,234,92,.02)),#16413A !important;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+.lg-sheet .sd-dock{top:calc(var(--lgnav-h, 72px) - 14px);}
+.sd-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.sd-top b{font-size:16px;}
+.sd-top b em{font-style:normal;margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--ball);color:var(--court);font-size:13px;}
+.sd-top span{font-size:13px;color:var(--muted);}
+.sd-list{display:flex;gap:8px;overflow-x:auto;padding:10px 2px 4px;margin:0 -2px;scrollbar-width:none;}
+.sd-list::-webkit-scrollbar{display:none;}
+.sd-chip{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);font:inherit;font-weight:700;font-size:14px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
+.sd-chip.dispo{border-color:rgba(207,234,92,.55);}
+.sd-chip small{font-weight:500;font-size:11px;color:var(--muted);}
+.sd-chip.pick{background:var(--ball);color:var(--court);}
+.sd-chip.pick small{color:var(--court);}
+.sd-chip.dragging{opacity:.35;}
+.sd-av{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:11px;}
+.sd-ghost{position:fixed;left:0;top:0;z-index:10000;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.5);border-color:var(--ball);transform-origin:0 0;}
+.sd-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap;}
+body.sd-dragging,body.sd-dragging *{cursor:grabbing !important;}
+body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px dashed rgba(207,234,92,.6);outline-offset:-2px;border-radius:12px;}
+.sub-slot.sd-over,[data-sg].sd-over{outline:2px solid var(--ball) !important;outline-offset:-2px;background:rgba(207,234,92,.10);}
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -5051,7 +5071,8 @@ function reinforcementHTML(open, g){
   // Une place d'absent est libre : on propose d'abord de la combler avec un remplaçant disponible.
   const holes = openAbsentSlots(open, g.id);
   if(holes.length){
-    if(!dispo.length || groupHasScores(gd)) return h;
+    // La bande « Remplaçants disponibles » en haut de l'onglet sert déjà à combler les places vides.
+    if(!dispo.length || groupHasScores(gd) || (DATA.substitutePool||[]).length) return h;
     const a = holes[0];
     return h + `<div class="rf-card">
       <div class="rf-t">${escapeHTML(dispo.map(x=>x.name).join(', '))} ${dispo.length>1?'sont disponibles':'est disponible'}</div>
@@ -5430,6 +5451,7 @@ function renderInner(){
   }
   LAST_RENDERED_MODAL = MODAL;
   placeCmThumb(false);
+  try{ const nv = document.querySelector('#lgSheetBody .lg-nav'); if(nv) document.getElementById('lgSheetBody').style.setProperty('--lgnav-h', nv.offsetHeight + 'px'); }catch(e){}
   applyQuickView();
   modernizeSubtabs();
   if(PENDING_GO) setTimeout(applyPendingGo, 0);
@@ -10334,6 +10356,7 @@ function adminGroupsHTML(){
   let html = rec
     ? `<div class="card"><p class="small">${open ? "Les terrains sont tirés au hasard parmi les joueurs présents. Marque les absences dans la fiche du joueur : tant que la soirée n'est pas publiée, le tirage est refait automatiquement." : "Aucune soirée en cours : les terrains seront tirés au hasard au démarrage de la prochaine."}</p></div>`
     : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+  html = subDockHTML(open) + html;
   const unassigned = DATA.players.filter(p=>!p.groupId);
   const absentNow = open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
   html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
@@ -10365,7 +10388,7 @@ function adminGroupsHTML(){
     const outOfRange = !rec && displayCount > 0 && (displayCount < GROUP_MIN_PLAYERS() || displayCount > GROUP_MAX_PLAYERS()) && displayCount !== 6;
     const isSix = !rec && displayCount === 6;
     html += `
-    <div class="card drop-target" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
+    <div class="card drop-target" data-sg="${g.id}" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;align-items:center;">
         <div style="display:flex;align-items:center;gap:10px;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span><span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span></div>
         <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du ${grpWord()}">⋯</button>
@@ -10394,14 +10417,14 @@ function adminGroupsHTML(){
             const isRealPlayer = !isGuestOrSubId(subId);
             const isSubPool = isSubPoolId(subId);
             const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
-            return `<div class="pf-row"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
+            return `<div class="pf-row sub-slot" data-g="${g.id}" data-a="${p.id}"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
               <span style="width:22px;color:var(--muted);text-align:center;">↳</span>
               <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)}</small></span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
-          return `<div class="pf-row" style="opacity:.75;" onclick="openPlayerDetailModal('${p.id}')">
+          return `<div class="pf-row sub-slot empty" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
             <span style="width:22px;color:var(--muted);text-align:center;">—</span>
-            <span class="t">Place vide<small>${escapeHTML(p.name)} est ${gw(p,'absent','absente','absent(e)')}</small></span><span class="pf-chip warn">Sans remplaçant</span>
+            <span class="t">Place vide<small>${escapeHTML(p.name)} est ${gw(p,'absent','absente','absent(e)')} · glisse un remplaçant ici</small></span><span class="pf-chip warn">Sans remplaçant</span>
           </div>`;
         }).join('')}
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
@@ -10470,6 +10493,103 @@ function groupAbsenceManagementHTML(open, g){
   });
   html += `</div>`;
   return html;
+}
+// ==================== Bande « Remplaçants disponibles » : glisser un remplaçant sur une place ====================
+let SUB_DOCK_ALL = false, SUB_PICK = null;
+function subDockHTML(open){
+  if(!open || open.status !== 'open' || isRecLeague() || DATA.leagueFormat === 'mlp' || !(DATA.substitutePool||[]).length) return '';
+  const used = subsUsedInSession(open);
+  const all = (DATA.substitutePool||[]).filter(function(sp){ return !used.has('sub::' + sp.id); });
+  const dispo = all.filter(function(sp){ return (open.availableSubs||[]).indexOf(sp.id) !== -1; });
+  const shown = SUB_DOCK_ALL ? all.slice().sort(function(a,b){ return ((open.availableSubs||[]).indexOf(b.id) !== -1) - ((open.availableSubs||[]).indexOf(a.id) !== -1) || a.name.localeCompare(b.name); }) : dispo;
+  const holes = groupsSorted().reduce(function(n, g){ return n + openAbsentSlots(open, g.id).length; }, 0);
+  const placed = (DATA.substitutePool||[]).filter(function(sp){ return used.has('sub::' + sp.id); }).length;
+  const chip = function(sp){
+    const d = (open.availableSubs||[]).indexOf(sp.id) !== -1;
+    return `<button type="button" class="sd-chip${d ? ' dispo' : ''}${SUB_PICK === 'sub::' + sp.id ? ' pick' : ''}" data-enc="sub::${sp.id}" onpointerdown="subDragStart(event)" onclick="subPick('sub::${sp.id}')">${avatarHTML('sd-av', partnerInitials(sp.name), null)}<span>${escapeHTML(sp.name)}</span>${d ? '' : '<small>non indiqué</small>'}</button>`;
+  };
+  return `<div class="card sd-dock" id="subDock">
+    <div class="sd-top"><b>Remplaçants disponibles <em>${dispo.length}</em></b><span>${holes ? holes + ' place' + (holes>1?'s':'') + ' à combler' : 'Aucune place vide'}${placed ? ' · ' + placed + ' placé' + (placed>1?'s':'') : ''}</span></div>
+    ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;">${all.length ? "Aucun remplaçant n'a encore indiqué sa disponibilité pour cette session." : 'Tous les remplaçants sont déjà placés.'}</p>`}
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant une place vide ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur une place vide, ou touche-le puis touche la place.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+  </div>`;
+}
+// Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
+function placeSubAt(enc, gid, absentId){
+  const open = currentOpenSession(); if(!open || !enc || !gid) return false;
+  const gd = open.groupsData.find(function(x){ return x.groupId === gid; });
+  const g = groupById(gid);
+  if(groupHasScores(gd)){ showToast('Des scores sont déjà entrés dans ce ' + grpWord(), true); return false; }
+  if(!absentId){ const holes = openAbsentSlots(open, gid); if(holes.length) absentId = holes[0]; }
+  if(absentId){ onSubSelect(gid, absentId, enc); showToast(playerName(enc) + ' remplace ' + playerName(absentId)); return true; }
+  if(activeRosterForGroup(open, gid).length === 4 && !openAbsentSlots(open, gid).length){ addReinforcement(gid, enc); showToast(playerName(enc) + ' vient en renfort dans le ' + (g ? g.name : grpWord())); return true; }
+  showToast('Ce ' + grpWord() + " n'a pas de place pour un remplaçant", true);
+  return false;
+}
+function subPick(enc){
+  if(SUB_DRAG && SUB_DRAG.moved) return;
+  SUB_PICK = SUB_PICK === enc ? null : enc;
+  render();
+  if(SUB_PICK) document.body.classList.add('sd-picking');
+}
+// Toucher une cible pendant qu'un remplaçant est sélectionné.
+document.addEventListener('click', function(e){
+  if(!SUB_PICK) return;
+  const t = e.target && e.target.closest ? e.target.closest('.sub-slot, [data-sg]') : null;
+  if(!t || (e.target.closest && e.target.closest('.sd-chip'))) return;
+  e.preventDefault(); e.stopPropagation();
+  const enc = SUB_PICK; SUB_PICK = null; document.body.classList.remove('sd-picking');
+  if(t.classList.contains('sub-slot')) placeSubAt(enc, t.getAttribute('data-g'), t.getAttribute('data-a'));
+  else placeSubAt(enc, t.getAttribute('data-sg'), null);
+}, true);
+// Glisser au doigt ou à la souris (pointer events : téléphone, tablette et ordinateur).
+let SUB_DRAG = null;
+function subDragTarget(x, y){
+  const el = document.elementFromPoint(x, y);
+  return el && el.closest ? el.closest('.sub-slot, [data-sg]') : null;
+}
+function subDragStart(e){
+  if(e.button !== undefined && e.button !== 0) return;
+  const chip = e.currentTarget, enc = chip.getAttribute('data-enc');
+  SUB_DRAG = { enc: enc, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId };
+  document.addEventListener('pointermove', subDragMove, { passive: false });
+  document.addEventListener('pointerup', subDragEnd);
+  document.addEventListener('pointercancel', subDragEnd);
+}
+function subDragMove(e){
+  const d = SUB_DRAG; if(!d) return;
+  if(!d.moved){
+    if(Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 8) return;
+    d.moved = true;
+    const g = d.chip.cloneNode(true); g.className = 'sd-chip sd-ghost'; g.removeAttribute('onclick'); g.removeAttribute('onpointerdown');
+    document.body.appendChild(g); d.ghost = g;
+    d.chip.classList.add('dragging'); document.body.classList.add('sd-dragging');
+  }
+  e.preventDefault();
+  d.ghost.style.transform = 'translate(' + (e.clientX - 40) + 'px,' + (e.clientY - 26) + 'px)';
+  const t = subDragTarget(e.clientX, e.clientY);
+  if(t !== d.over){ if(d.over) d.over.classList.remove('sd-over'); if(t) t.classList.add('sd-over'); d.over = t; }
+  // Défilement automatique près des bords
+  const sc = d.chip.closest ? d.chip.closest('.sheet-body') : null;
+  const r = sc ? sc.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  const edge = 70, dy = e.clientY < r.top + edge ? -12 : (e.clientY > r.bottom - edge ? 12 : 0);
+  if(dy){ if(sc) sc.scrollTop += dy; else window.scrollBy(0, dy); }
+}
+function subDragEnd(e){
+  const d = SUB_DRAG;
+  document.removeEventListener('pointermove', subDragMove);
+  document.removeEventListener('pointerup', subDragEnd);
+  document.removeEventListener('pointercancel', subDragEnd);
+  if(!d) return;
+  document.body.classList.remove('sd-dragging');
+  if(d.ghost) d.ghost.remove();
+  if(d.chip) d.chip.classList.remove('dragging');
+  if(d.over) d.over.classList.remove('sd-over');
+  if(d.moved && e.type === 'pointerup'){
+    const t = d.over;
+    if(t){ if(t.classList.contains('sub-slot')) placeSubAt(d.enc, t.getAttribute('data-g'), t.getAttribute('data-a')); else placeSubAt(d.enc, t.getAttribute('data-sg'), null); }
+  }
+  setTimeout(function(){ SUB_DRAG = null; }, 0); // le clic qui suit un glisser est ignoré
 }
 function addGroup(){
   const maxOrder = Math.max(0, ...DATA.groups.map(g=>g.order));
