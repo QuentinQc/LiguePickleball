@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 378">
+<meta name="app-build" content="Version 379">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -11470,7 +11470,6 @@ function reportsGroupsHTML(){
     </div>`;
   h += `<div class="rg-grid">${d.groups.map(function(x){
     return `<div class="card rg-card"><div class="rg-top"><b>${escapeHTML(x.g.name)}</b><span>${x.players.length} joueur${x.players.length>1?'s':''}</span></div>
-      ${showR && x.avg !== null ? `<div class="ah-meta" style="margin:-2px 0 8px;">Écart : ${rgFmt(x.min)} à ${rgFmt(x.max)}</div>` : ''}
       ${x.players.length ? x.players.map(row).join('') : `<div class="ah-meta">Aucun joueur.</div>`}</div>`;
   }).join('')}</div>`;
   if(d.none.length) h += `<div class="card rg-card rg-none"><div class="rg-top"><b>Sans ${grpWord()}</b><span>${d.none.length} joueur${d.none.length>1?'s':''}</span></div>${d.none.map(row).join('')}</div>`;
