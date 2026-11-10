@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 383">
+<meta name="app-build" content="Version 384">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -11443,7 +11443,8 @@ function rgRating(p){ return typeof p.rating === 'number' ? p.rating : RATING_DE
 function rgFmt(n){ return n.toFixed(2).replace('.', ','); }
 function reportsGroupsData(){
   const groups = groupsSorted().map(function(g){
-    const pl = playersInGroup(g.id).slice().sort(function(a,b){ return rgRating(b) - rgRating(a) || a.name.localeCompare(b.name); });
+    // Même ordre que dans l'app (position dans le groupe), pas un tri par cote.
+    const pl = playersInGroup(g.id).slice().sort(function(a,b){ return (typeof a.order==='number'?a.order:0) - (typeof b.order==='number'?b.order:0) || a.name.localeCompare(b.name); });
     const r = pl.map(rgRating);
     return { g: g, players: pl, avg: r.length ? r.reduce(function(a,b){ return a+b; }, 0) / r.length : null, min: r.length ? Math.min.apply(null, r) : null, max: r.length ? Math.max.apply(null, r) : null };
   });
