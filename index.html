@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 389">
+<meta name="app-build" content="Version 390">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -6825,7 +6825,22 @@ let PENDING_ORG_NAME = null;
 // Demande envoyée par le lien d'une ligue : gardée sur l'appareil pour afficher « en attente » plutôt que « entre un code ».
 function rememberJoinPending(leagueId){ try{ localStorage.setItem('dinkeo_join_pending', JSON.stringify({ league: leagueId || null, at: Date.now() })); }catch(e){} }
 function joinPendingInfo(){ try{ const j = JSON.parse(localStorage.getItem('dinkeo_join_pending') || 'null'); return (j && Date.now() - j.at < 60*86400000) ? j : null; }catch(e){ return null; } }
+// Demande envoyée par le lien d'une ligue : on vérifie son état (le joueur peut maintenant lire ses demandes).
+let JOIN_REQ_CHECKED = false, JOIN_REJECTED = false;
+function checkMyJoinRequest(){
+  if(JOIN_REQ_CHECKED || !CURRENT_PROFILE) return;
+  JOIN_REQ_CHECKED = true;
+  sb.from('join_requests').select('status, created_at').eq('profile_id', CURRENT_PROFILE.id).order('created_at', { ascending:false }).limit(1).then(function(r){
+    const last = r && !r.error && r.data && r.data[0];
+    if(last && last.status === 'rejected'){
+      try{ localStorage.removeItem('dinkeo_join_pending'); }catch(e){}
+      JOIN_REJECTED = true;
+      if(SESSION_USER && SESSION_USER.role === 'pending') render();
+    }
+  }, function(){});
+}
 function renderPending(){
+  if(joinPendingInfo()) checkMyJoinRequest();
   // Rattaché à une organisation par son lien, ou demande envoyée par le lien d'une ligue : en attente de l'organisateur.
   const pendingOrgId = CURRENT_PROFILE && CURRENT_PROFILE.organization_id && !CURRENT_PROFILE.is_super_admin ? CURRENT_PROFILE.organization_id : null;
   if(pendingOrgId && PENDING_ORG_NAME === null){
@@ -6854,7 +6869,7 @@ function renderPending(){
       <button type="button" class="pend-link" onclick="openInviteCodePrompt()">Ton organisateur t'a envoyé un code personnel ? L'entrer</button>
       <button type="button" class="pend-link" onclick="logout()">Déconnexion</button>
     </div>`
-    : `${pushPromoBannerHTML()}<div class="card">
+    : `${pushPromoBannerHTML()}${JOIN_REJECTED ? `<div class="card" style="border-color:rgba(255,159,10,.45);"><h2 style="margin-top:0;">Demande non retenue</h2><p class="small">L'organisateur n'a pas pu accepter ta demande d'adhésion pour le moment (ligue complète, par exemple). Tu peux chercher une autre ligue ci-dessous, ou lui écrire directement.</p></div>` : ''}<div class="card">
       <h2>Compte créé</h2>
       <p class="small">Ton compte (${escapeHTML(SESSION_USER.email||'')}) n'est pas encore associé à une ligue. Si ton organisateur t'a envoyé un lien ou un code d'invitation, utilise-le. Sinon, cherche une ligue et demande à la rejoindre.</p>
       <button class="btn btn-primary" onclick="openInviteCodePrompt()">J'ai un code d'invitation</button>
@@ -6894,7 +6909,7 @@ async function onCreateOrganization(){
 }
 let EXPLICIT_LOGOUT = false;
 async function logout(){
-  EXPLICIT_LOGOUT = true; INBOX = []; INBOX_LOADED_FOR = null; WELCOME_CHECKED = false; WELCOME_LATER = {}; MY_RULES_ACC = {}; MY_RULES_LOADED_FOR = null; RULES_PROMPTED = false;
+  EXPLICIT_LOGOUT = true; JOIN_REQ_CHECKED = false; JOIN_REJECTED = false; INBOX = []; INBOX_LOADED_FOR = null; WELCOME_CHECKED = false; WELCOME_LATER = {}; MY_RULES_ACC = {}; MY_RULES_LOADED_FOR = null; RULES_PROMPTED = false;
   setTimeout(()=>{ EXPLICIT_LOGOUT = false; }, 5000);
   await sb.auth.signOut();
   SESSION_USER = null;
