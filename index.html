@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 382">
+<meta name="app-build" content="Version 383">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10640,15 +10640,14 @@ function checkAndStartSession(explicitDate){
   const warnings = [];
   if(blocked.has(date)) warnings.push(`le ${date} est marqué comme date bloquée dans le calendrier de saison`);
   if(seasonEnd && date > seasonEnd) warnings.push(`le ${date} dépasse la fin de saison configurée (${seasonEnd})`);
+  // Une seule session à la fois : un deuxième toucher rapide ne crée rien de plus.
+  const go = ()=>{ if(currentOpenSession()) { render(); return; } notifySubsAfterSave(startNewSession(date)); saveAndRender(); };
+  const subs = (DATA.substitutePool||[]).length ? ' Les remplaçants seront prévenus pour indiquer leur disponibilité.' : '';
   if(warnings.length){
-    showConfirm(`Attention : ${warnings.join(' et ')}. Créer quand même une session pour cette date ?`, ()=>{
-      notifySubsAfterSave(startNewSession(date));
-      saveAndRender();
-    });
+    showConfirm(`Attention : ${warnings.join(' et ')}. Créer quand même une session pour cette date ?`, go);
     return;
   }
-  notifySubsAfterSave(startNewSession(date));
-  saveAndRender();
+  showConfirm(`Lancer la ${isRecLeague() ? 'soirée' : 'session'} du ${fdl(date)} ?${subs}`, go);
 }
 // ---------- Lancement d'une session : présentation simplifiée ----------
 const FR_DAYS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -10944,17 +10943,13 @@ function onPublishSession(){
     return;
   }
   const empties = emptySpotWarnings(open);
+  // Publication une seule fois, même après deux touchers rapides.
+  const go = ()=>{ if(open.published){ render(); return; } open.published = true; saveAndRender(); notifySessionPublished(open); };
   if(empties.length){
-    showConfirm("Attention, certaines places resteront vides pour cette session, sans remplaçant :\n\n" + empties.map(i=>'• '+i).join('\n') + "\n\nPublier quand même ?", ()=>{
-      open.published = true;
-      saveAndRender();
-      notifySessionPublished(open);
-    });
+    showConfirm("Attention, certaines places resteront vides pour cette session, sans remplaçant :\n\n" + empties.map(i=>'• '+i).join('\n') + "\n\nPublier quand même ?", go);
     return;
   }
-  open.published = true;
-  saveAndRender();
-  notifySessionPublished(open);
+  showConfirm(`Publier la ${isRecLeague() ? 'soirée' : 'session'} du ${fdl(open.date)} ? Les joueurs recevront une notification avec ${isRecLeague() ? 'leur terrain' : 'leurs groupes et leurs matchs'}.`, go);
 }
 function onUnpublishSession(){
   const open = currentOpenSession();
