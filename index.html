@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 388">
+<meta name="app-build" content="Version 389">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1682,6 +1682,10 @@ body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:
 body.sd-dragging,body.sd-dragging *{cursor:grabbing !important;}
 body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px dashed rgba(207,234,92,.6);outline-offset:-2px;border-radius:12px;}
 .sub-slot.sd-over,[data-sg].sd-over{outline:2px solid var(--ball) !important;outline-offset:-2px;background:rgba(207,234,92,.10);}
+.gd-sec{padding:12px 0;border-bottom:1px solid var(--line-soft);}
+.gd-sec:first-child{padding-top:0;}
+.gd-sec h3{margin:0 0 6px;font-size:15px;}
+.gd-sec p{margin:0;line-height:1.55;}
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -13294,35 +13298,14 @@ function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
 }
 function settingsGuideHTML(){
-  return `
-    <div class="card">
-      <h3>Onglet Session</h3>
-      <p class="small"><strong>Groupes</strong> : échelle, positions numérotées, glisser-déposer, joueurs en attente d'assignation, gestion des absences/remplaçants par groupe.</p>
-      <p class="small"><strong>Résultats</strong> : Publier/Dépublier, Terminer, Annuler, saisie des scores, impression des feuilles de match.</p>
-    </div>
-    <div class="card">
-      <h3>Onglet Joueurs</h3>
-      <p class="small"><strong>Réguliers</strong> : ajout de joueurs, comptes en attente/orphelins, pop-up de gestion complet par joueur (clique sur un nom).</p>
-      <p class="small"><strong>Remplaçants</strong> : bassin de personnes disponibles, courriel de disponibilité groupé.</p>
-    </div>
-    <div class="card">
-      <h3>Historique et Rapports</h3>
-      <p class="small"><strong>Historique</strong> : classements et matchs de chaque session passée, suppression avec annulation optionnelle des montées/descentes et de la cote.</p>
-      <p class="small"><strong>Rapports</strong> : liste des joueurs/remplaçants, statistiques détaillées par joueur, export PDF.</p>
-    </div>
-    <div class="card">
-      <h3>Comptes, rôles et cote</h3>
-      <p class="small">Un compte doit être lié à un joueur (menu ☰ → Organisation) avant d'accéder à sa vue joueur. Le rôle admin/joueur se change au même endroit. La cote évolue automatiquement après chaque match et est modifiable manuellement au besoin.</p>
-    </div>
-    <div class="card">
-      <h3>Dépannage courant</h3>
-      <p class="small">• Mauvais nombre de matchs générés → vérifie le Mode test.<br>
-      • Joueur qui ne voit pas ses matchs → vérifie que la session est publiée.<br>
-      • Compte orphelin → menu ☰ → Organisation, section Comptes orphelins.</p>
-    </div>
-    <div class="card">
-      <button class="btn-ghost" onclick="showPlayerGuideModal()">Aperçu du guide du joueur</button>
-    </div>`;
+  return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
+  + guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`)
+  + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant, avec sa cote de départ. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
+  + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (toute l'organisation, une ligue ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
+  + guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`)
+  + guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`)
+  + guideSec('Dépannage', `<p class="small">• Un joueur ne voit pas ses matchs : la session est-elle publiée ?<br>• Un joueur ne reçoit pas les notifications : demande-lui de toucher « Tester » dans Moi › Notifications, et d'ouvrir l'app depuis son icône.<br>• Un nouvel inscrit n'arrive pas à confirmer son courriel : vérifie Organisations › Comptes, sa demande peut y être en attente.<br>• L'app semble ancienne : la fermer complètement puis la rouvrir.<br>• Nombre de matchs inattendu : vérifie le mode test dans Réglages › Avancé.</p>`)
+  + `<div class="card"><button class="btn-ghost" onclick="showPlayerGuideModal()">Aperçu du guide du joueur</button></div>`;
 }
 
 // Garde le nom/l'étiquette jour-heure de la ligue (table leagues, utilisés
@@ -14092,35 +14075,31 @@ async function switchAdminView(kind){
 function toggleAdminPlayerView(){ switchAdminView('player'); }
 function toggleAdminSubView(){ switchAdminView('substitute'); }
 function setPlayerTab(t){ VIEW.tab=t; render(); }
+// Guide du joueur : reflète l'app actuelle (Accueil · Organisations · Calendrier · Communauté · Moi).
+function guideSec(t, html){ return `<div class="gd-sec"><h3>${t}</h3>${html}</div>`; }
 function playerGuideHTML(){
-  if(isRecLeague()) return `
-    <h3>Mon terrain</h3>
-    <p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. À chaque soirée, les joueurs présents sont répartis au hasard sur les terrains, en évitant autant que possible de rejouer avec les mêmes personnes.</p>
-    <h3 style="margin-top:14px;">Déclarer une absence</h3>
-    <p class="small">Dans la section « Absence » de Mon terrain : « Une session » pour la prochaine soirée, « Plusieurs sessions » pour couvrir une plage de dates à l'avance (vacances), et « Blessure » pour te déclarer hors jeu. Préviens le plus tôt possible pour que les terrains soient tirés avec les bonnes personnes.</p>
-    <h3 style="margin-top:14px;">Voir ton terrain</h3>
-    <p class="small">Ton terrain et tes partenaires apparaissent dans Mon terrain dès que ton administrateur publie la soirée. Quand il y a plus de joueurs que de places, ceux qui ont joué le plus souvent récemment cèdent leur place à tour de rôle.</p>
-    <h3 style="margin-top:14px;">Plusieurs ligues</h3>
-    <p class="small">Si tu joues dans plus d'une ligue avec le même compte, un sélecteur apparaît en haut de ton écran pour choisir laquelle consulter.</p>
-    <h3 style="margin-top:14px;">Besoin d'aide ?</h3>
-    <p class="small">Pour toute question, contacte directement un administrateur de ta ligue.</p>
-  `;
-  return `
-    <h3>Mon groupe</h3>
-    <p class="small">Affiche tes coéquipiers${DATA.showRatingToPlayers ? ' avec leur cote' : ''}, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
-    <h3 style="margin-top:14px;">Déclarer une absence</h3>
-    <p class="small">Dans la section « Absence » de Mon groupe, trois boutons ouvrent chacun un pop-up : « Une session » pour la session en cours (avant qu'elle ne soit finalisée, pour laisser le temps de trouver un remplaçant), « Plusieurs sessions » pour couvrir une plage de dates à l'avance (vacances), et « Blessure » pour te déclarer hors jeu. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
-    <h3 style="margin-top:14px;">Voir tes matchs</h3>
-    <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
-    <h3 style="margin-top:14px;">Historique</h3>
-    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées${DATA.showRatingToPlayers ? ', avec ton évolution de cote en vert/rouge' : ''}. La pastille « ${pbIcon()} Matchs de mon groupe » ouvre le détail des matchs.</p>
-    ${DATA.showRatingToPlayers ? `<h3 style="margin-top:14px;">La cote évolutive</h3>
-    <p class="small">Ta cote évolue automatiquement après chaque match compté (adversaire affronté, écart de score, nombre de matchs joués). Le bouton « Comment fonctionne la cote ? » dans Moi donne l'explication complète.</p>` : ''}
-    <h3 style="margin-top:14px;">Plusieurs ligues</h3>
-    <p class="small">Si tu joues dans plus d'une ligue avec le même compte, un sélecteur apparaît en haut de ton écran pour choisir laquelle consulter.</p>
-    <h3 style="margin-top:14px;">Besoin d'aide ?</h3>
-    <p class="small">Pour toute question, contacte directement un administrateur de ta ligue.</p>
-  `;
+  const rec = isRecLeague(), showR = !!DATA.showRatingToPlayers, g = grpWord(), G = grpWord(false, true);
+  const sub = SESSION_USER && SESSION_USER.role === 'substitute';
+  const hasRules = !!DATA.rulesText;
+  let h = guideSec("L'app en bref", `<p class="small">En bas de l'écran : <b>Accueil</b> (tes ligues et ce qui s'en vient), <b>Organisations</b>, <b>Calendrier</b> et <b>Communauté</b>. Touche ta photo en haut à gauche pour ouvrir <b>Moi</b> (profil, absences, notifications, aide). La <b>cloche</b> en haut à droite garde tes notifications des 14 derniers jours.</p>`);
+  if(sub){
+    h += guideSec('Indiquer ta disponibilité', `<p class="small">À chaque nouvelle session, tu reçois une notification. Sur l'Accueil, touche <b>« Je suis disponible »</b> sur la carte de ta ligue. L'organisateur te place s'il a besoin de toi : tu reçois alors « Tu joues… » avec ton ${g}. S'il change d'idée, tu en es aussi averti.</p>`);
+  } else {
+    h += guideSec('Ta ligue', `<p class="small">Sur l'Accueil, chaque ligue a sa carte : date de la prochaine ${rec ? 'soirée' : 'session'}, état (en préparation, publiée…) et boutons rapides. Touche la carte pour ouvrir <b>${myGroupLabel()}</b>${rec ? '' : ', <b>Statistiques</b> et <b>Historique</b>'}.</p>`);
+    h += guideSec('Signaler une absence', `<p class="small">Touche <b>« Je serai absent(e) »</b> sur la carte de ta ligue, le plus tôt possible : l'organisateur peut ainsi te trouver un remplaçant. Pour plusieurs dates d'avance (vacances) ou une <b>blessure</b>, va dans <b>Moi › Mes absences</b>.${rec ? '' : ` Une absence sans remplaçant entraîne une descente automatique d'un ${g}, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.`}</p>`);
+    h += rec
+      ? guideSec('Ton terrain', `<p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. Les joueurs présents sont répartis au hasard sur les terrains, en évitant de rejouer avec les mêmes personnes. Ton terrain apparaît dès que l'organisateur publie la soirée.</p>`)
+      : guideSec('Tes matchs et les scores', `<p class="small">Dès que l'organisateur publie la session, tu reçois une notification et tes matchs apparaissent dans ${myGroupLabel()}.${DATA.allowPlayerScoreEntry ? ' Le jour de la session, les joueurs entrent eux-mêmes les scores, match après match.' : " Les scores sont entrés par l'organisateur."} À la fin de la session, les premiers de chaque ${g} montent et les derniers descendent.</p>`);
+    if(!rec) h += guideSec('Statistiques et historique', `<p class="small"><b>Statistiques</b> : ton bilan de la saison, tes meilleurs partenaires et adversaires${showR ? ', et l\'évolution de ta cote' : ''}. <b>Historique</b> : le classement de chaque session passée et le détail des matchs${showR ? ', avec ta cote après chaque session' : ''}.</p>`);
+    if(showR && !rec) h += guideSec('La cote', `<p class="small">Ta cote évolue après chaque match compté, selon l'adversaire affronté et l'écart au score. L'explication complète est dans <b>Moi › Comment fonctionne la cote ?</b></p>`);
+  }
+  h += guideSec('Notifications', `<p class="small">Active-les dans <b>Moi › Notifications › Activer</b> : sessions publiées, résultats, annonces, événements. Le bouton <b>« Tester »</b> vérifie qu'elles arrivent bien. Sur iPhone, ouvre toujours l'app depuis son icône sur l'écran d'accueil, sinon elles ne fonctionnent pas. Tu choisis aussi quels types recevoir et des heures calmes.</p>`);
+  h += guideSec('Communauté', `<p class="small">Les événements de l'organisation et les recherches de partenaire. Touche <b>« Je viens »</b> ou <b>« Je suis partant(e) »</b> pour répondre, ou <b>« Publier »</b> pour chercher toi-même un partenaire (une date, un public : toute l'organisation, une ligue ou des joueurs choisis).</p>`);
+  h += guideSec('Calendrier', `<p class="small">Tes sessions, événements et matchs amicaux sur un même calendrier. <b>Moi › Mon agenda</b> te permet de les ajouter à l'agenda de ton téléphone.</p>`);
+  if(hasRules) h += guideSec('Règlement', `<p class="small">Le règlement de la ligue s'affiche à l'ouverture de l'app tant que tu ne l'as pas accepté. Tu le retrouves en tout temps dans <b>Moi › Règles de la ligue</b>.</p>`);
+  h += guideSec('Plusieurs ligues', `<p class="small">Avec un seul compte, toutes tes ligues apparaissent sur l'Accueil, chacune avec sa carte.</p>`);
+  h += guideSec('Un souci ?', `<p class="small">Si l'app semble ancienne ou figée, ferme-la complètement et rouvre-la depuis son icône. Pour toute autre question, écris à un organisateur de ta ligue.</p>`);
+  return h;
 }
 function showPlayerGuideModal(){
   showContentModal('Guide du joueur', playerGuideHTML());
