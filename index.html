@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 386">
+<meta name="app-build" content="Version 387">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1675,6 +1675,9 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sd-chip.dragging{opacity:.35;}
 .sd-av{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:11px;}
 .sd-ghost{position:fixed;left:0;top:0;z-index:10000;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.5);border-color:var(--ball);transform-origin:0 0;}
+.sd-handle{width:22px;flex:none;text-align:center;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:6px 0;}
+body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:-2px;}
+#subDock.sd-over{outline:2px solid var(--ball) !important;}
 .sd-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap;}
 body.sd-dragging,body.sd-dragging *{cursor:grabbing !important;}
 body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px dashed rgba(207,234,92,.6);outline-offset:-2px;border-radius:12px;}
@@ -5060,9 +5063,8 @@ function reinforcementHTML(open, g){
   let h = '';
   if(extras.length){
     h += `<div class="pf-list" style="margin-top:10px;">${extras.map(x=>`<div class="pf-row" style="cursor:default;">
-      <span style="width:22px;color:var(--muted);text-align:center;">＋</span>
-      <span class="t">${escapeHTML(playerName(x))}<small>Renfort pour cette session</small></span>
-      <button type="button" class="btn-ghost-danger" onclick="removeReinforcement('${g.id}','${x}')">Retirer</button></div>`).join('')}</div>`;
+      <span class="sd-handle" data-enc="${x}" data-fg="${g.id}" data-fx="1" onpointerdown="subDragStart(event)" aria-label="Déplacer ou retirer">⋮⋮</span>
+      <span class="t">${escapeHTML(playerName(x))}<small>Renfort pour cette session · glisse vers la bande du haut pour le retirer</small></span></div>`).join('')}</div>`;
   }
   const used = subsUsedInSession(open);
   const pool = (DATA.substitutePool||[]).map(sp=>({ enc:'sub::'+sp.id, name:sp.name, dispo:(open.availableSubs||[]).includes(sp.id) })).filter(x=>!used.has(x.enc));
@@ -10418,8 +10420,8 @@ function adminGroupsHTML(){
             const isSubPool = isSubPoolId(subId);
             const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
             return `<div class="pf-row sub-slot" data-g="${g.id}" data-a="${p.id}"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
-              <span style="width:22px;color:var(--muted);text-align:center;">↳</span>
-              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)}</small></span><span class="pf-chip on">Remplaçant</span>
+              <span class="sd-handle" data-enc="${subId}" data-fg="${g.id}" data-fa="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
+              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)} · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
           return `<div class="pf-row sub-slot empty" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
@@ -10430,7 +10432,7 @@ function adminGroupsHTML(){
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
       </div>
       ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Sur ordinateur, glisse-dépose un joueur pour changer sa position ou son groupe.</p>`}
-      ${open ? groupAbsenceManagementHTML(open, g) : ''}
+      ${open && !(DATA.substitutePool||[]).length ? groupAbsenceManagementHTML(open, g) : ''}
       ${open ? reinforcementHTML(open, g) : ''}
     </div>`;
   });
@@ -10511,7 +10513,7 @@ function subDockHTML(open){
   return `<div class="card sd-dock" id="subDock">
     <div class="sd-top"><b>Remplaçants disponibles <em>${dispo.length}</em></b><span>${holes ? holes + ' place' + (holes>1?'s':'') + ' à combler' : 'Aucune place vide'}${placed ? ' · ' + placed + ' placé' + (placed>1?'s':'') : ''}</span></div>
     ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;">${all.length ? "Aucun remplaçant n'a encore indiqué sa disponibilité pour cette session." : 'Tous les remplaçants sont déjà placés.'}</p>`}
-    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant une place vide ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur une place vide, ou touche-le puis touche la place.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant une place vide ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur une place vide. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
   </div>`;
 }
 // Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
@@ -10546,12 +10548,32 @@ document.addEventListener('click', function(e){
 let SUB_DRAG = null;
 function subDragTarget(x, y){
   const el = document.elementFromPoint(x, y);
-  return el && el.closest ? el.closest('.sub-slot, [data-sg]') : null;
+  return el && el.closest ? el.closest('#subDock, .sub-slot, [data-sg]') : null;
+}
+// Déplacement d'une place à une autre : on libère l'ancienne sans prévenir (il sera convoqué à la nouvelle).
+function clearSubSilently(d){
+  const open = currentOpenSession(); const gd = open && open.groupsData.find(function(x){ return x.groupId === d.fromG; });
+  if(!gd) return false;
+  if(groupHasScores(gd)){ showToast('Des scores sont déjà entrés dans ce ' + grpWord(), true); return false; }
+  if(d.fromX) gd.extras = (gd.extras || []).filter(function(x){ return x !== d.enc; });
+  else if(gd.substitutes) delete gd.substitutes[d.fromA];
+  regenerateGroupMatches(open, d.fromG);
+  return true;
+}
+// Retire un remplaçant de sa place actuelle (place d'absent ou renfort).
+function unplaceSub(d){
+  if(!d || !d.fromG) return;
+  if(d.fromX){ const open = currentOpenSession(); const gd = open && open.groupsData.find(function(x){ return x.groupId === d.fromG; });
+    if(groupHasScores(gd)){ showToast('Des scores sont déjà entrés dans ce ' + grpWord(), true); return false; }
+    gd.extras = (gd.extras || []).filter(function(x){ return x !== d.enc; }); regenerateGroupMatches(open, d.fromG); saveAndRender(); if(!subsUsedInSession(open).has(d.enc)) notifySubRemoved(d.enc); }
+  else setSubstitute(d.fromG, d.fromA, '');
+  return true;
 }
 function subDragStart(e){
   if(e.button !== undefined && e.button !== 0) return;
   const chip = e.currentTarget, enc = chip.getAttribute('data-enc');
-  SUB_DRAG = { enc: enc, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId };
+  SUB_DRAG = { enc: enc, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId,
+    fromG: chip.getAttribute('data-fg'), fromA: chip.getAttribute('data-fa'), fromX: chip.getAttribute('data-fx') === '1' };
   document.addEventListener('pointermove', subDragMove, { passive: false });
   document.addEventListener('pointerup', subDragEnd);
   document.addEventListener('pointercancel', subDragEnd);
@@ -10561,7 +10583,9 @@ function subDragMove(e){
   if(!d.moved){
     if(Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 8) return;
     d.moved = true;
-    const g = d.chip.cloneNode(true); g.className = 'sd-chip sd-ghost'; g.removeAttribute('onclick'); g.removeAttribute('onpointerdown');
+    const g = d.fromG ? document.createElement('div') : d.chip.cloneNode(true);
+    if(d.fromG) g.innerHTML = avatarHTML('sd-av', partnerInitials(playerName(d.enc)), null) + '<span>' + escapeHTML(playerName(d.enc)) + '</span>';
+    g.className = 'sd-chip sd-ghost'; g.removeAttribute('onclick'); g.removeAttribute('onpointerdown');
     document.body.appendChild(g); d.ghost = g;
     d.chip.classList.add('dragging'); document.body.classList.add('sd-dragging');
   }
@@ -10587,7 +10611,13 @@ function subDragEnd(e){
   if(d.over) d.over.classList.remove('sd-over');
   if(d.moved && e.type === 'pointerup'){
     const t = d.over;
-    if(t){ if(t.classList.contains('sub-slot')) placeSubAt(d.enc, t.getAttribute('data-g'), t.getAttribute('data-a')); else placeSubAt(d.enc, t.getAttribute('data-sg'), null); }
+    if(t && t.id === 'subDock'){ if(d.fromG && unplaceSub(d) !== false) showToast(playerName(d.enc) + ' est retiré(e) de la session'); }
+    else if(t){
+      const tg = t.classList.contains('sub-slot') ? t.getAttribute('data-g') : t.getAttribute('data-sg'), ta = t.classList.contains('sub-slot') ? t.getAttribute('data-a') : null;
+      if(d.fromG && tg === d.fromG && (ta === d.fromA || (!ta && !d.fromX))) { /* même place : rien */ }
+      else if(d.fromG){ if(clearSubSilently(d) !== false) placeSubAt(d.enc, tg, ta); }
+      else placeSubAt(d.enc, tg, ta);
+    }
   }
   setTimeout(function(){ SUB_DRAG = null; }, 0); // le clic qui suit un glisser est ignoré
 }
