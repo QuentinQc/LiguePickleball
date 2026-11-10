@@ -4683,8 +4683,12 @@ function orderedRosterWithSubs(session, gid){
 // Construit les matchs d'un groupe à partir du modèle de rotation défini
 // dans Réglages (positions 1,2,3... → joueur occupant cette position).
 function matchesFromTemplate(session, gid){
-  const ordered = orderedRosterWithSubs(session, gid);
-  const groupSize = playersInGroup(gid).length;
+  // Joueurs qui jouent réellement, dans l'ordre du groupe : absents remplacés par leur remplaçant,
+  // places vides retirées, renforts à la fin.
+  const active = activeRosterForGroup(session, gid);
+  const ordered = orderedRosterWithSubs(session, gid).filter(function(id){ return id && active.indexOf(id) !== -1; });
+  active.forEach(function(id){ if(ordered.indexOf(id) === -1) ordered.push(id); });
+  const groupSize = ordered.length;
   // On choisit le modèle selon la taille réelle du groupe (4 ou 5 joueurs) —
   // le plus proche est utilisé pour une taille atypique.
   const template = (groupSize <= 4 ? (DATA.manualMatchupTemplate4 || []) : (DATA.manualMatchupTemplate5 || []));
@@ -4703,7 +4707,9 @@ function matchesFromTemplate(session, gid){
 // le mode choisi dans Réglages (automatique ou modèle manuel par position).
 function matchesForGroup(session, gid){
   if(DATA.leagueFormat === 'social') return []; // rotation sociale : aucun match préparé, seulement les terrains
-  if(DATA.matchupMode === 'manual' && playersInGroup(gid).length !== 6) return matchesFromTemplate(session, gid); // un groupe de 6 (exception) utilise toujours la rotation fixe
+  // Mode manuel : le modèle suit le nombre de joueurs qui JOUENT réellement (absents retirés, remplaçants comptés).
+  // Un groupe de 6 (exception) ou une taille sans modèle utilise la rotation automatique.
+  if(DATA.matchupMode === 'manual'){ const nAct = activeRosterForGroup(session, gid).length; const tpl = nAct === 4 ? DATA.manualMatchupTemplate4 : (nAct === 5 ? DATA.manualMatchupTemplate5 : null); if(tpl && tpl.length) return matchesFromTemplate(session, gid); }
   const ids = activeRosterForGroup(session, gid);
   if(ids.length < 2) return [];
   MATCH_RNG = seededRng(String(session.id) + '|' + gid + '|' + ids.slice().sort().join(','));
