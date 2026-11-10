@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 375">
+<meta name="app-build" content="Version 376">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1627,6 +1627,25 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .cmx-empty .btn{width:auto;margin-top:8px;}
 .pc-preview .cmx-card{cursor:default;margin:0;}
 @media (max-width:640px){ .cmx-compose-ph{font-size:14px;} .cmx-card{padding:13px 14px;gap:12px;} .cmx-feat-d .ah-d{width:58px;min-width:58px;} }
+.rg-head{margin-bottom:14px;}
+.rg-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.rg-kpis div{display:flex;flex-direction:column;align-items:center;padding:12px 8px;border-radius:18px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.rg-kpis b{font-family:var(--font-display);font-size:26px;color:var(--ball);line-height:1;}
+.rg-kpis span{font-size:13px;color:var(--muted);margin-top:4px;}
+.rg-acts{display:flex;gap:8px;flex-wrap:wrap;}
+.rg-acts .btn{flex:1;min-width:140px;width:auto;}
+.rg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.rg-grid .card{margin:0;}
+.rg-card{padding:14px 16px;}
+.rg-none{margin-top:12px;border-style:dashed;}
+.rg-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.rg-top b{font-family:var(--font-display);font-size:19px;text-transform:uppercase;letter-spacing:.02em;}
+.rg-top span{font-size:13px;color:var(--muted);white-space:nowrap;}
+.rg-p{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line-soft);}
+.rg-n{width:22px;flex:none;font-size:13px;color:var(--muted);text-align:right;}
+.rg-name{flex:1;min-width:0;font-size:15px;display:flex;flex-direction:column;}
+.rg-name small{font-size:12px;color:#FF9F0A;}
+.rg-r{flex:none;font-family:var(--font-display);font-size:16px;color:var(--text);}
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -11413,13 +11432,78 @@ function reportsHealthHTML(){
 // Rapport de session (stats calculées à partir de l'historique).
 function adminReportsSectionHTML(){
   const sub = VIEW.reportsSubTab || 'bilan';
-  const subTabs = [['bilan','Bilan'],['liste','Liste'],['session','Rapport de session']];
+  const subTabs = [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session']];
   let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
-  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : reportsHealthHTML());
+  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : reportsHealthHTML()));
   return html;
 }
 function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
 
+// ---- Rapport « Composition des groupes » : pour travailler à plusieurs sur la composition de départ ----
+function rgRating(p){ return typeof p.rating === 'number' ? p.rating : RATING_DEFAULT; }
+function rgFmt(n){ return n.toFixed(2).replace('.', ','); }
+function reportsGroupsData(){
+  const groups = groupsSorted().map(function(g){
+    const pl = playersInGroup(g.id).slice().sort(function(a,b){ return rgRating(b) - rgRating(a) || a.name.localeCompare(b.name); });
+    const r = pl.map(rgRating);
+    return { g: g, players: pl, avg: r.length ? r.reduce(function(a,b){ return a+b; }, 0) / r.length : null, min: r.length ? Math.min.apply(null, r) : null, max: r.length ? Math.max.apply(null, r) : null };
+  });
+  const ids = {}; DATA.groups.forEach(function(g){ ids[g.id] = 1; });
+  const none = DATA.players.filter(function(p){ return !p.groupId || !ids[p.groupId]; }).sort(function(a,b){ return rgRating(b) - rgRating(a) || a.name.localeCompare(b.name); });
+  return { groups: groups, none: none };
+}
+function reportsGroupsHTML(){
+  const d = reportsGroupsData(), rec = isRecLeague(), showR = !rec;
+  const placed = d.groups.reduce(function(a,x){ return a + x.players.length; }, 0);
+  const row = function(p, i){
+    const tags = [p.injured ? 'Blessé(e)' : '', p.status === 'new' ? 'Nouveau' : ''].filter(Boolean).join(' · ');
+    return `<div class="rg-p"><span class="rg-n">${i+1}</span><span class="rg-name">${escapeHTML(p.name)}${tags ? `<small>${escapeHTML(tags)}</small>` : ''}</span>${showR ? `<span class="rg-r">${rgFmt(rgRating(p))}</span>` : ''}</div>`;
+  };
+  let h = `<div class="rg-head">
+      <div class="rg-kpis"><div><b>${d.groups.length}</b><span>${grpWord(d.groups.length > 1)}</span></div><div><b>${placed}</b><span>placé${placed>1?'s':''}</span></div><div><b>${d.none.length}</b><span>sans ${grpWord()}</span></div></div>
+      <div class="rg-acts">
+        ${navigator.share ? `<button type="button" class="btn btn-primary" onclick="shareGroupsReport()">Partager</button>` : ''}
+        <button type="button" class="btn btn-secondary" onclick="copyGroupsReport()">Copier le texte</button>
+        <button type="button" class="btn btn-secondary" onclick="printGroupsReport()">Imprimer / PDF</button>
+      </div>
+      <p class="ah-meta" style="margin:10px 2px 0;">À partager avec les autres organisateurs (Messenger, courriel) pour valider ensemble la composition de départ. Les déplacements se font ensuite dans l'onglet Joueurs.</p>
+    </div>`;
+  h += `<div class="rg-grid">${d.groups.map(function(x){
+    return `<div class="card rg-card"><div class="rg-top"><b>${escapeHTML(x.g.name)}</b><span>${x.players.length} joueur${x.players.length>1?'s':''}${showR && x.avg !== null ? ' · moy. ' + rgFmt(x.avg) : ''}</span></div>
+      ${showR && x.avg !== null ? `<div class="ah-meta" style="margin:-2px 0 8px;">Écart : ${rgFmt(x.min)} à ${rgFmt(x.max)}</div>` : ''}
+      ${x.players.length ? x.players.map(row).join('') : `<div class="ah-meta">Aucun joueur.</div>`}</div>`;
+  }).join('')}</div>`;
+  if(d.none.length) h += `<div class="card rg-card rg-none"><div class="rg-top"><b>Sans ${grpWord()}</b><span>${d.none.length} joueur${d.none.length>1?'s':''}</span></div>${d.none.map(row).join('')}</div>`;
+  return h;
+}
+function groupsReportText(){
+  const d = reportsGroupsData(), showR = !isRecLeague();
+  const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
+  let t = 'Composition des ' + grpWord(true) + ' — ' + lg + '\n';
+  d.groups.forEach(function(x){
+    t += '\n' + x.g.name + ' (' + x.players.length + (showR && x.avg !== null ? ' · moy. ' + rgFmt(x.avg) : '') + ')\n';
+    x.players.forEach(function(p, i){ t += (i+1) + '. ' + p.name + (showR ? ' — ' + rgFmt(rgRating(p)) : '') + (p.injured ? ' (blessé·e)' : '') + '\n'; });
+  });
+  if(d.none.length){ t += '\nSans ' + grpWord() + '\n'; d.none.forEach(function(p){ t += '- ' + p.name + (showR ? ' — ' + rgFmt(rgRating(p)) : '') + '\n'; }); }
+  return t;
+}
+function copyGroupsReport(){
+  const t = groupsReportText();
+  const ok = function(){ showToast('Composition copiée : colle-la dans Messenger ou un courriel'); };
+  try{ navigator.clipboard.writeText(t).then(ok, function(){ fallbackCopy(t); ok(); }); }catch(e){ fallbackCopy(t); ok(); }
+}
+function fallbackCopy(t){ try{ const a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }catch(e){} }
+function shareGroupsReport(){ try{ navigator.share({ title: 'Composition des ' + grpWord(true), text: groupsReportText() }).catch(function(){}); }catch(e){ copyGroupsReport(); } }
+function printGroupsReport(){
+  const d = reportsGroupsData(), showR = !isRecLeague();
+  const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
+  const table = function(title, list, avg){
+    return `<table class="print-table" style="width:100%;"><thead><tr><th colspan="${showR ? 3 : 2}">${escapeHTML(title)} — ${list.length} joueur${list.length>1?'s':''}${showR && avg !== null && avg !== undefined ? ' · moy. ' + rgFmt(avg) : ''}</th></tr></thead><tbody>${list.map(function(p, i){ return `<tr><td style="width:36px;">${i+1}</td><td>${escapeHTML(p.name)}${p.injured ? ' (blessé·e)' : ''}</td>${showR ? `<td style="width:70px;text-align:right;">${rgFmt(rgRating(p))}</td>` : ''}</tr>`; }).join('') || `<tr><td colspan="3">Aucun joueur</td></tr>`}</tbody></table>`;
+  };
+  const body = `<div class="print-page"><div class="print-title">Composition des ${grpWord(true)}</div><div class="print-sub">${escapeHTML(lg)} · ${escapeHTML(new Date().toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' }))}</div>
+    ${d.groups.map(function(x){ return table(x.g.name, x.players, x.avg); }).join('')}${d.none.length ? table('Sans ' + grpWord(), d.none) : ''}</div>`;
+  openPrintOverlay('Composition des ' + grpWord(true), body, false);
+}
 function reportsListHTML(){
   const sortBy = VIEW.reportsListSortBy || 'rating';
   const sortDir = VIEW.reportsListSortDir || 'desc';
