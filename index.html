@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 392">
+<meta name="app-build" content="Version 393">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2697,6 +2697,7 @@ function saveData(){
 }
 async function saveDataNow(){
   if(!CURRENT_LEAGUE_ID) return;
+  try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
   const leagueId = CURRENT_LEAGUE_ID;
   const guarded = !!DATA_VERSION && DATA_VERSION_FOR === leagueId;
   try{
@@ -4256,9 +4257,17 @@ function defaultData(){
 }
 
 // ---------- doubles generation ----------
+// Tirage des matchs reproductible : pour une même session, un même groupe et les mêmes joueurs,
+// tous les appareils (organisateur et joueurs) obtiennent exactement les mêmes matchs.
+let MATCH_RNG = null;
+function seededRng(str){
+  let h = 2166136261 >>> 0;
+  for(let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return function(){ h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
 function shuffle(arr){
-  const a = arr.slice();
-  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  const a = arr.slice(), rnd = MATCH_RNG || Math.random;
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
 // Règle standard : 5 joueurs → 10 matchs (à 9 points) ; 4 joueurs → 6 matchs (à 11 points) ;
@@ -4696,7 +4705,36 @@ function matchesForGroup(session, gid){
   if(DATA.leagueFormat === 'social') return []; // rotation sociale : aucun match préparé, seulement les terrains
   if(DATA.matchupMode === 'manual' && playersInGroup(gid).length !== 6) return matchesFromTemplate(session, gid); // un groupe de 6 (exception) utilise toujours la rotation fixe
   const ids = activeRosterForGroup(session, gid);
-  return ids.length >= 2 ? generateMatches(ids) : [];
+  if(ids.length < 2) return [];
+  MATCH_RNG = seededRng(String(session.id) + '|' + gid + '|' + ids.slice().sort().join(','));
+  try{ return generateMatches(ids); } finally { MATCH_RNG = null; }
+}
+// Les matchs enregistrés correspondent-ils encore aux joueurs du groupe ? (absence, remplaçant, déplacement)
+function matchesOutOfSync(session, gid){
+  if(!session || DATA.leagueFormat === 'social' || DATA.leagueFormat === 'mlp') return false;
+  const gd = session.groupsData.find(x=>x.groupId===gid); if(!gd) return false;
+  if(groupHasScores(gd)) return false; // des scores sont entrés : on ne touche plus aux matchs
+  const roster = activeRosterForGroup(session, gid).slice().sort().join(',');
+  const inMatches = new Set();
+  (gd.matches||[]).forEach(function(m){ (m.teamA||[]).concat(m.teamB||[]).concat([m.sit, m.sit2]).forEach(function(id){ if(id) inMatches.add(id); }); });
+  const want = matchesForGroup(session, gid);
+  if(!want.length && !(gd.matches||[]).length) return false;
+  return Array.from(inMatches).sort().join(',') !== roster || want.length !== (gd.matches||[]).length;
+}
+// Côté organisateur : remet les matchs de chaque groupe en accord avec sa composition, avant chaque enregistrement.
+function syncAllGroupMatches(){
+  const open = currentOpenSession();
+  if(!open || open.status !== 'open' || DATA.leagueFormat === 'social' || DATA.leagueFormat === 'mlp') return false;
+  let changed = false;
+  (open.groupsData||[]).forEach(function(gd){ if(matchesOutOfSync(open, gd.groupId)){ regenerateGroupMatches(open, gd.groupId); changed = true; } });
+  return changed;
+}
+// Côté joueur : matchs à jour même si l'organisateur ne les a pas encore enregistrés (même tirage partout).
+function displayMatches(session, gid){
+  const gd = session && session.groupsData.find(x=>x.groupId===gid);
+  if(!gd) return { matches: [], stale: false };
+  if(matchesOutOfSync(session, gid)) return { matches: matchesForGroup(session, gid), stale: true };
+  return { matches: gd.matches || [], stale: false };
 }
 // ---- Vocabulaire selon le type de ligue : en récréatif (rotation sociale), on parle
 // de terrains plutôt que de groupes, et il n'y a ni score, ni classement, ni montée/descente.
@@ -11272,6 +11310,7 @@ function isPlayerActor(){ return !!(SESSION_USER && SESSION_USER.role!=='admin')
 // d'une séance ouverte sans aucun score sont recalculés pour respecter la règle (5 joueurs = 10, 6 = rotation de 6).
 function syncOpenSessionMatchCounts(){
   try{
+    if(SESSION_USER && SESSION_USER.role === 'admin' && !OFFLINE_MODE && !DATA.testMode && syncAllGroupMatches()){ saveData(); return; }
     const open = currentOpenSession();
     if(!open || !SESSION_USER || SESSION_USER.role!=='admin' || OFFLINE_MODE || DATA.testMode) return;
     let changed = false;
@@ -13499,7 +13538,7 @@ function substituteAvailabilityHTML(sub){
   }
   html += `</div>`;
   if(placedGd && DATA.leagueFormat!=='social'){
-    const mine = (placedGd.matches||[]).map((m,mi)=>({m,mi})).filter(x=>x.m.teamA.includes(enc) || x.m.teamB.includes(enc));
+    const mine = displayMatches(open, placedGd.groupId).matches.map((m,mi)=>({m,mi})).filter(x=>x.m.teamA.includes(enc) || x.m.teamB.includes(enc));
     if(mine.length){
       html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Mes matchs</div></div>`;
       mine.forEach(({m,mi})=>{
@@ -14603,6 +14642,30 @@ function computePlayerBestGroup(pid){
 // (comparer des % de victoires entre groupes de niveaux différents serait injuste).
 // Prix qui exposent la cote (gain de cote, cotes, écart de cotes) : masqués
 // automatiquement quand l'admin cache la cote à ce rôle.
+// Composition actuelle du groupe pour la session : présents, remplaçants (à la place des absents) et renforts.
+function playerGroupRosterRows(open, gid, members){
+  const gd = open && open.groupsData.find(x=>x.groupId===gid);
+  const subs = (gd && gd.substitutes) || {};
+  const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+  const rt = function(id){ const x = DATA.players.find(q=>q.id===id) || (String(id).indexOf('sub::')===0 ? (DATA.substitutePool||[]).find(q=>'sub::'+q.id===id) : null); return x && typeof x.rating === 'number' ? x.rating : RATING_DEFAULT; };
+  const row = function(id, name, tag, dim){
+    return `<div class="pf-row" style="cursor:default;${dim ? 'opacity:.55;' : ''}">
+      <span class="member-avatar">${escapeHTML(ini(name))}</span>
+      <span class="t">${escapeHTML(name)}</span>${tag || ''}
+      ${!dim && DATA.showRatingToPlayers ? `<span style="font-family:var(--font-display);font-size:18px;color:var(--ball);">${rt(id).toFixed(2)}</span>` : ''}
+    </div>`;
+  };
+  let h = '';
+  members.forEach(function(p){
+    const out = open && (p.injured || isAbsent(open, p.id));
+    if(!out){ h += row(p.id, p.name, '', false); return; }
+    const by = subs[p.id];
+    if(by) h += row(by, playerName(by), `<span class="pf-chip on">Remplace ${escapeHTML(String(p.name).split(' ')[0])}</span>`, false);
+    else h += row(p.id, p.name, `<span class="pf-chip warn">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>`, true);
+  });
+  ((gd && gd.extras) || []).forEach(function(x){ h += row(x, playerName(x), '<span class="pf-chip on">Renfort</span>', false); });
+  return h;
+}
 function playerGroupHTML(me){
   // Blessé : plus aucun groupe/match/score à afficher — un seul message clair,
   // le joueur reste hors de son groupe jusqu'à ce qu'il se déclare rétabli
@@ -14631,15 +14694,7 @@ function playerGroupHTML(me){
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
-    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${groupMembers.map(p=>{
-        const rating = typeof p.rating === 'number' ? p.rating : RATING_DEFAULT;
-        const ini = (p.name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-        return `<div class="pf-row" style="cursor:default;">
-          <span class="member-avatar">${escapeHTML(ini)}</span>
-          <span class="t">${escapeHTML(p.name)}</span>
-          ${DATA.showRatingToPlayers ? `<span style="font-family:var(--font-display);font-size:18px;color:var(--ball);">${rating.toFixed(2)}</span>` : ''}
-        </div>`;
-      }).join('')}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
+    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${playerGroupRosterRows(open, me.groupId, groupMembers)}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
   </div>`;
   if(open){
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
@@ -14648,9 +14703,10 @@ function playerGroupHTML(me){
       html += `<div class="card"><p class="small">Tu es indiqué(e) absent(e) pour la ${isRecLeague() ? 'soirée' : 'session'} du ${fdl(open.date)} — ${isRecLeague() ? "tu n'es placé(e) sur aucun terrain." : 'le groupe et les scores de cette session ne sont pas affichés.'} Contacte un administrateur si c'est une erreur.</p></div>`;
     } else if(!open.published){
       // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
-    } else if(gd && gd.matches.length){
+    } else if(gd && displayMatches(open, me.groupId).matches.length){
+      const dm = displayMatches(open, me.groupId), dmMatches = dm.matches;
       const social = DATA.leagueFormat==='social';
-      const nDone = gd.matches.filter(rsDone).length, nAll = gd.matches.length;
+      const nDone = dmMatches.filter(rsDone).length, nAll = dmMatches.length;
       html += `<div class="card rs-card" id="playerMatchesCard"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${me.groupId}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i id="rsb_${me.groupId}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
       if(social){
         html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer.</div>`;
@@ -14659,9 +14715,10 @@ function playerGroupHTML(me){
       } else if(DATA.allowPlayerScoreEntry && OFFLINE_MODE){
         html += `<div class="rs-warn">Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</div>`;
       }
-      gd.matches.forEach((m,mi)=>{
+      if(dm.stale) html += `<div class="ah-meta" style="margin:0 2px 8px;">Matchs mis à jour selon la composition actuelle du ${grpWord()}. La saisie des scores ouvrira dès que l'organisateur aura ouvert l'app.</div>`;
+      dmMatches.forEach((m,mi)=>{
         const mine = m.teamA.includes(me.id) || m.teamB.includes(me.id);
-        const entryOn = DATA.allowPlayerScoreEntry && !OFFLINE_MODE && scoreDayOpen(open.date);
+        const entryOn = DATA.allowPlayerScoreEntry && !OFFLINE_MODE && scoreDayOpen(open.date) && !dm.stale;
         const lk = entryOn ? scoreLockState(m,false) : null;
         const editable = !!lk && (lk.state==='open' || lk.state==='mine');
         const done = rsDone(m);
