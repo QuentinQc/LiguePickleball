@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 379">
+<meta name="app-build" content="Version 380">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1634,6 +1634,10 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rg-kpis span{font-size:13px;color:var(--muted);margin-top:4px;}
 .rg-acts{display:flex;gap:8px;flex-wrap:wrap;}
 .rg-acts .btn{flex:1;min-width:140px;width:auto;}
+.rg-exp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.rg-exp span{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px;}
+.rg-exp button{flex:1;min-width:80px;min-height:42px;border-radius:999px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.04);color:var(--text);font:inherit;font-weight:700;font-size:14px;cursor:pointer;}
+.rg-exp button:active{transform:scale(.96);}
 .rg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
 .rg-grid .card{margin:0;}
 .rg-card{padding:14px 16px;}
@@ -11464,7 +11468,11 @@ function reportsGroupsHTML(){
       <div class="rg-acts">
         ${navigator.share ? `<button type="button" class="btn btn-primary" onclick="shareGroupsReport()">Partager</button>` : ''}
         <button type="button" class="btn btn-secondary" onclick="copyGroupsReport()">Copier le texte</button>
-        <button type="button" class="btn btn-secondary" onclick="printGroupsReport()">Imprimer / PDF</button>
+      </div>
+      <div class="rg-exp"><span>Exporter</span>
+        <button type="button" onclick="printGroupsReport()">PDF</button>
+        <button type="button" onclick="exportGroupsReport('xls')">Excel</button>
+        <button type="button" onclick="exportGroupsReport('doc')">Word</button>
       </div>
       <p class="ah-meta" style="margin:10px 2px 0;">À partager avec les autres organisateurs (Messenger, courriel) pour valider ensemble la composition de départ. Les déplacements se font ensuite dans l'onglet Joueurs.</p>
     </div>`;
@@ -11493,6 +11501,39 @@ function copyGroupsReport(){
 }
 function fallbackCopy(t){ try{ const a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); }catch(e){} }
 function shareGroupsReport(){ try{ navigator.share({ title: 'Composition des ' + grpWord(true), text: groupsReportText() }).catch(function(){}); }catch(e){ copyGroupsReport(); } }
+// Export Excel (.csv, ouvert directement par Excel) ou Word (.doc). Sur iPhone/iPad, le fichier passe
+// par le menu de partage (Enregistrer dans Fichiers, Messenger, courriel…) ; ailleurs, il est téléchargé.
+function exportGroupsReport(kind){
+  const d = reportsGroupsData(), showR = !isRecLeague();
+  const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
+  const base = ('Composition ' + grpWord(true) + ' - ' + lg).replace(/[\\/:*?"<>|]+/g, '-');
+  const lists = d.groups.map(function(x){ return { name: x.g.name, players: x.players }; });
+  if(d.none.length) lists.push({ name: 'Sans ' + grpWord(), players: d.none });
+  let blob, fname;
+  if(kind === 'xls'){
+    const q = function(v){ v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const rows = [[grpWord(false, true), 'Rang', 'Joueur'].concat(showR ? ['Cote'] : []).concat(['Blessé(e)'])];
+    lists.forEach(function(L){ L.players.forEach(function(p, i){ rows.push([L.name, i+1, p.name].concat(showR ? [rgFmt(rgRating(p))] : []).concat([p.injured ? 'oui' : ''])); }); });
+    blob = new Blob(['\ufeff' + rows.map(function(r){ return r.map(q).join(';'); }).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    fname = base + '.csv';
+  } else {
+    const tbl = function(L){ return `<h2 style="font-family:Arial;font-size:14pt;margin:14pt 0 4pt;">${escapeHTML(L.name)} (${L.players.length} joueur${L.players.length>1?'s':''})</h2><table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:11pt;width:100%;"><tr><th style="width:40px;">#</th><th style="text-align:left;">Joueur</th>${showR ? '<th style="width:70px;">Cote</th>' : ''}</tr>${L.players.map(function(p, i){ return `<tr><td>${i+1}</td><td>${escapeHTML(p.name)}${p.injured ? ' (blessé·e)' : ''}</td>${showR ? `<td style="text-align:right;">${rgFmt(rgRating(p))}</td>` : ''}</tr>`; }).join('')}</table>`; };
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${escapeHTML(base)}</title></head><body><h1 style="font-family:Arial;font-size:18pt;margin:0;">Composition des ${grpWord(true)}</h1><p style="font-family:Arial;font-size:11pt;color:#444;">${escapeHTML(lg)} · ${escapeHTML(new Date().toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' }))}</p>${lists.map(tbl).join('')}</body></html>`;
+    blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+    fname = base + '.doc';
+  }
+  saveOrShareFile(blob, fname);
+}
+function saveOrShareFile(blob, fname){
+  try{
+    const file = new File([blob], fname, { type: blob.type });
+    if(isIOSDevice() && navigator.canShare && navigator.canShare({ files: [file] })){ navigator.share({ files: [file], title: fname }).catch(function(){}); return; }
+  }catch(e){}
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  showToast('Fichier téléchargé : ' + fname);
+}
 function printGroupsReport(){
   const d = reportsGroupsData(), showR = !isRecLeague();
   const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
