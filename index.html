@@ -1661,6 +1661,23 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rl-ok{margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.12);color:var(--ball);font-weight:700;font-size:14px;}
 .sd-dock{position:sticky;top:calc(var(--tb-gap, 18px) + 64px + env(safe-area-inset-top));z-index:4;border:1px solid rgba(207,234,92,.30) !important;background:linear-gradient(135deg,rgba(207,234,92,.10),rgba(207,234,92,.02)),#16413A !important;box-shadow:0 8px 20px rgba(0,0,0,.25);}
 .lg-sheet .sd-dock{top:calc(var(--lgnav-h, 72px) - 14px);}
+.rp-pill{flex:none;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);}
+.sd-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.sd-col{min-width:0;}
+.sd-h{display:flex;align-items:center;gap:6px;}
+.sd-h em{font-style:normal;font-size:13px;font-weight:800;color:var(--ball);}
+.sd-h em.o{color:#FF9F0A;}
+.sd-col .sd-list{flex-direction:column;align-items:stretch;overflow:visible;padding:8px 0 0;margin:0;}
+.sd-col .sd-chip{width:100%;padding:5px 10px 5px 5px;font-size:13px;}
+.sd-col .sd-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sd-col .sd-av{width:26px;height:26px;font-size:10px;}
+.sd-abs-list{display:flex;flex-direction:column;gap:6px;padding-top:8px;}
+.sd-col .sd-list,.sd-abs-list{max-height:168px;overflow-y:auto;}
+.sd-abs{font-style:normal !important;display:flex;flex-direction:column;padding:6px 10px;border-radius:14px;border:1px solid rgba(255,159,10,.25);background:rgba(255,159,10,.06);min-width:0;}
+.sd-abs.free{border:1px dashed rgba(255,159,10,.7);}
+.sd-abs:not(.free){opacity:.6;}
+.sd-abs-n{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-abs small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sd-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .sd-top b{font-size:16px;}
 .sd-top b em{font-style:normal;margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--ball);color:var(--court);font-size:13px;}
@@ -1678,11 +1695,6 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sd-handle{width:22px;flex:none;text-align:center;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:6px 0;}
 body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:-2px;}
 #subDock.sd-over{outline:2px solid var(--ball) !important;}
-.rp-pill{flex:none;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);}
-.rp-box{display:flex !important;flex-direction:column;gap:6px;min-width:0;flex:1;}
-.rp-name{font-weight:400;}
-.rp-pills{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-.rp-abs{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ab-pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(255,159,10,.14);color:#FF9F0A;}
 .ab-row{border-style:dashed !important;background:transparent !important;}
 .ab-row .t{color:var(--muted);}
@@ -10466,8 +10478,7 @@ function adminGroupsHTML(){
             const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
             return `<div class="pf-row sub-slot" data-g="${g.id}" data-a="${p.id}"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
               <span class="sd-handle" data-enc="${subId}" data-fg="${g.id}" data-fa="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
-              <span class="t rp-box"><b class="rp-name">${escapeHTML(playerName(subId))}</b>
-                <span class="rp-pills"><span class="rp-pill">Remplaçant</span><span class="ab-pill rp-abs">${escapeHTML(p.name)} ${p.injured ? gw(p,'blessé','blessée','blessé(e)') : gw(p,'absent','absente','absent(e)')}</span></span></span>
+              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)} · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
           return `<div class="pf-row sub-slot empty ab-row" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
@@ -10556,10 +10567,32 @@ function subDockHTML(open){
     const d = (open.availableSubs||[]).indexOf(sp.id) !== -1;
     return `<button type="button" class="sd-chip${d ? ' dispo' : ''}${SUB_PICK === 'sub::' + sp.id ? ' pick' : ''}" data-enc="sub::${sp.id}" onpointerdown="subDragStart(event)" onclick="subPick('sub::${sp.id}')">${avatarHTML('sd-av', partnerInitials(sp.name), null)}<span>${escapeHTML(sp.name)}</span>${d ? '' : '<small>non indiqué</small>'}</button>`;
   };
+  // Absents de la session (à droite) : ceux sans remplaçant d'abord ; on peut y déposer un remplaçant.
+  const absList = [];
+  groupsSorted().forEach(function(g){
+    const gd = open.groupsData.find(function(x){ return x.groupId === g.id; }) || {};
+    playersInGroup(g.id).filter(function(p){ return p.injured || isAbsent(open, p.id); }).forEach(function(p){
+      const by = (gd.substitutes || {})[p.id] || (open.loans && open.loans[p.id] ? 'loan' : null);
+      absList.push({ p: p, g: g, by: by });
+    });
+  });
+  absList.sort(function(a,b){ return (!!a.by) - (!!b.by); });
+  const absChip = function(x){
+    const free = !x.by;
+    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-abs-n">${escapeHTML(x.p.name)}</span><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : 'remplacé(e) par ' + escapeHTML(String(playerName(x.by)).split(' ')[0]))}</small></div>`;
+  };
   return `<div class="card sd-dock" id="subDock">
-    <div class="sd-top"><b>Remplaçants disponibles <em>${dispo.length}</em></b><span>${holes ? holes + ' place' + (holes>1?'s':'') + ' à combler' : 'Aucune place vide'}${placed ? ' · ' + placed + ' placé' + (placed>1?'s':'') : ''}</span></div>
-    ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;">${all.length ? "Aucun remplaçant n'a encore indiqué sa disponibilité pour cette session." : 'Tous les remplaçants sont déjà placés.'}</p>`}
-    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant une place vide ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur une place vide. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+    <div class="sd-cols">
+      <div class="sd-col">
+        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em></div>
+        ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">${all.length ? "Aucun n'a encore indiqué sa disponibilité." : 'Tous déjà placés.'}</p>`}
+      </div>
+      <div class="sd-col">
+        <div class="sd-h"><span class="ab-pill">Absents</span><em class="o">${absList.length}</em></div>
+        ${absList.length ? `<div class="sd-abs-list">${absList.map(absChip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Aucune absence.</p>`}
+      </div>
+    </div>
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur un absent. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
   </div>`;
 }
 // Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
