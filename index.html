@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 384">
+<meta name="app-build" content="Version 385">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1650,6 +1650,15 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rg-name{flex:1;min-width:0;font-size:15px;display:flex;flex-direction:column;}
 .rg-name small{font-size:12px;color:#FF9F0A;}
 .rg-r{flex:none;font-family:var(--font-display);font-size:16px;color:var(--text);}
+.rl-banner{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:12px 14px;border-radius:18px;border:1px solid rgba(255,214,10,.35);background:rgba(255,214,10,.08);color:var(--text);font:inherit;text-align:left;cursor:pointer;}
+.rl-t{flex:1;min-width:0;display:flex;flex-direction:column;}
+.rl-t b{font-size:15px;}
+.rl-t small{font-size:13px;color:var(--muted);}
+.rl-go{flex:none;padding:8px 14px;border-radius:999px;background:#FFD60A;color:#2a2300;font-weight:800;font-size:14px;}
+.rl-text{white-space:pre-wrap;word-break:break-word;font-size:15px;line-height:1.55;max-height:50vh;overflow:auto;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.18);border:1px solid var(--line-soft);}
+.rl-check{display:flex;align-items:center;gap:10px;margin:14px 2px 6px;font-size:15px;font-weight:600;cursor:pointer;}
+.rl-check input{width:22px;height:22px;flex:none;accent-color:var(--ball);}
+.rl-ok{margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.12);color:var(--ball);font-weight:700;font-size:14px;}
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
@@ -5396,6 +5405,7 @@ function renderInner(){
   if(PENDING_GO && !GO_RUNNING && SESSION_USER && SESSION_USER.role !== 'pending' && CURRENT_PROFILE) setTimeout(applyPendingGo, 250);
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
   ensureInboxLoaded();
+  ensureRulesLoaded();
   if(!WELCOME_CHECKED) setTimeout(maybeShowWelcome, 300);
   if(!INSTALL_PROMPT_SCHEDULED && SESSION_USER && SESSION_USER.role !== 'pending'){ INSTALL_PROMPT_SCHEDULED = true; setTimeout(maybeShowInstallPrompt, 4000); }
   ensurePushStatusChecked();
@@ -5873,6 +5883,11 @@ async function applyPendingGo(){
         await openMyLeague(id);
         if(sec === 'hist' || sec === 'stats'){ VIEW.pdet = sec; render(); }
       }
+    } else if(k === 'reglement' && id){
+      MODAL = null; MODAL_UNDER = null;
+      if(!MY_RULES_LOADED_FOR) await loadMyRulesAcc();
+      if(id !== CURRENT_LEAGUE_ID && (MY_LEAGUE_LINKS||[]).some(function(l){ return l.league_id === id; })) await switchMyLeague(id);
+      openRulesAccept(id);
     } else if(k === 'annonce'){
       MODAL = null; MODAL_UNDER = null;
       await openLatestAnnouncement();
@@ -6851,7 +6866,7 @@ async function onCreateOrganization(){
 }
 let EXPLICIT_LOGOUT = false;
 async function logout(){
-  EXPLICIT_LOGOUT = true; INBOX = []; INBOX_LOADED_FOR = null; WELCOME_CHECKED = false; WELCOME_LATER = {};
+  EXPLICIT_LOGOUT = true; INBOX = []; INBOX_LOADED_FOR = null; WELCOME_CHECKED = false; WELCOME_LATER = {}; MY_RULES_ACC = {}; MY_RULES_LOADED_FOR = null; RULES_PROMPTED = false;
   setTimeout(()=>{ EXPLICIT_LOGOUT = false; }, 5000);
   await sb.auth.signOut();
   SESSION_USER = null;
@@ -11431,9 +11446,9 @@ function reportsHealthHTML(){
 // Rapport de session (stats calculées à partir de l'historique).
 function adminReportsSectionHTML(){
   const sub = VIEW.reportsSubTab || 'bilan';
-  const subTabs = [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session']];
+  const subTabs = [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session'],['reglement','Règlement']];
   let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
-  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : reportsHealthHTML()));
+  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : (sub === 'reglement' ? reportsRulesHTML() : reportsHealthHTML())));
   return html;
 }
 function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
@@ -11658,6 +11673,130 @@ function printGroupsReport(){
   const body = `${css}<div class="print-page rgp"><div class="rgp-top"><div><h1>Composition des ${grpWord(true)}</h1><p>${escapeHTML(lg)} · ${escapeHTML(new Date().toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' }))}</p></div><div class="k">${d.groups.length} ${grpWord(d.groups.length > 1)} · ${placed} placé${placed>1?'s':''}${d.none.length ? ' · ' + d.none.length + ' sans ' + grpWord() : ''}</div></div>
     <div class="rgp-grid">${lists.map(block).join('')}</div><div class="rgp-foot">Dinkeo · dinkeo.ca</div></div>`;
   openPrintOverlay('Composition des ' + grpWord(true), body, false);
+}
+// ==================== RÈGLEMENT DE LA LIGUE (acceptation non bloquante) ====================
+let MY_RULES_ACC = {}, MY_RULES_LOADED_FOR = null, RULES_PROMPTED = false;
+async function loadMyRulesAcc(){
+  if(!CURRENT_PROFILE) return;
+  MY_RULES_LOADED_FOR = CURRENT_PROFILE.id;
+  try{
+    const { data, error } = await sb.from('rules_acceptances').select('league_id, version, accepted_at').eq('profile_id', CURRENT_PROFILE.id);
+    if(error) return;
+    MY_RULES_ACC = {};
+    (data||[]).forEach(function(r){ const c = MY_RULES_ACC[r.league_id]; if(!c || r.version > c.v) MY_RULES_ACC[r.league_id] = { v: r.version, at: r.accepted_at }; });
+  }catch(e){}
+}
+function ensureRulesLoaded(){
+  if(!CURRENT_PROFILE || !SESSION_USER || SESSION_USER.role === 'pending' || MY_RULES_LOADED_FOR === CURRENT_PROFILE.id) return;
+  loadMyRulesAcc().then(function(){ if(!MODAL && !appBusyEditing()) render(); setTimeout(maybePromptRules, 1200); });
+}
+// Règlement d'une ligue où je suis joueur ou remplaçant (ligue affichée : DATA ; autres : résumé).
+function rulesInfo(leagueId){
+  if(!(MY_LEAGUE_LINKS||[]).some(function(l){ return l.league_id === leagueId; })) return null;
+  let text, v, req;
+  if(leagueId === CURRENT_LEAGUE_ID && DATA){ text = DATA.rulesText; v = DATA.rulesVersion || 0; req = !!DATA.rulesRequire; }
+  else { const sm = MY_LEAGUE_SUMMARY[leagueId]; if(!sm) return null; text = sm.rulesText; v = sm.rulesVersion; req = sm.rulesRequire; }
+  if(!text) return null;
+  const acc = MY_RULES_ACC[leagueId];
+  const lg = (LEAGUES||[]).find(function(l){ return l.id === leagueId; }) || {};
+  return { leagueId: leagueId, name: lg.name || 'Ligue', text: text, version: v || 1, require: req, accepted: !!(acc && acc.v >= (v || 1)), at: acc && acc.at };
+}
+function rulesPendingList(){
+  if(!SESSION_USER || SESSION_USER.role === 'pending' || MY_RULES_LOADED_FOR !== (CURRENT_PROFILE && CURRENT_PROFILE.id)) return [];
+  if(SESSION_USER.role === 'admin' && !(ADMIN_VIEWING_AS === 'player' || ADMIN_VIEWING_AS === 'substitute')) return [];
+  const ids = Array.from(new Set((MY_LEAGUE_LINKS||[]).map(function(l){ return l.league_id; })));
+  return ids.map(rulesInfo).filter(function(r){ return r && r.require && !r.accepted; });
+}
+function rulesBannerHTML(){
+  return rulesPendingList().map(function(r){
+    return `<button type="button" class="rl-banner" onclick="openRulesAccept('${r.leagueId}')"><span class="rl-t"><b>Règlement à accepter</b><small>${escapeHTML(r.name)} · prends une minute pour le lire</small></span><span class="rl-go">Lire</span></button>`;
+  }).join('');
+}
+function maybePromptRules(){
+  if(RULES_PROMPTED || MODAL) return;
+  const list = rulesPendingList(); if(!list.length) return;
+  RULES_PROMPTED = true;
+  openRulesAccept(list[0].leagueId);
+}
+function openRulesAccept(leagueId){
+  const r = rulesInfo(leagueId); if(!r) return;
+  showContentModal('Règlement', function(){ return rulesModalHTML(leagueId); });
+}
+function rulesModalHTML(leagueId){
+  const r = rulesInfo(leagueId); if(!r) return '<p class="empty">Règlement introuvable.</p>';
+  const when = r.at ? new Date(r.at).toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' }) : '';
+  return `<div class="ah-meta" style="margin:0 0 10px;">${escapeHTML(r.name)} · version ${r.version}</div>
+    <div class="rl-text">${escapeHTML(r.text)}</div>
+    ${r.accepted ? `<div class="rl-ok">Accepté${when ? ' le ' + escapeHTML(when) : ''}</div><button type="button" class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="closeModal()">Fermer</button>`
+      : (r.require ? `<label class="rl-check"><input type="checkbox" id="rlChk" onchange="document.getElementById('rlGo').disabled=!this.checked"> J'ai lu et j'accepte le règlement de la ligue</label>
+        <div class="wl-acts"><button type="button" class="btn btn-secondary" onclick="closeModal()">Plus tard</button><button type="button" class="btn btn-primary" id="rlGo" disabled onclick="acceptRules('${leagueId}', ${r.version}, this)">Accepter</button></div>`
+        : `<button type="button" class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="closeModal()">Fermer</button>`)}`;
+}
+async function acceptRules(leagueId, version, btn){
+  if(!CURRENT_PROFILE) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Envoi…'; }
+  const { error } = await sb.from('rules_acceptances').insert({ league_id: leagueId, profile_id: CURRENT_PROFILE.id, version: version, name: myDisplayName() });
+  if(error && !/duplicate|unique/i.test(error.message || '')){ if(btn){ btn.disabled = false; btn.textContent = 'Accepter'; } showAlert("L'acceptation n'a pas pu être enregistrée : " + error.message); return; }
+  MY_RULES_ACC[leagueId] = { v: version, at: new Date().toISOString() };
+  closeModal();
+  showToast('Merci, règlement accepté');
+}
+// --- Côté admin : rédaction
+function openRulesEditModal(){
+  showFormModal('Règlement de la ligue', function(){
+    return `<p class="small" style="color:var(--muted);margin:0 0 10px;">Retards, absences, comportement, frais, remplacements… Ce texte est propre à cette ligue. Chaque modification demande une nouvelle acceptation.</p>
+      <textarea id="rulesTextInput" rows="12" maxlength="8000" placeholder="Ex. : Arriver 10 minutes avant le début. Prévenir de son absence au plus tard 24 h à l'avance…" style="width:100%;">${escapeHTML(DATA.rulesText||'')}</textarea>
+      <label class="notif-row" style="margin-top:12px;"><span><strong>Demander l'acceptation</strong><span class="small" style="display:block;color:var(--muted);">Joueurs et remplaçants : une fenêtre leur demande de le lire et de l'accepter, sans les bloquer.</span></span><input type="checkbox" id="rulesRequireInput" ${DATA.rulesRequire || !DATA.rulesText ? 'checked' : ''}></label>`;
+  }, function(){
+    const t = String((document.getElementById('rulesTextInput')||{}).value || '').trim();
+    const req = !!(document.getElementById('rulesRequireInput')||{}).checked;
+    if(t !== (DATA.rulesText||'')){ DATA.rulesVersion = (DATA.rulesVersion||0) + 1; DATA.rulesUpdatedAt = new Date().toISOString(); }
+    DATA.rulesText = t; DATA.rulesRequire = req && !!t;
+    setTimeout(function(){ showToast(t ? 'Règlement enregistré' : 'Règlement retiré'); }, 50);
+  });
+}
+// --- Côté admin : suivi dans Rapports
+let RULES_REPORT = null; // { leagueId, version, rows, loading }
+async function loadRulesReport(){
+  const lid = CURRENT_LEAGUE_ID, v = DATA.rulesVersion || 1;
+  RULES_REPORT = { leagueId: lid, version: v, rows: null };
+  try{ if(!ALL_PROFILE_PLAYERS.length) await loadAllProfilePlayers(); }catch(e){}
+  const { data } = await sb.from('rules_acceptances').select('profile_id, accepted_at').eq('league_id', lid).eq('version', v);
+  if(!RULES_REPORT || RULES_REPORT.leagueId !== lid) return;
+  RULES_REPORT.rows = data || [];
+  if(VIEW.reportsSubTab === 'reglement') render();
+}
+function reportsRulesHTML(){
+  if(!DATA.rulesText) return `<div class="card"><p class="empty">Aucun règlement rédigé pour cette ligue. Rédige-le dans Réglages › Règlement.</p></div>`;
+  const v = DATA.rulesVersion || 1;
+  if(!RULES_REPORT || RULES_REPORT.leagueId !== CURRENT_LEAGUE_ID || RULES_REPORT.version !== v){ setTimeout(loadRulesReport, 0); return '<p class="small">Chargement…</p>'; }
+  if(!RULES_REPORT.rows) return '<p class="small">Chargement…</p>';
+  const acc = {}; RULES_REPORT.rows.forEach(function(r){ acc[r.profile_id] = r.accepted_at; });
+  const links = (ALL_PROFILE_PLAYERS||[]).filter(function(pp){ return pp.league_id === CURRENT_LEAGUE_ID; });
+  const nameOf = function(pp){ const x = pp.substitute_id ? (DATA.substitutePool||[]).find(function(s){ return s.id === pp.substitute_id; }) : (DATA.players||[]).find(function(q){ return q.id === pp.player_id; }); return (x && x.name) || 'Membre'; };
+  const seen = {}, people = [];
+  links.forEach(function(pp){ if(seen[pp.profile_id]) return; seen[pp.profile_id] = 1; people.push({ id: pp.profile_id, name: nameOf(pp), sub: !!pp.substitute_id, at: acc[pp.profile_id] || null }); });
+  people.sort(function(a,b){ return a.name.localeCompare(b.name); });
+  const ok = people.filter(function(x){ return x.at; }), wait = people.filter(function(x){ return !x.at; });
+  const linkedP = {}; links.forEach(function(pp){ if(pp.player_id) linkedP[pp.player_id] = 1; if(pp.substitute_id) linkedP['s' + pp.substitute_id] = 1; });
+  const noAcc = (DATA.players||[]).filter(function(p){ return !linkedP[p.id]; }).length + (DATA.substitutePool||[]).filter(function(s){ return !linkedP['s' + s.id]; }).length;
+  const row = function(x){ return `<div class="rg-p"><span class="rg-name">${escapeHTML(x.name)}${x.sub ? '<small style="color:var(--muted);">Remplaçant</small>' : ''}</span><span class="${x.at ? 'cmx-st on' : 'cmx-st wait'}">${x.at ? escapeHTML(new Date(x.at).toLocaleDateString('fr-CA', { day:'numeric', month:'short' })) : 'En attente'}</span></div>`; };
+  return `<div class="rg-kpis"><div><b>${ok.length}</b><span>accepté${ok.length>1?'s':''}</span></div><div><b>${wait.length}</b><span>en attente</span></div><div><b>${noAcc}</b><span>sans compte</span></div></div>
+    ${!DATA.rulesRequire ? `<p class="ah-meta" style="margin:0 2px 10px;">L'acceptation n'est pas demandée pour cette ligue (Réglages › Règlement).</p>` : ''}
+    ${wait.length && DATA.rulesRequire ? `<button type="button" class="btn btn-primary" style="width:100%;margin-bottom:12px;" onclick="remindRules()">Relancer les ${wait.length} en attente</button>` : ''}
+    <div class="card rg-card"><div class="rg-top"><b>Version ${v}</b><span>${people.length} compte${people.length>1?'s':''}</span></div>${wait.map(row).join('')}${ok.map(row).join('') || ''}${people.length ? '' : '<div class="ah-meta">Aucun compte lié à cette ligue.</div>'}</div>
+    ${noAcc ? `<p class="ah-meta" style="margin:8px 2px 0;">Les ${noAcc} personne${noAcc>1?'s':''} sans compte dans l'app ne peuvent pas accepter le règlement.</p>` : ''}`;
+}
+function remindRules(){
+  if(!RULES_REPORT || !RULES_REPORT.rows) return;
+  const acc = {}; RULES_REPORT.rows.forEach(function(r){ acc[r.profile_id] = 1; });
+  const ids = Array.from(new Set((ALL_PROFILE_PLAYERS||[]).filter(function(pp){ return pp.league_id === CURRENT_LEAGUE_ID && !acc[pp.profile_id]; }).map(function(pp){ return pp.profile_id; })));
+  if(!ids.length) return;
+  const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || 'la ligue';
+  showConfirm('Envoyer un rappel aux ' + ids.length + ' personnes qui n\'ont pas encore accepté le règlement ?', function(){
+    invokeSendNotification({ organization_id: currentLeagueOrgId(), profile_ids: ids, category: 'league_announce', title: 'Règlement à accepter', body: 'Prends une minute pour lire et accepter le règlement de ' + lg + '.', url: goUrl('reglement:' + CURRENT_LEAGUE_ID) });
+    showToast('Rappel envoyé');
+  });
 }
 function reportsListHTML(){
   const sortBy = VIEW.reportsListSortBy || 'rating';
@@ -12162,7 +12301,8 @@ function adminSettingsSectionHTML(){
     settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
     mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
     settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
-    settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')")
+    settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
+    settingsRow('', 'Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'acceptation demandée aux joueurs et remplaçants' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()')
   ]);
   let regles;
   if(mlp) regles = [settingsRow('', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()')];
@@ -13405,6 +13545,7 @@ function summarizeLeagueData(data, link, leagueId){
   const lg = LEAGUES.find(x=>x.id===leagueId) || {};
   const out = { leagueId, name: lg.name || 'Ligue', schedule: lg.schedule_label || '', orgId: lg.organization_id || null, isSub: !!link.substitute_id, showRating: !!(data && data.showRatingToPlayers), open: null, groupName: null, rating: null, injured: false, playerId: link.player_id || null };
   if(data){
+    out.rulesText = data.rulesText || ''; out.rulesVersion = data.rulesVersion || 0; out.rulesRequire = !!data.rulesRequire;
     out.rec = isRecLeague(data);
     out.playDay = typeof data.playDayOfWeek === 'number' ? data.playDayOfWeek : null;
     out.playTime = data.playTime || '';
@@ -13523,7 +13664,7 @@ function accountHomeHTML(me){
 }
 // Une section par organisation, une carte par ligue (joueur ou remplaçant) : même présentation que l'accueil admin.
 function accHomeLeaguesHTML(){
-  let html = '';
+  let html = rulesBannerHTML();
   const orgs = myOrgsList();
   orgs.forEach(function(o, i){
     const items = o.leagues.map(function(x){ return { lg: x.lg, link: x.link, sum: leagueSummaryFor(x.lg.id) }; });
@@ -13855,7 +13996,9 @@ function showRatingExplanationModal(){
   showContentModal('Comment fonctionne la cote ?', ratingExplanationHTML());
 }
 function showLeagueRulesModal(){
-  showContentModal('Règles de la ligue', leagueRulesHTML());
+  const r = CURRENT_LEAGUE_ID ? rulesInfo(CURRENT_LEAGUE_ID) : null;
+  if(r) showContentModal('Règles de la ligue', function(){ return rulesModalHTML(CURRENT_LEAGUE_ID) + `<h3 style="margin-top:18px;">Règles du jeu</h3>` + leagueRulesHTML(); });
+  else showContentModal('Règles de la ligue', leagueRulesHTML());
 }
 // Résumé des règles actuelles de la ligue, généré à partir des réglages en
 // vigueur — s'ajuste donc automatiquement si l'admin les modifie.
