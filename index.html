@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 391">
+<meta name="app-build" content="Version 392">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1678,6 +1678,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sd-handle{width:22px;flex:none;text-align:center;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:6px 0;}
 body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:-2px;}
 #subDock.sd-over{outline:2px solid var(--ball) !important;}
+.rp-pill{flex:none;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);}
+.rp-box{display:flex !important;flex-direction:column;gap:6px;min-width:0;flex:1;}
+.rp-name{font-weight:400;}
+.rp-pills{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.rp-abs{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ab-pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(255,159,10,.14);color:#FF9F0A;}
 .ab-row{border-style:dashed !important;background:transparent !important;}
 .ab-row .t{color:var(--muted);}
@@ -10461,7 +10466,8 @@ function adminGroupsHTML(){
             const openFn = isRealPlayer ? `openPlayerDetailModal('${subId}')` : (isSubPool ? `openSubstituteDetailModal('${subId.slice(5)}')` : '');
             return `<div class="pf-row sub-slot" data-g="${g.id}" data-a="${p.id}"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
               <span class="sd-handle" data-enc="${subId}" data-fg="${g.id}" data-fa="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
-              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)} · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
+              <span class="t rp-box"><b class="rp-name">${escapeHTML(playerName(subId))}</b>
+                <span class="rp-pills"><span class="rp-pill">Remplaçant</span><span class="ab-pill rp-abs">${escapeHTML(p.name)} ${p.injured ? gw(p,'blessé','blessée','blessé(e)') : gw(p,'absent','absente','absent(e)')}</span></span></span>
             </div>`;
           }
           return `<div class="pf-row sub-slot empty ab-row" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
