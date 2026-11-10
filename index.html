@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 387">
+<meta name="app-build" content="Version 388">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2301,7 +2301,7 @@ function notifySessionResultsPublished(finishedDate, corrected){
     league_id: CURRENT_LEAGUE_ID, category: 'league_results',
     title: corrected ? 'Résultats corrigés' : 'Résultats publiés',
     body: corrected
-      ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores, classement et cotes sont mis à jour : jette un œil à ta position.`
+      ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores${DATA.showRatingToPlayers ? ', classement et cotes sont mis' : ' et classement sont mis'} à jour : jette un œil à ta position.`
       : `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} sont disponibles.`,
     url: goUrl('league:' + CURRENT_LEAGUE_ID + ':hist')
   });
@@ -14107,15 +14107,15 @@ function playerGuideHTML(){
   `;
   return `
     <h3>Mon groupe</h3>
-    <p class="small">Affiche tes coéquipiers avec leur cote, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
+    <p class="small">Affiche tes coéquipiers${DATA.showRatingToPlayers ? ' avec leur cote' : ''}, et une carte de statistiques amusantes une fois que tu as assez d'historique (bête noire, cible favorite, duel serré, meilleur allié, série en cours).</p>
     <h3 style="margin-top:14px;">Déclarer une absence</h3>
     <p class="small">Dans la section « Absence » de Mon groupe, trois boutons ouvrent chacun un pop-up : « Une session » pour la session en cours (avant qu'elle ne soit finalisée, pour laisser le temps de trouver un remplaçant), « Plusieurs sessions » pour couvrir une plage de dates à l'avance (vacances), et « Blessure » pour te déclarer hors jeu. Une absence sans remplaçant entraîne une descente automatique d'un groupe, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.</p>
     <h3 style="margin-top:14px;">Voir tes matchs</h3>
     <p class="small">Une fois que ton administrateur publie la session, les matchs et les scores apparaissent dans Mon groupe. Avant ça, un message indique que la session est en préparation.</p>
     <h3 style="margin-top:14px;">Historique</h3>
-    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées, avec ton évolution de cote en vert/rouge. La pastille « ${pbIcon()} Matchs de mon groupe » ouvre le détail des matchs.</p>
-    <h3 style="margin-top:14px;">La cote évolutive</h3>
-    <p class="small">Ta cote évolue automatiquement après chaque match compté (adversaire affronté, écart de score, nombre de matchs joués). Le bouton « Comment fonctionne la cote ? » dans Mon groupe donne l'explication complète.</p>
+    <p class="small">« Historique résultats » montre le classement de toutes les sessions passées${DATA.showRatingToPlayers ? ', avec ton évolution de cote en vert/rouge' : ''}. La pastille « ${pbIcon()} Matchs de mon groupe » ouvre le détail des matchs.</p>
+    ${DATA.showRatingToPlayers ? `<h3 style="margin-top:14px;">La cote évolutive</h3>
+    <p class="small">Ta cote évolue automatiquement après chaque match compté (adversaire affronté, écart de score, nombre de matchs joués). Le bouton « Comment fonctionne la cote ? » dans Moi donne l'explication complète.</p>` : ''}
     <h3 style="margin-top:14px;">Plusieurs ligues</h3>
     <p class="small">Si tu joues dans plus d'une ligue avec le même compte, un sélecteur apparaît en haut de ton écran pour choisir laquelle consulter.</p>
     <h3 style="margin-top:14px;">Besoin d'aide ?</h3>
