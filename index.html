@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 390">
+<meta name="app-build" content="Version 391">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1678,10 +1678,15 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sd-handle{width:22px;flex:none;text-align:center;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:6px 0;}
 body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:-2px;}
 #subDock.sd-over{outline:2px solid var(--ball) !important;}
+.ab-pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(255,159,10,.14);color:#FF9F0A;}
+.ab-row{border-style:dashed !important;background:transparent !important;}
+.ab-row .t{color:var(--muted);}
+.ab-dot{width:8px;height:8px;border-radius:50%;background:#FF9F0A;flex:none;margin:0 7px;}
+.ab-tag{flex:none;font-size:12px;font-weight:700;color:#FF9F0A;}
 .sd-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap;}
 body.sd-dragging,body.sd-dragging *{cursor:grabbing !important;}
 body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px dashed rgba(207,234,92,.6);outline-offset:-2px;border-radius:12px;}
-.sub-slot.sd-over,[data-sg].sd-over{outline:2px solid var(--ball) !important;outline-offset:-2px;background:rgba(207,234,92,.10);}
+.sub-slot.sd-over,[data-sg].sd-over,[data-prow].sd-over,#waitCard.sd-over{outline:2px solid var(--ball) !important;outline-offset:-2px;background:rgba(207,234,92,.10);}
 .gd-sec{padding:12px 0;border-bottom:1px solid var(--line-soft);}
 .gd-sec:first-child{padding-top:0;}
 .gd-sec h3{margin:0 0 6px;font-size:15px;}
@@ -4535,10 +4540,22 @@ function onRowDrop(ev, gid, targetPid){
   ev.preventDefault();
   ev.stopPropagation();
   ev.currentTarget.classList.remove('row-drop-hover');
-  const draggedPid = ev.dataTransfer.getData('text/plain');
+  movePlayerTo(ev.dataTransfer.getData('text/plain'), gid, targetPid);
+}
+// Déplacement d'un joueur (souris ou doigt) : vers un groupe, avant un joueur donné, ou en attente (gid vide).
+// Le joueur reste ensuite dans ce groupe : il y est classé et monte ou descend à partir de là.
+function movePlayerTo(draggedPid, gid, targetPid){
   if(!draggedPid || draggedPid === targetPid) return;
   const dragged = DATA.players.find(x=>x.id===draggedPid);
   if(!dragged) return;
+  if(!gid){ if(dragged.groupId){ dragged.groupId = null; dragged.order = 0; saveAndRender(); } return; }
+  if(!targetPid){
+    if(dragged.groupId === gid) return;
+    dragged.groupId = resolveGroupAssignment(gid, DATA.groups, DATA.players.filter(x=>x.id!==draggedPid));
+    dragged.order = nextOrderInGroup(dragged.groupId);
+    saveAndRender();
+    return;
+  }
   if(dragged.groupId !== gid){
     const otherPlayers = DATA.players.filter(x=>x.id!==draggedPid);
     dragged.groupId = resolveGroupAssignment(gid, DATA.groups, otherPlayers);
@@ -10376,10 +10393,11 @@ function adminGroupsHTML(){
   const rec = isRecLeague();
   let html = rec
     ? `<div class="card"><p class="small">${open ? "Les terrains sont tirés au hasard parmi les joueurs présents. Marque les absences dans la fiche du joueur : tant que la soirée n'est pas publiée, le tirage est refait automatiquement." : "Aucune soirée en cours : les terrains seront tirés au hasard au démarrage de la prochaine."}</p></div>`
-    : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse-dépose directement un joueur d'un groupe à l'autre ci-dessous (sur ordinateur). ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
+    : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse un joueur par sa poignée ⋮⋮ vers un autre groupe ci-dessous. ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
   html = subDockHTML(open) + html;
   const unassigned = DATA.players.filter(p=>!p.groupId);
-  const absentNow = open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
+  // Les absents restent affichés dans leur groupe (pastille « absent ») : pas de doublon ici.
+  const absentNow = rec && open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
   html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
     <h2>${rec ? 'Sans terrain' : "En attente d'assignation"} <span class="small">(${unassigned.length + absentNow.length})</span></h2>
     <p class="small">${rec ? 'Joueurs absents, blessés, ou qui cèdent leur place quand les terrains sont pleins.' : "Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner."}</p>
@@ -10389,6 +10407,7 @@ function adminGroupsHTML(){
         const chip = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`
           : (rec && open && isAbsent(open, p.id) ? `<span class="pf-chip warn">${gw(p,'Absent','Absente','Absent(e)')}</span>` : '<span class="pf-chip acc">En attente</span>');
         return `<div class="pf-row draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')" onclick="openPlayerDetailModal('${p.id}')">
+          <span class="sd-handle" data-pid="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer">⋮⋮</span>
           <span class="t">${escapeHTML(p.name)}${lastGroup ? `<small>${rec ? 'Dernier terrain' : 'Dernier groupe'} : ${escapeHTML(lastGroup.name)}</small>` : ''}</span>${chip}
         </div>`;
       }).join('')}
@@ -10411,7 +10430,7 @@ function adminGroupsHTML(){
     html += `
     <div class="card drop-target" data-sg="${g.id}" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <div style="display:flex;align-items:center;gap:10px;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span><span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span><span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span>${absentInGroup.length ? `<span class="ab-pill">${absentInGroup.length} absent${absentInGroup.length>1?'s':''}</span>` : ''}</div>
         <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du ${grpWord()}">⋯</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
@@ -10425,8 +10444,10 @@ function adminGroupsHTML(){
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
           ondrop="onRowDrop(event,'${g.id}','${p.id}')"
+          data-prow="${p.id}" data-g="${g.id}"
           onclick="openPlayerDetailModal('${p.id}')">
-          ${rec ? '' : `<span style="width:22px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${i+1}</span>`}
+          <span class="sd-handle" data-pid="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer">⋮⋮</span>
+          ${rec ? '' : `<span style="width:18px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${i+1}</span>`}
           <span class="t">${escapeHTML(p.name)}${(!rec && prevText) ? `<small>${prevText}</small>` : ''}</span>
           ${p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>` : ''}
         </div>`;
@@ -10443,14 +10464,14 @@ function adminGroupsHTML(){
               <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)} · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
-          return `<div class="pf-row sub-slot empty" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
-            <span style="width:22px;color:var(--muted);text-align:center;">—</span>
-            <span class="t">Place vide<small>${escapeHTML(p.name)} est ${gw(p,'absent','absente','absent(e)')} · glisse un remplaçant ici</small></span><span class="pf-chip warn">Sans remplaçant</span>
+          return `<div class="pf-row sub-slot empty ab-row" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
+            <span class="ab-dot" aria-hidden="true"></span>
+            <span class="t">${escapeHTML(p.name)}<small>Place libre${(DATA.substitutePool||[]).length ? ' · glisse un remplaçant ici' : ''}</small></span><span class="ab-tag">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>
           </div>`;
         }).join('')}
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
       </div>
-      ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Sur ordinateur, glisse-dépose un joueur pour changer sa position ou son groupe.</p>`}
+      ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Glisse un joueur par sa poignée ⋮⋮ pour changer sa position ou son groupe. Il continue ensuite à partir de ce groupe.</p>`}
       ${open && !(DATA.substitutePool||[]).length ? groupAbsenceManagementHTML(open, g) : ''}
       ${open ? reinforcementHTML(open, g) : ''}
     </div>`;
@@ -10565,6 +10586,10 @@ document.addEventListener('click', function(e){
 }, true);
 // Glisser au doigt ou à la souris (pointer events : téléphone, tablette et ordinateur).
 let SUB_DRAG = null;
+function playerDragTarget(x, y){
+  const el = document.elementFromPoint(x, y);
+  return el && el.closest ? el.closest('[data-prow], [data-sg], #waitCard') : null;
+}
 function subDragTarget(x, y){
   const el = document.elementFromPoint(x, y);
   return el && el.closest ? el.closest('#subDock, .sub-slot, [data-sg]') : null;
@@ -10591,7 +10616,7 @@ function unplaceSub(d){
 function subDragStart(e){
   if(e.button !== undefined && e.button !== 0) return;
   const chip = e.currentTarget, enc = chip.getAttribute('data-enc');
-  SUB_DRAG = { enc: enc, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId,
+  SUB_DRAG = { enc: enc, pid: chip.getAttribute('data-pid'), x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId,
     fromG: chip.getAttribute('data-fg'), fromA: chip.getAttribute('data-fa'), fromX: chip.getAttribute('data-fx') === '1' };
   document.addEventListener('pointermove', subDragMove, { passive: false });
   document.addEventListener('pointerup', subDragEnd);
@@ -10602,15 +10627,16 @@ function subDragMove(e){
   if(!d.moved){
     if(Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 8) return;
     d.moved = true;
-    const g = d.fromG ? document.createElement('div') : d.chip.cloneNode(true);
-    if(d.fromG) g.innerHTML = avatarHTML('sd-av', partnerInitials(playerName(d.enc)), null) + '<span>' + escapeHTML(playerName(d.enc)) + '</span>';
+    const g = (d.fromG || d.pid) ? document.createElement('div') : d.chip.cloneNode(true);
+    const nm = d.pid ? playerName(d.pid) : playerName(d.enc);
+    if(d.fromG || d.pid) g.innerHTML = avatarHTML('sd-av', partnerInitials(nm), null) + '<span>' + escapeHTML(nm) + '</span>';
     g.className = 'sd-chip sd-ghost'; g.removeAttribute('onclick'); g.removeAttribute('onpointerdown');
     document.body.appendChild(g); d.ghost = g;
     d.chip.classList.add('dragging'); document.body.classList.add('sd-dragging');
   }
   e.preventDefault();
   d.ghost.style.transform = 'translate(' + (e.clientX - 40) + 'px,' + (e.clientY - 26) + 'px)';
-  const t = subDragTarget(e.clientX, e.clientY);
+  const t = d.pid ? playerDragTarget(e.clientX, e.clientY) : subDragTarget(e.clientX, e.clientY);
   if(t !== d.over){ if(d.over) d.over.classList.remove('sd-over'); if(t) t.classList.add('sd-over'); d.over = t; }
   // Défilement automatique près des bords
   const sc = d.chip.closest ? d.chip.closest('.sheet-body') : null;
@@ -10628,7 +10654,14 @@ function subDragEnd(e){
   if(d.ghost) d.ghost.remove();
   if(d.chip) d.chip.classList.remove('dragging');
   if(d.over) d.over.classList.remove('sd-over');
-  if(d.moved && e.type === 'pointerup'){
+  if(d.moved && e.type === 'pointerup' && d.pid){
+    const t = d.over;
+    if(t){
+      if(t.id === 'waitCard') movePlayerTo(d.pid, null, null);
+      else if(t.hasAttribute('data-prow')) movePlayerTo(d.pid, t.getAttribute('data-g'), t.getAttribute('data-prow'));
+      else movePlayerTo(d.pid, t.getAttribute('data-sg'), null);
+    }
+  } else if(d.moved && e.type === 'pointerup'){
     const t = d.over;
     if(t && t.id === 'subDock'){ if(d.fromG && unplaceSub(d) !== false) showToast(playerName(d.enc) + ' est retiré(e) de la session'); }
     else if(t){
@@ -10676,22 +10709,7 @@ function onGroupDragLeave(ev){
 function onGroupDrop(ev, gid){
   ev.preventDefault();
   ev.currentTarget.classList.remove('drop-target-hover');
-  const pid = ev.dataTransfer.getData('text/plain');
-  if(!pid) return;
-  const p = DATA.players.find(x=>x.id===pid);
-  const targetGroupId = gid || null;
-  if(!p || p.groupId === targetGroupId) return;
-  if(!targetGroupId){
-    // Déposé sur la carte « En attente d'assignation »
-    p.groupId = null;
-    p.order = 0;
-    saveAndRender();
-    return;
-  }
-  const otherPlayers = DATA.players.filter(x=>x.id!==pid);
-  p.groupId = resolveGroupAssignment(targetGroupId, DATA.groups, otherPlayers);
-  p.order = nextOrderInGroup(p.groupId);
-  saveAndRender();
+  movePlayerTo(ev.dataTransfer.getData('text/plain'), gid || null, null);
 }
 function deleteGroup(gid){
   const g = groupById(gid);
