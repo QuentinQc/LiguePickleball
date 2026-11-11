@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 393">
+<meta name="app-build" content="Version 394">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13516,7 +13516,7 @@ function substituteAvailabilityHTML(sub){
   const open = currentOpenSession();
   const rec = isRecLeague();
   if(!open){
-    return `<div class="card"><div class="pf-sec" style="margin-top:0;">Prochaine ${rec?'soirée':'session'}</div><div class="ah-meta">Aucune ${rec?'soirée':'session'} prévue pour l'instant. Reviens ici quand elle sera lancée pour indiquer ta disponibilité.</div></div>`;
+    return `<div class="card"><div class="pf-sec" style="margin-top:0;">Prochaine ${rec?'soirée':'session'}</div><div class="ah-meta">Aucune ${rec?'soirée':'session'} prévue pour l'instant. Reviens ici quand elle sera lancée pour indiquer ta disponibilité.</div></div>` + lastSessionResultHTML('sub::' + sub.id);
   }
   const available = (open.availableSubs||[]).includes(sub.id);
   // Remplaçant déjà placé dans un groupe (session publiée seulement)
@@ -13559,6 +13559,7 @@ function substituteAvailabilityHTML(sub){
       html += `</div>`;
     }
   }
+  html += lastSessionResultHTML('sub::' + sub.id);
   return html;
 }
 function toggleSubAvailability(subId){
@@ -14672,6 +14673,38 @@ function playerGroupRosterRows(open, gid, members){
   ((gd && gd.extras) || []).forEach(function(x){ h += row(x, playerName(x), '<span class="pf-chip on">Renfort</span>', false); });
   return h;
 }
+// Entre la fin d'une session et la publication de la suivante : résultat de la session terminée
+// pour le groupe où le joueur (ou remplaçant) a joué.
+function lastSessionResultHTML(pid){
+  if(isRecLeague() || DATA.leagueFormat === 'mlp') return '';
+  const open = currentOpenSession();
+  if(open && (open.published || DATA.showGroupBeforePublish)) return '';
+  const closed = (DATA.sessions||[]).filter(function(x){ return x.status === 'closed'; });
+  const s = closed[closed.length - 1]; if(!s || !s.standingsByGroup) return '';
+  let gid = playerSessionGroupId(s, pid), wasAbsent = false;
+  if(!gid){
+    const snap = (s.preSnapshot||[]).find(function(x){ return x.id === pid; });
+    if(snap && snap.groupId && (s.absences||[]).indexOf(pid) !== -1){ gid = snap.groupId; wasAbsent = true; }
+  }
+  const rows = gid ? s.standingsByGroup[gid] : null;
+  if(!rows || !rows.length) return '';
+  const g = groupById(gid);
+  const gd = (s.groupsData||[]).find(function(x){ return x.groupId === gid; });
+  const subValues = new Set((gd && gd.substitutes ? Object.values(gd.substitutes) : []).concat((gd && gd.extras) || []));
+  const list = rows.map(function(r, i){
+    const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
+    const tag = isGuestId(r.playerId) ? ' <span class="rs-tag">invité</span>' : (subValues.has(r.playerId) ? ' <span class="rs-tag">rempl.</span>' : '');
+    return `<div class="pf-row hs-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(playerName(r.playerId))}${tag}<small>${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}</small></span></div>`;
+  }).join('');
+  return `<div class="card">
+    <div class="rs-top"><div class="pf-sec" style="margin:0;">Résultats — ${escapeHTML(frDateLong(s.date))}</div>${g ? `<span class="pf-chip acc">${escapeHTML(g.name)}</span>` : ''}</div>
+    ${wasAbsent ? `<p class="ah-meta" style="margin:6px 2px 8px;">Tu étais absent(e) à cette session.</p>` : ''}
+    <div class="pf-list" style="margin-top:10px;">${list}</div>
+    <div class="pf-sec" style="margin:16px 2px 8px;">Matchs</div>
+    ${matchListInnerHTML(s, gid)}
+    <p class="ah-meta" style="margin:12px 2px 0;">Ton prochain ${grpWord()} sera visible dès la publication de la prochaine session.</p>
+  </div>`;
+}
 function playerGroupHTML(me){
   // Blessé : plus aucun groupe/match/score à afficher — un seul message clair,
   // le joueur reste hors de son groupe jusqu'à ce qu'il se déclare rétabli
@@ -14702,6 +14735,7 @@ function playerGroupHTML(me){
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
     ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${playerGroupRosterRows(open, me.groupId, groupMembers)}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
   </div>`;
+  html += lastSessionResultHTML(me.id);
   if(open){
     const gd = open.groupsData.find(x=>x.groupId===me.groupId);
     const amAbsent = isAbsent(open, me.id);
