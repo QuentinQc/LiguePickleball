@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 395">
+<meta name="app-build" content="Version 396">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13548,26 +13548,7 @@ function substituteAvailabilityHTML(sub){
     const gid = placedGd.groupId;
     const members = playersInGroup(gid).slice().sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     html += `<div class="card"><h2 style="margin:0 0 12px;">${escapeHTML(placedG ? placedG.name : grpWord())}</h2><div class="pf-list">${playerGroupRosterRows(open, gid, members)}</div></div>`;
-    const dm = displayMatches(open, gid), dmMatches = dm.matches;
-    if(dmMatches.length){
-      const social = DATA.leagueFormat==='social';
-      const nDone = dmMatches.filter(rsDone).length, nAll = dmMatches.length;
-      html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
-      if(social) html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer.</div>`;
-      else html += `<div class="ah-meta" style="margin:0 2px 8px;">Les scores sont entrés par les joueurs du ${grpWord()} ou un administrateur.</div>`;
-      dmMatches.forEach((m,mi)=>{
-        const mine = m.teamA.includes(enc) || m.teamB.includes(enc) || m.teamA.includes(sub.id) || m.teamB.includes(sub.id);
-        const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
-        const sc = v => (v===null || v==='' || v===undefined) ? '—' : v;
-        html += `<div class="rs-m ro${mine ? ' me' : ''} ${!social && rsDone(m) ? rsClass(m) : ''}">
-          <div class="rs-mh"><b>Match ${mi+1}</b>${mine ? '<span class="rs-tag">ton match</span>' : ''}${!social && rsDone(m) ? '<span class="rs-state">✓</span>' : ''}</div>
-          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${social ? '' : `<div class="rs-sc">${sc(m.scoreA)}</div>`}</div>
-          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${social ? '' : `<div class="rs-sc">${sc(m.scoreB)}</div>`}</div>
-          ${m.sit ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
-        </div>`;
-      });
-      html += `</div>`;
-    }
+    if(displayMatches(open, gid).matches.length) html += groupMatchesCardHTML(open, gid, enc);
   }
   html += lastSessionResultHTML('sub::' + sub.id);
   return html;
@@ -14715,6 +14696,42 @@ function lastSessionResultHTML(pid){
     <p class="ah-meta" style="margin:12px 2px 0;">Ton prochain ${grpWord()} sera visible dès la publication de la prochaine session.</p>
   </div>`;
 }
+// Carte « Matchs » d'un groupe telle que vue par un joueur (ou un remplaçant placé, meId = « sub::<id> »).
+function groupMatchesCardHTML(open, gid, meId){
+  let html = '';
+  const dm = displayMatches(open, gid), dmMatches = dm.matches;
+  const social = DATA.leagueFormat==='social';
+  const nDone = dmMatches.filter(rsDone).length, nAll = dmMatches.length;
+  html += `<div class="card rs-card" id="playerMatchesCard"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${gid}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i id="rsb_${gid}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
+  if(social){
+    html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer.</div>`;
+  } else if(DATA.allowPlayerScoreEntry && !scoreDayOpen(open.date)){
+    html += `<div class="ah-meta">${escapeHTML(scoreDayMsg(open.date))}</div>`;
+  } else if(DATA.allowPlayerScoreEntry && OFFLINE_MODE){
+    html += `<div class="rs-warn">Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</div>`;
+  }
+  if(dm.stale) html += `<div class="ah-meta" style="margin:0 2px 8px;">Matchs mis à jour selon la composition actuelle du ${grpWord()}. La saisie des scores ouvrira dès que l'organisateur aura ouvert l'app.</div>`;
+  dmMatches.forEach((m,mi)=>{
+    const mine = m.teamA.includes(meId) || m.teamB.includes(meId);
+    const entryOn = DATA.allowPlayerScoreEntry && !OFFLINE_MODE && scoreDayOpen(open.date) && !dm.stale;
+    const lk = entryOn ? scoreLockState(m,false) : null;
+    const editable = !!lk && (lk.state==='open' || lk.state==='mine');
+    const done = rsDone(m);
+    const cell = (side, val) => social ? '' : editable
+      ? `<input class="pill-input rs-in" type="number" min="0" inputmode="numeric" aria-label="Score de l'équipe ${side==='A'?1:2}" id="sc_${gid}_${mi}_${side}" value="${val===null?'':val}" onchange="playerSubmitLadderScore('${gid}',${mi},true)">`
+      : `<div class="rs-sc">${val==null||val===''?'—':val}</div>`;
+    const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
+    const st = done ? '✓' : (editable ? 'À saisir' : '');
+    html += `<div class="rs-m ${social ? '' : rsClass(m)}${editable?'':' ro'}" id="rsm_${gid}_${mi}" data-edit="${editable?1:0}">
+      <div class="rs-mh"><b>Match ${mi+1}</b>${social ? '' : scoreMarkHTML('ladder', gid, mi, m, false, true)}${st ? `<span class="rs-state">${st}</span>` : ''}</div>
+      <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${cell('A', m.scoreA)}</div>
+      <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${cell('B', m.scoreB)}</div>
+      ${m.sit ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
 function playerGroupHTML(me){
   // Blessé : plus aucun groupe/match/score à afficher — un seul message clair,
   // le joueur reste hors de son groupe jusqu'à ce qu'il se déclare rétabli
@@ -14754,37 +14771,7 @@ function playerGroupHTML(me){
     } else if(!open.published){
       // (message déjà affiché dans la carte « Mon groupe » ci-dessus)
     } else if(gd && displayMatches(open, me.groupId).matches.length){
-      const dm = displayMatches(open, me.groupId), dmMatches = dm.matches;
-      const social = DATA.leagueFormat==='social';
-      const nDone = dmMatches.filter(rsDone).length, nAll = dmMatches.length;
-      html += `<div class="card rs-card" id="playerMatchesCard"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${me.groupId}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i id="rsb_${me.groupId}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
-      if(social){
-        html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer.</div>`;
-      } else if(DATA.allowPlayerScoreEntry && !scoreDayOpen(open.date)){
-        html += `<div class="ah-meta">${escapeHTML(scoreDayMsg(open.date))}</div>`;
-      } else if(DATA.allowPlayerScoreEntry && OFFLINE_MODE){
-        html += `<div class="rs-warn">Hors ligne — la saisie de scores est désactivée jusqu'au retour de la connexion.</div>`;
-      }
-      if(dm.stale) html += `<div class="ah-meta" style="margin:0 2px 8px;">Matchs mis à jour selon la composition actuelle du ${grpWord()}. La saisie des scores ouvrira dès que l'organisateur aura ouvert l'app.</div>`;
-      dmMatches.forEach((m,mi)=>{
-        const mine = m.teamA.includes(me.id) || m.teamB.includes(me.id);
-        const entryOn = DATA.allowPlayerScoreEntry && !OFFLINE_MODE && scoreDayOpen(open.date) && !dm.stale;
-        const lk = entryOn ? scoreLockState(m,false) : null;
-        const editable = !!lk && (lk.state==='open' || lk.state==='mine');
-        const done = rsDone(m);
-        const cell = (side, val) => social ? '' : editable
-          ? `<input class="pill-input rs-in" type="number" min="0" inputmode="numeric" aria-label="Score de l'équipe ${side==='A'?1:2}" id="sc_${me.groupId}_${mi}_${side}" value="${val===null?'':val}" onchange="playerSubmitLadderScore('${me.groupId}',${mi},true)">`
-          : `<div class="rs-sc">${val==null||val===''?'—':val}</div>`;
-        const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
-        const st = done ? '✓' : (editable ? 'À saisir' : '');
-        html += `<div class="rs-m ${social ? '' : rsClass(m)}${editable?'':' ro'}" id="rsm_${me.groupId}_${mi}" data-edit="${editable?1:0}">
-          <div class="rs-mh"><b>Match ${mi+1}</b>${social ? '' : scoreMarkHTML('ladder', me.groupId, mi, m, false, true)}${st ? `<span class="rs-state">${st}</span>` : ''}</div>
-          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${cell('A', m.scoreA)}</div>
-          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${cell('B', m.scoreB)}</div>
-          ${m.sit ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
-        </div>`;
-      });
-      html += `</div>`;
+      html += groupMatchesCardHTML(open, me.groupId, me.id);
     }
   }
   return html;
