@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 394">
+<meta name="app-build" content="Version 395">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13543,17 +13543,27 @@ function substituteAvailabilityHTML(sub){
       <button class="btn ${available?'btn-secondary':'btn-primary'}" style="width:100%;" onclick="toggleSubAvailability('${sub.id}')">${available ? "Je ne suis plus disponible" : "Je suis disponible"}</button>`;
   }
   html += `</div>`;
-  if(placedGd && DATA.leagueFormat!=='social'){
-    const mine = displayMatches(open, placedGd.groupId).matches.map((m,mi)=>({m,mi})).filter(x=>x.m.teamA.includes(enc) || x.m.teamB.includes(enc));
-    if(mine.length){
-      html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Mes matchs</div></div>`;
-      mine.forEach(({m,mi})=>{
+  if(placedGd){
+    // Vue du groupe comme un joueur : composition actuelle + tous les matchs (les siens en surbrillance).
+    const gid = placedGd.groupId;
+    const members = playersInGroup(gid).slice().sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
+    html += `<div class="card"><h2 style="margin:0 0 12px;">${escapeHTML(placedG ? placedG.name : grpWord())}</h2><div class="pf-list">${playerGroupRosterRows(open, gid, members)}</div></div>`;
+    const dm = displayMatches(open, gid), dmMatches = dm.matches;
+    if(dmMatches.length){
+      const social = DATA.leagueFormat==='social';
+      const nDone = dmMatches.filter(rsDone).length, nAll = dmMatches.length;
+      html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">Matchs</div>${social ? '' : `<span class="ah-st ${nDone===nAll?'on':'wait'}">${nDone} / ${nAll}</span>`}</div><div class="ah-meta">${escapeHTML(frDateLong(open.date))}</div>${social ? '' : `<div class="ah-bar rs-bar"><i style="width:${Math.round(100*nDone/nAll)}%"></i></div>`}`;
+      if(social) html += `<div class="ah-meta">Ici on joue pour le plaisir : aucun score à entrer.</div>`;
+      else html += `<div class="ah-meta" style="margin:0 2px 8px;">Les scores sont entrés par les joueurs du ${grpWord()} ou un administrateur.</div>`;
+      dmMatches.forEach((m,mi)=>{
+        const mine = m.teamA.includes(enc) || m.teamB.includes(enc) || m.teamA.includes(sub.id) || m.teamB.includes(sub.id);
         const team = t=> t.map(id=>escapeHTML(playerName(id))).join('<br>');
         const sc = v => (v===null || v==='' || v===undefined) ? '—' : v;
-        html += `<div class="rs-m me ro ${rsDone(m) ? rsClass(m) : ''}">
-          <div class="rs-mh"><b>Match ${mi+1}</b>${rsDone(m) ? '<span class="rs-state">✓</span>' : ''}</div>
-          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div><div class="rs-sc">${sc(m.scoreA)}</div></div>
-          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div><div class="rs-sc">${sc(m.scoreB)}</div></div>
+        html += `<div class="rs-m ro${mine ? ' me' : ''} ${!social && rsDone(m) ? rsClass(m) : ''}">
+          <div class="rs-mh"><b>Match ${mi+1}</b>${mine ? '<span class="rs-tag">ton match</span>' : ''}${!social && rsDone(m) ? '<span class="rs-state">✓</span>' : ''}</div>
+          <div class="rs-line a"><div class="rs-team">${team(m.teamA)}</div>${social ? '' : `<div class="rs-sc">${sc(m.scoreA)}</div>`}</div>
+          <div class="rs-line b"><div class="rs-team">${team(m.teamB)}</div>${social ? '' : `<div class="rs-sc">${sc(m.scoreB)}</div>`}</div>
+          ${m.sit ? `<div class="rs-sit">Repos : ${escapeHTML(sitLabel(m))}</div>` : ''}
         </div>`;
       });
       html += `</div>`;
