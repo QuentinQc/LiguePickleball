@@ -12701,7 +12701,7 @@ function adminSettingsSectionHTML(){
     isOrganizerOnly() ? '' : settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
     mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
     isOrganizerOnly() ? '' : settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
-    isOrganizerOnly() ? '' : settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
+    settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
     isOrganizerOnly() ? '' : settingsRow('', 'Organisateurs', organizersSettingsSummary(), 'openOrganizersModal()'),
     settingsRow('', 'Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'acceptation demandée aux joueurs et remplaçants' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()')
   ]);
