@@ -7321,9 +7321,7 @@ function adminLeagueCardHTML(lg){
   </div>`;
 }
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
-  const tabs = isOrganizerOnly()
-    ? [['accueil','Accueil',''],['cal','Calendrier',''],['comm','Communauté','']]
-    : [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
+  const tabs = [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
   const active = (tabs.some(t=>t[0]===VIEW.atab) || VIEW.atab==='moi') ? VIEW.atab : 'accueil';
   const aName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
   NAV_NO_MORE = true;
@@ -7361,7 +7359,7 @@ function adminHomeHTML(){
     const parts = [];
     if(pending > 0) parts.push(pending + ' à approuver');
     if(interested > 0) parts.push(interested + ' intéressé' + (interested>1?'s':''));
-    const right = (parts.length && !isOrganizerOnly())
+    const right = parts.length
       ? `<button type="button" class="ah-pend" onclick="openOrgSheetFor('${o.id}','comptes')">${parts.join(' · ')} ›</button>`
       : `<span class="ah-org-r">${ls.length} ligue${ls.length>1?'s':''}</span>`;
     html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
@@ -7394,13 +7392,13 @@ function adminOrgsHTML(){
   const tiles = leagues.map(lg=>{ const sm = adminSummaryFor(lg); return leagueTileHTML(lg.name, lg.schedule_label||'', `openAdminLeague('${lg.id}','session')`, !!(sm && (sm.unassigned || (sm.open && sm.open.published && sm.open.total>0 && sm.open.done===sm.open.total)))); }).join('');
   return `${back}${orgHeroHTML(org ? org.name : '', chips)}
     <div class="pc-sec">Mes ligues</div>
-    <div class="lg-tiles">${tiles}<button type="button" class="lg-tile lg-tile-add" onclick="onCreateLeague()"><span class="lg-tile-ico">＋</span><b>Nouvelle ligue</b></button></div>
-    <div class="pc-sec">Gérer l'organisation</div>
+    <div class="lg-tiles">${tiles}${isOrganizerOnly() ? '' : `<button type="button" class="lg-tile lg-tile-add" onclick="onCreateLeague()"><span class="lg-tile-ico">＋</span><b>Nouvelle ligue</b></button>`}</div>
+    <div class="pc-sec">${isOrganizerOnly() ? 'Membres et demandes' : "Gérer l'organisation"}</div>
     <div class="org-acts">
       ${orgActionHTML('joueurs','Membres','Joueurs et invitations',`openOrgSheet('membres')`)}
       ${orgActionHTML('lock','Comptes','Approbations et accès',`openOrgSheet('comptes')`, pending||'')}
       ${orgActionHTML('rapports','Rapport','Qui joue où',`openOrgSheet('rapport')`)}
-      ${orgActionHTML('reglages','Paramètres','Nom, lien d\'invitation',`openOrgSheet('general')`)}
+      ${isOrganizerOnly() ? '' : orgActionHTML('reglages','Paramètres','Nom, lien d\'invitation',`openOrgSheet('general')`)}
     </div>`;
 }
 // ---- Communauté admin ----
@@ -9782,7 +9780,7 @@ function orgMemberDetailModalHTML(idx){
         : `<div class="pf-row" style="cursor:default;"><span class="t">Genre<small>Ajoute d'abord à une ligue</small></span></div>`}
     </div>
     <p class="small" style="color:var(--muted);margin:6px 2px 0;">Ces infos s'appliquent dans toutes ses ligues.</p>
-    <div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="confirmFullyDeleteOrgMember(${idx})">Supprimer de l'organisation</button></div>`;
+    ${isOrganizerOnly() ? '' : `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="confirmFullyDeleteOrgMember(${idx})">Supprimer de l'organisation</button></div>`}`;
   } else {
     html += memberAccountSectionHTML(entry, idx, linkedProfile);
   }
@@ -10135,7 +10133,7 @@ function organizationAccountsHTML(){
   const orgProfiles = ALL_PROFILES.filter(p=>p.organization_id===CURRENT_ORGANIZATION_ID);
   const orgLinks = ALL_PROFILE_PLAYERS.filter(pp=>orgLeagueIds.has(pp.league_id));
   const linkedProfileIds = new Set(orgLinks.map(l=>l.profile_id));
-  const pending = orgProfiles.filter(p=>!linkedProfileIds.has(p.id));
+  const pending = isOrganizerOnly() ? [] : orgProfiles.filter(p=>!linkedProfileIds.has(p.id));
   const unlinkedPlayersByLeague = (leagueId)=>{
     const bucket = ORG_ROSTER_BY_LEAGUE[leagueId] || { players: [] };
     const linkedInLeague = new Set(orgLinks.filter(pp=>pp.league_id===leagueId).map(pp=>pp.player_id));
@@ -10242,7 +10240,7 @@ function organizationAccountsHTML(){
       </div>`).join('')}
       ${(list.length===0 && emptyText) ? `<p class="empty">${emptyText}</p>` : ''}
     </div>`; }
-  const codeHTML = orgJoinCardHTML() + `<div class="card">
+  const codeHTML = (isOrganizerOnly() ? '' : orgJoinCardHTML()) + `<div class="card">
     <div class="section-heading"><span class="icon-badge"></span><h3 style="margin:0;">Invitations par ligue</h3></div>
     <p class="small" style="margin:8px 0 4px;">Un lien d'invitation par ligue (centre, groupe Facebook…). Il ne donne aucun accès : chaque personne apparaît dans « À approuver » ci-dessus. Pour inviter un joueur précis, ouvre sa fiche.</p>
     ${orgLeagues.map(l=>{
@@ -12807,7 +12805,7 @@ function orgBackToHub(){ VIEW.orgHub = true; render(); }
 function isMobileModern(){ return MODERN_NAV && window.matchMedia('(max-width:640px)').matches; }
 // Personnes à approuver dans une organisation : comptes sans joueur + demandes d'adhésion (pas l'intérêt).
 function approvalsCountForOrg(orgId){
-  const ids = new Set(LEAGUES.filter(l=>l.organization_id===orgId).map(l=>l.id));
+  const ids = new Set(LEAGUES.filter(l=>l.organization_id===orgId && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1)).map(l=>l.id));
   const linked = new Set(ALL_PROFILE_PLAYERS.filter(pp=>ids.has(pp.league_id)).map(pp=>pp.profile_id));
   const accts = ALL_PROFILES.filter(p=>p.organization_id===orgId && !linked.has(p.id)).length;
   const reqs = (ALL_JOIN_REQUESTS||[]).filter(r=>r.status==='pending' && ids.has(r.league_id) && r.kind !== 'interest').length;
@@ -13550,7 +13548,7 @@ function settingsGuideHTML(){
   return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
   + guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`)
   + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant, avec sa cote de départ. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
-  + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Les réglages de l'organisation, les autres ligues et les approbations de comptes restent aux administrateurs.</p>`)
+  + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Ils peuvent aussi approuver les demandes d'adhésion à leur ligue et ajouter des personnes à l'organisation (Organisations › Membres et Comptes). Les réglages de l'organisation, les autres ligues et la suppression de membres restent aux administrateurs.</p>`)
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
   + guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`)
   + guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`)
