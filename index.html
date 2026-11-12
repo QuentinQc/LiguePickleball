@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 405">
+<meta name="app-build" content="Version 406">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1150,6 +1150,37 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rs-name{font-family:var(--font-display);font-size:22px;font-weight:600;text-transform:uppercase;line-height:1.1;}
 .rs-bar{margin-bottom:4px;}
 .rs-warn{font-size:14px;color:#FF9F0A;font-weight:600;background:rgba(255,159,10,.1);border-radius:12px;padding:10px 12px;}
+.rot-me{display:flex;gap:16px;align-items:center;}
+.rot-num{flex:0 0 auto;width:92px;height:92px;border-radius:24px;background:var(--ball);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.rot-num small{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.rot-num b{font-family:var(--font-display);font-size:46px;line-height:1;}
+.rot-meta{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.rot-meta b{font-family:var(--font-display);font-size:20px;text-transform:uppercase;}
+.rot-meta span{font-size:13px;color:var(--muted);}
+.rot-list{display:flex;flex-direction:column;gap:8px;}
+.rot-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:6px 12px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.rot-row.rest{grid-template-columns:auto 1fr;opacity:.75;}
+.rot-row.now{border-color:var(--ball);box-shadow:0 0 0 1px var(--ball) inset;}
+.rot-row.past{opacity:.45;}
+.rot-r{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.rot-c{font-family:var(--font-display);font-size:17px;color:var(--ball);white-space:nowrap;}
+.rot-what{font-size:14px;line-height:1.55;}
+.rot-now{font-size:11px;font-weight:700;background:var(--ball);color:var(--court);border-radius:999px;padding:3px 8px;}
+.rot-p{display:inline-flex;align-items:center;gap:5px;margin:2px 6px 2px 0;font-weight:600;}
+.rot-p i{font-style:normal;font-size:11px;font-weight:800;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);display:inline-flex;align-items:center;justify-content:center;}
+.rot-p.me i{background:var(--ball);color:var(--court);}
+.rot-nums{display:flex;flex-wrap:wrap;gap:4px 8px;}
+.rot-courts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:10px;}
+.rot-court{padding:10px 12px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.rot-court b{display:block;font-family:var(--font-display);color:var(--ball);margin-bottom:4px;}
+.rot-vs{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:2px 0;}
+.rot-big{text-align:center;padding:18px 0 12px;}
+.rot-big small{display:block;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.rot-big b{display:block;font-family:var(--font-display);font-size:min(28vw,150px);line-height:1;color:var(--ball);}
+.rot-big.chg b{color:#FFD60A;}
+.rot-big span{font-size:15px;color:var(--muted);}
+.rot-go{max-width:360px;margin:6px auto 4px;display:block;}
+.rot-courts.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));}
 .pl-role{color:var(--ball);font-weight:700;font-size:12px;letter-spacing:.02em;margin-top:2px;}
 .tag.tag-orga{background:rgba(207,234,92,.14);color:var(--ball);border:1px solid rgba(207,234,92,.35);}
 .rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
@@ -2771,6 +2802,7 @@ function sheetModalHTML(){
   if(MODAL.sheet === 'publier') return publishSheetHTML();
   if(MODAL.sheet === 'inbox') return inboxSheetHTML();
   if(MODAL.sheet === 'ecompose') return eventComposerSheetHTML();
+  if(MODAL.sheet === 'rotchrono') return rotationTimerSheetHTML();
   const k = MODAL.sheet;
   const ORGS = { 'org-membres':['','Membres','Joueurs et invitations'], 'org-comptes':['','Comptes','Approbations et accès'], 'org-rapport':['','Rapport','Qui joue où'], 'org-general':['','Paramètres','Nom et lien d\'invitation'] };
   const og = ORGS[k];
@@ -4976,6 +5008,225 @@ function socialRedraw(){
     saveAndRender();
   });
 }
+
+// ==================== ROTATION CHRONOMÉTRÉE (récréatif) ====================
+// Chaque soirée : un numéro tiré au hasard par joueur présent, puis des rondes de X minutes en 2 contre 2.
+// À chaque ronde, on change de partenaire, d'adversaires et de terrain ; les repos tournent équitablement.
+// L'horaire est reproductible (même soirée + mêmes présents = même horaire sur tous les appareils),
+// puis figé à la publication.
+function isRotationMode(d){ d = d || DATA; return !!d && d.leagueFormat === 'social' && d.socialMode === 'rotation'; }
+function rotationSettings(){
+  const round = parseInt(DATA.rotationRoundMin, 10) || 12, change = parseInt(DATA.rotationChangeMin, 10);
+  const ch = isNaN(change) ? 2 : change;
+  const total = parseInt(DATA.sessionDurationMin, 10) || 120;
+  const maxC = parseInt(DATA.socialMaxCourts, 10) || 5;
+  return { round: round, change: ch, total: total, rounds: Math.max(1, Math.floor((total + ch) / (round + ch))), maxCourts: maxC };
+}
+function rotationPresentIds(session){
+  return DATA.players.filter(function(p){ return !p.injured && !isAbsent(session, p.id); }).map(function(p){ return p.id; }).sort();
+}
+function rotationBuild(session, ids, seedExtra){
+  const st = rotationSettings();
+  const rnd = seededRng('rot|' + session.id + '|' + (seedExtra || 0) + '|' + ids.join(','));
+  const shuf = function(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+  const order = shuf(ids), numbers = {};
+  order.forEach(function(id, i){ numbers[id] = i + 1; });
+  const N = ids.length, C = Math.min(st.maxCourts, Math.floor(N / 4));
+  const k = function(a, b){ return a < b ? a + '|' + b : b + '|' + a; };
+  const partner = {}, opp = {}, rests = {}, lastRest = {}, onCourt = {};
+  ids.forEach(function(id){ rests[id] = 0; lastRest[id] = -9; onCourt[id] = {}; });
+  const rounds = [];
+  for(let r = 0; r < st.rounds; r++){
+    if(C < 1){ rounds.push({ courts: [], rest: order.slice() }); continue; }
+    // Repos : ceux qui se sont le moins reposés, jamais deux rondes de suite si possible.
+    let playing, rest;
+    if(r === 0){ playing = order.slice(0, 4 * C); rest = order.slice(4 * C); }
+    else {
+      const cand = shuf(ids).sort(function(a, b){ return (rests[a] - rests[b]) || ((lastRest[a] === r - 1) - (lastRest[b] === r - 1)); });
+      rest = cand.slice(0, N - 4 * C); playing = ids.filter(function(id){ return rest.indexOf(id) === -1; });
+    }
+    let best = null, bestCost = Infinity;
+    const tries = r === 0 ? 1 : 80;
+    for(let t = 0; t < tries; t++){
+      const pl = r === 0 ? playing.slice() : shuf(playing);
+      const matches = [];
+      if(r === 0){ for(let c = 0; c < C; c++) matches.push({ a: [pl[4*c], pl[4*c+1]], b: [pl[4*c+2], pl[4*c+3]] }); }
+      else {
+        // Équipes : chaque joueur prend le partenaire le moins déjà eu ; puis les équipes s'affrontent selon le moins de rencontres.
+        const pool = pl.slice(), teams = [];
+        while(pool.length){
+          const a = pool.shift(); let bi = 0, bc = Infinity;
+          for(let i = 0; i < pool.length; i++){ const c = (partner[k(a, pool[i])] || 0) * 10 + rnd() * 0.5; if(c < bc){ bc = c; bi = i; } }
+          teams.push([a, pool.splice(bi, 1)[0]]);
+        }
+        const tp = teams.slice();
+        while(tp.length){
+          const A = tp.shift(); let bi = 0, bc = Infinity;
+          for(let i = 0; i < tp.length; i++){ const B = tp[i]; let c = 0; A.forEach(function(x){ B.forEach(function(y){ c += (opp[k(x, y)] || 0); }); }); c += rnd() * 0.3; if(c < bc){ bc = c; bi = i; } }
+          matches.push({ a: A, b: tp.splice(bi, 1)[0] });
+        }
+      }
+      let cost = 0;
+      matches.forEach(function(m){
+        cost += ((partner[k(m.a[0], m.a[1])] || 0) + (partner[k(m.b[0], m.b[1])] || 0)) * 10;
+        m.a.forEach(function(x){ m.b.forEach(function(y){ cost += (opp[k(x, y)] || 0) * 3; }); });
+      });
+      if(cost < bestCost){ bestCost = cost; best = matches; }
+      if(cost === 0) break;
+    }
+    // Terrains : on évite de renvoyer un joueur sur un terrain où il a déjà joué.
+    const courtOrder = [];
+    const freeC = []; for(let c = 1; c <= C; c++) freeC.push(c);
+    const ms = r === 0 ? best.slice() : shuf(best);
+    ms.forEach(function(m){
+      const four = m.a.concat(m.b); let bi = 0, bc = Infinity;
+      freeC.forEach(function(c, i){ let s = 0; four.forEach(function(x){ s += onCourt[x][c] || 0; }); s += rnd() * 0.2; if(s < bc){ bc = s; bi = i; } });
+      courtOrder.push({ c: freeC.splice(bi, 1)[0], a: m.a, b: m.b });
+    });
+    courtOrder.sort(function(x, y){ return x.c - y.c; });
+    courtOrder.forEach(function(m){
+      partner[k(m.a[0], m.a[1])] = (partner[k(m.a[0], m.a[1])] || 0) + 1;
+      partner[k(m.b[0], m.b[1])] = (partner[k(m.b[0], m.b[1])] || 0) + 1;
+      m.a.forEach(function(x){ m.b.forEach(function(y){ opp[k(x, y)] = (opp[k(x, y)] || 0) + 1; }); });
+      m.a.concat(m.b).forEach(function(x){ onCourt[x][m.c] = (onCourt[x][m.c] || 0) + 1; });
+    });
+    rest.forEach(function(id){ rests[id]++; lastRest[id] = r; });
+    rounds.push({ courts: courtOrder, rest: rest.slice().sort(function(a, b){ return numbers[a] - numbers[b]; }) });
+  }
+  return { numbers: numbers, rounds: rounds, players: ids.slice(), round: st.round, change: st.change, courts: C, seed: seedExtra || 0 };
+}
+// Horaire de la soirée : figé à la publication, sinon calculé en direct.
+function rotationFor(session){
+  if(!session) return null;
+  if(session.rotation && session.rotation.rounds) return session.rotation;
+  return rotationBuild(session, rotationPresentIds(session), session.rotationSeed || 0);
+}
+// Les présences ont-elles changé depuis que l'horaire a été figé ?
+function rotationStale(session){
+  if(!session || !session.rotation) return false;
+  return session.rotation.players.join(',') !== rotationPresentIds(session).join(',');
+}
+function rotationRedo(){
+  const open = currentOpenSession(); if(!open) return;
+  showConfirm(open.published ? "Refaire l'horaire avec les joueurs présents ? Les joueurs recevront le nouvel horaire." : "Refaire le tirage des numéros et de l'horaire ?", function(){
+    open.rotationSeed = (open.rotationSeed || 0) + 1;
+    open.rotation = open.published ? rotationBuild(open, rotationPresentIds(open), open.rotationSeed) : null;
+    open.rotationStart = null;
+    saveAndRender();
+    if(open.published) notifySocialRedraw(open);
+  });
+}
+// Ronde en cours d'après le chrono (null si le chrono n'est pas lancé).
+function rotationCurrentRound(session, rot){
+  if(!session || !session.rotationStart || !rot) return null;
+  const el = (Date.now() - new Date(session.rotationStart).getTime()) / 60000;
+  if(el < 0) return null;
+  const per = rot.round + rot.change, i = Math.floor(el / per);
+  if(i >= rot.rounds.length) return { index: rot.rounds.length, done: true };
+  const inRound = el - i * per;
+  return { index: i, changing: inRound >= rot.round, left: Math.max(0, (inRound < rot.round ? rot.round : per) - inRound) };
+}
+function rotNameHTML(id, rot, meId){
+  const n = rot.numbers[id];
+  return `<span class="rot-p${id === meId ? ' me' : ''}"><i>${n || ''}</i>${escapeHTML(playerName(id))}</span>`;
+}
+// Vue joueur : numéro de la soirée + son parcours, ronde par ronde.
+function rotationPlayerHTML(me, open){
+  const rot = rotationFor(open);
+  const n = rot.numbers[me.id];
+  if(!n) return `<div class="card"><h2 style="margin:0 0 6px;">Rotation</h2><p class="small" style="margin:0;color:var(--muted);">Tu n'es pas inscrit(e) à l'horaire de cette soirée. Vois avec l'organisateur.</p></div>`;
+  const cur = rotationCurrentRound(open, rot);
+  let h = `<div class="card rot-me">
+    <div class="rot-num"><small>Ton numéro</small><b>${n}</b></div>
+    <div class="rot-meta"><b>${escapeHTML(frDateLong(open.date))}</b><span>${rot.rounds.length} rondes de ${rot.round} min · ${rot.courts} terrain${rot.courts > 1 ? 's' : ''}</span><span>Change de partenaire, d'adversaires et de terrain à chaque ronde.</span></div>
+  </div><div class="card"><div class="pf-sec" style="margin-top:0;">Ma soirée</div><div class="rot-list">`;
+  rot.rounds.forEach(function(rd, i){
+    const m = rd.courts.find(function(x){ return x.a.indexOf(me.id) !== -1 || x.b.indexOf(me.id) !== -1; });
+    const now = cur && !cur.done && cur.index === i;
+    const past = cur && (cur.done || cur.index > i);
+    if(!m){ h += `<div class="rot-row rest${now ? ' now' : ''}${past ? ' past' : ''}"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-what">Repos</span></div>`; return; }
+    const mate = (m.a.indexOf(me.id) !== -1 ? m.a : m.b).filter(function(x){ return x !== me.id; })[0];
+    const vs = m.a.indexOf(me.id) !== -1 ? m.b : m.a;
+    h += `<div class="rot-row${now ? ' now' : ''}${past ? ' past' : ''}"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Terrain ${m.c}</span>
+      <span class="rot-what">avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</span>${now ? `<span class="rot-now">${cur.changing ? 'Changement' : 'En cours'}</span>` : ''}</div>`;
+  });
+  return h + `</div></div>`;
+}
+// Vue organisateur : horaire complet, ronde par ronde.
+function rotationAdminHTML(open){
+  const rot = rotationFor(open);
+  const st = rotationSettings();
+  const N = rot.players.length;
+  let h = '';
+  if(rotationStale(open)) h += `<div class="rs-warn">Les présences ont changé depuis la publication. <button type="button" class="btn-ghost" style="margin-left:6px;" onclick="rotationRedo()">Refaire l'horaire</button></div>`;
+  h += `<div class="card"><div class="rs-top"><div class="rs-name">Rotation chronométrée</div><span class="ah-st ${open.published ? 'on' : 'wait'}">${open.published ? 'Horaire publié' : 'Aperçu'}</span></div>
+    <div class="ah-meta">${N} joueur${N > 1 ? 's' : ''} · ${rot.courts} terrain${rot.courts > 1 ? 's' : ''} · ${rot.rounds.length} rondes de ${rot.round} min + ${rot.change} min de changement</div>
+    ${N < 4 ? `<p class="empty">Il faut au moins 4 joueurs présents.</p>` : ''}
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button class="btn btn-primary" style="width:auto;" onclick="openRotationTimer()">Écran chrono</button>
+      <button class="btn btn-secondary" style="width:auto;" onclick="printRotation()">Imprimer l'horaire</button>
+      <button class="btn-ghost" onclick="rotationRedo()">Refaire le tirage</button>
+    </div></div>`;
+  h += `<div class="card"><div class="pf-sec" style="margin-top:0;">Numéros de la soirée</div><div class="rot-nums">${rot.players.slice().sort(function(a, b){ return rot.numbers[a] - rot.numbers[b]; }).map(function(id){ return rotNameHTML(id, rot); }).join('')}</div></div>`;
+  rot.rounds.forEach(function(rd, i){
+    h += `<div class="card rot-round"><div class="rs-top"><div class="rs-name">Ronde ${i + 1}</div></div>
+      ${rd.rest.length ? `<div class="ah-meta" style="margin-top:4px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</div>` : ''}
+      <div class="rot-courts">${rd.courts.map(function(m){ return `<div class="rot-court"><b>Terrain ${m.c}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div></div>`;
+  });
+  return h;
+}
+// Écran chrono (tablette ou télé) : compte à rebours, ronde en cours et terrains.
+let ROT_TIMER = null;
+function openRotationTimer(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'rotchrono', title:'' }; render(); rotationTick(); }
+function rotationTick(){
+  if(ROT_TIMER) clearInterval(ROT_TIMER);
+  ROT_TIMER = setInterval(function(){
+    if(!MODAL || MODAL.sheet !== 'rotchrono'){ clearInterval(ROT_TIMER); ROT_TIMER = null; return; }
+    const el = document.getElementById('rotChrono'); if(el) el.innerHTML = rotationChronoInnerHTML();
+  }, 1000);
+}
+function rotationStartTimer(){
+  const open = currentOpenSession(); if(!open) return;
+  const go = function(){ open.rotationStart = new Date().toISOString(); saveData(); render(); rotationTick(); };
+  if(open.rotationStart) showConfirm('Recommencer le chrono à la ronde 1 ?', function(){ go(); openRotationTimer(); }); else go();
+}
+function rotationStopTimer(){ const open = currentOpenSession(); if(!open) return; open.rotationStart = null; saveData(); render(); }
+function rotationChronoInnerHTML(){
+  const open = currentOpenSession(); if(!open) return '';
+  const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
+  const fmt = function(m){ const t = Math.ceil(m * 60), mm = Math.floor(t / 60), ss = t % 60; return mm + ':' + (ss < 10 ? '0' : '') + ss; };
+  if(!cur) return `<div class="rot-big"><small>Prêt</small><b>${rot.round}:00</b><span>Ronde 1 · ${rot.rounds.length} rondes</span></div><button class="btn btn-primary rot-go" onclick="rotationStartTimer()">Démarrer la ronde 1</button>${rotationCourtsBoardHTML(rot, 0)}`;
+  if(cur.done) return `<div class="rot-big"><small>Terminé</small><b>Merci !</b><span>${rot.rounds.length} rondes jouées</span></div><button class="btn-ghost" onclick="rotationStartTimer()">Recommencer</button>`;
+  const next = cur.changing ? cur.index + 1 : cur.index;
+  return `<div class="rot-big${cur.changing ? ' chg' : ''}"><small>${cur.changing ? 'Changez de terrain' : 'Ronde ' + (cur.index + 1) + ' sur ' + rot.rounds.length}</small><b>${fmt(cur.left)}</b><span>${cur.changing ? (next < rot.rounds.length ? 'Prochaine : ronde ' + (next + 1) : 'Dernière ronde terminée') : 'Temps restant'}</span></div>
+    <div class="row" style="gap:8px;justify-content:center;"><button class="btn-ghost" onclick="rotationStartTimer()">Recommencer</button><button class="btn-ghost" onclick="rotationStopTimer()">Arrêter</button></div>
+    ${next < rot.rounds.length ? rotationCourtsBoardHTML(rot, next) : ''}`;
+}
+function rotationCourtsBoardHTML(rot, i){
+  const rd = rot.rounds[i]; if(!rd) return '';
+  return `<div class="pf-sec" style="text-align:center;">Ronde ${i + 1}</div><div class="rot-courts big">${rd.courts.map(function(m){ return `<div class="rot-court"><b>Terrain ${m.c}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div>${rd.rest.length ? `<p class="ah-meta" style="text-align:center;margin-top:10px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</p>` : ''}`;
+}
+function rotationTimerSheetHTML(){
+  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="chat-sheet chat-sheet-lg">
+      <div class="chat-head"><div class="chat-head-ico"></div><div class="chat-head-txt"><div class="chat-head-title">Écran chrono</div><div class="chat-head-sub">À afficher sur une tablette ou une télé</div></div><button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button></div>
+      <div class="sheet-body" data-key="rotchrono"><div id="rotChrono">${rotationChronoInnerHTML()}</div></div>
+    </div></div>`;
+}
+// Feuille imprimable : une ronde par bloc, numéros et noms.
+function printRotation(){
+  const open = currentOpenSession(); if(!open) return;
+  const rot = rotationFor(open);
+  const nm = function(id){ return '<b>' + rot.numbers[id] + '</b> ' + escapeHTML(playerName(id)); };
+  let body = `<h1>${escapeHTML(currentLeagueLabel())} — ${escapeHTML(frDateLong(open.date))}</h1><p>${rot.rounds.length} rondes de ${rot.round} min + ${rot.change} min de changement</p>`;
+  rot.rounds.forEach(function(rd, i){
+    body += `<div class="rd"><h2>Ronde ${i + 1}</h2><table>${rd.courts.map(function(m){ return `<tr><td class="c">Terrain ${m.c}</td><td>${m.a.map(nm).join(' &amp; ')}</td><td class="v">contre</td><td>${m.b.map(nm).join(' &amp; ')}</td></tr>`; }).join('')}</table>${rd.rest.length ? `<p class="r">Repos : ${rd.rest.map(nm).join(', ')}</p>` : ''}</div>`;
+  });
+  const w = window.open('', '_blank'); if(!w){ showAlert("Autorise les fenêtres pour imprimer."); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Horaire</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 6px}.rd{break-inside:avoid;margin:14px 0;padding:10px;border:1px solid #ccc;border-radius:8px}table{border-collapse:collapse;width:100%}td{padding:4px 6px;border-top:1px solid #eee;font-size:13px}.c{font-weight:bold;width:80px}.v{color:#777;width:60px;text-align:center}.r{font-size:12px;color:#555;margin:6px 0 0}</style></head><body>${body}</body></html>`);
+  w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 300);
+}
+
 function startNewSession(explicitDate){
   const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData: DATA.groups.map(g=>({ groupId:g.id, matches:[] })), movements: null, absences: [], published: false };
   applyPlannedAbsencesToSession(session);
@@ -7541,9 +7792,9 @@ function adminSessionSectionHTML(){
     </div>`;
   }
   const sub = VIEW.sessionSubTab || 'groupes';
-  const subTabs = isRecLeague() ? [['groupes','Présences'],['resultats','Terrains']] : [['groupes','Groupes'],['resultats','Résultats']];
+  const subTabs = isRecLeague() ? [['groupes','Présences'],['resultats', isRotationMode() ? 'Horaire' : 'Terrains']] : [['groupes','Groupes'],['resultats','Résultats']];
   html += `<div class="pf-seg" id="sessSubtabs" style="margin-bottom:14px;scroll-margin-top:90px;">${subTabs.map(([k,l])=>`<button type="button" class="${sub===k?'on':''}" onclick="setSessionSubTab('${k}')">${l}</button>`).join('')}</div>`;
-  html += sub === 'resultats' ? adminSessionHTML() : adminGroupsHTML();
+  html += sub === 'resultats' ? ((isRotationMode() && open) ? rotationAdminHTML(open) : adminSessionHTML()) : adminGroupsHTML();
   return html;
 }
 // Raccourci des étapes : ouvre l'onglet voulu et fait défiler jusqu'à son contenu.
@@ -11368,7 +11619,7 @@ function onPublishSession(){
   }
   const empties = emptySpotWarnings(open);
   // Publication une seule fois, même après deux touchers rapides.
-  const go = ()=>{ if(open.published){ render(); return; } open.published = true; saveAndRender(); notifySessionPublished(open); };
+  const go = ()=>{ if(open.published){ render(); return; } if(isRotationMode()) open.rotation = rotationBuild(open, rotationPresentIds(open), open.rotationSeed || 0); open.published = true; saveAndRender(); notifySessionPublished(open); };
   if(empties.length){
     showConfirm("Attention, certaines places resteront vides pour cette session, sans remplaçant :\n\n" + empties.map(i=>'• '+i).join('\n') + "\n\nPublier quand même ?", go);
     return;
@@ -12911,7 +13162,8 @@ function adminSettingsSectionHTML(){
   if(mlp) regles = [settingsRow('', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()')];
   else if(rec){
     const lim = socialCourtLimits(), K = parseInt(DATA.socialMaxCourts, 10) || 0;
-    regles = [settingsRow('', 'Joueurs par terrain', 'Nombre de joueurs placés sur chaque terrain au tirage · ' + lim.label, 'openCourtSizeModal()'),
+    regles = [settingsRow('', 'Formule de la soirée', isRotationMode() ? (function(){ const st = rotationSettings(); return 'Rotation chronométrée · ' + st.rounds + ' rondes de ' + st.round + ' min + ' + st.change + ' min de changement'; })() : 'Terrains tirés au sort pour la soirée', 'openSocialModeModal()'),
+      isRotationMode() ? '' : settingsRow('', 'Joueurs par terrain', 'Nombre de joueurs placés sur chaque terrain au tirage · ' + lim.label, 'openCourtSizeModal()'),
       settingsRow('', 'Terrains disponibles', K ? 'Le tirage utilise au plus ' + K + ' terrain' + (K>1?'s':'') : 'Le tirage utilise autant de terrains que nécessaire', 'openMaxCourtsModal()')];
   } else {
     const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
@@ -13306,6 +13558,32 @@ function saveLeagueListing(){
     if(res.error){ showAlert("Impossible d'enregistrer : " + res.error.message); return; }
     const l = LEAGUES.find(x=>x.id===id); if(l) Object.assign(l, v);
     render();
+  });
+}
+function openSocialModeModal(){
+  const st = rotationSettings(), rot = isRotationMode();
+  showFormModal('Formule de la soirée', function(){
+    return `<div class="pf-seg" style="margin-bottom:12px;"><button type="button" id="smTer" class="${rot?'':'on'}" onclick="this.classList.add('on');document.getElementById('smRot').classList.remove('on');document.getElementById('smRotOpts').style.display='none'">Terrains tirés au sort</button><button type="button" id="smRot" class="${rot?'on':''}" onclick="this.classList.add('on');document.getElementById('smTer').classList.remove('on');document.getElementById('smRotOpts').style.display=''">Rotation chronométrée</button></div>
+      <div id="smRotOpts" style="${rot?'':'display:none;'}">
+        <p class="small" style="color:var(--muted);margin:0 0 12px;">Chaque soirée, chaque joueur reçoit un numéro au hasard. On joue en 2 contre 2 pendant la durée d'une ronde, puis on change de partenaire, d'adversaires et de terrain. Pas de score. Les repos tournent quand il y a plus de joueurs que de places.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;"><label>Durée d'une ronde (min)</label><input id="smRound" type="number" min="5" max="45" value="${st.round}"></div>
+          <div class="field" style="margin:0;"><label>Changement (min)</label><input id="smChange" type="number" min="0" max="10" value="${st.change}"></div>
+        </div>
+        <p class="small" style="color:var(--muted);margin:10px 2px 0;">Soirée de ${st.total} min (Informations générales) · au plus ${st.maxCourts} terrains (Terrains disponibles).</p>
+      </div>`;
+  }, function(){
+    const isRot = document.getElementById('smRot').classList.contains('on');
+    DATA.socialMode = isRot ? 'rotation' : 'terrains';
+    if(isRot){
+      const r = parseInt(document.getElementById('smRound').value, 10), c = parseInt(document.getElementById('smChange').value, 10);
+      DATA.rotationRoundMin = Math.min(45, Math.max(5, isNaN(r) ? 12 : r));
+      DATA.rotationChangeMin = Math.min(10, Math.max(0, isNaN(c) ? 2 : c));
+      if(!parseInt(DATA.socialMaxCourts, 10)) DATA.socialMaxCourts = 5;
+    }
+    const open = currentOpenSession();
+    if(open && !open.published) open.rotation = null;
+    setTimeout(function(){ showToast(isRot ? 'Rotation chronométrée activée' : 'Terrains tirés au sort'); }, 50);
   });
 }
 function openCourtSizeModal(){
@@ -15082,6 +15360,9 @@ function playerGroupHTML(me){
   const g = groupById(me.groupId);
   const groupMembers = (me.groupId ? playersInGroup(me.groupId) : []).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
   const open = currentOpenSession();
+  if(isRotationMode() && open && open.published && !isAbsent(open, me.id)){
+    return `<div class="row" style="justify-content:flex-end;margin-bottom:8px;"><button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Absence</button></div>` + rotationPlayerHTML(me, open);
+  }
   const absenceBadges = [];
   if(open && isAbsent(open, me.id)) absenceBadges.push(`<span class="pf-chip warn">${gw(me,'Absent','Absente','Absent(e)')} cette ${isRecLeague() ? 'soirée' : 'session'}</span>`);
   const planned = plannedAbsencesForPlayer(me.id);
@@ -15095,7 +15376,7 @@ function playerGroupHTML(me){
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
-    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.' : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${playerGroupRosterRows(open, me.groupId, groupMembers)}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
+    ${!groupVisible ? `<p class="small" style="margin:0;color:var(--muted);">${open && isAbsent(open, me.id) ? 'Tu es absent(e) pour la '+(isRecLeague() ? 'soirée' : 'session')+' du '+escapeHTML(frDateLong(open.date).toLowerCase())+'.' : (isRecLeague() ? (isRotationMode() ? 'Ton numéro et ton horaire de la soirée seront visibles dès la publication.' : 'Ton terrain sera tiré au hasard et visible dès la publication de la prochaine soirée.') : 'Ton groupe sera visible dès la publication de la prochaine session.')}</p>` : (groupMembers.length ? `<div class="pf-list">${playerGroupRosterRows(open, me.groupId, groupMembers)}</div>` : `<p class="small" style="margin:0;color:var(--muted);">${isRecLeague() ? "Aucun terrain pour toi cette soirée (les terrains étaient pleins) — tu seras prioritaire la prochaine fois." : 'Aucun joueur dans ce groupe'}</p>`)}
   </div>`;
   html += lastSessionResultHTML(me.id);
   if(open){
