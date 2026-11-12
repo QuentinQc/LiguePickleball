@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 415">
+<meta name="app-build" content="Version 416">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2315,7 +2315,7 @@ async function sendTestPush(justActivated){
   const tail = "\n\nUne notification de test arrive dans quelques secondes. Si rien n'apparaît, ferme complètement l'app (balaye-la vers le haut) et rouvre-la depuis son icône : c'est souvent nécessaire juste après l'installation. Ensuite, utilise « Tester » dans Paramètres › Notifications.";
   showAlert(head + tail);
   try{
-    const res = await sb.functions.invoke('send-session-notification', { body: {
+    const res = await sbInvoke('send-session-notification', { body: {
       profile_id: CURRENT_PROFILE.id, inbox: false,
       title: 'Ça fonctionne !',
       body: "Les notifications Dinkeo sont bien reçues sur cet appareil.",
@@ -2325,7 +2325,7 @@ async function sendTestPush(justActivated){
   }catch(e){ console.error('Notification de test', e); }
 }
 function invokeSendNotification(payload){
-  sb.functions.invoke('send-session-notification', { body: payload })
+  sbInvoke('send-session-notification', { body: payload })
     .catch(e=>console.error("Erreur d'envoi des notifications", e));
 }
 function currentLeagueLabel(){
@@ -2744,7 +2744,7 @@ function sendAnnouncement(){
     ? { league_id: a.leagues[0], category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome }
     : { organization_id: org, league_ids: a.kind === 'leagues' ? a.leagues.slice() : (isOrganizerOnly() ? ORGANIZER_LEAGUES.slice() : undefined), profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome };
   a.sending = true; render();
-  sb.functions.invoke('send-session-notification', { body: payload }).then(function(r){
+  sbInvoke('send-session-notification', { body: payload }).then(function(r){
     a.sending = false;
     if(r && r.error) a.result = { error: r.error.message || 'Erreur inconnue.' };
     else a.result = { sent: r && r.data && typeof r.data.sent === 'number' ? r.data.sent : null };
@@ -5824,6 +5824,12 @@ const app = document.getElementById('app');
 // Copie de la ligue en mémoire, avec des joueurs fictifs. Rien n'est enregistré dans la base ni envoyé :
 // les écritures, fonctions serveur et notifications sont interceptées tant que la simulation est active.
 let SIM = null;
+// Toutes les fonctions serveur (notifications) passent par ici : en simulation, rien ne part.
+// (sb.functions est recréé à chaque accès par la bibliothèque : on ne peut pas le remplacer, d'où ce point unique.)
+function sbInvoke(name, opts){
+  if(SIM) return Promise.resolve({ data: { sent: 0, total: 0 }, error: null });
+  return sb.functions.invoke(name, opts);
+}
 function simFakeQuery(){
   const res = { data: null, error: null };
   const q = {};
@@ -5864,7 +5870,7 @@ function openSimulationModal(){
 }
 function simStart(n, k){
   if(SIM || !CURRENT_LEAGUE_ID) return;
-  SIM = { leagueId: CURRENT_LEAGUE_ID, from: sb.from, rpc: sb.rpc, invoke: sb.functions.invoke, view: VIEW, backup: JSON.parse(JSON.stringify(DATA)), backupVersion: DATA_VERSION };
+  SIM = { leagueId: CURRENT_LEAGUE_ID, from: sb.from, rpc: sb.rpc, view: VIEW, backup: JSON.parse(JSON.stringify(DATA)), backupVersion: DATA_VERSION };
   // Écritures interceptées : lecture normale, écriture factice.
   sb.from = function(t){
     const real = SIM.from.call(sb, t);
@@ -5876,7 +5882,6 @@ function simStart(n, k){
     if(name === 'ladder_submit_score') simApplyScore(args || {});
     return simFakeQuery();
   };
-  sb.functions.invoke = function(){ return Promise.resolve({ data: { sent: 0 }, error: null }); };
   const d = JSON.parse(JSON.stringify(DATA));
   const players = simFakePlayers(n, 'Test', 'simp');
   if(!isRecLeague(d) && d.leagueFormat !== 'mlp'){
@@ -5899,7 +5904,7 @@ function simStart(n, k){
 }
 async function simStop(){
   if(!SIM) return;
-  sb.from = SIM.from; sb.rpc = SIM.rpc; sb.functions.invoke = SIM.invoke;
+  sb.from = SIM.from; sb.rpc = SIM.rpc;
   if(SIM.links){ MY_LEAGUE_LINKS = SIM.links.my; MY_LEAGUE_LINKS_ALL = SIM.links.all; }
   const lid = SIM.leagueId, back = SIM.view;
   // Les vraies données d'abord (copie gardée au départ), puis rechargées du serveur si possible.
