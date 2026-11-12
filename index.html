@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 407">
+<meta name="app-build" content="Version 409">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1181,6 +1181,12 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-big span{font-size:15px;color:var(--muted);}
 .rot-go{max-width:360px;margin:6px auto 4px;display:block;}
 .rot-courts.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));}
+.sim-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 96px);z-index:100000;width:min(560px, calc(100% - 32px));box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-radius:16px;background:#FFD60A;color:#2b2100;box-shadow:0 10px 30px rgba(0,0,0,.45);}
+.sim-bar b{display:block;font-family:var(--font-display);font-size:17px;text-transform:uppercase;}
+.sim-bar span{font-size:12.5px;}
+.sim-acts{display:flex;gap:6px;flex-wrap:wrap;}
+.sim-acts button{border:1px solid rgba(43,33,0,.35);background:transparent;color:#2b2100;font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 12px;cursor:pointer;}
+.sim-acts button.q{background:#2b2100;color:#FFD60A;border-color:#2b2100;}
 .pl-role{color:var(--ball);font-weight:700;font-size:12px;letter-spacing:.02em;margin-top:2px;}
 .tag.tag-orga{background:rgba(207,234,92,.14);color:var(--ball);border:1px solid rgba(207,234,92,.35);}
 .rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
@@ -2050,6 +2056,7 @@ async function fetchLeagueVersion(leagueId){
   }catch(e){ return null; }
 }
 async function loadData(leagueId){
+  if(SIM && leagueId === SIM.leagueId) return DATA;
   try{
     // Version lue AVANT les données : si une écriture se glisse entre les deux, l'enregistrement
     // suivant sera simplement refusé puis rechargé (jamais l'inverse, qui effacerait des données).
@@ -2080,6 +2087,7 @@ async function loadData(leagueId){
 // ---- Cache local (hors ligne) : garde une copie des dernières données vues
 // sur cet appareil, pour pouvoir au moins les consulter sans connexion. ----
 function cacheDataLocally(leagueId, data){
+  if(SIM) return;
   try{ localStorage.setItem('cachedData_'+leagueId, JSON.stringify({ data, cachedAt: new Date().toISOString() })); }catch(e){}
 }
 function getCachedDataLocally(leagueId){
@@ -2748,6 +2756,7 @@ function saveData(){
   return SAVE_CHAIN;
 }
 async function saveDataNow(){
+  if(SIM) return; // simulation : rien n'est enregistré
   if(!CURRENT_LEAGUE_ID) return;
   try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
   const leagueId = CURRENT_LEAGUE_ID;
@@ -4240,6 +4249,7 @@ function snapshotCurrentLeagueSummary(){
   }catch(e){}
 }
 async function switchToLeague(leagueId){
+  if(SIM && leagueId !== SIM.leagueId) await simStop();
   snapshotCurrentLeagueSummary();
   CURRENT_LEAGUE_ID = leagueId;
   const loaded = await loadData(leagueId);
@@ -5762,7 +5772,130 @@ function applyRatingUpdates(session){
 // ---------- render ----------
 const app = document.getElementById('app');
 
+
+// ==================== SIMULATION (joueurs test) ====================
+// Copie de la ligue en mémoire, avec des joueurs fictifs. Rien n'est enregistré dans la base ni envoyé :
+// les écritures, fonctions serveur et notifications sont interceptées tant que la simulation est active.
+let SIM = null;
+function simFakeQuery(){
+  const res = { data: null, error: null };
+  const q = {};
+  ['select','eq','neq','in','is','gt','gte','lt','lte','like','ilike','or','order','limit','single','maybeSingle','match','filter','not','range'].forEach(function(m){ q[m] = function(){ return q; }; });
+  q.then = function(ok, ko){ return Promise.resolve(res).then(ok, ko); };
+  q.catch = function(ko){ return Promise.resolve(res).catch(ko); };
+  return q;
+}
+const SIM_READ_RPC = ['get_league_data','org_people','league_push_profiles','invitation_other_leagues'];
+function simApplyScore(a){
+  try{
+    const se = (DATA.sessions||[]).find(function(x){ return x.id === a.p_session_id; });
+    const gd = se && (se.groupsData||[]).find(function(x){ return x.groupId === a.p_group_id; });
+    const m = gd && gd.matches[a.p_match_idx];
+    if(m){ m.scoreA = a.p_score_a; m.scoreB = a.p_score_b; }
+  }catch(e){}
+}
+function simFakePlayers(n, prefix, idp){
+  const first = ['Alex','Sam','Charlie','Jo','Max','Lou','Robin','Camille','Dany','Morgan','Sasha','Noa','Eli','Jade','Léo','Mia','Théo','Zoé','Ari','Kim','Nico','Lia','Tom','Eva','Gab','Rose','Yan','Ines','Paul','Ana'];
+  const out = [];
+  for(let i = 0; i < n; i++) out.push({ id: idp + (i + 1), name: first[i % first.length] + ' ' + prefix + (i >= first.length ? ' ' + (Math.floor(i / first.length) + 1) : '') });
+  return out;
+}
+function openSimulationModal(){
+  if(SIM){ simStop(); return; }
+  const rec = isRecLeague(), defN = rec ? 22 : 20;
+  showFormModal('Simulation', function(){
+    return `<p class="small" style="color:var(--muted);margin:0 0 12px;">Essaie la ligue avec des joueurs test, sur cet appareil seulement. Les vrais membres, les données de la ligue et les notifications ne sont pas touchés : rien n'est enregistré ni envoyé. On quitte la simulation avec le bandeau en haut.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field" style="margin:0;"><label>Joueurs test</label><input id="simN" type="number" min="4" max="60" value="${defN}"></div>
+        <div class="field" style="margin:0;"><label>Remplaçants test</label><input id="simS" type="number" min="0" max="20" value="${rec ? 0 : 4}"></div>
+      </div>`;
+  }, function(){
+    const n = Math.min(60, Math.max(4, parseInt(document.getElementById('simN').value, 10) || defN));
+    const k = Math.min(20, Math.max(0, parseInt(document.getElementById('simS').value, 10) || 0));
+    setTimeout(function(){ simStart(n, k); }, 30);
+  });
+}
+function simStart(n, k){
+  if(SIM || !CURRENT_LEAGUE_ID) return;
+  SIM = { leagueId: CURRENT_LEAGUE_ID, from: sb.from, rpc: sb.rpc, invoke: sb.functions.invoke, view: VIEW, backup: JSON.parse(JSON.stringify(DATA)), backupVersion: DATA_VERSION };
+  // Écritures interceptées : lecture normale, écriture factice.
+  sb.from = function(t){
+    const real = SIM.from.call(sb, t);
+    return { select: function(){ return real.select.apply(real, arguments); },
+      insert: simFakeQuery, update: simFakeQuery, upsert: simFakeQuery, delete: simFakeQuery };
+  };
+  sb.rpc = function(name, args){
+    if(SIM_READ_RPC.indexOf(name) !== -1) return SIM.rpc.call(sb, name, args);
+    if(name === 'ladder_submit_score') simApplyScore(args || {});
+    return simFakeQuery();
+  };
+  sb.functions.invoke = function(){ return Promise.resolve({ data: { sent: 0 }, error: null }); };
+  const d = JSON.parse(JSON.stringify(DATA));
+  const players = simFakePlayers(n, 'Test', 'simp');
+  if(!isRecLeague(d) && d.leagueFormat !== 'mlp'){
+    // Échelle : groupes remplis dans l'ordre, selon la taille maximale des groupes.
+    d.groups = d.groups || [];
+    const max = d.groupMaxPlayers || 5;
+    while(d.groups.length * max < n){ const k2 = d.groups.length + 1; d.groups.push({ id: uid('g'), name: 'Groupe ' + k2, order: k2 }); }
+    const groups = d.groups.slice().sort(function(a, b){ return a.order - b.order; });
+    players.forEach(function(p, i){ const g = groups[Math.floor(i / max)]; p.groupId = g ? g.id : null; p.order = (i % max) + 1; p.rating = RATING_DEFAULT; p.ratingGames = 0; if(!g) p.status = 'new'; });
+  } else players.forEach(function(p){ p.groupId = null; });
+  d.players = players;
+  d.substitutePool = simFakePlayers(k, 'Remplaçant', 'sims').map(function(x){ x.rating = RATING_DEFAULT; x.ratingGames = 0; return x; });
+  d.sessions = []; d.prospects = []; d.plannedAbsences = []; d.scoreLog = []; d.scoreCorrections = [];
+  DATA = d;
+  migrateData();
+  ADMIN_VIEWING_AS = null;
+  VIEW = { tab:'session', atab: (SIM.view && SIM.view.atab) || 'accueil', adet: true };
+  render();
+  showToast('Simulation : ' + n + ' joueurs test');
+}
+async function simStop(){
+  if(!SIM) return;
+  sb.from = SIM.from; sb.rpc = SIM.rpc; sb.functions.invoke = SIM.invoke;
+  if(SIM.links){ MY_LEAGUE_LINKS = SIM.links.my; MY_LEAGUE_LINKS_ALL = SIM.links.all; }
+  const lid = SIM.leagueId, back = SIM.view;
+  // Les vraies données d'abord (copie gardée au départ), puis rechargées du serveur si possible.
+  DATA = SIM.backup; DATA_VERSION = SIM.backupVersion;
+  SIM = null;
+  ADMIN_VIEWING_AS = null; ADMIN_RETURN = null;
+  try{ const loaded = await loadData(lid); if(loaded){ DATA = loaded; migrateData(); } }catch(e){}
+  try{ await refreshMyLinkForCurrentLeague(); }catch(e){}
+  VIEW = back || { atab:'accueil' };
+  render();
+  showToast('Simulation terminée');
+}
+// Voir l'app comme un joueur test (dans la simulation).
+function simViewAs(pid){
+  if(!SIM) return;
+  const isSub = String(pid).indexOf('sims') === 0;
+  ADMIN_RETURN = { league: CURRENT_LEAGUE_ID, view: VIEW };
+  MY_LINK_IN_CURRENT_LEAGUE = isSub ? { league_id: CURRENT_LEAGUE_ID, substitute_id: pid, player_id: null, profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id } : { league_id: CURRENT_LEAGUE_ID, player_id: pid, substitute_id: null, profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id };
+  ADMIN_VIEWING_AS = isSub ? 'substitute' : 'player';
+  if(!SIM.links) SIM.links = { my: MY_LEAGUE_LINKS, all: MY_LEAGUE_LINKS_ALL };
+  MY_LEAGUE_LINKS = [MY_LINK_IN_CURRENT_LEAGUE]; MY_LEAGUE_LINKS_ALL = [MY_LINK_IN_CURRENT_LEAGUE];
+  VIEW = { tab: isSub ? 'dispo' : 'classement', ptab:'accueil', pdet:'group' };
+  render();
+}
+function simBackToAdmin(){
+  if(SIM && SIM.links){ MY_LEAGUE_LINKS = SIM.links.my; MY_LEAGUE_LINKS_ALL = SIM.links.all; SIM.links = null; }
+  ADMIN_VIEWING_AS = null; ADMIN_RETURN = null;
+  try{ refreshMyLinkForCurrentLeague().then(render); }catch(e){}
+  VIEW = { tab:'session', atab:'accueil', adet:true };
+  render();
+}
+function simPickPlayerView(){
+  const list = (DATA.players||[]).concat(DATA.substitutePool||[]);
+  showContentModal('Voir comme un joueur test', `<div class="pf-list">${list.map(function(p){ return `<button type="button" class="pf-row" onclick="closeModal();simViewAs('${p.id}')"><span class="t">${escapeHTML(p.name)}</span><span class="ch">›</span></button>`; }).join('')}</div>`);
+}
+function simBannerHTML(){
+  if(!SIM) return '';
+  return `<div class="sim-bar"><div><b>Simulation</b><span>Joueurs test · rien n'est enregistré ni envoyé</span></div>
+    <div class="sim-acts">${ADMIN_VIEWING_AS ? `<button type="button" onclick="simBackToAdmin()">Vue organisateur</button>` : `<button type="button" onclick="simPickPlayerView()">Voir comme joueur</button>`}<button type="button" class="q" onclick="simStop()">Quitter</button></div></div>`;
+}
+
 function storageBannerHTML(){
+  if(SIM) return simBannerHTML();
   if(OFFLINE_MODE){
     const when = OFFLINE_CACHED_AT ? new Date(OFFLINE_CACHED_AT).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' }) : '';
     return `<div class="card" style="border-color:#FF9F0A;background:rgba(255,159,10,0.12);">
@@ -9689,6 +9822,7 @@ async function loadOrgMembers(){
 // Fiche « membre » de l'organisation : la référence unique d'une personne. Une personne avec un
 // compte réutilise sa fiche existante ; sinon une nouvelle fiche est créée (les homonymes ont la leur).
 async function ensureMemberFiche(name, email, profileId, orgId){
+  if(SIM) return null; // simulation : aucune fiche réelle
   const org = orgId || CURRENT_ORGANIZATION_ID;
   if(profileId){
     const ex = (ORG_MEMBERS||[]).find(function(m){ return m.profile_id === profileId && (!m.organization_id || m.organization_id === org); });
@@ -9707,6 +9841,7 @@ function sameNameMembers(name){
   return organizationRosterEntries().filter(function(e){ return normPersonName(e.name) === nn; });
 }
 async function createOrgMember(name, email, notes, profileId){
+  if(SIM){ const fake = { id: uid('simm'), organization_id: CURRENT_ORGANIZATION_ID, name: name, email: email||null, profile_id: profileId||null }; return fake; }
   const { data, error } = await sb.from('org_members').insert({ organization_id: CURRENT_ORGANIZATION_ID, name, email: email||null, notes: notes||null, profile_id: profileId||null }).select().single();
   if(error){ showAlert("Erreur : " + error.message + (error.message && error.message.includes('org_members') ? " — la table org_members existe-t-elle encore dans Supabase ?" : "")); return null; }
   ORG_MEMBERS.push(data);
@@ -13187,6 +13322,7 @@ function adminSettingsSectionHTML(){
   html += stGroup('Ce que voient les joueurs', vue);
   html += stGroup('Avancé', [
     settingsRow('', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()'),
+    settingsRow('', 'Simulation avec joueurs test', SIM ? 'En cours · touche pour quitter' : "Essayer la ligue avec des joueurs fictifs, sans toucher aux vrais membres ni rien enregistrer", 'openSimulationModal()'),
     rec ? '' : settingsRow('', 'Mode test', 'Moins de matchs par groupe, pour essayer l\'app ou faire une démonstration · ' + (DATA.testMode ? 'activé' : 'désactivé'), 'openTestModeModal()')
   ]);
   if(!isOrganizerOnly()) html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
