@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 396">
+<meta name="app-build" content="Version 397">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -12013,6 +12013,28 @@ async function acceptRules(leagueId, version, btn){
   showToast('Merci, règlement accepté');
 }
 // --- Côté admin : rédaction
+// Organisateurs affichés aux joueurs et remplaçants (Moi › Organisateurs), propres à chaque ligue.
+function leagueOrganizers(){ return (DATA.organizers||[]).map(function(n){ return String(n||'').trim(); }).filter(Boolean); }
+function openOrganizersModal(){
+  showFormModal('Organisateurs', function(){
+    return `<p class="small" style="color:var(--muted);margin:0 0 10px;">Ces noms sont affichés aux joueurs et aux remplaçants de cette ligue, dans Moi › Organisateurs. Un nom par ligne.</p>
+      <textarea id="organizersInput" rows="5" maxlength="600" placeholder="Ex. : Marie Tremblay" style="width:100%;">${escapeHTML(leagueOrganizers().join('\n'))}</textarea>`;
+  }, function(){
+    const seen = {};
+    DATA.organizers = String((document.getElementById('organizersInput')||{}).value || '').split('\n')
+      .map(function(n){ return n.trim().slice(0, 60); })
+      .filter(function(n){ const k = n.toLowerCase(); if(!n || seen[k]) return false; seen[k] = 1; return true; })
+      .slice(0, 12);
+    setTimeout(function(){ showToast('Organisateurs enregistrés'); }, 50);
+  });
+}
+function organizersMeHTML(){
+  const list = leagueOrganizers();
+  if(!list.length) return '';
+  const ini = function(n){ return n.split(' ').filter(Boolean).slice(0,2).map(function(w){ return w[0].toUpperCase(); }).join(''); };
+  return `<div class="pf-sec">Organisateurs</div>
+    <div class="pf-list">${list.map(function(n){ return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(n))}</span><span class="t">${escapeHTML(n)}</span></div>`; }).join('')}</div>`;
+}
 function openRulesEditModal(){
   showFormModal('Règlement de la ligue', function(){
     return `<p class="small" style="color:var(--muted);margin:0 0 10px;">Retards, absences, comportement, frais, remplacements… Ce texte est propre à cette ligue. Chaque modification demande une nouvelle acceptation.</p>
@@ -12573,6 +12595,7 @@ function adminSettingsSectionHTML(){
     mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
     settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
     settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
+    settingsRow('', 'Organisateurs', (DATA.organizers||[]).length ? (DATA.organizers||[]).join(', ') : 'Aucun nom affiché aux joueurs', 'openOrganizersModal()'),
     settingsRow('', 'Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'acceptation demandée aux joueurs et remplaçants' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()')
   ]);
   let regles;
@@ -13497,6 +13520,7 @@ function substituteMeHTML(sub){
       ${isRunningStandalone() ? '' : meRow('', "Installer l'app", "Sur l'écran d'accueil de ton téléphone", `openInstallGuide()`)}
       ${meRow('', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
     </div>
+    ${organizersMeHTML()}
     <div class="pf-sec">Aide</div>
     <div class="pf-list">
       ${meRow('', 'Règles de la ligue', '', `showLeagueRulesModal()`)}
@@ -14087,6 +14111,7 @@ function accountMeHTML(me){
       ${isRunningStandalone() ? '' : meRow('', "Installer l'app", "Sur l'écran d'accueil de ton téléphone", `openInstallGuide()`)}
       ${meRow('', "Entrer un code d'invitation", 'Rejoindre une autre ligue ou organisation', `openInviteCodePrompt()`)}
     </div>
+    ${organizersMeHTML()}
     <div class="pf-sec">Aide</div>
     <div class="pf-list">
       ${meRow('', 'Guide', '', `showPlayerGuideModal()`)}
@@ -14207,7 +14232,7 @@ function playerGuideHTML(){
   h += guideSec('Calendrier', `<p class="small">Tes sessions, événements et matchs amicaux sur un même calendrier. <b>Moi › Mon agenda</b> te permet de les ajouter à l'agenda de ton téléphone.</p>`);
   if(hasRules) h += guideSec('Règlement', `<p class="small">Le règlement de la ligue s'affiche à l'ouverture de l'app tant que tu ne l'as pas accepté. Tu le retrouves en tout temps dans <b>Moi › Règles de la ligue</b>.</p>`);
   h += guideSec('Plusieurs ligues', `<p class="small">Avec un seul compte, toutes tes ligues apparaissent sur l'Accueil, chacune avec sa carte.</p>`);
-  h += guideSec('Un souci ?', `<p class="small">Si l'app semble ancienne ou figée, ferme-la complètement et rouvre-la depuis son icône. Pour toute autre question, écris à un organisateur de ta ligue.</p>`);
+  h += guideSec('Un souci ?', `<p class="small">Si l'app semble ancienne ou figée, ferme-la complètement et rouvre-la depuis son icône. Pour toute autre question, écris à un organisateur de ta ligue${leagueOrganizers().length ? ' (' + escapeHTML(leagueOrganizers().join(', ')) + ')' : ''}.</p>`);
   return h;
 }
 function showPlayerGuideModal(){
