@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 401">
+<meta name="app-build" content="Version 402">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9859,7 +9859,13 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
     const isAdmin = linkedProfile && linkedProfile.role === 'admin';
     const admins = ALL_PROFILES.filter(function(p){ return p.organization_id===CURRENT_ORGANIZATION_ID && p.role==='admin'; }).length;
     h += `<p class="small">${linkedProfile ? escapeHTML(linkedProfile.email || '') + ' · ' : ''}${isAdmin ? 'Administrateur' : 'Accès joueur'}</p>`;
-    if(linkedProfile) h += `<button class="btn btn-secondary" ${isAdmin && admins<=1 ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="closeModal();setAccountRole('${linkedProfile.id}','${isAdmin?'player':'admin'}')">${isAdmin ? 'Retirer les droits admin' : 'Rendre admin'}</button>`;
+    const orgzLeagues = linkedProfile ? myOrgLeagues().filter(function(l){ return isOrganizerOf(linkedProfile.id, l.id); }) : [];
+    if(linkedProfile && !isOrganizerOnly()) h += `<button class="btn btn-secondary" ${isAdmin && admins<=1 ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="closeModal();setAccountRole('${linkedProfile.id}','${isAdmin?'player':'admin'}')">${isAdmin ? (orgzLeagues.length ? 'Retirer les droits admin (reste organisateur)' : 'Retirer les droits admin') : 'Rendre admin'}</button>`;
+    if(linkedProfile && !isOrganizerOnly()){
+      h += `<div class="pf-sec" style="margin:16px 0 6px;">Organisateur de ligue</div>
+        <div class="an-chips" style="margin-top:0;">${myOrgLeagues().map(function(l){ const on = isOrganizerOf(linkedProfile.id, l.id); return `<button type="button" class="an-chip ${on?'on':''}" onclick="toggleMemberOrganizer(${idx},'${linkedProfile.id}','${l.id}')">${escapeHTML(l.name)}</button>`; }).join('')}</div>
+        <p class="small" style="color:var(--muted);margin:8px 2px 0;">${isAdmin ? "Pour qu'un admin devienne organisateur : coche ses ligues ici, puis retire ses droits admin." : "Touche une ligue pour lui en confier la gestion (sessions, groupes, scores, demandes d'adhésion)."}</p>`;
+    }
   } else if(!entry.rows.length){
     h += `<p class="small">Ajoute d'abord cette personne à une ligue pour pouvoir l'inviter.</p>`;
   } else if(st.key === 'invite'){
@@ -12137,6 +12143,26 @@ async function acceptRules(leagueId, version, btn){
 function leagueOrganizers(){ return (DATA.organizers||[]).map(function(n){ return String(n||'').trim(); }).filter(Boolean); }
 // Organisateurs de la ligue : comptes qui gèrent cette ligue (droits limités à elle) + noms affichés aux joueurs.
 let LEAGUE_ORGZ = { leagueId:null, ids:null };
+let ORG_ORGZ = []; // [{ league_id, profile_id }] pour les ligues de l'organisation affichée
+async function loadOrgOrganizers(){
+  const ids = myOrgLeagues().map(function(l){ return l.id; });
+  if(!ids.length){ ORG_ORGZ = []; return ORG_ORGZ; }
+  const { data, error } = await sb.from('league_organizers').select('league_id, profile_id').in('league_id', ids);
+  ORG_ORGZ = error ? [] : (data || []);
+  return ORG_ORGZ;
+}
+function isOrganizerOf(profileId, leagueId){ return ORG_ORGZ.some(function(r){ return r.profile_id === profileId && r.league_id === leagueId; }); }
+async function toggleMemberOrganizer(idx, profileId, leagueId){
+  const on = isOrganizerOf(profileId, leagueId);
+  const r = on ? await sb.from('league_organizers').delete().eq('league_id', leagueId).eq('profile_id', profileId)
+               : await sb.from('league_organizers').insert({ league_id: leagueId, profile_id: profileId });
+  if(r && r.error){ showAlert("Erreur : " + r.error.message); return; }
+  await loadOrgOrganizers();
+  if(LEAGUE_ORGZ.leagueId === leagueId) LEAGUE_ORGZ = { leagueId:null, ids:null };
+  const lg = LEAGUES.find(function(l){ return l.id === leagueId; });
+  showToast((on ? 'Retiré comme organisateur de ' : 'Organisateur de ') + (lg ? lg.name : 'la ligue'));
+  render();
+}
 async function loadLeagueOrganizers(){
   const lid = CURRENT_LEAGUE_ID;
   const { data, error } = await sb.from('league_organizers').select('profile_id').eq('league_id', lid);
@@ -12154,11 +12180,16 @@ function organizersSettingsSummary(){
 }
 function profileDisplayName(pr){ return (pr && (pr.display_name || String(pr.email||'').split('@')[0])) || 'Membre'; }
 async function openOrganizersModal(){
-  try{ await Promise.all([loadLeagueOrganizers(), loadAllProfiles()]); }catch(e){}
+  try{ await Promise.all([loadLeagueOrganizers(), loadAllProfiles(), loadAllProfilePlayers(), loadOrgMembers()]); }catch(e){}
   const current = (LEAGUE_ORGZ.ids || []).slice();
-  // Comptes reliés à cette ligue, sans les admins de l'organisation (ils ont déjà tous les droits).
+  // Comptes de l'organisation (joueurs de n'importe quelle ligue ou fiches avec compte), sans les admins
+  // (ils ont déjà tous les droits). Un organisateur n'a pas besoin de jouer dans la ligue.
   const seen = {}, accounts = [];
-  (LEAGUE_PLAYER_LINKS || []).forEach(function(l){
+  const orgLeagueIds = myOrgLeagues().map(function(l){ return l.id; });
+  const pool = (ALL_PROFILE_PLAYERS || []).filter(function(l){ return orgLeagueIds.indexOf(l.league_id) !== -1; })
+    .concat((ORG_MEMBERS || []).filter(function(m){ return m.profile_id; }).map(function(m){ return { profile_id: m.profile_id }; }))
+    .concat((ALL_PROFILES || []).filter(function(p){ return p.organization_id === CURRENT_ORGANIZATION_ID; }).map(function(p){ return { profile_id: p.id }; }));
+  pool.forEach(function(l){
     if(seen[l.profile_id]) return; seen[l.profile_id] = 1;
     const pr = (ALL_PROFILES || []).find(function(x){ return x.id === l.profile_id; });
     if(!pr || pr.role === 'admin') return;
@@ -12168,7 +12199,7 @@ async function openOrganizersModal(){
   accounts.sort(function(a,b){ return a.name.localeCompare(b.name, 'fr'); });
   showFormModal('Organisateurs', function(){
     return `<div class="pf-sec" style="margin-top:0;">Comptes organisateurs</div>
-      <p class="small" style="color:var(--muted);margin:0 0 10px;">Ils gèrent cette ligue seulement : sessions, groupes, scores, absences, remplaçants, publications et alertes de la ligue. Ils n'ont pas accès aux réglages de l'organisation ni aux autres ligues.</p>
+      <p class="small" style="color:var(--muted);margin:0 0 10px;">Les admins n'apparaissent pas ici : retire d'abord leurs droits admin (Organisations › Membres › la personne › Compte). Ils gèrent cette ligue seulement : sessions, groupes, scores, absences, remplaçants, publications et alertes de la ligue. Ils n'ont pas accès aux réglages de l'organisation ni aux autres ligues.</p>
       <input type="search" class="pp-search" placeholder="Rechercher un nom…" oninput="filterOrgzList(this.value)" autocomplete="off">
       <div class="pf-list" id="orgzList" style="max-height:260px;overflow:auto;">${accounts.length ? accounts.map(function(x){ return `<label class="pf-row pp-row" data-n="${escapeHTML(x.name.toLowerCase())}"><span class="member-avatar">${escapeHTML(partnerInitials(x.name))}</span><span class="t">${escapeHTML(x.name)}</span><input type="checkbox" class="pp-chk orgz-chk" data-id="${x.id}" data-name="${escapeHTML(x.name)}" ${current.indexOf(x.id)!==-1?'checked':''}></label>`; }).join('') : `<p class="ah-meta" style="padding:12px;">Aucun compte relié à cette ligue pour l'instant.</p>`}</div>
       <div class="pf-sec">Noms affichés aux joueurs</div>
@@ -12856,7 +12887,7 @@ async function openOrgSheetFor(orgId, tab){
 function openOrgSheet(tab){
   const safe = f=>Promise.resolve().then(f).catch(e=>console.error(e));
   Promise.all([
-    safe(loadAllProfiles), safe(loadAllProfilePlayers), safe(loadOrgRoster), safe(loadOrgMembers)
+    safe(loadAllProfiles), safe(loadAllProfilePlayers), safe(loadOrgRoster), safe(loadOrgMembers), safe(loadOrgOrganizers)
   ]).then(()=>{
     VIEW.orgSubTab = tab; VIEW.orgHub = false;
     MODAL_UNDER = null;
