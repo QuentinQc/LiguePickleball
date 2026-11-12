@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 398">
+<meta name="app-build" content="Version 399">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1905,6 +1905,18 @@ let SOCIAL_EVENTS = [];         // événements sociaux de l'organisation couran
 let SOCIAL_EVENT_RSVPS = {};    // { event_id: [{profile_id,name,status}, ...] }
 let MY_ORGANIZATIONS = [];     // organisations gérées par ce compte admin : [{id, name}, ...]
 let CURRENT_ORGANIZATION_ID = null; // organisation actuellement sélectionnée
+// Organisateur de ligue : compte non admin qui gère seulement certaines ligues (table league_organizers).
+let ORGANIZER_LEAGUES = [];
+function isOrganizerOnly(){ return !!(SESSION_USER && SESSION_USER.organizer); }
+// Admin de l'organisation ou organisateur de ligue (droits de gestion dans l'app).
+function isStaff(){ return !!((CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin') || isOrganizerOnly()); }
+async function loadMyOrganizerLeagues(profileId){
+  try{
+    const { data, error } = await sb.from('league_organizers').select('league_id').eq('profile_id', profileId);
+    ORGANIZER_LEAGUES = error ? [] : (data || []).map(function(r){ return r.league_id; });
+  }catch(e){ ORGANIZER_LEAGUES = []; }
+  return ORGANIZER_LEAGUES;
+}
 let PARTNER_REALTIME_CHANNEL = null; // canal Supabase Realtime abonné à partner_posts pour la ligue courante
 
 // ===== Menu moderne (toujours actif) =====
@@ -2418,7 +2430,7 @@ let ANN_AUD = { kind:'leagues', leagues:[], people:[], text:'', q:'', sending:fa
 // Noms des ligues choisies, pour les titres et les étiquettes.
 function leagueNamesLabel(ids){ return (ids||[]).map(function(id){ const l = LEAGUES.find(function(x){ return x.id===id; }); return l ? l.name : null; }).filter(Boolean).join(', '); }
 function toggleInList(arr, id){ const i = arr.indexOf(id); if(i === -1) arr.push(id); else arr.splice(i, 1); return arr; }
-function annOrgLeagues(){ const org = partnerOrgId(); return LEAGUES.filter(l=>l.organization_id===org); }
+function annOrgLeagues(){ const org = partnerOrgId(); return LEAGUES.filter(l=>l.organization_id===org && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1)); }
 function annOrgName(){ const lg = annOrgLeagues()[0]; return (lg && lg.organizations && lg.organizations.name) || 'Ton organisation'; }
 // Nombre de comptes visés (comptes reliés), pour que l'admin sache à qui ça part.
 function annAccountCount(kind){
@@ -2685,7 +2697,7 @@ function sendAnnouncement(){
   const org = partnerOrgId();
   const payload = (a.kind === 'leagues' && a.leagues.length === 1)
     ? { league_id: a.leagues[0], category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome }
-    : { organization_id: org, league_ids: a.kind === 'leagues' ? a.leagues.slice() : undefined, profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome };
+    : { organization_id: org, league_ids: a.kind === 'leagues' ? a.leagues.slice() : (isOrganizerOnly() ? ORGANIZER_LEAGUES.slice() : undefined), profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome };
   a.sending = true; render();
   sb.functions.invoke('send-session-notification', { body: payload }).then(function(r){
     a.sending = false;
@@ -2817,8 +2829,9 @@ let PARTNER_DRAFT = { message:'', date:'', time:'' };
 let ORG_PEOPLE = {}; // { [orgId]: [{ id, name, avatar_url }] } — personnes de l'organisation qu'on peut viser
 function partnerLeagueChoices(){
   const org = partnerOrgId();
-  const ids = (SESSION_USER && SESSION_USER.role === 'admin')
+  const ids = (SESSION_USER && SESSION_USER.role === 'admin' && !isOrganizerOnly())
     ? LEAGUES.filter(l=>l.organization_id===org).map(l=>l.id)
+    : isOrganizerOnly() ? ORGANIZER_LEAGUES.concat((MY_LEAGUE_LINKS||[]).map(l=>l.league_id)).filter(function(id){ const lg = LEAGUES.find(x=>x.id===id); return lg && lg.organization_id===org; })
     : (MY_LEAGUE_LINKS||[]).map(l=>l.league_id).filter(function(id){ const lg = LEAGUES.find(x=>x.id===id); return lg && lg.organization_id===org; });
   const seen = {};
   return ids.filter(function(id){ if(seen[id]) return false; seen[id] = true; return true; }).map(id=>LEAGUES.find(l=>l.id===id)).filter(Boolean);
@@ -3089,7 +3102,7 @@ const CM_SEGS = [['tout','Tout'],['evenements','Événements'],['partenaire','Pa
 function communityFeedHTML(filter, inSheet){
   if(['tout','evenements','partenaire'].indexOf(filter) === -1) filter = 'tout';
   const me = CURRENT_PROFILE, nm = myDisplayName();
-  const isAdmin = me && me.role === 'admin';
+  const isAdmin = isStaff();
   const compose = `<button type="button" class="cmx-compose" onclick="openPublishMenu()">
       ${avatarHTML('cmx-compose-av', partnerInitials(nm), (me && me.avatar_url) || null)}
       <span class="cmx-compose-ph">${isAdmin ? 'Proposer une partie, un événement…' : 'Proposer une partie, chercher un partenaire…'}</span>
@@ -3235,14 +3248,14 @@ function cmxCardHTML(i, featured){
   </article>`;
 }
 function openPublishMenu(){
-  if(!(CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin')){ openPartnerComposer(); return; } // une seule possibilité : on y va directement
+  if(!isStaff()){ openPartnerComposer(); return; } // une seule possibilité : on y va directement
   MODAL_UNDER = null; MODAL = { kind:'content', sheet:'publier', title:'' }; render();
 }
 function publishSheetHTML(){
-  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  const isAdmin = isStaff();
   const tiles = [['', 'Chercher un partenaire', 'Une partie, un match amical, un remplaçant', 'openPartnerComposer()']];
   if(isAdmin) tiles.push(['', 'Organiser un événement', 'Soirée, tournoi, rencontre', 'openNewSocialEventModal()']);
-  if(isAdmin && (PUSH_SUPPORTED || isIOSDevice())) tiles.push(['', 'Envoyer une annonce', "Une notification à l'organisation, une ligue ou des joueurs", 'openSendAnnouncementModal()']);
+  if(isAdmin && (PUSH_SUPPORTED || isIOSDevice())) tiles.push(['', 'Envoyer une annonce', "Une notification à une ou plusieurs ligues, ou à des joueurs", 'openSendAnnouncementModal()']);
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet pub-sheet">
       <div class="chat-head">
@@ -3615,7 +3628,7 @@ function socialEventFormHTML(e){
     </div>`;
 }
 let EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'', leagues:[] };
-function eventLeagueChoices(){ const org = currentLeagueOrgId(); return LEAGUES.filter(function(l){ return l.organization_id === org; }); }
+function eventLeagueChoices(){ const org = currentLeagueOrgId(); return LEAGUES.filter(function(l){ return l.organization_id === org && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1); }); }
 function evDefaultLeagues(){ const ch = eventLeagueChoices().map(function(l){ return l.id; }); return ch.length ? [ch.indexOf(CURRENT_LEAGUE_ID) !== -1 ? CURRENT_LEAGUE_ID : ch[0]] : []; }
 function evToggleLeague(id){ evSave(); toggleInList(EVENT_DRAFT.leagues, id); renderSheet(); }
 // Étiquette des ligues visées par un événement (rien pour un ancien événement ouvert à toute l'organisation).
@@ -3789,7 +3802,8 @@ function openEventDetail(id){ showContentModal('Événement', ()=>eventDetailInn
 function eventDetailInnerHTML(id){
   const e = (SOCIAL_EVENTS||[]).find(x=>x.id===id);
   if(!e) return '<p class="empty">Cet événement a été supprimé.</p>';
-  const isAdmin = CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin';
+  // Organisateur : seulement les événements de ses ligues.
+  const isAdmin = (CURRENT_PROFILE && CURRENT_PROFILE.role === 'admin') || (isOrganizerOnly() && (e.league_ids||[]).length > 0 && (e.league_ids||[]).every(function(id){ return ORGANIZER_LEAGUES.indexOf(id) !== -1; }));
   const todayStr = fmtDate(new Date());
   const past = (e.event_date || '') < todayStr;
   const rsvps = SOCIAL_EVENT_RSVPS[e.id] || [];
@@ -3840,7 +3854,7 @@ async function loadLeagues(){
 // pour le sélecteur de ligue côté joueur qui peut couvrir plusieurs
 // organisations avec le même compte).
 function myOrgLeagues(){
-  return LEAGUES.filter(l=>l.organization_id === CURRENT_ORGANIZATION_ID);
+  return LEAGUES.filter(l=>l.organization_id === CURRENT_ORGANIZATION_ID && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1));
 }
 // Organisations dont je suis admin, l'actuelle en premier (accueil admin multi-organisations).
 function adminHomeOrgs(){
@@ -3849,7 +3863,7 @@ function adminHomeOrgs(){
 }
 function adminAllLeagues(){
   const ids = adminHomeOrgs().map(function(o){ return o.id; });
-  return LEAGUES.filter(function(l){ return ids.indexOf(l.organization_id) !== -1; });
+  return LEAGUES.filter(function(l){ return ids.indexOf(l.organization_id) !== -1 && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1); });
 }
 // Réordonne les ligues (de l'organisation actuelle) par glisser-déposer et
 // sauvegarde le nouvel ordre.
@@ -6177,7 +6191,7 @@ function calLeaguesList(){
 async function loadCalLeagues(){
   try{
     let ids = [];
-    if(CURRENT_PROFILE && CURRENT_PROFILE.role==='admin') ids = myOrgLeagues().map(l=>l.id);
+    if(isStaff()) ids = myOrgLeagues().map(l=>l.id);
     else if(CURRENT_PROFILE){
       const { data } = await sb.from('profile_players').select('league_id').eq('profile_id', CURRENT_PROFILE.id);
       ids = Array.from(new Set((data||[]).map(r=>r.league_id)));
@@ -6762,6 +6776,18 @@ async function onAuthResolved(user){
   CURRENT_ORGANIZATION_ID = null;
   await loadLeagues();
   await loadMyLeagueLinks(profile.id);
+  // Organisateur de ligue : vue de gestion limitée à ses ligues.
+  const orgzLeagues = (await loadMyOrganizerLeagues(profile.id)).filter(function(id){ return LEAGUES.some(function(l){ return l.id === id; }); });
+  if(orgzLeagues.length){
+    SESSION_USER = { role:'admin', organizer:true, email: profile.email };
+    const seenOrg = {};
+    MY_ORGANIZATIONS = [];
+    orgzLeagues.forEach(function(id){ const lg = LEAGUES.find(function(l){ return l.id === id; }); if(lg && !seenOrg[lg.organization_id]){ seenOrg[lg.organization_id] = 1; MY_ORGANIZATIONS.push({ id: lg.organization_id, name: (lg.organizations && lg.organizations.name) || '' }); } });
+    CURRENT_ORGANIZATION_ID = (CURRENT_ORGANIZATION_ID && seenOrg[CURRENT_ORGANIZATION_ID]) ? CURRENT_ORGANIZATION_ID : MY_ORGANIZATIONS[0].id;
+    const tgt = (CURRENT_LEAGUE_ID && orgzLeagues.indexOf(CURRENT_LEAGUE_ID) !== -1) ? CURRENT_LEAGUE_ID : myOrgLeagues()[0].id;
+    await switchToLeague(tgt);
+    return;
+  }
   if(MY_LEAGUE_LINKS.length === 0){
     SESSION_USER = { role:'pending', email: profile.email, displayName: profile.display_name };
     render();
@@ -7295,7 +7321,9 @@ function adminLeagueCardHTML(lg){
   </div>`;
 }
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
-  const tabs = [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
+  const tabs = isOrganizerOnly()
+    ? [['accueil','Accueil',''],['cal','Calendrier',''],['comm','Communauté','']]
+    : [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
   const active = (tabs.some(t=>t[0]===VIEW.atab) || VIEW.atab==='moi') ? VIEW.atab : 'accueil';
   const aName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
   NAV_NO_MORE = true;
@@ -7320,7 +7348,7 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
 let ADMIN_HOME_PRELOADED = false;
 function adminHomeHTML(){
   const orgs = adminHomeOrgs();
-  const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid); };
+  const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1)); };
   if(!ADMIN_HOME_PRELOADED){ ADMIN_HOME_PRELOADED = true; Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(()=>{ if(!MODAL && (VIEW.atab===undefined || VIEW.atab==='accueil')) render(); }).catch(function(){}); }
   const ready = ALL_PROFILES && ALL_PROFILES.length && ALL_PROFILE_PLAYERS && ALL_PROFILE_PLAYERS.length;
   let html = '';
@@ -7333,7 +7361,7 @@ function adminHomeHTML(){
     const parts = [];
     if(pending > 0) parts.push(pending + ' à approuver');
     if(interested > 0) parts.push(interested + ' intéressé' + (interested>1?'s':''));
-    const right = parts.length
+    const right = (parts.length && !isOrganizerOnly())
       ? `<button type="button" class="ah-pend" onclick="openOrgSheetFor('${o.id}','comptes')">${parts.join(' · ')} ›</button>`
       : `<span class="ah-org-r">${ls.length} ligue${ls.length>1?'s':''}</span>`;
     html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
@@ -7385,8 +7413,12 @@ function adminMeHTML(canViewAsPlayer, canViewAsSub){
   const name = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
   const isSuper = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin;
   const nOrgs = (MY_ORGANIZATIONS||[]).length;
+  if(isOrganizerOnly()){ const ln = leagueNamesLabel(ORGANIZER_LEAGUES); return meHeroHTML(name, `<span class="pf-chip on">Organisateur</span>${ln ? `<span class="pf-chip acc">${escapeHTML(ln)}</span>` : ''}`) + adminMeRestHTML(canViewAsPlayer, canViewAsSub, false); }
   return meHeroHTML(name, `<span class="pf-chip on">Administrateur</span>${isSuper ? '<span class="pf-chip warn">Super admin</span>' : ''}${nOrgs ? `<span class="pf-chip acc">${nOrgs} organisation${nOrgs>1?'s':''}</span>` : ''}`)
-    + `<div class="pf-sec">Voir comme</div>
+    + adminMeRestHTML(canViewAsPlayer, canViewAsSub, isSuper);
+}
+function adminMeRestHTML(canViewAsPlayer, canViewAsSub, isSuper){
+  return `<div class="pf-sec">Voir comme</div>
     ${(canViewAsPlayer || canViewAsSub) ? `<div class="pf-list">
       ${canViewAsPlayer ? meRow('', 'Joueur', "Voir l'app comme un joueur", `toggleAdminPlayerView()`) : ''}
       ${canViewAsSub ? meRow('', 'Remplaçant', "Voir l'app comme un remplaçant", `toggleAdminSubView()`) : ''}
@@ -12040,18 +12072,70 @@ async function acceptRules(leagueId, version, btn){
 // --- Côté admin : rédaction
 // Organisateurs affichés aux joueurs et remplaçants (Moi › Organisateurs), propres à chaque ligue.
 function leagueOrganizers(){ return (DATA.organizers||[]).map(function(n){ return String(n||'').trim(); }).filter(Boolean); }
-function openOrganizersModal(){
-  showFormModal('Organisateurs', function(){
-    return `<p class="small" style="color:var(--muted);margin:0 0 10px;">Ces noms sont affichés aux joueurs et aux remplaçants de cette ligue, dans Moi › Organisateurs. Un nom par ligne.</p>
-      <textarea id="organizersInput" rows="5" maxlength="600" placeholder="Ex. : Marie Tremblay" style="width:100%;">${escapeHTML(leagueOrganizers().join('\n'))}</textarea>`;
-  }, function(){
-    const seen = {};
-    DATA.organizers = String((document.getElementById('organizersInput')||{}).value || '').split('\n')
-      .map(function(n){ return n.trim().slice(0, 60); })
-      .filter(function(n){ const k = n.toLowerCase(); if(!n || seen[k]) return false; seen[k] = 1; return true; })
-      .slice(0, 12);
-    setTimeout(function(){ showToast('Organisateurs enregistrés'); }, 50);
+// Organisateurs de la ligue : comptes qui gèrent cette ligue (droits limités à elle) + noms affichés aux joueurs.
+let LEAGUE_ORGZ = { leagueId:null, ids:null };
+async function loadLeagueOrganizers(){
+  const lid = CURRENT_LEAGUE_ID;
+  const { data, error } = await sb.from('league_organizers').select('profile_id').eq('league_id', lid);
+  LEAGUE_ORGZ = { leagueId: lid, ids: error ? [] : (data || []).map(function(r){ return r.profile_id; }) };
+  return LEAGUE_ORGZ.ids;
+}
+function organizersSettingsSummary(){
+  if(LEAGUE_ORGZ.leagueId !== CURRENT_LEAGUE_ID && !isOrganizerOnly()){ LEAGUE_ORGZ = { leagueId: CURRENT_LEAGUE_ID, ids: null }; loadLeagueOrganizers().then(function(){ if(!MODAL) render(); }); }
+  const n = (LEAGUE_ORGZ.leagueId === CURRENT_LEAGUE_ID && LEAGUE_ORGZ.ids) ? LEAGUE_ORGZ.ids.length : null;
+  const names = leagueOrganizers();
+  const parts = [];
+  if(n) parts.push(n + ' compte' + (n>1?'s':'') + ' organisateur' + (n>1?'s':''));
+  parts.push(names.length ? 'Affichés : ' + names.join(', ') : 'Aucun nom affiché aux joueurs');
+  return parts.join(' · ');
+}
+function profileDisplayName(pr){ return (pr && (pr.display_name || String(pr.email||'').split('@')[0])) || 'Membre'; }
+async function openOrganizersModal(){
+  try{ await Promise.all([loadLeagueOrganizers(), loadAllProfiles()]); }catch(e){}
+  const current = (LEAGUE_ORGZ.ids || []).slice();
+  // Comptes reliés à cette ligue, sans les admins de l'organisation (ils ont déjà tous les droits).
+  const seen = {}, accounts = [];
+  (LEAGUE_PLAYER_LINKS || []).forEach(function(l){
+    if(seen[l.profile_id]) return; seen[l.profile_id] = 1;
+    const pr = (ALL_PROFILES || []).find(function(x){ return x.id === l.profile_id; });
+    if(!pr || pr.role === 'admin') return;
+    accounts.push({ id: pr.id, name: profileDisplayName(pr) });
   });
+  current.forEach(function(id){ if(!seen[id]){ const pr = (ALL_PROFILES || []).find(function(x){ return x.id === id; }); accounts.push({ id: id, name: profileDisplayName(pr) }); } });
+  accounts.sort(function(a,b){ return a.name.localeCompare(b.name, 'fr'); });
+  showFormModal('Organisateurs', function(){
+    return `<div class="pf-sec" style="margin-top:0;">Comptes organisateurs</div>
+      <p class="small" style="color:var(--muted);margin:0 0 10px;">Ils gèrent cette ligue seulement : sessions, groupes, scores, absences, remplaçants, publications et alertes de la ligue. Ils n'ont pas accès aux réglages de l'organisation ni aux autres ligues.</p>
+      <input type="search" class="pp-search" placeholder="Rechercher un nom…" oninput="filterOrgzList(this.value)" autocomplete="off">
+      <div class="pf-list" id="orgzList" style="max-height:260px;overflow:auto;">${accounts.length ? accounts.map(function(x){ return `<label class="pf-row pp-row" data-n="${escapeHTML(x.name.toLowerCase())}"><span class="member-avatar">${escapeHTML(partnerInitials(x.name))}</span><span class="t">${escapeHTML(x.name)}</span><input type="checkbox" class="pp-chk orgz-chk" data-id="${x.id}" data-name="${escapeHTML(x.name)}" ${current.indexOf(x.id)!==-1?'checked':''}></label>`; }).join('') : `<p class="ah-meta" style="padding:12px;">Aucun compte relié à cette ligue pour l'instant.</p>`}</div>
+      <div class="pf-sec">Noms affichés aux joueurs</div>
+      <p class="small" style="color:var(--muted);margin:0 0 10px;">Dans Moi › Organisateurs, pour les joueurs et remplaçants. Un nom par ligne. Les nouveaux organisateurs y sont ajoutés automatiquement.</p>
+      <textarea id="organizersInput" rows="4" maxlength="600" placeholder="Ex. : Marie Tremblay" style="width:100%;">${escapeHTML(leagueOrganizers().join('\n'))}</textarea>`;
+  }, function(){
+    const lid = CURRENT_LEAGUE_ID, wanted = [], added = [];
+    document.querySelectorAll('.orgz-chk').forEach(function(c){ if(c.checked){ wanted.push(c.getAttribute('data-id')); if(current.indexOf(c.getAttribute('data-id')) === -1) added.push(c.getAttribute('data-name')); } });
+    const toAdd = wanted.filter(function(id){ return current.indexOf(id) === -1; });
+    const toDel = current.filter(function(id){ return wanted.indexOf(id) === -1; });
+    const seenN = {};
+    const lines = String((document.getElementById('organizersInput')||{}).value || '').split('\n').concat(added);
+    DATA.organizers = lines.map(function(n){ return String(n||'').trim().slice(0, 60); })
+      .filter(function(n){ const k = n.toLowerCase(); if(!n || seenN[k]) return false; seenN[k] = 1; return true; }).slice(0, 12);
+    LEAGUE_ORGZ = { leagueId: lid, ids: wanted };
+    if(toAdd.length || toDel.length){
+      const ops = [];
+      if(toAdd.length) ops.push(sb.from('league_organizers').insert(toAdd.map(function(id){ return { league_id: lid, profile_id: id }; })));
+      if(toDel.length) ops.push(sb.from('league_organizers').delete().eq('league_id', lid).in('profile_id', toDel));
+      Promise.all(ops).then(function(rs){
+        const err = rs.map(function(r){ return r && r.error; }).filter(Boolean)[0];
+        if(err){ showAlert("Les organisateurs n'ont pas pu être enregistrés : " + err.message); loadLeagueOrganizers().then(render); }
+        else showToast('Organisateurs enregistrés');
+      }, function(){ showAlert('Vérifie ta connexion et réessaie.'); });
+    } else setTimeout(function(){ showToast('Organisateurs enregistrés'); }, 50);
+  });
+}
+function filterOrgzList(q){
+  q = String(q||'').toLowerCase().trim();
+  document.querySelectorAll('#orgzList .pp-row').forEach(function(r){ r.style.display = (!q || r.getAttribute('data-n').indexOf(q) !== -1) ? '' : 'none'; });
 }
 function organizersMeHTML(){
   const list = leagueOrganizers();
@@ -12616,11 +12700,11 @@ function adminSettingsSectionHTML(){
     + (DATA.seasonEndDate ? ' · fin le ' + fdl(DATA.seasonEndDate) : '') + ((DATA.blockedDates||[]).length ? ' · ' + DATA.blockedDates.length + ' date' + (DATA.blockedDates.length>1?'s':'') + ' bloquée' + (DATA.blockedDates.length>1?'s':'') : '');
   const nP = (DATA.players||[]).length, nS = (DATA.substitutePool||[]).length;
   let html = stGroup('Ligue', [
-    settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
+    isOrganizerOnly() ? '' : settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
     mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
-    settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
-    settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
-    settingsRow('', 'Organisateurs', (DATA.organizers||[]).length ? (DATA.organizers||[]).join(', ') : 'Aucun nom affiché aux joueurs', 'openOrganizersModal()'),
+    isOrganizerOnly() ? '' : settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
+    isOrganizerOnly() ? '' : settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
+    isOrganizerOnly() ? '' : settingsRow('', 'Organisateurs', organizersSettingsSummary(), 'openOrganizersModal()'),
     settingsRow('', 'Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'acceptation demandée aux joueurs et remplaçants' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()')
   ]);
   let regles;
@@ -12656,7 +12740,7 @@ function adminSettingsSectionHTML(){
     settingsRow('', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()'),
     rec ? '' : settingsRow('', 'Mode test', 'Moins de matchs par groupe, pour essayer l\'app ou faire une démonstration · ' + (DATA.testMode ? 'activé' : 'désactivé'), 'openTestModeModal()')
   ]);
-  html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
+  if(!isOrganizerOnly()) html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
     <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs sont conservés.</p>`;
   return html;
 }
@@ -13466,6 +13550,7 @@ function settingsGuideHTML(){
   return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
   + guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`)
   + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant, avec sa cote de départ. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
+  + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Les réglages de l'organisation, les autres ligues et les approbations de comptes restent aux administrateurs.</p>`)
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
   + guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`)
   + guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`)
