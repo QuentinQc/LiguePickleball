@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 403">
+<meta name="app-build" content="Version 404">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9867,9 +9867,9 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
       const seg = [['membre','Membre'],['orga','Organisateur'],['admin','Admin']];
       h += `<div class="pf-sec" style="margin:0 0 6px;">Rôle</div>
         <div class="pf-seg" style="grid-template-columns:repeat(3,minmax(0,1fr));">${seg.map(function(x){ return `<button type="button" style="padding:11px 4px;" class="${role===x[0]?'on':''}" ${(lastAdmin && x[0]!=='admin') ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="setMemberRole(${idx},'${linkedProfile.id}','${x[0]}')">${x[1]}</button>`; }).join('')}</div>
-        <p class="small" style="color:var(--muted);margin:8px 2px 0;">${role==='admin' ? "Gère toute l'organisation et toutes ses ligues." : role==='orga' ? "Gère seulement les ligues choisies ci-dessous : sessions, groupes, scores, demandes d'adhésion." : "Joue dans ses ligues, sans droit de gestion."}${lastAdmin ? ' Seul administrateur : nomme d’abord un autre admin.' : ''}</p>`;
+        <p class="small" style="color:var(--muted);margin:8px 2px 0;">${role==='admin' ? "Gère toute l'organisation et toutes ses ligues." : role==='orga' ? "Gère seulement ses ligues : sessions, groupes, scores, demandes d'adhésion." : "Joue dans ses ligues, sans droit de gestion."}${lastAdmin ? ' Seul administrateur : nomme d’abord un autre admin.' : ''}</p>`;
       if(role === 'orga'){
-        h += `<div class="an-chips">${myOrgLeagues().map(function(l){ const on = isOrganizerOf(linkedProfile.id, l.id); return `<button type="button" class="an-chip ${on?'on':''}" onclick="toggleMemberOrganizer(${idx},'${linkedProfile.id}','${l.id}')">${escapeHTML(l.name)}</button>`; }).join('')}</div>`;
+        h += `<button type="button" class="pf-row" style="margin-top:10px;width:100%;border-radius:14px;" onclick="openOrganizerLeaguesPopup(${idx},'${linkedProfile.id}')"><span class="t">Ses ligues<small>${escapeHTML(leagueNamesLabel(orgzLeagues.map(function(l){ return l.id; })))}</small></span><span class="ch">›</span></button>`;
       }
     } else {
       h += `<p class="small">${role==='admin' ? 'Administrateur' : role==='orga' ? 'Organisateur' : 'Membre'}</p>`;
@@ -12167,6 +12167,10 @@ function setMemberRole(idx, profileId, target){
   const isAdmin = pr.role === 'admin';
   const mine = ORG_ORGZ.filter(function(r){ return r.profile_id === profileId; });
   const current = isAdmin ? 'admin' : (mine.length ? 'orga' : 'membre');
+  if(target === 'orga'){
+    if(CURRENT_PROFILE && profileId === CURRENT_PROFILE.id){ showAlert('Pour changer ton propre rôle, demande à un autre administrateur.'); return; }
+    openOrganizerLeaguesPopup(idx, profileId); return;
+  }
   if(target === current) return;
   if(CURRENT_PROFILE && profileId === CURRENT_PROFILE.id){ showAlert('Pour changer ton propre rôle, demande à un autre administrateur.'); return; }
   // Organisateur : ses ligues de jeu par défaut, sinon la ligue affichée.
@@ -12193,6 +12197,41 @@ function setMemberRole(idx, profileId, target){
     PF_TAB = 'compte';
     showToast(target === 'admin' ? 'Administrateur' : target === 'orga' ? 'Organisateur' : 'Membre');
     openOrgMemberDetailModal(idx);
+  });
+}
+// Fenêtre « Organisateur » : choisir ses ligues. Enregistrer nomme dans ces ligues, puis retire les droits d'admin s'il y a lieu.
+function openOrganizerLeaguesPopup(idx, profileId){
+  const pr = (ALL_PROFILES||[]).find(function(p){ return p.id === profileId; }) || {};
+  const name = pr.display_name || pr.email || 'Cette personne';
+  const isAdmin = pr.role === 'admin';
+  const leagues = myOrgLeagues();
+  const mine = ORG_ORGZ.filter(function(r){ return r.profile_id === profileId; }).map(function(r){ return r.league_id; });
+  let pre = mine.slice();
+  if(!pre.length){
+    pre = (ALL_PROFILE_PLAYERS||[]).filter(function(l){ return l.profile_id === profileId; }).map(function(l){ return l.league_id; })
+      .filter(function(id){ return leagues.some(function(l){ return l.id === id; }); });
+    if(!pre.length && leagues.length) pre = [leagues.some(function(l){ return l.id === CURRENT_LEAGUE_ID; }) ? CURRENT_LEAGUE_ID : leagues[0].id];
+  }
+  showFormModal('Organisateur', function(){
+    return `<p class="small" style="color:var(--muted);margin:0 0 12px;">Choisis les ligues que ${escapeHTML(name)} va gérer.${isAdmin ? ' Ses droits d’admin seront retirés.' : ''}</p>
+      <div class="pf-list">${leagues.map(function(l){ return `<label class="pf-row pp-row"><span class="t">${escapeHTML(l.name)}${l.schedule_label ? `<small>${escapeHTML(l.schedule_label)}</small>` : ''}</span><input type="checkbox" class="pp-chk orgl-chk" value="${l.id}" ${pre.indexOf(l.id)!==-1?'checked':''}></label>`; }).join('')}</div>`;
+  }, function(){
+    const want = Array.from(document.querySelectorAll('.orgl-chk')).filter(function(c){ return c.checked; }).map(function(c){ return c.value; });
+    if(!want.length){ showAlert('Choisis au moins une ligue.'); return false; }
+    const add = want.filter(function(id){ return mine.indexOf(id) === -1; });
+    const del = mine.filter(function(id){ return want.indexOf(id) === -1; });
+    (async function(){
+      try{
+        if(add.length){ const r = await sb.from('league_organizers').insert(add.map(function(id){ return { league_id: id, profile_id: profileId }; })); if(r.error) throw r.error; }
+        if(del.length){ const r = await sb.from('league_organizers').delete().eq('profile_id', profileId).in('league_id', del); if(r.error) throw r.error; }
+        if(isAdmin){ const r = await sb.from('profiles').update({ role: 'player' }).eq('id', profileId); if(r.error) throw r.error; }
+      }catch(e){ showAlert('Erreur : ' + (e && e.message || e)); }
+      await Promise.all([loadAllProfiles(), loadOrgOrganizers()]);
+      LEAGUE_ORGZ = { leagueId:null, ids:null };
+      PF_TAB = 'compte';
+      showToast('Organisateur de ' + leagueNamesLabel(want));
+      openOrgMemberDetailModal(idx);
+    })();
   });
 }
 async function toggleMemberOrganizer(idx, profileId, leagueId){
