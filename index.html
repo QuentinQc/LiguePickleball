@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 427">
+<meta name="app-build" content="Version 428">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5417,14 +5417,14 @@ function openCourtPlan(courtId){
 }
 // Format du groupe selon les joueurs qui jouent vraiment ce soir (absents retirés, remplaçants comptés) :
 // « 10 matchs en 9 points · 5 joueurs ». S'ajuste tout seul quand la composition change.
-function groupFormatText(session, gid){
+function groupFormatText(session, gid, noCount){
   if(!session || DATA.leagueFormat === 'social' || DATA.leagueFormat === 'mlp') return '';
   const n = activeRosterForGroup(session, gid).length; if(!n) return '';
   let m = 0; try{ m = displayMatches(session, gid).matches.length; }catch(e){ const gd = session.groupsData.find(function(x){ return x.groupId === gid; }); m = gd ? gd.matches.length : 0; }
   if(!m) return n + ' joueur' + (n > 1 ? 's' : '');
-  return m + ' match' + (m > 1 ? 's' : '') + ' en ' + targetPointsFor(n) + ' points · ' + n + ' joueur' + (n > 1 ? 's' : '');
+  return m + ' match' + (m > 1 ? 's' : '') + ' en ' + targetPointsFor(n) + ' points' + (noCount ? '' : ' · ' + n + ' joueur' + (n > 1 ? 's' : ''));
 }
-function groupFormatLineHTML(session, gid){ const t = groupFormatText(session, gid); return t ? `<div class="grp-format">Format : <b>${escapeHTML(t)}</b></div>` : ''; }
+function groupFormatLineHTML(session, gid, noCount){ const t = groupFormatText(session, gid, noCount); return t ? `<div class="grp-format">Format : <b>${escapeHTML(t)}</b></div>` : ''; }
 function groupFormatSubHTML(session, gid){ const t = groupFormatText(session, gid); return t ? `<span class="grp-court">Format : <b>${escapeHTML(t)}</b></span>` : ''; }
 function courtChipHTML(session, gid){ const n = courtNameFor(session, gid); return n ? `<span class="pf-chip on">${escapeHTML(n)}</span>` : ''; }
 // Changement ponctuel pour une session : échange avec le groupe qui avait ce terrain.
@@ -11319,7 +11319,7 @@ function adminGroupsHTML(){
         }).join('')}
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
       </div>
-      ${(open && !rec) ? groupFormatLineHTML(open, g.id) : ''}
+      ${(open && !rec) ? groupFormatLineHTML(open, g.id, true) : ''}
       ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Glisse un joueur par sa poignée ⋮⋮ pour changer sa position ou son groupe. Il continue ensuite à partir de ce groupe.</p>`}
       ${open && !(DATA.substitutePool||[]).length ? groupAbsenceManagementHTML(open, g) : ''}
       ${open ? reinforcementHTML(open, g) : ''}
