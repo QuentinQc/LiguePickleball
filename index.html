@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 418">
+<meta name="app-build" content="Version 419">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4637,6 +4637,11 @@ function previousSessionInfoForPlayer(pid){
   return null;
 }
 function groupsSorted(){ return DATA.groups.slice().sort((a,b)=>a.order-b.order); }
+// Nom d'un nouveau groupe : lettres (Groupe I…) si la ligue nomme déjà ses groupes par lettre, sinon chiffres.
+function groupNameFor(n, groups){
+  const letters = (groups||[]).some(function(g){ return /^Groupe [A-Z]$/.test(g.name || ''); });
+  return 'Groupe ' + (letters && n >= 1 && n <= 26 ? String.fromCharCode(64 + n) : n);
+}
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
 function GROUP_MAX_PLAYERS(){ return DATA.groupMaxPlayers || 5; }
@@ -5923,7 +5928,7 @@ function simStart(n, k){
     // Échelle : groupes remplis dans l'ordre, selon la taille maximale des groupes.
     d.groups = d.groups || [];
     const max = d.groupMaxPlayers || 5;
-    while(d.groups.length * max < n){ const k2 = d.groups.length + 1; d.groups.push({ id: uid('g'), name: 'Groupe ' + k2, order: k2 }); }
+    while(d.groups.length * max < n){ const k2 = d.groups.length + 1; d.groups.push({ id: uid('g'), name: groupNameFor(k2, d.groups), order: k2 }); }
     const groups = d.groups.slice().sort(function(a, b){ return a.order - b.order; });
     players.forEach(function(p, i){ const g = groups[Math.floor(i / max)]; p.groupId = g ? g.id : null; p.order = (i % max) + 1; p.rating = RATING_DEFAULT; p.ratingGames = 0; if(!g) p.status = 'new'; });
   } else players.forEach(function(p){ p.groupId = null; });
@@ -11367,7 +11372,7 @@ function subDragEnd(e){
 }
 function addGroup(){
   const maxOrder = Math.max(0, ...DATA.groups.map(g=>g.order));
-  DATA.groups.push({ id: uid('g'), name: 'Groupe ' + (maxOrder+1), order: maxOrder+1 });
+  DATA.groups.push({ id: uid('g'), name: groupNameFor(maxOrder+1, DATA.groups), order: maxOrder+1 });
   saveAndRender();
 }
 function openGroupMenu(gid){
