@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 422">
+<meta name="app-build" content="Version 423">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1207,6 +1207,9 @@ button.court-line{cursor:pointer;}
 .grp-title{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .grp-court{font-size:13px;color:var(--muted);font-family:var(--font-body,inherit);text-transform:none;letter-spacing:0;font-weight:500;}
 .grp-court b{color:var(--ball);font-weight:700;}
+button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:left;}
+.grp-court u{font-size:12px;color:var(--muted);margin-left:4px;text-decoration:underline;text-underline-offset:2px;}
+.court-plan{width:100%;height:auto;display:block;border-radius:14px;background:rgba(0,0,0,.18);}
 .pl-role{color:var(--ball);font-weight:700;font-size:12px;letter-spacing:.02em;margin-top:2px;}
 .tag.tag-orga{background:rgba(207,234,92,.14);color:var(--ball);border:1px solid rgba(207,234,92,.35);}
 .rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
@@ -5375,7 +5378,41 @@ function courtLineHTML(session, gid, editable){
     ? `<button type="button" class="court-line" onclick="openSessionCourtPicker('${gid}')" title="Changer le terrain pour cette session"><span>Terrain :</span> <b>${escapeHTML(n)}</b><i>›</i></button>`
     : `<div class="court-line"><span>Terrain :</span> <b>${escapeHTML(n)}</b></div>`;
 }
-function courtSubHTML(session, gid){ const n = courtNameFor(session, gid); return n ? `<span class="grp-court">Terrain : <b>${escapeHTML(n)}</b></span>` : ''; }
+function courtSubHTML(session, gid){
+  const n = courtNameFor(session, gid); if(!n) return '';
+  const id = session && session.courts && session.courts[gid];
+  const hasPlan = !!(DATA.courtLayout && DATA.courtLayout[id]);
+  return hasPlan
+    ? `<button type="button" class="grp-court link" onclick="event.stopPropagation();openCourtPlan('${id}')">Terrain : <b>${escapeHTML(n)}</b> <u>Voir sur le plan</u></button>`
+    : `<span class="grp-court">Terrain : <b>${escapeHTML(n)}</b></span>`;
+}
+// Plan du centre : tous les terrains, celui du groupe encadré. DATA.courtLayout = { courtId: {x, y, w, h} } (unités du plan).
+function courtPlanSVG(highlightId){
+  const L = DATA.courtLayout || {}, courts = DATA.courts || [];
+  let maxX = 0, maxY = 0;
+  Object.keys(L).forEach(function(k){ const r = L[k]; maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.h); });
+  let h = '';
+  courts.forEach(function(c){
+    const r = L[c.id]; if(!r) return;
+    const on = c.id === highlightId, cx = r.x + r.w / 2, cy = r.y + r.h / 2, vert = r.h > r.w;
+    h += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="10" fill="${on ? '#CFEA5C' : '#1f5a50'}" stroke="${on ? '#CFEA5C' : '#2d6e62'}" stroke-width="${on ? 8 : 3}" ${on ? '' : 'opacity=".55"'}/>`;
+    h += vert ? `<line x1="${r.x}" y1="${cy}" x2="${r.x + r.w}" y2="${cy}" stroke="${on ? '#16413A' : '#ffffff'}" stroke-opacity=".35" stroke-width="3" stroke-dasharray="8 6"/>`
+              : `<line x1="${cx}" y1="${r.y}" x2="${cx}" y2="${r.y + r.h}" stroke="${on ? '#16413A' : '#ffffff'}" stroke-opacity=".35" stroke-width="3" stroke-dasharray="8 6"/>`;
+    const words = String(c.name).split(' '), lines = [];
+    // Terrain vertical : le nom est écrit le long du terrain (pivoté) pour rester lisible.
+    const along = vert ? r.h : r.w, across = vert ? r.w : r.h;
+    words.forEach(function(w){ const last = lines[lines.length - 1]; if(last && (last + ' ' + w).length <= 14) lines[lines.length - 1] = last + ' ' + w; else lines.push(w); });
+    const longest = Math.max.apply(null, lines.map(function(t){ return t.length; }));
+    const fs = Math.max(18, Math.min(on ? 60 : 52, Math.floor((along - 24) / (0.6 * longest)), Math.floor((across - 20) / (lines.length * 1.25))));
+    const rot = vert ? ` transform="rotate(-90 ${cx} ${cy})"` : '';
+    lines.forEach(function(t, i){ h += `<text x="${cx}" y="${cy + (i - (lines.length - 1) / 2) * (fs + 4) + fs / 3}"${rot} text-anchor="middle" font-size="${fs}" font-weight="${on ? 800 : 600}" fill="${on ? '#16413A' : '#e8f1ee'}" font-family="Inter, Arial, sans-serif">${escapeHTML(t)}</text>`; });
+  });
+  return `<svg class="court-plan" viewBox="-20 -20 ${maxX + 40} ${maxY + 40}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan des terrains">${h}</svg>`;
+}
+function openCourtPlan(courtId){
+  const c = (DATA.courts || []).find(function(x){ return x.id === courtId; });
+  showContentModal('Plan du centre', `<p class="small" style="margin:0 0 10px;color:var(--muted);">Ton terrain : <b style="color:var(--ball);">${escapeHTML(c ? c.name : '')}</b></p>${courtPlanSVG(courtId)}`);
+}
 function courtChipHTML(session, gid){ const n = courtNameFor(session, gid); return n ? `<span class="pf-chip on">${escapeHTML(n)}</span>` : ''; }
 // Changement ponctuel pour une session : échange avec le groupe qui avait ce terrain.
 function openSessionCourtPicker(gid){
