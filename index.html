@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 423">
+<meta name="app-build" content="Version 424">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5383,7 +5383,7 @@ function courtSubHTML(session, gid){
   const id = session && session.courts && session.courts[gid];
   const hasPlan = !!(DATA.courtLayout && DATA.courtLayout[id]);
   return hasPlan
-    ? `<button type="button" class="grp-court link" onclick="event.stopPropagation();openCourtPlan('${id}')">Terrain : <b>${escapeHTML(n)}</b> <u>Voir sur le plan</u></button>`
+    ? `<button type="button" class="grp-court link" onclick="event.stopPropagation();openCourtPlan('${id}')">Terrain : <b>${escapeHTML(n)}</b></button>`
     : `<span class="grp-court">Terrain : <b>${escapeHTML(n)}</b></span>`;
 }
 // Plan du centre : tous les terrains, celui du groupe encadré. DATA.courtLayout = { courtId: {x, y, w, h} } (unités du plan).
