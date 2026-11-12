@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 413">
+<meta name="app-build" content="Version 414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5133,17 +5133,26 @@ function rotationRedo(){
 function rotationCurrentRound(session, rot){
   if(!session || !rot) return null;
   const n = rot.rounds.length;
-  let idx = Math.min(n - 1, Math.max(0, session.rotationRound || 0));
+  const idx = Math.min(n - 1, Math.max(0, session.rotationRound || 0));
   if(!session.rotationTimerStart){
     if(session.rotationRound === null || session.rotationRound === undefined) return null;
-    return { index: idx, running: false, changing: false, left: rot.round };
+    if(session.rotationDone && idx >= n - 1) return { index: idx, running: false, finished: true, left: 0 };
+    return { index: idx, running: false, left: rot.round };
   }
-  const per = rot.round + rot.change;
   let el = (Date.now() - new Date(session.rotationTimerStart).getTime()) / 60000;
   if(el < 0) el = 0;
-  while(el >= per && idx < n - 1){ el -= per; idx++; }
-  if(el >= rot.round && idx === n - 1) return { index: idx, running: true, finished: true, changing: false, left: 0 };
-  return { index: idx, running: true, changing: el >= rot.round, left: el < rot.round ? rot.round - el : per - el };
+  // Fin du temps : on passe à la ronde suivante, chrono arrêté (il faut redémarrer).
+  if(el >= rot.round){
+    if(idx >= n - 1) return { index: idx, running: false, finished: true, left: 0 };
+    return { index: idx + 1, running: false, ended: true, left: rot.round };
+  }
+  return { index: idx, running: true, left: rot.round - el };
+}
+// Le chrono arrivé à zéro : on enregistre le passage à la ronde suivante (chrono arrêté).
+function rotationSettle(open){
+  if(!open || !open.rotationTimerStart) return;
+  const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
+  if(cur && !cur.running){ open.rotationRound = cur.index; open.rotationTimerStart = null; open.rotationDone = !!cur.finished; saveData(); }
 }
 function rotNameHTML(id, rot, meId){
   const n = rot.numbers[id];
@@ -5201,12 +5210,14 @@ function rotationTick(){
   if(ROT_TIMER) clearInterval(ROT_TIMER);
   ROT_TIMER = setInterval(function(){
     if(!MODAL || MODAL.sheet !== 'rotchrono'){ clearInterval(ROT_TIMER); ROT_TIMER = null; return; }
+    rotationSettle(currentOpenSession());
     const el = document.getElementById('rotChrono'); if(el) el.innerHTML = rotationChronoInnerHTML();
   }, 1000);
 }
 function rotationStartTimer(){
   const open = currentOpenSession(); if(!open) return;
   if(open.rotationRound === null || open.rotationRound === undefined) open.rotationRound = 0;
+  open.rotationDone = false;
   open.rotationTimerStart = new Date().toISOString();
   saveData(); render(); rotationTick();
 }
@@ -5214,7 +5225,7 @@ function rotationStartTimer(){
 function rotationStopTimer(){
   const open = currentOpenSession(); if(!open) return;
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
-  if(cur) open.rotationRound = Math.min(rot.rounds.length - 1, cur.changing ? cur.index + 1 : cur.index);
+  if(cur) open.rotationRound = cur.index;
   open.rotationTimerStart = null;
   saveData(); render();
 }
@@ -5224,6 +5235,7 @@ function rotationJump(delta){
   if(open.rotationTimerStart){ showAlert('Arrête le chrono avant de changer de ronde.'); return; }
   const rot = rotationFor(open);
   open.rotationRound = Math.max(0, Math.min(rot.rounds.length - 1, (open.rotationRound || 0) + delta));
+  open.rotationDone = false;
   saveData(); render();
 }
 function rotationChronoInnerHTML(){
@@ -5231,13 +5243,14 @@ function rotationChronoInnerHTML(){
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot), n = rot.rounds.length;
   const fmt = function(m){ const t = Math.ceil(m * 60), mm = Math.floor(t / 60), ss = t % 60; return mm + ':' + (ss < 10 ? '0' : '') + ss; };
   const idx = cur ? cur.index : 0, running = !!(cur && cur.running);
-  const shown = (cur && cur.changing) ? Math.min(n - 1, idx + 1) : idx;
+  const finished = !!(cur && cur.finished) || (!running && open.rotationDone && idx >= n - 1);
+  const shown = idx;
   const nav = `<div class="rot-nav"><button type="button" aria-label="Ronde précédente" ${idx <= 0 ? 'disabled' : ''} onclick="rotationJump(-1)">‹</button><span>Ronde ${idx + 1} sur ${n}</span><button type="button" aria-label="Ronde suivante" ${idx >= n - 1 ? 'disabled' : ''} onclick="rotationJump(1)">›</button></div>`;
   let big;
-  if(cur && cur.finished) big = `<div class="rot-big"><b>0:00</b><span>Dernière ronde terminée</span></div>`;
-  else if(running) big = `<div class="rot-big${cur.changing ? ' chg' : ''}"><b>${fmt(cur.left)}</b><span>${cur.changing ? (idx + 1 < n ? 'Prochaine : ronde ' + (idx + 2) : 'Dernière ronde terminée') : 'Temps restant'}</span></div>`;
-  else big = `<div class="rot-big"><b>${rot.round}:00</b><span>Chrono arrêté</span></div>`;
-  const btn = running ? `<button class="btn btn-secondary rot-go" onclick="rotationStopTimer()">Arrêter le chrono</button>` : `<button class="btn btn-primary rot-go" onclick="rotationStartTimer()">Démarrer la ronde ${idx + 1}</button>`;
+  if(finished) big = `<div class="rot-big"><b>0:00</b><span>Dernière ronde terminée</span></div>`;
+  else if(running) big = `<div class="rot-big"><b>${fmt(cur.left)}</b><span>Temps restant</span></div>`;
+  else big = `<div class="rot-big"><b>${rot.round}:00</b><span>${(cur && cur.ended) || (open.rotationRound > 0 && !open.rotationTimerStart) ? 'Prêt pour la ronde ' + (idx + 1) : 'Chrono arrêté'}</span></div>`;
+  const btn = running ? `<button class="btn btn-secondary rot-go" onclick="rotationStopTimer()">Arrêter le chrono</button>` : (finished ? '' : `<button class="btn btn-primary rot-go" onclick="rotationStartTimer()">Démarrer la ronde ${idx + 1}</button>`);
   return nav + big + btn + rotationCourtsBoardHTML(rot, shown);
 }
 function rotationCourtsBoardHTML(rot, i){
