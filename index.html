@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 404">
+<meta name="app-build" content="Version 405">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1150,6 +1150,8 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rs-name{font-family:var(--font-display);font-size:22px;font-weight:600;text-transform:uppercase;line-height:1.1;}
 .rs-bar{margin-bottom:4px;}
 .rs-warn{font-size:14px;color:#FF9F0A;font-weight:600;background:rgba(255,159,10,.1);border-radius:12px;padding:10px 12px;}
+.pl-role{color:var(--ball);font-weight:700;font-size:12px;letter-spacing:.02em;margin-top:2px;}
+.tag.tag-orga{background:rgba(207,234,92,.14);color:var(--ball);border:1px solid rgba(207,234,92,.35);}
 .rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
 .rs-m.todo{border-color:rgba(255,214,10,.35);}
 .rs-mh{display:flex;align-items:center;gap:8px;padding:10px 14px 6px;}
@@ -4217,6 +4219,7 @@ async function switchToLeague(leagueId){
   await refreshMyLinkForCurrentLeague();
   VIEW = { tab:'session' };
   render();
+  if(isStaff()) loadOrgOrganizers().then(function(){ if(!MODAL) render(); }).catch(function(){});
 }
 // Change l'organisation affichée par un admin qui en gère plusieurs.
 async function switchToOrganization(orgId){
@@ -7596,7 +7599,7 @@ function plListHTML(o){
     ${(o.sorts||[]).length ? `<div class="pl-sorts"><span class="small">Trier</span>${o.sorts.map(x=>`<button type="button" class="orgpick-chip ${x.active?'active':''}" onclick="${x.onclick}">${x.label}${x.arrow||''}</button>`).join('')}</div>` : ''}
     <div class="pl-list">${rows.map(r=>`<div class="pl-row" style="${r.style||''}${(st.f!=='all' && !(r.f||[]).includes(st.f))?'display:none;':''}" data-name="${escapeHTML(normSearch(r.name))}" data-f="${(r.f||[]).join(' ')}" onclick="${r.click}">
       ${avatarHTML('pl-av', partnerInitials(r.name), r.avatarUrl, r.avStyle||'')}
-      <span class="pl-main"><span class="pl-name">${escapeHTML(r.name)}${r.tags||''}</span><span class="pl-sub">${r.sub||''}</span></span>
+      <span class="pl-main"><span class="pl-name">${escapeHTML(r.name)}${r.tags||''}</span><span class="pl-sub">${r.sub||''}</span>${r.role ? `<span class="pl-role">${r.role}</span>` : ''}</span>
       ${typeof r.rating==='number' ? `<span class="pl-rating">${r.rating.toFixed(2)}</span>` : ''}${r.right||''}
     </div>`).join('')}
       <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
@@ -7649,15 +7652,15 @@ function adminAllPeopleHTML(){
     const waiting = !g && !p.injured;
     rows.push({ name:p.name, f:['reg'].concat(waiting?['wait']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-      tags:`${pr && pr.role==='admin' ? ' <span class="tag tag-up">Admin</span>' : ''}${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}${waiting?' <span class="tag tag-stay">Sans groupe</span>':''}`,
-      sub:`Régulier · ${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}` });
+      tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}${waiting?' <span class="tag tag-stay">Sans groupe</span>':''}`,
+      sub:`Régulier · ${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' });
   });
   (DATA.substitutePool||[]).forEach(sb_=>{
     const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===sb_.id), pr = profOf(link);
     rows.push({ name:sb_.name, f:['sub'], click:`openSubstituteDetailModal('${sb_.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof sb_.rating==='number' ? sb_.rating : RATING_DEFAULT,
-      tags: pr && pr.role==='admin' ? ' <span class="tag tag-up">Admin</span>' : '',
-      sub:`Remplaçant${link?' · Compte':''}` });
+      tags: '',
+      sub:`Remplaçant${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' });
   });
   const allSort = VIEW.allSortBy || 'name', allDir = VIEW.allSortDir || (allSort==='rating' ? 'desc' : 'asc');
   rows.sort((a,b)=>{
@@ -9138,8 +9141,8 @@ function adminPlayersHTML(){
     const waiting = !g && !p.injured;
     return { name:p.name, f:[g?'g_'+g.id:'wait'].concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-      tags:`${pr && pr.role==='admin' ? ' <span class="tag tag-up">Admin</span>' : ''}${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}`,
-      sub:`${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}` };
+      tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}`,
+      sub:`${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' };
   });
   const nInj = rows.filter(r=>r.f.includes('inj')).length;
   const chips = [['all','Tous']].concat(groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), [['wait','En attente']], nInj ? [['inj','Blessés']] : []);
@@ -9870,6 +9873,8 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
         <p class="small" style="color:var(--muted);margin:8px 2px 0;">${role==='admin' ? "Gère toute l'organisation et toutes ses ligues." : role==='orga' ? "Gère seulement ses ligues : sessions, groupes, scores, demandes d'adhésion." : "Joue dans ses ligues, sans droit de gestion."}${lastAdmin ? ' Seul administrateur : nomme d’abord un autre admin.' : ''}</p>`;
       if(role === 'orga'){
         h += `<button type="button" class="pf-row" style="margin-top:10px;width:100%;border-radius:14px;" onclick="openOrganizerLeaguesPopup(${idx},'${linkedProfile.id}')"><span class="t">Ses ligues<small>${escapeHTML(leagueNamesLabel(orgzLeagues.map(function(l){ return l.id; })))}</small></span><span class="ch">›</span></button>`;
+      } else if(role === 'admin'){
+        h += `<button type="button" class="pf-row" style="margin-top:10px;width:100%;border-radius:14px;" onclick="openOrganizerLeaguesPopup(${idx},'${linkedProfile.id}',true)"><span class="t">Organisateur aussi de<small>${orgzLeagues.length ? escapeHTML(leagueNamesLabel(orgzLeagues.map(function(l){ return l.id; }))) : 'Aucune ligue · facultatif'}</small></span><span class="ch">›</span></button>`;
       }
     } else {
       h += `<p class="small">${role==='admin' ? 'Administrateur' : role==='orga' ? 'Organisateur' : 'Membre'}</p>`;
@@ -12159,6 +12164,24 @@ async function loadOrgOrganizers(){
   ORG_ORGZ = error ? [] : (data || []);
   return ORG_ORGZ;
 }
+// Étiquettes de rôle : « Admin » (toute l'organisation) et/ou « Organisateur » (de cette ligue, ou de ses ligues).
+function staffTagsHTML(profileId, leagueId){
+  if(!profileId) return '';
+  const pr = (ALL_PROFILES||[]).find(function(x){ return x.id === profileId; });
+  let h = (pr && pr.role === 'admin') ? ' <span class="tag tag-up">Admin</span>' : '';
+  const orgz = ORG_ORGZ.filter(function(r){ return r.profile_id === profileId && (!leagueId || r.league_id === leagueId); });
+  if(orgz.length) h += ' <span class="tag tag-orga">Organisateur' + (leagueId ? '' : ' · ' + escapeHTML(leagueNamesLabel(orgz.map(function(r){ return r.league_id; })))) + '</span>';
+  return h;
+}
+// Rôle en texte, pour la 2e ligne des listes de joueurs d'une ligue.
+function staffRoleSubHTML(profileId, leagueId){
+  if(!profileId) return '';
+  const pr = (ALL_PROFILES||[]).find(function(x){ return x.id === profileId; });
+  const parts = [];
+  if(pr && pr.role === 'admin') parts.push('Admin');
+  if(ORG_ORGZ.some(function(r){ return r.profile_id === profileId && r.league_id === leagueId; })) parts.push('Organisateur');
+  return parts.join(' · ');
+}
 function isOrganizerOf(profileId, leagueId){ return ORG_ORGZ.some(function(r){ return r.profile_id === profileId && r.league_id === leagueId; }); }
 // Rôle d'une personne en un geste : Membre, Organisateur (de ses ligues) ou Admin.
 function setMemberRole(idx, profileId, target){
@@ -12200,36 +12223,36 @@ function setMemberRole(idx, profileId, target){
   });
 }
 // Fenêtre « Organisateur » : choisir ses ligues. Enregistrer nomme dans ces ligues, puis retire les droits d'admin s'il y a lieu.
-function openOrganizerLeaguesPopup(idx, profileId){
+function openOrganizerLeaguesPopup(idx, profileId, keepAdmin){
   const pr = (ALL_PROFILES||[]).find(function(p){ return p.id === profileId; }) || {};
   const name = pr.display_name || pr.email || 'Cette personne';
   const isAdmin = pr.role === 'admin';
   const leagues = myOrgLeagues();
   const mine = ORG_ORGZ.filter(function(r){ return r.profile_id === profileId; }).map(function(r){ return r.league_id; });
   let pre = mine.slice();
-  if(!pre.length){
+  if(!pre.length && !keepAdmin){
     pre = (ALL_PROFILE_PLAYERS||[]).filter(function(l){ return l.profile_id === profileId; }).map(function(l){ return l.league_id; })
       .filter(function(id){ return leagues.some(function(l){ return l.id === id; }); });
     if(!pre.length && leagues.length) pre = [leagues.some(function(l){ return l.id === CURRENT_LEAGUE_ID; }) ? CURRENT_LEAGUE_ID : leagues[0].id];
   }
   showFormModal('Organisateur', function(){
-    return `<p class="small" style="color:var(--muted);margin:0 0 12px;">Choisis les ligues que ${escapeHTML(name)} va gérer.${isAdmin ? ' Ses droits d’admin seront retirés.' : ''}</p>
+    return `<p class="small" style="color:var(--muted);margin:0 0 12px;">${keepAdmin ? `${escapeHTML(name)} reste admin de toute l'organisation. Coche les ligues dont il est aussi l'organisateur : il apparaîtra comme organisateur dans ces ligues et en recevra les alertes.` : `Choisis les ligues que ${escapeHTML(name)} va gérer.${isAdmin ? ' Ses droits d’admin seront retirés.' : ''}`}</p>
       <div class="pf-list">${leagues.map(function(l){ return `<label class="pf-row pp-row"><span class="t">${escapeHTML(l.name)}${l.schedule_label ? `<small>${escapeHTML(l.schedule_label)}</small>` : ''}</span><input type="checkbox" class="pp-chk orgl-chk" value="${l.id}" ${pre.indexOf(l.id)!==-1?'checked':''}></label>`; }).join('')}</div>`;
   }, function(){
     const want = Array.from(document.querySelectorAll('.orgl-chk')).filter(function(c){ return c.checked; }).map(function(c){ return c.value; });
-    if(!want.length){ showAlert('Choisis au moins une ligue.'); return false; }
+    if(!want.length && !keepAdmin){ showAlert('Choisis au moins une ligue.'); return false; }
     const add = want.filter(function(id){ return mine.indexOf(id) === -1; });
     const del = mine.filter(function(id){ return want.indexOf(id) === -1; });
     (async function(){
       try{
         if(add.length){ const r = await sb.from('league_organizers').insert(add.map(function(id){ return { league_id: id, profile_id: profileId }; })); if(r.error) throw r.error; }
         if(del.length){ const r = await sb.from('league_organizers').delete().eq('profile_id', profileId).in('league_id', del); if(r.error) throw r.error; }
-        if(isAdmin){ const r = await sb.from('profiles').update({ role: 'player' }).eq('id', profileId); if(r.error) throw r.error; }
+        if(isAdmin && !keepAdmin){ const r = await sb.from('profiles').update({ role: 'player' }).eq('id', profileId); if(r.error) throw r.error; }
       }catch(e){ showAlert('Erreur : ' + (e && e.message || e)); }
       await Promise.all([loadAllProfiles(), loadOrgOrganizers()]);
       LEAGUE_ORGZ = { leagueId:null, ids:null };
       PF_TAB = 'compte';
-      showToast('Organisateur de ' + leagueNamesLabel(want));
+      showToast(want.length ? 'Organisateur de ' + leagueNamesLabel(want) : 'Aucune ligue');
       openOrgMemberDetailModal(idx);
     })();
   });
@@ -13191,7 +13214,7 @@ function orgMembersBodyHTML(){
     ${list.map(({e,i})=>`<div class="member-row member-row-tap" role="button" tabindex="0" onclick="openOrgMemberDetailModal(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOrgMemberDetailModal(${i});}">
       ${avatarHTML('member-avatar', initialsOf(e.name), e.profileId ? (ALL_PROFILES.find(x=>x.id===e.profileId)||{}).avatar_url : null)}
       <div class="member-info">
-        <div class="member-name">${escapeHTML(e.name)} ${memberAccountStatus(e).tag}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
+        <div class="member-name">${escapeHTML(e.name)} ${staffTagsHTML(e.profileId, null)} ${memberAccountStatus(e).tag}${!e.orgMemberId?' <span class="small" style="opacity:.65;">(détecté par nom)</span>':''}</div>
         ${e.email?`<div class="small">${escapeHTML(e.email)}</div>`:''}
         <div class="member-leagues">${e.rows.length ? e.rows.map(r=>`<span class="tag">${escapeHTML(r.leagueLabel)}${r.type==='remplaçant'?'':''}</span>`).join('') : '<span class="small">— aucune ligue —</span>'}</div>
       </div>
