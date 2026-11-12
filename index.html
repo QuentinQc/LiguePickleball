@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 406">
+<meta name="app-build" content="Version 407">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5038,13 +5038,10 @@ function rotationBuild(session, ids, seedExtra){
   const rounds = [];
   for(let r = 0; r < st.rounds; r++){
     if(C < 1){ rounds.push({ courts: [], rest: order.slice() }); continue; }
-    // Repos : ceux qui se sont le moins reposés, jamais deux rondes de suite si possible.
-    let playing, rest;
-    if(r === 0){ playing = order.slice(0, 4 * C); rest = order.slice(4 * C); }
-    else {
-      const cand = shuf(ids).sort(function(a, b){ return (rests[a] - rests[b]) || ((lastRest[a] === r - 1) - (lastRest[b] === r - 1)); });
-      rest = cand.slice(0, N - 4 * C); playing = ids.filter(function(id){ return rest.indexOf(id) === -1; });
-    }
+        // Repos en cycle régulier sur l'ordre des numéros : chacun se repose à intervalles le plus égaux possible.
+    const kRest = N - 4 * C, rest = [];
+    for(let j = 0; j < kRest; j++) rest.push(order[(4 * C + r * kRest + j) % N]);
+    const playing = r === 0 ? order.slice(0, 4 * C) : ids.filter(function(id){ return rest.indexOf(id) === -1; });
     let best = null, bestCost = Infinity;
     const tries = r === 0 ? 1 : 80;
     for(let t = 0; t < tries; t++){
