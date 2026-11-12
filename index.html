@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 400">
+<meta name="app-build" content="Version 401">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4189,7 +4189,7 @@ function wizCreate(){
     if(cv.city || cv.venue){ try{ await sb.from('leagues').update(cv).eq('id', id); }catch(e){} }
     // Ajoutés un à la fois : chaque ajout relit puis réécrit tout le league_data de la ligue.
     for(const m of selected){
-      if(m.profileId){ await addPlayerToLeagueForProfile(id, m.profileId, m.name); }
+      if(m.profileId){ await addPlayerToLeagueForProfile(id, m.profileId, m.name, undefined, m.orgMemberId); }
       else { await addNamedEntryToLeague(id, m.name, 'joueur', m.email, m.orgMemberId); }
     }
     if(w.invite){ try{ await sb.rpc('manage_join_code', { p_league_id: id, p_action: 'create', p_max_uses: 500, p_days: 30 }); }catch(e){} }
@@ -7714,15 +7714,49 @@ function submitAddPerson(){
   const type = document.getElementById('addPersonType').value;
   const rawName = document.getElementById('addPersonName').value.trim();
   if(!rawName){ if(err){ err.textContent = 'Le nom est requis.'; err.style.display='block'; } return; }
+  if(type === 'regulier' || type === 'remplacant'){
+    // Joueur ou remplaçant : la personne reçoit sa fiche de membre de l'organisation (la référence unique).
+    const v = {};
+    if(type === 'regulier'){
+      const groupEl = document.getElementById('addPersonGroup');
+      v.groupId = (groupEl && groupEl.value) || null;
+      const rawRating = parseFloat(((document.getElementById('addPersonRating')||{}).value||'').replace(',', '.'));
+      v.rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
+    } else {
+      v.email = ((document.getElementById('addPersonSubEmail')||{}).value||'').trim();
+      v.notes = ((document.getElementById('addPersonSubNotes')||{}).value||'').trim();
+    }
+    const go = async function(){
+      const ficheId = await ensureMemberFiche(rawName, v.email || null, null);
+      addPersonToCurrentLeague(type, rawName, v, ficheId);
+    };
+    const homonyms = sameNameMembers(rawName);
+    MODAL = null;
+    if(homonyms.length){
+      const where = homonyms.map(function(h){ return h.rows.length ? h.rows.map(function(r){ return r.leagueLabel; }).join(', ') : 'aucune ligue'; }).join(' ; ');
+      showConfirm(`« ${rawName} » existe déjà dans l'organisation (${where}). Ajouter une nouvelle personne du même nom ? Si c'est la même personne, annule et choisis-la dans « Depuis l'organisation ».`, go);
+      return;
+    }
+    render();
+    go();
+    return;
+  }
+  const email = document.getElementById('addPersonProspectEmail').value.trim();
+  const phone = document.getElementById('addPersonProspectPhone').value.trim();
+  const notes = document.getElementById('addPersonProspectNotes').value.trim();
+  DATA.prospects = DATA.prospects || [];
+  DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
+  MODAL = null;
+  saveAndRender();
+}
+function addPersonToCurrentLeague(type, rawName, v, ficheId){
   let overflowMsg = null;
   if(type==='regulier'){
     const name = uniquePlayerName(rawName, DATA.players);
-    const groupEl = document.getElementById('addPersonGroup');
-    const groupId = (groupEl && groupEl.value) || null;
-    const ratingEl = document.getElementById('addPersonRating');
-    const rawRating = parseFloat((ratingEl.value||'').replace(',', '.'));
-    const rating = isNaN(rawRating) ? RATING_DEFAULT : Math.min(RATING_MAX, Math.max(RATING_MIN, rawRating));
-    DATA.players.push({ id: uid('p'), name, groupId, rating: Math.round(rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' });
+    const groupId = v.groupId;
+    const pl = { id: uid('p'), name, groupId, rating: Math.round(v.rating*1000)/1000, ratingGames: 0, order: groupId ? nextOrderInGroup(groupId) : 0, status: 'new' };
+    if(ficheId) pl.orgMemberId = ficheId;
+    DATA.players.push(pl);
     if(groupId){
       const count = DATA.players.filter(p=>p.groupId===groupId).length;
       if(count > GROUP_MAX_PLAYERS()){
@@ -7730,24 +7764,16 @@ function submitAddPerson(){
         overflowMsg = `Attention : ${desiredName} a maintenant ${count} joueurs, au-dessus de la limite recommandée de ${GROUP_MAX_PLAYERS()}. Le joueur a quand même été placé — pense à rééquilibrer avant de publier une session.`;
       }
     }
-  } else if(type==='remplacant'){
+  } else {
     const entry = { id: uid('sub'), name: rawName, rating: RATING_DEFAULT, ratingGames: 0 };
-    const email = document.getElementById('addPersonSubEmail').value.trim();
-    const notes = document.getElementById('addPersonSubNotes').value.trim();
-    if(email) entry.email = email;
-    if(notes) entry.notes = notes;
+    if(v.email) entry.email = v.email;
+    if(v.notes) entry.notes = v.notes;
+    if(ficheId) entry.orgMemberId = ficheId;
     DATA.substitutePool = DATA.substitutePool || [];
     DATA.substitutePool.push(entry);
-  } else {
-    const email = document.getElementById('addPersonProspectEmail').value.trim();
-    const phone = document.getElementById('addPersonProspectPhone').value.trim();
-    const notes = document.getElementById('addPersonProspectNotes').value.trim();
-    DATA.prospects = DATA.prospects || [];
-    DATA.prospects.push({ id: uid('pro'), name: rawName, email, phone, notes });
   }
-  MODAL = null;
   saveAndRender();
-  if(overflowMsg) showAlert(overflowMsg);
+  if(overflowMsg) showAlert(overflowMsg); else showToast(rawName + ' ajouté(e)');
 }
 // ---- Ajouter à la ligue des gens déjà connus de l'organisation (avec ou sans
 // compte), en lot — pensé pour remplir vite une nouvelle ligue. ----
@@ -7917,12 +7943,9 @@ async function confirmAddFromOrg(){
     const m = await createOrgMember(nm, null, null, null);
     if(m) all.push({ name:nm, orgMemberId:m.id, profileId:null, email:null, gender:null, rating:null });
   }
-  // Comptes en attente sans fiche membre : on leur en crée une pour garder l'identité canonique.
+  // Personne sans fiche membre (ancienne inscription) : on lui en donne une pour garder l'identité canonique.
   for(const c of all){
-    if(!c.orgMemberId && c.profileId){
-      const m = await createOrgMember(c.name, c.email, null, c.profileId);
-      if(m) c.orgMemberId = m.id;
-    }
+    if(!c.orgMemberId) c.orgMemberId = await ensureMemberFiche(c.name, c.email, c.profileId || null);
   }
   const links = [];
   const addedIds = [];
@@ -9412,6 +9435,26 @@ async function loadOrgMembers(){
   const { data, error } = await sb.from('org_members').select('*').eq('organization_id', CURRENT_ORGANIZATION_ID).order('name');
   ORG_MEMBERS = error ? [] : (data || []);
 }
+// Fiche « membre » de l'organisation : la référence unique d'une personne. Une personne avec un
+// compte réutilise sa fiche existante ; sinon une nouvelle fiche est créée (les homonymes ont la leur).
+async function ensureMemberFiche(name, email, profileId, orgId){
+  const org = orgId || CURRENT_ORGANIZATION_ID;
+  if(profileId){
+    const ex = (ORG_MEMBERS||[]).find(function(m){ return m.profile_id === profileId && (!m.organization_id || m.organization_id === org); });
+    if(ex) return ex.id;
+    try{ const r = await sb.from('org_members').select('id').eq('organization_id', org).eq('profile_id', profileId).limit(1); if(r && r.data && r.data[0]) return r.data[0].id; }catch(e){}
+  }
+  const { data, error } = await sb.from('org_members').insert({ organization_id: org, name: String(name||'').trim() || 'Membre', email: email||null, profile_id: profileId||null }).select().single();
+  if(error){ console.error('fiche membre', error); return null; }
+  if(org === CURRENT_ORGANIZATION_ID) ORG_MEMBERS.push(data);
+  return data.id;
+}
+function leagueOrgId(leagueId){ const l = LEAGUES.find(function(x){ return x.id === leagueId; }); return (l && l.organization_id) || CURRENT_ORGANIZATION_ID; }
+// Personnes déjà dans l'organisation qui portent ce nom (sans accents ni majuscules).
+function sameNameMembers(name){
+  const nn = normPersonName(name);
+  return organizationRosterEntries().filter(function(e){ return normPersonName(e.name) === nn; });
+}
 async function createOrgMember(name, email, notes, profileId){
   const { data, error } = await sb.from('org_members').insert({ organization_id: CURRENT_ORGANIZATION_ID, name, email: email||null, notes: notes||null, profile_id: profileId||null }).select().single();
   if(error){ showAlert("Erreur : " + error.message + (error.message && error.message.includes('org_members') ? " — la table org_members existe-t-elle encore dans Supabase ?" : "")); return null; }
@@ -9452,9 +9495,10 @@ async function loadAllProfilePlayers(){
 }
 // Ajoute un joueur (par son compte lié) dans une AUTRE ligue : crée un nouveau
 // joueur là-bas (dans son premier groupe) et lie le compte à celui-ci.
-async function addPlayerToLeagueForProfile(leagueId, profileId, name, rating){
+async function addPlayerToLeagueForProfile(leagueId, profileId, name, rating, orgMemberId){
   const { data: ex } = await sb.from('profile_players').select('player_id,substitute_id').eq('profile_id', profileId).eq('league_id', leagueId).maybeSingle();
   if(ex) return ex.player_id || ex.substitute_id; // ce compte a déjà une place dans cette ligue
+  if(!orgMemberId) orgMemberId = await ensureMemberFiche(name, null, profileId, leagueOrgId(leagueId));
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
@@ -9465,6 +9509,7 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name, rating){
   const newPlayer = { id: uid('p'), name: finalName, groupId: place.groupId, order: place.order };
   if(place.waiting) newPlayer.status = 'new'; // aucun groupe avec de la place : en attente d'assignation
   if(typeof rating === 'number' && isFinite(rating)){ newPlayer.rating = Math.round(rating*100)/100; newPlayer.ratingGames = 0; }
+  if(orgMemberId) newPlayer.orgMemberId = orgMemberId;
   leagueData.players.push(newPlayer);
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
@@ -9477,15 +9522,17 @@ async function addPlayerToLeagueForProfile(leagueId, profileId, name, rating){
 // profile_players.substitute_id (jamais player_id). Sans cette liaison, le
 // compte reste "en attente" ou pointe vers rien, d'où le message « Profil de
 // remplaçant introuvable » côté joueur.
-async function addSubstituteToLeagueForProfile(leagueId, profileId, name, rating){
+async function addSubstituteToLeagueForProfile(leagueId, profileId, name, rating, orgMemberId){
   const { data: ex } = await sb.from('profile_players').select('player_id,substitute_id').eq('profile_id', profileId).eq('league_id', leagueId).maybeSingle();
   if(ex) return ex.player_id || ex.substitute_id;
+  if(!orgMemberId) orgMemberId = await ensureMemberFiche(name, null, profileId, leagueOrgId(leagueId));
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
   const leagueData = (data && data.data && Object.keys(data.data).length>0) ? data.data : defaultData();
   leagueData.substitutePool = leagueData.substitutePool || [];
   const finalName = uniquePlayerName(name, leagueData.substitutePool);
   const newSub = { id: uid('sub'), name: finalName, rating: (typeof rating === 'number' && isFinite(rating)) ? Math.round(rating*100)/100 : RATING_DEFAULT, ratingGames: 0 };
+  if(orgMemberId) newSub.orgMemberId = orgMemberId;
   leagueData.substitutePool.push(newSub);
   const { error: err2 } = await sb.from('league_data').update({ data: leagueData, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
   if(err2){ showAlert("Erreur : " + err2.message); return null; }
@@ -9581,7 +9628,8 @@ function organizationRosterEntries(){
 // ligue donnée (pas nécessairement la ligue actuellement affichée) — même
 // logique que le formulaire « Ajouter une personne », généralisée à
 // n'importe quelle ligue de l'organisation.
-async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId, rating){
+async function addNamedEntryToLeague(leagueId, name, type, email, orgMemberId, rating, profileId){
+  if(!orgMemberId) orgMemberId = await ensureMemberFiche(name, email, profileId || null, leagueOrgId(leagueId));
   const startRating = (typeof rating === 'number' && isFinite(rating)) ? Math.round(rating*100)/100 : null;
   const { data, error } = await sb.from('league_data').select('data').eq('league_id', leagueId).single();
   if(error){ showAlert("Erreur : " + error.message); return null; }
@@ -9694,27 +9742,38 @@ function saveAddOrgMemberForm(){
   if(!name){ showAlert("Le nom est requis."); return false; }
   const email = document.getElementById('orgMemberEmail').value.trim();
   // Doublon : même nom (sans accents ni majuscules) ou même courriel déjà dans l'organisation.
-  const nn = normPersonName(name), ee = email.toLowerCase();
-  const known = organizationRosterEntries().find(e=> normPersonName(e.name)===nn || (ee && e.email && e.email.toLowerCase()===ee));
-  if(known){
-    showAlert(`« ${known.name} » existe déjà dans l'organisation. Ouvre sa fiche (Membres) pour l'ajouter à une ligue. Si c'est une autre personne, précise le nom (ex. initiale).`);
+  const ee = email.toLowerCase();
+  const sameEmail = ee ? organizationRosterEntries().find(e=> e.email && e.email.toLowerCase()===ee) : null;
+  if(sameEmail){
+    showAlert(`Le courriel ${email} appartient déjà à « ${sameEmail.name} ». Ouvre sa fiche (Membres) pour l'ajouter à une ligue.`);
     return false;
   }
   const picks = readPerLeagueTypes('orgMemberLeague');
   const badRating = picks.find(p=>p.ratingRaw !== '' && (p.rating === null || p.rating < 1 || p.rating > 8));
   if(badRating){ showAlert("La cote doit être un nombre entre 1 et 8 (ex. 3.75). Laisse vide pour " + RATING_DEFAULT.toFixed(2) + "."); return false; }
-  ORG_ADD_BUSY = true;
-  (async ()=>{
-    // La personne est d'abord créée une fois pour toutes dans org_members —
-    // c'est SON identifiant qui sera repris dans chaque ligue cochée, plutôt
-    // que de recréer une fiche indépendante à chaque fois.
-    try{
-      const member = await createOrgMember(name, email, null, null);
-      if(!member) return;
-      for(const { leagueId, type, rating } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id, rating); }
-      await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
-    } finally { ORG_ADD_BUSY = false; }
-  })();
+  const go = function(){
+    ORG_ADD_BUSY = true;
+    (async ()=>{
+      // La personne est d'abord créée une fois pour toutes dans org_members —
+      // c'est SON identifiant qui sera repris dans chaque ligue cochée, plutôt
+      // que de recréer une fiche indépendante à chaque fois.
+      try{
+        const member = await createOrgMember(name, email, null, null);
+        if(!member) return;
+        for(const { leagueId, type, rating } of picks){ await addNamedEntryToLeague(leagueId, name, type, email, member.id, rating); }
+        await refreshAfterOrgRosterChange(picks.map(p=>p.leagueId));
+        showToast(name + ' ajouté(e)');
+      } finally { ORG_ADD_BUSY = false; }
+    })();
+  };
+  // Même nom qu'une personne existante : homonyme possible, on demande avant de créer une 2e fiche.
+  const homonyms = sameNameMembers(name);
+  if(homonyms.length){
+    const where = homonyms.map(function(h){ return h.rows.length ? h.rows.map(function(r){ return r.leagueLabel; }).join(', ') : 'aucune ligue'; }).join(' ; ');
+    setTimeout(function(){ showConfirm(`« ${name} » existe déjà dans l'organisation (${where}). Créer quand même une nouvelle fiche pour une autre personne du même nom ? Si c'est la même personne, annule et ouvre sa fiche dans Membres.`, go); }, 60);
+    return;
+  }
+  go();
 }
 // L'ancien bouton "+ Assigner" de la liste (et sa modale dédiée) a été
 // retiré : l'ajout à une ligue se fait maintenant directement dans la fiche
@@ -10014,9 +10073,9 @@ async function addMemberToLeagues(idx, picks){
   }
   for(const { leagueId, type, rating } of picks){
     if(entry.profileId && type==='joueur'){
-      await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name, rating);
+      await addPlayerToLeagueForProfile(leagueId, entry.profileId, entry.name, rating, orgMemberId);
     } else if(entry.profileId && type==='remplacant'){
-      await addSubstituteToLeagueForProfile(leagueId, entry.profileId, entry.name, rating);
+      await addSubstituteToLeagueForProfile(leagueId, entry.profileId, entry.name, rating, orgMemberId);
     } else {
       await addNamedEntryToLeague(leagueId, entry.name, type, entry.email, orgMemberId, rating);
     }
@@ -10366,7 +10425,7 @@ async function approveJoinRequest(reqId){
   const raw = sel && sel.value; if(!raw){ showAlert('Choisis qui est cette personne dans la ligue.'); return; }
   const parts = raw.split('::'); const kind = parts[0]; let val = parts[1];
   if(val === '__new__'){
-    val = await addNamedEntryToLeague(r.league_id, r.display_name || r.email, kind==='s' ? 'remplacant' : 'joueur', r.email, null);
+    val = await addNamedEntryToLeague(r.league_id, r.display_name || r.email, kind==='s' ? 'remplacant' : 'joueur', r.email, null, undefined, r.profile_id);
     if(!val) return;
   }
   const { error } = await sb.rpc('approve_join_request', { p_request_id: reqId, p_player_id: kind==='j' ? val : null, p_substitute_id: kind==='s' ? val : null });
@@ -10452,7 +10511,7 @@ async function linkAccount(profileId){
   if(kind === 's'){
     let subId = val;
     if(val === '__new__'){
-      subId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null);
+      subId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null, undefined, profileId);
       if(!subId) return;
     }
     const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, substitute_id: subId });
@@ -10460,7 +10519,7 @@ async function linkAccount(profileId){
   } else {
     let playerId = val;
     if(val === '__new__'){
-      playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+      playerId = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null, undefined, profileId);
       if(!playerId) return;
     }
     const { error } = await sb.from('profile_players').insert({ profile_id: profileId, league_id: leagueId, player_id: playerId });
@@ -10485,14 +10544,14 @@ async function relinkAccount(profileId, leagueId, kind){
   let id = value;
   if(kind === 's'){
     if(value === '__new__'){
-      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null);
+      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'remplacant', pr.email, null, undefined, profileId);
       if(!id) return;
     }
     const { error } = await sb.from('profile_players').update({ substitute_id: id, player_id: null }).eq('profile_id', profileId).eq('league_id', leagueId);
     if(error){ showAlert("Erreur lors de la reconnexion : " + error.message); return; }
   } else {
     if(value === '__new__'){
-      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null);
+      id = await addNamedEntryToLeague(leagueId, pr.display_name || pr.email, 'joueur', pr.email, null, undefined, profileId);
       if(!id) return;
     }
     const { error } = await sb.from('profile_players').update({ player_id: id, substitute_id: null }).eq('profile_id', profileId).eq('league_id', leagueId);
