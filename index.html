@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 402">
+<meta name="app-build" content="Version 403">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9795,6 +9795,7 @@ function orgMemberDetailModalHTML(idx){
   const stLbl = { actif: st.shared ? 'Compte actif (partagé)' : 'Compte actif', invite:'Invité', expire:'Invitation expirée', aucun:'Aucun compte' }[st.key];
   const chips = [`<span class="pf-chip ${stCls}">${stLbl}</span>`];
   if(linkedProfile && linkedProfile.role === 'admin') chips.push(`<span class="pf-chip on">Admin</span>`);
+  else if(linkedProfile && ORG_ORGZ.some(function(r){ return r.profile_id === linkedProfile.id; })) chips.push(`<span class="pf-chip on">Organisateur</span>`);
   if(!entry.orgMemberId) chips.push(`<span class="pf-chip acc">Détecté par nom</span>`);
   let html = `<div class="pf-hero">
     <div class="pf-top">
@@ -9858,13 +9859,20 @@ function memberAccountSectionHTML(entry, idx, linkedProfile){
   if(st.key === 'actif'){
     const isAdmin = linkedProfile && linkedProfile.role === 'admin';
     const admins = ALL_PROFILES.filter(function(p){ return p.organization_id===CURRENT_ORGANIZATION_ID && p.role==='admin'; }).length;
-    h += `<p class="small">${linkedProfile ? escapeHTML(linkedProfile.email || '') + ' · ' : ''}${isAdmin ? 'Administrateur' : 'Accès joueur'}</p>`;
     const orgzLeagues = linkedProfile ? myOrgLeagues().filter(function(l){ return isOrganizerOf(linkedProfile.id, l.id); }) : [];
-    if(linkedProfile && !isOrganizerOnly()) h += `<button class="btn btn-secondary" ${isAdmin && admins<=1 ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="closeModal();setAccountRole('${linkedProfile.id}','${isAdmin?'player':'admin'}')">${isAdmin ? (orgzLeagues.length ? 'Retirer les droits admin (reste organisateur)' : 'Retirer les droits admin') : 'Rendre admin'}</button>`;
+    const role = isAdmin ? 'admin' : (orgzLeagues.length ? 'orga' : 'membre');
+    h += `<p class="small" style="margin:0 0 10px;">${linkedProfile ? escapeHTML(linkedProfile.email || '') : ''}</p>`;
     if(linkedProfile && !isOrganizerOnly()){
-      h += `<div class="pf-sec" style="margin:16px 0 6px;">Organisateur de ligue</div>
-        <div class="an-chips" style="margin-top:0;">${myOrgLeagues().map(function(l){ const on = isOrganizerOf(linkedProfile.id, l.id); return `<button type="button" class="an-chip ${on?'on':''}" onclick="toggleMemberOrganizer(${idx},'${linkedProfile.id}','${l.id}')">${escapeHTML(l.name)}</button>`; }).join('')}</div>
-        <p class="small" style="color:var(--muted);margin:8px 2px 0;">${isAdmin ? "Pour qu'un admin devienne organisateur : coche ses ligues ici, puis retire ses droits admin." : "Touche une ligue pour lui en confier la gestion (sessions, groupes, scores, demandes d'adhésion)."}</p>`;
+      const lastAdmin = isAdmin && admins <= 1;
+      const seg = [['membre','Membre'],['orga','Organisateur'],['admin','Admin']];
+      h += `<div class="pf-sec" style="margin:0 0 6px;">Rôle</div>
+        <div class="pf-seg" style="grid-template-columns:repeat(3,minmax(0,1fr));">${seg.map(function(x){ return `<button type="button" style="padding:11px 4px;" class="${role===x[0]?'on':''}" ${(lastAdmin && x[0]!=='admin') ? 'disabled title="Il doit rester au moins un administrateur"' : ''} onclick="setMemberRole(${idx},'${linkedProfile.id}','${x[0]}')">${x[1]}</button>`; }).join('')}</div>
+        <p class="small" style="color:var(--muted);margin:8px 2px 0;">${role==='admin' ? "Gère toute l'organisation et toutes ses ligues." : role==='orga' ? "Gère seulement les ligues choisies ci-dessous : sessions, groupes, scores, demandes d'adhésion." : "Joue dans ses ligues, sans droit de gestion."}${lastAdmin ? ' Seul administrateur : nomme d’abord un autre admin.' : ''}</p>`;
+      if(role === 'orga'){
+        h += `<div class="an-chips">${myOrgLeagues().map(function(l){ const on = isOrganizerOf(linkedProfile.id, l.id); return `<button type="button" class="an-chip ${on?'on':''}" onclick="toggleMemberOrganizer(${idx},'${linkedProfile.id}','${l.id}')">${escapeHTML(l.name)}</button>`; }).join('')}</div>`;
+      }
+    } else {
+      h += `<p class="small">${role==='admin' ? 'Administrateur' : role==='orga' ? 'Organisateur' : 'Membre'}</p>`;
     }
   } else if(!entry.rows.length){
     h += `<p class="small">Ajoute d'abord cette personne à une ligue pour pouvoir l'inviter.</p>`;
@@ -12152,8 +12160,44 @@ async function loadOrgOrganizers(){
   return ORG_ORGZ;
 }
 function isOrganizerOf(profileId, leagueId){ return ORG_ORGZ.some(function(r){ return r.profile_id === profileId && r.league_id === leagueId; }); }
+// Rôle d'une personne en un geste : Membre, Organisateur (de ses ligues) ou Admin.
+function setMemberRole(idx, profileId, target){
+  const pr = (ALL_PROFILES||[]).find(function(p){ return p.id === profileId; }) || {};
+  const name = pr.display_name || pr.email || 'Cette personne';
+  const isAdmin = pr.role === 'admin';
+  const mine = ORG_ORGZ.filter(function(r){ return r.profile_id === profileId; });
+  const current = isAdmin ? 'admin' : (mine.length ? 'orga' : 'membre');
+  if(target === current) return;
+  if(CURRENT_PROFILE && profileId === CURRENT_PROFILE.id){ showAlert('Pour changer ton propre rôle, demande à un autre administrateur.'); return; }
+  // Organisateur : ses ligues de jeu par défaut, sinon la ligue affichée.
+  const playIn = (ALL_PROFILE_PLAYERS||[]).filter(function(l){ return l.profile_id === profileId; }).map(function(l){ return l.league_id; });
+  const orgIds = myOrgLeagues().map(function(l){ return l.id; });
+  let pick = playIn.filter(function(id){ return orgIds.indexOf(id) !== -1; });
+  if(!pick.length && orgIds.length) pick = [orgIds.indexOf(CURRENT_LEAGUE_ID) !== -1 ? CURRENT_LEAGUE_ID : orgIds[0]];
+  const msg = target === 'admin' ? `Rendre ${name} administrateur de toute l'organisation ?`
+    : target === 'orga' ? `${name} devient organisateur de : ${leagueNamesLabel(pick)}.${isAdmin ? ' Ses droits d’admin sont retirés.' : ''} Tu pourras ajuster ses ligues ensuite.`
+    : `${name} redevient simple membre, sans droit de gestion ?`;
+  showConfirm(msg, async function(){
+    try{
+      if(target === 'orga'){
+        if(!mine.length){ const r = await sb.from('league_organizers').insert(pick.map(function(id){ return { league_id: id, profile_id: profileId }; })); if(r.error) throw r.error; }
+      } else if(mine.length){
+        const r = await sb.from('league_organizers').delete().eq('profile_id', profileId).in('league_id', orgIds); if(r.error) throw r.error;
+      }
+      if((target === 'admin') !== isAdmin){
+        const r = await sb.from('profiles').update({ role: target === 'admin' ? 'admin' : 'player' }).eq('id', profileId); if(r.error) throw r.error;
+      }
+    }catch(e){ showAlert('Erreur : ' + (e && e.message || e)); }
+    await Promise.all([loadAllProfiles(), loadOrgOrganizers()]);
+    LEAGUE_ORGZ = { leagueId:null, ids:null };
+    PF_TAB = 'compte';
+    showToast(target === 'admin' ? 'Administrateur' : target === 'orga' ? 'Organisateur' : 'Membre');
+    openOrgMemberDetailModal(idx);
+  });
+}
 async function toggleMemberOrganizer(idx, profileId, leagueId){
   const on = isOrganizerOf(profileId, leagueId);
+  if(on && ORG_ORGZ.filter(function(r){ return r.profile_id === profileId; }).length <= 1){ showAlert("Il doit rester au moins une ligue. Pour retirer le rôle, choisis « Membre »."); return; }
   const r = on ? await sb.from('league_organizers').delete().eq('league_id', leagueId).eq('profile_id', profileId)
                : await sb.from('league_organizers').insert({ league_id: leagueId, profile_id: profileId });
   if(r && r.error){ showAlert("Erreur : " + r.error.message); return; }
