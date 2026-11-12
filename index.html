@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 416">
+<meta name="app-build" content="Version 417">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -15452,12 +15452,17 @@ function playerGroupRosterRows(open, gid, members){
     </div>`;
   };
   let h = '';
+  // Groupe de 6 (exception) qui retombe à 5 joueurs ou plus : les absents non remplacés ne sont pas montrés,
+  // le groupe apparaît comme un groupe normal. Sous 5, l'absent reste visible (grisé).
+  const isOut = function(p){ return open && (p.injured || isAbsent(open, p.id)); };
+  const playing = members.filter(function(p){ return !isOut(p) || subs[p.id]; }).length + (((gd && gd.extras) || []).length);
+  const hideOut = members.length >= 6 && playing >= 5;
   members.forEach(function(p){
-    const out = open && (p.injured || isAbsent(open, p.id));
+    const out = isOut(p);
     if(!out){ h += row(p.id, p.name, '', false); return; }
     const by = subs[p.id];
     if(by) h += row(by, playerName(by), `<span class="pf-chip on">Remplace ${escapeHTML(String(p.name).split(' ')[0])}</span>`, false);
-    else h += row(p.id, p.name, `<span class="pf-chip warn">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>`, true);
+    else if(!hideOut) h += row(p.id, p.name, `<span class="pf-chip warn">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>`, true);
   });
   ((gd && gd.extras) || []).forEach(function(x){ h += row(x, playerName(x), '<span class="pf-chip on">Renfort</span>', false); });
   return h;
