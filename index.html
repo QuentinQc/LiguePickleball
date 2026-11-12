@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 414">
+<meta name="app-build" content="Version 415">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4813,7 +4813,10 @@ function matchesOutOfSync(session, gid){
   (gd.matches||[]).forEach(function(m){ (m.teamA||[]).concat(m.teamB||[]).concat([m.sit, m.sit2]).forEach(function(id){ if(id) inMatches.add(id); }); });
   const want = matchesForGroup(session, gid);
   if(!want.length && !(gd.matches||[]).length) return false;
-  return Array.from(inMatches).sort().join(',') !== roster || want.length !== (gd.matches||[]).length;
+  if(Array.from(inMatches).sort().join(',') !== roster || want.length !== (gd.matches||[]).length) return true;
+  // Mêmes joueurs, mais pas les matchs prévus (modèle changé, ancienne génération) : on refait aussi.
+  const sig = function(m){ const t = function(a){ return (a||[]).slice().sort().join('+'); }; return [t(m.teamA), t(m.teamB)].sort().join(' vs '); };
+  return want.some(function(m, i){ return sig(m) !== sig(gd.matches[i]); });
 }
 // Côté organisateur : remet les matchs de chaque groupe en accord avec sa composition, avant chaque enregistrement.
 function syncAllGroupMatches(){
