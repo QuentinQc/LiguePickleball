@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 419">
+<meta name="app-build" content="Version 420">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1191,6 +1191,14 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .sim-acts{display:flex;gap:6px;flex-wrap:wrap;}
 .sim-acts button{border:1px solid rgba(43,33,0,.35);background:transparent;color:#2b2100;font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 12px;cursor:pointer;}
 .sim-acts button.q{background:#2b2100;color:#FFD60A;border-color:#2b2100;}
+.ct-list{display:flex;flex-direction:column;gap:6px;}
+.ct-row{display:flex;align-items:center;gap:6px;}
+.ct-n{width:24px;text-align:center;font-family:var(--font-display);color:var(--ball);}
+.ct-name{flex:1;min-width:0;}
+.ct-start{max-width:60%;}
+.ct-b{width:38px;height:38px;border-radius:10px;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);cursor:pointer;flex:0 0 auto;}
+.ct-b:disabled{opacity:.3;cursor:default;}
+.ct-b.x{color:var(--danger,#e9556b);}
 .pl-role{color:var(--ball);font-weight:700;font-size:12px;letter-spacing:.02em;margin-top:2px;}
 .tag.tag-orga{background:rgba(207,234,92,.14);color:var(--ball);border:1px solid rgba(207,234,92,.35);}
 .rs-m{border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);overflow:hidden;}
@@ -2851,6 +2859,7 @@ function sheetModalHTML(){
   if(MODAL.sheet === 'inbox') return inboxSheetHTML();
   if(MODAL.sheet === 'ecompose') return eventComposerSheetHTML();
   if(MODAL.sheet === 'rotchrono') return rotationTimerSheetHTML();
+  if(MODAL.sheet === 'courts') return courtsSheetHTML();
   const k = MODAL.sheet;
   const ORGS = { 'org-membres':['','Membres','Joueurs et invitations'], 'org-comptes':['','Comptes','Approbations et accès'], 'org-rapport':['','Rapport','Qui joue où'], 'org-general':['','Paramètres','Nom et lien d\'invitation'] };
   const og = ORGS[k];
@@ -5321,6 +5330,101 @@ function printRotation(){
   w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 300);
 }
 
+
+// ==================== TERRAINS DES GROUPES (échelle) ====================
+// DATA.courts : terrains dans l'ordre du cycle [{id, name}] ; DATA.courtStart : terrain de départ de chaque groupe ;
+// DATA.courtRotation : à chaque nouvelle session, chaque groupe passe au terrain suivant du cycle ;
+// DATA.courtShift : décalage de la prochaine session. Chaque session garde son affectation (session.courts).
+function courtsEnabled(){ return !!(DATA && (DATA.courts||[]).length && DATA.leagueFormat !== 'social' && DATA.leagueFormat !== 'mlp'); }
+function courtAssignment(shift){
+  const courts = DATA.courts || [], n = courts.length, out = {};
+  if(!n) return out;
+  groupsSorted().forEach(function(g, i){
+    const startId = (DATA.courtStart || {})[g.id];
+    let idx = courts.findIndex(function(c){ return c.id === startId; });
+    if(idx === -1) idx = i % n;
+    out[g.id] = courts[((idx + (shift || 0)) % n + n) % n].id;
+  });
+  return out;
+}
+function assignSessionCourts(session, advance){
+  if(!courtsEnabled() || !session) return;
+  const shift = (typeof session.courtShift === 'number') ? session.courtShift : (DATA.courtRotation ? (DATA.courtShift || 0) : 0);
+  session.courtShift = shift;
+  session.courts = courtAssignment(shift);
+  if(advance && DATA.courtRotation) DATA.courtShift = shift + 1;
+}
+function courtNameFor(session, gid){
+  if(!courtsEnabled() || !session || !session.courts) return '';
+  const id = session.courts[gid];
+  const c = (DATA.courts || []).find(function(x){ return x.id === id; });
+  return c ? c.name : '';
+}
+function courtChipHTML(session, gid){ const n = courtNameFor(session, gid); return n ? `<span class="pf-chip on">${escapeHTML(n)}</span>` : ''; }
+// Changement ponctuel pour une session : échange avec le groupe qui avait ce terrain.
+function openSessionCourtPicker(gid){
+  const open = currentOpenSession(); if(!open || !courtsEnabled()) return;
+  if(!open.courts) assignSessionCourts(open, false);
+  const courts = DATA.courts || [], g = groupById(gid);
+  showChoice(`Terrain du ${g ? g.name : grpWord()} pour cette session (le groupe qui l'avait prend l'ancien terrain) :`, courts.map(function(c){ return c.name; }), function(i){
+    const c = courts[i]; if(!c) return;
+    const cur = open.courts[gid], other = Object.keys(open.courts).find(function(k){ return k !== gid && open.courts[k] === c.id; });
+    open.courts[gid] = c.id; if(other) open.courts[other] = cur;
+    saveAndRender();
+  });
+}
+let COURTS_DRAFT = null;
+function openCourtsModal(){
+  COURTS_DRAFT = { courts: (DATA.courts || []).map(function(c){ return { id: c.id, name: c.name }; }), start: Object.assign({}, DATA.courtStart || {}), rotation: !!DATA.courtRotation };
+  setModal({ kind:'content', sheet:'courts' }); render();
+}
+function courtsDraftRead(){
+  document.querySelectorAll('.ct-name').forEach(function(el){ const c = COURTS_DRAFT.courts[+el.getAttribute('data-i')]; if(c) c.name = el.value; });
+  document.querySelectorAll('.ct-start').forEach(function(el){ if(el.getAttribute('data-t')) COURTS_DRAFT.start[el.getAttribute('data-g')] = el.value; });
+  const r = document.getElementById('ctRot'); if(r) COURTS_DRAFT.rotation = r.checked;
+}
+function courtsMove(i, d){ courtsDraftRead(); const a = COURTS_DRAFT.courts, j = i + d; if(j < 0 || j >= a.length) return; const t = a[i]; a[i] = a[j]; a[j] = t; renderSheet(); }
+function courtsDel(i){ courtsDraftRead(); const c = COURTS_DRAFT.courts.splice(i, 1)[0]; Object.keys(COURTS_DRAFT.start).forEach(function(g){ if(COURTS_DRAFT.start[g] === (c && c.id)) delete COURTS_DRAFT.start[g]; }); renderSheet(); }
+function courtsAdd(){ courtsDraftRead(); COURTS_DRAFT.courts.push({ id: uid('ct'), name: '' }); renderSheet(); setTimeout(function(){ const els = document.querySelectorAll('.ct-name'); if(els.length) els[els.length - 1].focus(); }, 50); }
+function courtsSave(){
+  courtsDraftRead();
+  const courts = COURTS_DRAFT.courts.map(function(c){ return { id: c.id, name: String(c.name || '').trim().slice(0, 40) }; }).filter(function(c){ return c.name; });
+  // Terrains de départ effectifs (choisis, sinon par position) : deux groupes ne peuvent pas partir du même terrain.
+  const used = {}, dup = [];
+  groupsSorted().forEach(function(g, i){
+    let id = COURTS_DRAFT.start[g.id];
+    if(!courts.some(function(c){ return c.id === id; })) id = courts.length ? courts[i % courts.length].id : null;
+    if(id){ if(used[id]) dup.push(g.name); used[id] = 1; COURTS_DRAFT.start[g.id] = id; }
+  });
+  if(dup.length && courts.length >= groupsSorted().length){ showAlert('Deux ' + grpWord() + 's ont le même terrain de départ (' + dup.join(', ') + '). Choisis un terrain différent pour chacun.'); return; }
+  DATA.courts = courts;
+  DATA.courtStart = {}; Object.keys(COURTS_DRAFT.start).forEach(function(g){ if(courts.some(function(c){ return c.id === COURTS_DRAFT.start[g]; })) DATA.courtStart[g] = COURTS_DRAFT.start[g]; });
+  if(DATA.courtRotation !== COURTS_DRAFT.rotation){ DATA.courtRotation = COURTS_DRAFT.rotation; }
+  // La session en cours suit les nouveaux réglages (son décalage est conservé).
+  const open = currentOpenSession();
+  if(open){ if(courts.length){ const first = typeof open.courtShift !== 'number'; assignSessionCourts(open, false); if(first && DATA.courtRotation) DATA.courtShift = open.courtShift + 1; } else { delete open.courts; } }
+  COURTS_DRAFT = null; closeModal(); saveAndRender();
+  showToast(courts.length ? 'Terrains enregistrés' : 'Terrains retirés');
+}
+function courtsSheetHTML(){
+  const D = COURTS_DRAFT, groups = groupsSorted();
+  const rows = D.courts.map(function(c, i){ return `<div class="ct-row"><span class="ct-n">${i + 1}</span><input class="ct-name" data-i="${i}" maxlength="40" value="${escapeHTML(c.name)}" placeholder="Nom du terrain (commanditaire)"><button type="button" class="ct-b" aria-label="Monter" ${i === 0 ? 'disabled' : ''} onclick="courtsMove(${i},-1)">▲</button><button type="button" class="ct-b" aria-label="Descendre" ${i === D.courts.length - 1 ? 'disabled' : ''} onclick="courtsMove(${i},1)">▼</button><button type="button" class="ct-b x" aria-label="Retirer" onclick="courtsDel(${i})">✕</button></div>`; }).join('');
+  const opts = function(sel){ return D.courts.map(function(c){ return `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${escapeHTML(c.name || 'Terrain sans nom')}</option>`; }).join(''); };
+  const starts = groups.map(function(g, i){ const sel = D.start[g.id] || (D.courts[i % Math.max(1, D.courts.length)] || {}).id; return `<div class="ct-row"><span class="t" style="flex:1;font-weight:600;">${escapeHTML(g.name)}</span><select class="ct-start" data-g="${g.id}" ${D.start[g.id] ? 'data-t="1"' : ''} onchange="this.setAttribute('data-t','1')">${opts(sel)}</select></div>`; }).join('');
+  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="chat-sheet an-sheet">
+      <div class="chat-head"><div class="chat-head-ico"></div><div class="chat-head-txt"><div class="chat-head-title">Terrains</div><div class="chat-head-sub">Où joue chaque ${grpWord()}</div></div><button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button></div>
+      <div class="sheet-body" data-key="courts">
+        <div class="an-sec">Terrains, dans l'ordre de la rotation</div>
+        <div class="ct-list">${rows || '<p class="ah-meta" style="padding:6px 2px;">Aucun terrain pour l\'instant.</p>'}</div>
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="courtsAdd()">+ Ajouter un terrain</button>
+        ${D.courts.length ? `<div class="an-sec">Terrain de départ de chaque ${grpWord()}</div><div class="ct-list">${starts}</div>
+        <label class="notif-row" style="margin-top:14px;"><span><strong>Rotation des terrains</strong><span class="small" style="display:block;color:var(--muted);">À chaque nouvelle session, chaque ${grpWord()} passe au terrain suivant de la liste (le dernier revient au premier). Tout le monde joue ainsi sur tous les terrains.</span></span><input type="checkbox" id="ctRot" ${D.rotation ? 'checked' : ''}></label>` : ''}
+      </div>
+      <div class="an-foot"><div class="an-to"><small>Terrains</small><b>${D.courts.length}</b></div><button type="button" class="btn btn-primary an-send" onclick="courtsSave()">Enregistrer</button></div>
+    </div></div>`;
+}
+
 function startNewSession(explicitDate){
   const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData: DATA.groups.map(g=>({ groupId:g.id, matches:[] })), movements: null, absences: [], published: false };
   applyPlannedAbsencesToSession(session);
@@ -5329,6 +5433,7 @@ function startNewSession(explicitDate){
     session.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
   }
   DATA.sessions.push(session);
+  assignSessionCourts(session, true);
   DATA.groups.forEach(g=>{
     const gd = session.groupsData.find(x=>x.groupId===g.id);
     gd.matches = matchesForGroup(session, g.id);
@@ -11105,11 +11210,11 @@ function adminGroupsHTML(){
     html += `
     <div class="card drop-target" data-sg="${g.id}" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'${g.id}')">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span><span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span>${absentInGroup.length ? `<span class="ab-pill">${absentInGroup.length} absent${absentInGroup.length>1?'s':''}</span>` : ''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pf-name" style="font-size:20px;">${escapeHTML(g.name)}</span>${(open && courtsEnabled()) ? `<button type="button" class="pf-chip on" style="border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:700;" onclick="openSessionCourtPicker('${g.id}')" title="Changer le terrain pour cette session">${escapeHTML(courtNameFor(open, g.id) || 'Terrain ?')}</button>` : ''}<span class="pf-chip acc">${displayCount} joueur${displayCount>1?'s':''}</span>${absentInGroup.length ? `<span class="ab-pill">${absentInGroup.length} absent${absentInGroup.length>1?'s':''}</span>` : ''}</div>
         <button class="grp-more" onclick="openGroupMenu('${g.id}')" aria-label="Options du ${grpWord()}">⋯</button>
       </div>
       ${outOfRange ? `<p class="small" style="color:var(--paddle);">Ce groupe devrait avoir entre ${GROUP_MIN_PLAYERS()} et ${GROUP_MAX_PLAYERS()} joueurs (actuellement ${displayCount}) — déplace des joueurs pour le rééquilibrer.</p>` : ''}
-      ${isSix ? `<p class="small" style="color:var(--ball);">6️⃣ Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
+      ${isSix ? `<p class="small" style="color:var(--ball);">Groupe de 6 (exception) : rotation fixe de ${DATA.rules6Matches||6} matchs à ${DATA.rules6Points||11} points, 4 matchs joués par joueur.</p>` : ''}
       <div class="pf-list" style="margin-top:10px;">
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
@@ -11474,7 +11579,7 @@ function adminSessionHTML(){
     const info = DATA.leagueFormat==='social' ? (activeCount+' joueur'+(activeCount>1?'s':'')) : activeCount>0 ? (manual ? `${gd.matches.length} match${gd.matches.length>1?'s':''} (selon le modèle défini dans Réglages)` : `${matchesCountFor(activeCount)} matchs, en ${targetPointsFor(activeCount)} points`) : '';
     const nDone = gd.matches.filter(rsDone).length, nAll = gd.matches.length;
     const showProg = DATA.leagueFormat!=='social' && nAll>0;
-    html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">${escapeHTML(g.name)}</div>${showProg ? `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${g.id}">${nDone} / ${nAll}</span>` : ''}</div>${info ? `<div class="ah-meta">${info}</div>` : ''}${showProg ? `<div class="ah-bar rs-bar"><i id="rsb_${g.id}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>` : ''}`;
+    html += `<div class="card rs-card"><div class="rs-top"><div class="rs-name">${escapeHTML(g.name)}${courtNameFor(open, g.id) ? ` <span class="pf-chip on" style="vertical-align:middle;">${escapeHTML(courtNameFor(open, g.id))}</span>` : ''}</div>${showProg ? `<span class="ah-st ${nDone===nAll?'on':'wait'}" id="rsc_${g.id}">${nDone} / ${nAll}</span>` : ''}</div>${info ? `<div class="ah-meta">${info}</div>` : ''}${showProg ? `<div class="ah-bar rs-bar"><i id="rsb_${g.id}" style="width:${Math.round(100*nDone/nAll)}%"></i></div>` : ''}`;
     if(stale) html += `<div class="rs-warn">Les matchs affichés ne reflètent plus les absences et remplaçants actuels. Refais les matchs de ce groupe.</div>`;
     if(DATA.leagueFormat==='social'){
       const names = activeRosterForGroup(open, g.id).map(playerName).map(escapeHTML);
@@ -11704,7 +11809,7 @@ function printableMatchSheetsHTML(session){
       <div class="ms-header">
         <div>
           <div class="ms-league">${escapeHTML(DATA.leagueName)}</div>
-          <div class="ms-group">${escapeHTML(g.name)}</div>
+          <div class="ms-group">${escapeHTML(g.name)}${courtNameFor(session, g.id) ? ' · ' + escapeHTML(courtNameFor(session, g.id)) : ''}</div>
         </div>
         <div class="ms-meta">
           <div>Session du <strong>${fdl(session.date)}</strong></div>
@@ -12077,6 +12182,8 @@ function autoFillAllScores(){
 }
 function onCancelSession(){
   showConfirm('Annuler cette session ?', ()=>{
+    const op = currentOpenSession();
+    if(op && DATA.courtRotation && typeof op.courtShift === 'number') DATA.courtShift = op.courtShift;
     DATA.sessions = DATA.sessions.filter(s=>s.status!=='open');
     saveAndRender();
   });
@@ -13391,7 +13498,8 @@ function adminSettingsSectionHTML(){
       settingsRow('', 'Terrains disponibles', K ? 'Le tirage utilise au plus ' + K + ' terrain' + (K>1?'s':'') : 'Le tirage utilise autant de terrains que nécessaire', 'openMaxCourtsModal()')];
   } else {
     const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
-    regles = [settingsRow('', 'Taille des groupes', `De ${DATA.groupMinPlayers||4} à ${DATA.groupMaxPlayers||5} joueurs par groupe`, 'openGroupSizeModal()'),
+    regles = [settingsRow('', 'Terrains', (DATA.courts||[]).length ? (DATA.courts.length + ' terrain' + (DATA.courts.length>1?'s':'') + (DATA.courtRotation ? ' · rotation à chaque session' : ' · fixes')) : 'Indiquer sur quel terrain joue chaque groupe', 'openCourtsModal()'),
+      settingsRow('', 'Taille des groupes', `De ${DATA.groupMinPlayers||4} à ${DATA.groupMaxPlayers||5} joueurs par groupe`, 'openGroupSizeModal()'),
       settingsRow('', 'Génération des matchs', DATA.matchupMode==='manual' ? 'Manuelle : les matchs suivent ton modèle de rotation' : "Automatique : l'app crée les matchs de chaque groupe", 'openMatchupSettingsModal()'),
       settingsRow(pbIcon(), 'Format des matchs', `Groupe de 4 : ${DATA.rules4Matches||6} matchs en ${DATA.rules4Points||11} points · de 5 : ${DATA.rules5Matches||10} matchs en ${DATA.rules5Points||9} points`, 'openMatchFormatModal()'),
       settingsRow('', 'Ordre de départage', enabledCriteria.length ? 'En cas d\'égalité : ' + enabledCriteria.join(', puis ') : 'Aucun critère : les égalités gardent leur ordre', 'openTiebreakModal()')];
@@ -15602,7 +15710,7 @@ function playerGroupHTML(me){
   const groupVisible = !!(open && (open.published || DATA.showGroupBeforePublish) && !isAbsent(open, me.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
-      <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : (isRecLeague() ? 'Pas de terrain' : '—')) : myGroupLabel()}</h2>
+      <h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : (isRecLeague() ? 'Pas de terrain' : '—')) : myGroupLabel()}${(groupVisible && g && courtNameFor(open, g.id)) ? ` <span class="pf-chip on" style="vertical-align:middle;font-family:var(--font-body,inherit);">${escapeHTML(courtNameFor(open, g.id))}</span>` : ''}</h2>
       <button class="btn-ghost" onclick="openAbsenceHub('${me.id}')">Absence</button>
     </div>
     ${absenceBadges.length ? `<div class="modal-badges" style="margin-bottom:12px;">${absenceBadges.join('')}</div>` : ''}
