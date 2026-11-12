@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 409">
+<meta name="app-build" content="Version 410">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1179,6 +1179,10 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-big b{display:block;font-family:var(--font-display);font-size:min(28vw,150px);line-height:1;color:var(--ball);}
 .rot-big.chg b{color:#FFD60A;}
 .rot-big span{font-size:15px;color:var(--muted);}
+.rot-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:520px;margin:0 auto;}
+.rot-nav span{font-family:var(--font-display);font-size:20px;text-transform:uppercase;letter-spacing:.04em;}
+.rot-nav button{width:56px;height:56px;border-radius:50%;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);font-size:30px;line-height:1;cursor:pointer;}
+.rot-nav button:disabled{opacity:.3;cursor:default;}
 .rot-go{max-width:360px;margin:6px auto 4px;display:block;}
 .rot-courts.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));}
 .sim-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 96px);z-index:100000;width:min(560px, calc(100% - 32px));box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-radius:16px;background:#FFD60A;color:#2b2100;box-shadow:0 10px 30px rgba(0,0,0,.45);}
@@ -5197,15 +5201,26 @@ function rotationStartTimer(){
   const go = function(){ open.rotationStart = new Date().toISOString(); saveData(); render(); rotationTick(); };
   if(open.rotationStart) showConfirm('Recommencer le chrono à la ronde 1 ?', function(){ go(); openRotationTimer(); }); else go();
 }
+// Le chrono est indicatif : flèches pour passer à la ronde précédente ou suivante (la ronde visée commence maintenant).
+function rotationJump(delta){
+  const open = currentOpenSession(); if(!open) return;
+  const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
+  const now = cur ? (cur.done ? rot.rounds.length : (cur.changing ? cur.index + 1 : cur.index)) : 0;
+  const target = Math.max(0, Math.min(rot.rounds.length - 1, (cur ? now : 0) + delta));
+  open.rotationStart = new Date(Date.now() - target * (rot.round + rot.change) * 60000).toISOString();
+  saveData(); render(); rotationTick();
+}
 function rotationStopTimer(){ const open = currentOpenSession(); if(!open) return; open.rotationStart = null; saveData(); render(); }
 function rotationChronoInnerHTML(){
   const open = currentOpenSession(); if(!open) return '';
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
   const fmt = function(m){ const t = Math.ceil(m * 60), mm = Math.floor(t / 60), ss = t % 60; return mm + ':' + (ss < 10 ? '0' : '') + ss; };
   if(!cur) return `<div class="rot-big"><small>Prêt</small><b>${rot.round}:00</b><span>Ronde 1 · ${rot.rounds.length} rondes</span></div><button class="btn btn-primary rot-go" onclick="rotationStartTimer()">Démarrer la ronde 1</button>${rotationCourtsBoardHTML(rot, 0)}`;
-  if(cur.done) return `<div class="rot-big"><small>Terminé</small><b>Merci !</b><span>${rot.rounds.length} rondes jouées</span></div><button class="btn-ghost" onclick="rotationStartTimer()">Recommencer</button>`;
+  if(cur.done) return `<div class="rot-nav"><button type="button" aria-label="Ronde précédente" onclick="rotationJump(-1)">‹</button><span>Soirée terminée</span><button type="button" disabled>›</button></div><div class="rot-big"><small>Terminé</small><b>Merci !</b><span>${rot.rounds.length} rondes jouées</span></div><button class="btn-ghost" onclick="rotationStartTimer()">Recommencer</button>`;
   const next = cur.changing ? cur.index + 1 : cur.index;
-  return `<div class="rot-big${cur.changing ? ' chg' : ''}"><small>${cur.changing ? 'Changez de terrain' : 'Ronde ' + (cur.index + 1) + ' sur ' + rot.rounds.length}</small><b>${fmt(cur.left)}</b><span>${cur.changing ? (next < rot.rounds.length ? 'Prochaine : ronde ' + (next + 1) : 'Dernière ronde terminée') : 'Temps restant'}</span></div>
+  const shown = Math.min(next, rot.rounds.length - 1);
+  const nav = `<div class="rot-nav"><button type="button" aria-label="Ronde précédente" ${shown <= 0 ? 'disabled' : ''} onclick="rotationJump(-1)">‹</button><span>Ronde ${shown + 1} sur ${rot.rounds.length}</span><button type="button" aria-label="Ronde suivante" ${shown >= rot.rounds.length - 1 ? 'disabled' : ''} onclick="rotationJump(1)">›</button></div>`;
+  return nav + `<div class="rot-big${cur.changing ? ' chg' : ''}"><small>${cur.changing ? 'Changez de terrain' : 'Chrono indicatif'}</small><b>${fmt(cur.left)}</b><span>${cur.changing ? (next < rot.rounds.length ? 'Prochaine : ronde ' + (next + 1) : 'Dernière ronde terminée') : 'Temps restant'}</span></div>
     <div class="row" style="gap:8px;justify-content:center;"><button class="btn-ghost" onclick="rotationStartTimer()">Recommencer</button><button class="btn-ghost" onclick="rotationStopTimer()">Arrêter</button></div>
     ${next < rot.rounds.length ? rotationCourtsBoardHTML(rot, next) : ''}`;
 }
