@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 432">
+<meta name="app-build" content="Version 433">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3392,7 +3392,37 @@ function renderSheet(){
 }
 // À l'ouverture d'un formulaire sur ordinateur, le curseur est déjà dans le premier champ.
 function focusComposer(id){ try{ if(window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) setTimeout(function(){ const el = document.getElementById(id); if(el) el.focus({ preventScroll:true }); }, 60); }catch(e){} }
-function openPartnerComposer(){ partnerAudEnsure(); MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput'); }
+// Modifier sa propre recherche de partenaire : message, date et heure seulement (le public reste celui choisi).
+let PARTNER_EDIT = null;
+function openEditPartnerPost(id){
+  const p = (PARTNER_POSTS||[]).find(function(x){ return x.id === id; });
+  if(!p || !CURRENT_PROFILE || p.profile_id !== CURRENT_PROFILE.id) return;
+  PARTNER_EDIT = p;
+  const t = p.play_time ? String(p.play_time).slice(0, 5) : '';
+  PARTNER_DRAFT = { message: p.message || '', date: p.play_date || '', time: t, other: !!(p.play_date && !quickDates().some(function(x){ return x[0] === p.play_date; })) };
+  MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput');
+}
+async function savePartnerEdit(btn){
+  if(PARTNER_BUSY || !PARTNER_EDIT) return;
+  savePartnerDraft();
+  const message = String(PARTNER_DRAFT.message || '').trim();
+  if(!message){ partnerStatus("Écris d'abord ton annonce.", 'err'); return; }
+  const play_date = PARTNER_DRAFT.date || null, play_time = (play_date && PARTNER_DRAFT.time) ? PARTNER_DRAFT.time : null;
+  const id = PARTNER_EDIT.id;
+  PARTNER_BUSY = true; if(btn){ btn.disabled = true; btn.textContent = 'Enregistrement…'; }
+  let error = null;
+  try{
+    ({ error } = await sb.from('partner_posts').update({ message: message, play_date: play_date, play_time: play_time }).eq('id', id));
+    if(error && /play_time/.test(error.message || '')) ({ error } = await sb.from('partner_posts').update({ message: message, play_date: play_date }).eq('id', id));
+  }catch(e){ error = e; }
+  PARTNER_BUSY = false;
+  if(error){ if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; } partnerStatus("Impossible d'enregistrer : " + (error.message || 'erreur inconnue') + '.', 'err'); return; }
+  PARTNER_EDIT = null; PARTNER_DRAFT = { message:'', date:'', time:'' };
+  await loadPartnerPosts(CURRENT_LEAGUE_ID);
+  if(MODAL && MODAL.sheet === 'pcompose'){ MODAL_UNDER = null; MODAL = null; }
+  render(); showToast('Annonce modifiée');
+}
+function openPartnerComposer(){ PARTNER_EDIT = null; partnerAudEnsure(); MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput'); }
 // Dates rapides : aujourd'hui, demain, prochain samedi, prochain dimanche.
 function quickDates(){
   const t = new Date(), mk = d=>fmtDate(d), add = n=>new Date(t.getFullYear(), t.getMonth(), t.getDate()+n);
@@ -3418,9 +3448,9 @@ function pcOnType(el){
   const pv = document.getElementById('pcPreview'); if(pv) pv.innerHTML = partnerPreviewHTML();
   const b = document.getElementById('pcSend'); if(b) b.disabled = !pcValid();
 }
-function pcValid(){ return !!(String(PARTNER_DRAFT.message||'').trim() && (PARTNER_AUD.kind !== 'leagues' || PARTNER_AUD.leagues.length) && (PARTNER_AUD.kind !== 'people' || PARTNER_AUD.people.length)); }
+function pcValid(){ if(PARTNER_EDIT) return !!String(PARTNER_DRAFT.message||'').trim(); return !!(String(PARTNER_DRAFT.message||'').trim() && (PARTNER_AUD.kind !== 'leagues' || PARTNER_AUD.leagues.length) && (PARTNER_AUD.kind !== 'people' || PARTNER_AUD.people.length)); }
 function partnerPreviewHTML(){
-  const fake = { id:'apercu', profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id, author_name: myDisplayName(), avatar_url: CURRENT_PROFILE && CURRENT_PROFILE.avatar_url, message: String(PARTNER_DRAFT.message||'').trim() || 'Ton message apparaîtra ici', play_date: PARTNER_DRAFT.date || null, play_time: (PARTNER_DRAFT.date && PARTNER_DRAFT.time) || null, status:'open', interested:[], audience: PARTNER_AUD.kind === 'people' ? 'people' : 'leagues', league_ids: PARTNER_AUD.leagues, target_profiles: PARTNER_AUD.people, created_at: new Date().toISOString() };
+  const fake = { id:'apercu', profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id, author_name: myDisplayName(), avatar_url: CURRENT_PROFILE && CURRENT_PROFILE.avatar_url, message: String(PARTNER_DRAFT.message||'').trim() || 'Ton message apparaîtra ici', play_date: PARTNER_DRAFT.date || null, play_time: (PARTNER_DRAFT.date && PARTNER_DRAFT.time) || null, status:'open', interested:[], audience: PARTNER_EDIT ? PARTNER_EDIT.audience : (PARTNER_AUD.kind === 'people' ? 'people' : 'leagues'), league_id: PARTNER_EDIT ? PARTNER_EDIT.league_id : null, league_ids: PARTNER_EDIT ? PARTNER_EDIT.league_ids : PARTNER_AUD.leagues, target_profiles: PARTNER_EDIT ? PARTNER_EDIT.target_profiles : PARTNER_AUD.people, created_at: new Date().toISOString() };
   return cmxCardHTML({ kind:'pt', dated:!!fake.play_date, past:false, x:fake }, false);
 }
 function partnerComposerSheetHTML(){
@@ -3439,7 +3469,7 @@ function partnerComposerSheetHTML(){
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
         <div class="chat-head-ico"></div>
-        <div class="chat-head-txt"><div class="chat-head-title">Chercher un partenaire</div><div class="chat-head-sub">Une partie, un match amical, un remplaçant</div></div>
+        <div class="chat-head-txt"><div class="chat-head-title">${PARTNER_EDIT ? "Modifier l'annonce" : 'Chercher un partenaire'}</div><div class="chat-head-sub">${PARTNER_EDIT ? 'Message, date et heure' : 'Une partie, un match amical, un remplaçant'}</div></div>
         <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
       </div>
       <div class="sheet-body cmp-body" data-key="pcompose">
@@ -3454,16 +3484,16 @@ function partnerComposerSheetHTML(){
           ${(D.other || !isQuick) ? `<label class="pc-field"><span>Date</span><input type="date" id="partnerDateInput" min="${today}" onchange="savePartnerDraft();renderSheet()" value="${escapeHTML(D.date||'')}"></label>` : `<input type="hidden" id="partnerDateInput" value="${escapeHTML(D.date||'')}">`}
           ${D.date ? `<label class="pc-field"><span>Heure (facultatif)</span><input type="time" id="partnerTimeInput" onchange="savePartnerDraft();pcOnType(document.getElementById('partnerMessageInput'))" value="${escapeHTML(D.time||'')}"></label>` : ''}
         </div>` : `<input type="hidden" id="partnerDateInput" value="">`}
-        <div class="an-sec">Pour qui ?</div>
+        ${PARTNER_EDIT ? `<div class="an-sec">Pour qui ?</div><p class="ah-meta" style="margin:0 2px;">${escapeHTML(partnerAudienceTag(PARTNER_EDIT) || 'Public choisi à la publication')} · ne peut pas être changé.</p>` : `<div class="an-sec">Pour qui ?</div>
         <div class="an-aud">${cards.map(c=>`<button type="button" class="an-card ${A.kind===c[0]?'on':''}" onclick="pcSetAud('${c[0]}')"><span class="an-card-ic">${c[1]}</span><b>${c[2]}</b><small>${escapeHTML(c[3])}</small></button>`).join('')}</div>
-        ${detail}
+        ${detail}`}
         <div class="an-sec">Aperçu</div>
         <div id="pcPreview" class="pc-preview">${partnerPreviewHTML()}</div>
         <div id="partnerStatus" class="pc-status"></div>
       </div>
       <div class="an-foot">
-        <div class="an-to"><small>Pour</small><b>${escapeHTML(to)}</b></div>
-        <button type="button" class="btn btn-primary an-send" id="pcSend" ${pcValid()?'':'disabled'} onclick="createPartnerPost(this)">Publier</button>
+        <div class="an-to"><small>Pour</small><b>${escapeHTML(PARTNER_EDIT ? (partnerAudienceTag(PARTNER_EDIT) || '—') : to)}</b></div>
+        ${PARTNER_EDIT ? `<button type="button" class="btn btn-primary an-send" id="pcSend" ${String(D.message||'').trim()?'':'disabled'} onclick="savePartnerEdit(this)">Enregistrer</button>` : `<button type="button" class="btn btn-primary an-send" id="pcSend" ${pcValid()?'':'disabled'} onclick="createPartnerPost(this)">Publier</button>`}
       </div>
     </div>
   </div>`;
@@ -3588,6 +3618,7 @@ function partnerPostDetailInnerHTML(id){
     ${attendanceHTML({ going: all, singular: 'partant', plural: 'partants', goingTitle: 'Partants', empty: '', badgeFor: function(x){ return x.profile_id === p.profile_id ? 'Organise' : ''; } })}
     <div class="row" style="gap:6px;margin-top:16px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
       ${!closed && !mine ? `<button class="btn ${iAmIn?'btn-secondary':'btn-primary'}" style="width:auto;min-height:44px;padding:8px 16px;font-size:15px;border-radius:14px;" onclick="togglePartnerInterest('${p.id}')">${iAmIn ? 'Partant(e) — retirer' : 'Je suis partant(e) !'}</button>` : ''}
+      ${mine ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="closeModal();openEditPartnerPost('${p.id}')">Modifier</button>` : ''}
       ${canManage ? `<button class="btn-ghost" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="togglePartnerStatus('${p.id}')">${closed?'Rouvrir':'Marquer comblée'}</button>` : ''}
       ${canManage ? `<button class="btn-ghost-danger" style="min-height:44px;padding:8px 14px;font-size:15px;" onclick="deletePartnerPost('${p.id}')">Supprimer</button>` : ''}
     </div>`;
