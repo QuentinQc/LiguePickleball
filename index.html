@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 431">
+<meta name="app-build" content="Version 432">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3006,6 +3006,8 @@ function partnerAudienceTag(p){
     const t = Array.isArray(p.target_profiles) ? p.target_profiles : [];
     const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
     if(mine){ const names = t.map(orgPersonName).filter(Boolean); return 'Pour ' + (names.length ? names.slice(0,3).join(', ') + (names.length>3 ? ' +' + (names.length-3) : '') : t.length + ' joueur' + (t.length>1?'s':'')); }
+    // Les joueurs ciblés ne voient aucune mention du public ; seuls l'auteur et l'équipe (admins, organisateurs) la voient.
+    if(!isStaff()) return '';
     return t.length > 1 ? 'Annonce ciblée · ' + t.length + ' joueurs' : 'Annonce personnelle';
   }
   return 'Toute l\'organisation';
@@ -3546,7 +3548,7 @@ function partnerPostsListHTML(){
         <div class="pc-who"><div class="pc-name">${escapeHTML(p.author_name)}</div><div class="small">${partnerRelTime(p.created_at)}</div></div>
         <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
       </div>
-      <div class="pc-aud-tag">${escapeHTML(partnerAudienceTag(p))}</div>
+      ${partnerAudienceTag(p) ? `<div class="pc-aud-tag">${escapeHTML(partnerAudienceTag(p))}</div>` : ''}
       ${when}
       <div class="pc-msg">${escapeHTML(p.message)}</div>
       ${(act||cnt) ? `<div class="pc-foot">${act}${cnt}</div>` : ''}
@@ -3580,7 +3582,7 @@ function partnerPostDetailInnerHTML(id){
       </div>
       <span class="pill ${closed?'pill-gray':'pill-green'}">${closed?'Comblé':'Ouvert'}</span>
     </div>
-    <div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>
+    ${partnerAudienceTag(p) ? `<div class="pc-aud-tag" style="margin-top:10px;">${escapeHTML(partnerAudienceTag(p))}</div>` : ''}
     ${p.play_date ? `<div class="small" style="margin-top:10px;color:var(--muted);">${escapeHTML(partnerDateLabel(p.play_date))}${p.play_time ? ' ·'+escapeHTML(fmtHM(p.play_time)) : ''}</div>` : ''}
     <div style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">${escapeHTML(p.message)}</div>
     ${attendanceHTML({ going: all, singular: 'partant', plural: 'partants', goingTitle: 'Partants', empty: '', badgeFor: function(x){ return x.profile_id === p.profile_id ? 'Organise' : ''; } })}
