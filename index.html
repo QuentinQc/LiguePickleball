@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 435">
+<meta name="app-build" content="Version 436">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1314,6 +1314,8 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .pc-aud-sw{margin:0;padding:0;flex-wrap:wrap;overflow:visible;}
 .pc-aud-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
 .pc-aud-seg button{padding:8px 4px;font-size:13px;text-align:center;}
+.rl-roles{margin-top:12px;}
+.rl-roles-l{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 2px 6px;}
 .pc-aud-note{font-size:12px;color:var(--muted);}
 .pc-people{display:flex;flex-wrap:wrap;gap:6px;}
 .pc-person{display:inline-flex;align-items:center;gap:6px;background:rgba(207,234,92,.14);color:var(--ball);border-radius:999px;padding:6px 6px 6px 12px;font-size:14px;font-weight:600;}
@@ -2494,7 +2496,16 @@ function notifyAdminsSubAvailable(subName, sessionDate){
 }
 // Annonce libre écrite par l'admin : à toute l'organisation, à une ligue, ou à des joueurs choisis.
 // Panneau « Nouvelle annonce » : état dans ANN_AUD, pour qu'un rafraîchissement de l'écran garde tout.
-let ANN_AUD = { kind:'leagues', leagues:[], people:[], text:'', q:'', sending:false, result:null };
+let ANN_AUD = { kind:'leagues', leagues:[], people:[], roles:'all', text:'', q:'', sending:false, result:null };
+// Dans les ligues choisies : tout le monde, joueurs seulement ou remplaçants seulement (annonces, événements, partenaires).
+function leagueRolesOf(r){ return (r === 'players' || r === 'subs') ? r : 'all'; }
+function leagueRolesHTML(cur, fn){
+  const opts = [['all','Tous'],['players','Joueurs'],['subs','Remplaçants']];
+  cur = leagueRolesOf(cur);
+  return `<div class="rl-roles"><span class="rl-roles-l">Dans ces ligues</span><div class="ah-switch pc-aud-sw pc-aud-seg">${opts.map(o=>`<button type="button" class="${cur===o[0]?'on':''}" onclick="${fn}('${o[0]}')">${o[1]}</button>`).join('')}</div></div>`;
+}
+function leagueRolesSuffix(r){ r = leagueRolesOf(r); return r === 'players' ? ' · joueurs' : (r === 'subs' ? ' · remplaçants' : ''); }
+function linkMatchesRoles(l, r){ r = leagueRolesOf(r); return r === 'all' || (r === 'players' ? !l.substitute_id : !!l.substitute_id); }
 // Noms des ligues choisies, pour les titres et les étiquettes.
 function leagueNamesLabel(ids){ return (ids||[]).map(function(id){ const l = LEAGUES.find(function(x){ return x.id===id; }); return l ? l.name : null; }).filter(Boolean).join(', '); }
 function toggleInList(arr, id){ const i = arr.indexOf(id); if(i === -1) arr.push(id); else arr.splice(i, 1); return arr; }
@@ -2504,7 +2515,7 @@ function annOrgName(){ const lg = annOrgLeagues()[0]; return (lg && lg.organizat
 function annAccountCount(kind){
   if(kind === 'people') return ANN_AUD.people.length;
   const ids = ANN_AUD.leagues.slice();
-  const set = {}; (ALL_PROFILE_PLAYERS||[]).forEach(function(l){ if(ids.indexOf(l.league_id) !== -1) set[l.profile_id] = 1; });
+  const set = {}; (ALL_PROFILE_PLAYERS||[]).forEach(function(l){ if(ids.indexOf(l.league_id) !== -1 && linkMatchesRoles(l, ANN_AUD.roles)) set[l.profile_id] = 1; });
   return (ALL_PROFILE_PLAYERS||[]).length ? Object.keys(set).length : null;
 }
 function annTitle(){
@@ -2517,7 +2528,7 @@ function annTitle(){
 function openSendAnnouncementModal(){
   const leagues = annOrgLeagues();
   const cur = (leagues.find(l=>l.id===CURRENT_LEAGUE_ID) || leagues[0] || {}).id;
-  ANN_AUD = { kind:'leagues', leagues: cur ? [cur] : [], people:[], text:'', q:'', sending:false, result:null };
+  ANN_AUD = { kind:'leagues', leagues: cur ? [cur] : [], people:[], roles:'all', text:'', q:'', sending:false, result:null };
   setModal({ kind:'content', sheet:'annonce' });
   render();
 }
@@ -2539,7 +2550,7 @@ function annSheetHTML(){
     const cards = [['leagues','','Ligues', a.leagues.length ? a.leagues.length + ' choisie' + (a.leagues.length>1?'s':'') : 'À choisir'],['people','','Des joueurs', a.people.length ? a.people.length + ' choisi' + (a.people.length>1?'s':'') : 'À choisir']];
     let detail = '';
     if(a.kind === 'leagues'){
-      detail = `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${a.leagues.indexOf(l.id)!==-1?'on':''}" onclick="setAnnLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div><div class="ah-meta" style="margin:8px 2px 0;font-size:12px;">Touche une ou plusieurs ligues.</div>`;
+      detail = `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${a.leagues.indexOf(l.id)!==-1?'on':''}" onclick="setAnnLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div><div class="ah-meta" style="margin:8px 2px 0;font-size:12px;">Touche une ou plusieurs ligues.</div>` + leagueRolesHTML(a.roles, 'setAnnRoles');
     } else if(a.kind === 'people'){
       const list = ORG_PEOPLE[org];
       detail = `<input type="search" class="pp-search an-search" placeholder="Rechercher un nom…" value="${escapeHTML(a.q||'')}" oninput="ANN_AUD.q=this.value;filterAnnPeople(this.value)" autocomplete="off">
@@ -2560,7 +2571,7 @@ function annSheetHTML(){
       <div class="ah-meta" style="font-size:12px;margin:8px 2px 0;">La notification n'arrive que chez les personnes qui l'ont activée ; elle reste aussi dans leur cloche pendant 14 jours.</div>`;
   }
   const valid = (a.text||'').trim() && (a.kind !== 'leagues' || a.leagues.length) && (a.kind !== 'people' || a.people.length);
-  const to = a.kind === 'leagues' ? (leagueNamesLabel(a.leagues) || '—') : (a.people.length ? a.people.length + ' joueur' + (a.people.length>1?'s':'') : 'personne');
+  const to = a.kind === 'leagues' ? ((leagueNamesLabel(a.leagues) || '—') + (a.leagues.length ? leagueRolesSuffix(a.roles) : '')) : (a.people.length ? a.people.length + ' joueur' + (a.people.length>1?'s':'') : 'personne');
   const n = annAccountCount(a.kind);
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet an-sheet">
@@ -2605,6 +2616,7 @@ function setAnnAudience(k){
   render();
 }
 function setAnnLeague(id){ toggleInList(ANN_AUD.leagues, id); render(); }
+function setAnnRoles(r){ ANN_AUD.roles = leagueRolesOf(r); render(); }
 function annPeopleListHTML(list){
   const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   const q = String(ANN_AUD.q||'').toLowerCase().trim();
@@ -2763,9 +2775,11 @@ function sendAnnouncement(){
   if(a.kind === 'leagues' && !a.leagues.length) return;
   if(a.kind === 'people' && !a.people.length) return;
   const org = partnerOrgId();
+  const annRole = a.kind === 'leagues' ? leagueRolesOf(a.roles) : 'all';
   const payload = (a.kind === 'leagues' && a.leagues.length === 1)
     ? { league_id: a.leagues[0], category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome }
     : { organization_id: org, league_ids: a.kind === 'leagues' ? a.leagues.slice() : (isOrganizerOnly() ? ORGANIZER_LEAGUES.slice() : undefined), profile_ids: a.kind === 'people' ? a.people.slice() : undefined, category:'league_announce', title: annTitle(), body: text, url: goUrl('annonce'), welcome: !!a.welcome };
+  if(annRole !== 'all') payload.audience = annRole === 'players' ? 'players' : 'substitutes';
   a.sending = true; render();
   sbInvoke('send-session-notification', { body: payload }).then(function(r){
     a.sending = false;
@@ -2922,7 +2936,7 @@ async function cleanupExpiredPartnerPosts(orgId){
   await sb.from('partner_posts').delete().eq('organization_id', orgId).eq('status', 'closed').lt('closed_at', cutoff);
 }
 // ---- Public d'une annonce : toute l'organisation, une ligue, ou des joueurs choisis ----
-let PARTNER_AUD = { kind:'leagues', leagues:[], people:[] };
+let PARTNER_AUD = { kind:'leagues', leagues:[], people:[], roles:'all' };
 // Par défaut : la ligue affichée (ou la seule ligue de la personne).
 function partnerAudEnsure(){
   if(PARTNER_AUD.kind !== 'people') PARTNER_AUD.kind = 'leagues';
@@ -2963,6 +2977,7 @@ function setPartnerAudience(k){
   render();
 }
 function setPartnerLeague(id){ savePartnerDraft(); toggleInList(PARTNER_AUD.leagues, id); render(); }
+function setPartnerRoles(r){ savePartnerDraft(); PARTNER_AUD.roles = leagueRolesOf(r); render(); }
 function removePartnerPerson(id){ savePartnerDraft(); PARTNER_AUD.people = PARTNER_AUD.people.filter(x=>x!==id); render(); }
 async function openPartnerPeoplePicker(){
   savePartnerDraft();
@@ -2990,7 +3005,7 @@ function partnerAudienceHTML(){
   const seg = [['leagues','Ligues'],['people','Des joueurs']];
   let h = `<div class="pc-aud"><span class="pc-aud-l">Pour qui ?</span><div class="ah-switch pc-aud-sw pc-aud-seg">${seg.map(([k,l])=>`<button type="button" class="${a.kind===k?'on':''}" onclick="setPartnerAudience('${k}')">${l}</button>`).join('')}</div>`;
   if(a.kind === 'leagues'){
-    h += leagues.length ? `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${a.leagues.indexOf(l.id)!==-1?'on':''}" onclick="setPartnerLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div><div class="pc-aud-note">Visible seulement par les membres des ligues choisies.</div>`
+    h += leagues.length ? `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${a.leagues.indexOf(l.id)!==-1?'on':''}" onclick="setPartnerLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>${leagueRolesHTML(a.roles, 'setPartnerRoles')}<div class="pc-aud-note">${leagueRolesOf(a.roles) === 'players' ? 'Visible seulement par les joueurs des ligues choisies.' : (leagueRolesOf(a.roles) === 'subs' ? 'Visible seulement par les remplaçants des ligues choisies.' : 'Visible seulement par les membres des ligues choisies.')}</div>`
       : `<div class="pc-aud-note">Aucune ligue disponible.</div>`;
   }
   if(a.kind === 'people'){
@@ -3000,8 +3015,8 @@ function partnerAudienceHTML(){
 }
 function partnerAudienceTag(p){
   const aud = p.audience || (p.league_id ? 'league' : 'org');
-  if(aud === 'league'){ const lg = LEAGUES.find(l=>l.id===p.league_id); return '' + (lg ? lg.name : 'Ligue'); }
-  if(aud === 'leagues'){ const nm = leagueNamesLabel(p.league_ids); return nm || ((p.league_ids||[]).length + ' ligues'); }
+  if(aud === 'league'){ const lg = LEAGUES.find(l=>l.id===p.league_id); return '' + (lg ? lg.name : 'Ligue') + leagueRolesSuffix(p.league_roles); }
+  if(aud === 'leagues'){ const nm = leagueNamesLabel(p.league_ids); return (nm || ((p.league_ids||[]).length + ' ligues')) + leagueRolesSuffix(p.league_roles); }
   if(aud === 'people'){
     const t = Array.isArray(p.target_profiles) ? p.target_profiles : [];
     const mine = CURRENT_PROFILE && p.profile_id === CURRENT_PROFILE.id;
@@ -3040,6 +3055,7 @@ async function createPartnerPost(btn){
   const row = { organization_id: org, audience: aud === 'people' ? 'people' : (oneLeague ? 'league' : 'leagues'), league_id: oneLeague ? PARTNER_AUD.leagues[0] : null, target_profiles: aud === 'people' ? PARTNER_AUD.people.slice() : [], profile_id: CURRENT_PROFILE.id, author_name, avatar_url: CURRENT_PROFILE.avatar_url || null, message, play_date };
   if(play_time) row.play_time = play_time;
   if(row.audience === 'leagues') row.league_ids = PARTNER_AUD.leagues.slice();
+  if(row.audience !== 'people') row.league_roles = leagueRolesOf(PARTNER_AUD.roles);
   PARTNER_BUSY = true;
   if(btn){ btn.disabled = true; btn.textContent = 'Publication…'; }
   partnerStatus('', '');
@@ -3404,8 +3420,8 @@ function openEditPartnerPost(id){
   PARTNER_EDIT = p;
   // Public modifiable (même type) : personnes ajoutées/retirées, ou ligues ajoutées/retirées.
   PARTNER_AUD = p.audience === 'people'
-    ? { kind:'people', leagues:[], people:(p.target_profiles||[]).slice() }
-    : { kind:'leagues', leagues: (p.league_ids && p.league_ids.length ? p.league_ids.slice() : (p.league_id ? [p.league_id] : [])), people:[] };
+    ? { kind:'people', leagues:[], people:(p.target_profiles||[]).slice(), roles:'all' }
+    : { kind:'leagues', leagues: (p.league_ids && p.league_ids.length ? p.league_ids.slice() : (p.league_id ? [p.league_id] : [])), people:[], roles: leagueRolesOf(p.league_roles) };
   if(p.audience === 'people' && !ORG_PEOPLE[partnerOrgId()]) loadOrgPeople().then(function(){ if(MODAL && MODAL.sheet === 'pcompose') renderSheet(); });
   const t = p.play_time ? String(p.play_time).slice(0, 5) : '';
   PARTNER_DRAFT = { message: p.message || '', date: p.play_date || '', time: t, other: !!(p.play_date && !quickDates().some(function(x){ return x[0] === p.play_date; })) };
@@ -3429,24 +3445,26 @@ async function savePartnerEdit(btn){
       if(!PARTNER_AUD.leagues.length){ PARTNER_BUSY = false; if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; } partnerStatus('Choisis au moins une ligue.', 'err'); return; }
       if(PARTNER_AUD.leagues.length === 1){ upd.audience = 'league'; upd.league_id = PARTNER_AUD.leagues[0]; upd.league_ids = []; }
       else { upd.audience = 'leagues'; upd.league_id = null; upd.league_ids = PARTNER_AUD.leagues.slice(); }
+      upd.league_roles = leagueRolesOf(PARTNER_AUD.roles);
     }
     // On n'envoie le public que s'il a vraiment changé.
     const same = function(a, b){ return (a||[]).slice().sort().join(',') === (b||[]).slice().sort().join(','); };
     const o = PARTNER_EDIT;
     if(upd.target_profiles && same(upd.target_profiles, o.target_profiles)) delete upd.target_profiles;
     if(upd.audience && upd.audience === o.audience && (upd.league_id || null) === (o.league_id || null) && same(upd.league_ids, o.league_ids)){ delete upd.audience; delete upd.league_id; delete upd.league_ids; }
+    if(upd.league_roles && upd.league_roles === leagueRolesOf(o.league_roles)) delete upd.league_roles;
     ({ error } = await sb.from('partner_posts').update(upd).eq('id', id));
     if(error && /Public et auteur/.test(error.message || '')) error = { message: "le changement de public n'est pas encore activé sur le serveur" };
     if(error && /play_time/.test(error.message || '')){ delete upd.play_time; ({ error } = await sb.from('partner_posts').update(upd).eq('id', id)); }
   }catch(e){ error = e; }
   PARTNER_BUSY = false;
   if(error){ if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; } partnerStatus("Impossible d'enregistrer : " + (error.message || 'erreur inconnue') + '.', 'err'); return; }
-  PARTNER_EDIT = null; PARTNER_DRAFT = { message:'', date:'', time:'' };
+  PARTNER_EDIT = null; PARTNER_AUD.roles = 'all'; PARTNER_DRAFT = { message:'', date:'', time:'' };
   await loadPartnerPosts(CURRENT_LEAGUE_ID);
   if(MODAL && MODAL.sheet === 'pcompose'){ MODAL_UNDER = null; MODAL = null; }
   render(); showToast('Annonce modifiée');
 }
-function openPartnerComposer(){ PARTNER_EDIT = null; partnerAudEnsure(); MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput'); }
+function openPartnerComposer(){ if(PARTNER_EDIT) PARTNER_AUD.roles = 'all'; PARTNER_EDIT = null; partnerAudEnsure(); MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pcompose', title:'' }; render(); focusComposer('partnerMessageInput'); }
 // Dates rapides : aujourd'hui, demain, prochain samedi, prochain dimanche.
 function quickDates(){
   const t = new Date(), mk = d=>fmtDate(d), add = n=>new Date(t.getFullYear(), t.getMonth(), t.getDate()+n);
@@ -3465,6 +3483,7 @@ function pcSetAud(k){
   renderSheet();
 }
 function pcSetLeague(id){ savePartnerDraft(); toggleInList(PARTNER_AUD.leagues, id); renderSheet(); }
+function pcSetRoles(r){ savePartnerDraft(); PARTNER_AUD.roles = leagueRolesOf(r); renderSheet(); }
 function pcTogglePerson(id){ savePartnerDraft(); const i = PARTNER_AUD.people.indexOf(id); if(i === -1) PARTNER_AUD.people.push(id); else PARTNER_AUD.people.splice(i, 1); renderSheet(); }
 function pcOnType(el){
   savePartnerDraft();
@@ -3474,7 +3493,7 @@ function pcOnType(el){
 }
 function pcValid(){ if(PARTNER_EDIT) return !!String(PARTNER_DRAFT.message||'').trim() && (PARTNER_EDIT.audience !== 'people' || PARTNER_AUD.people.length > 0) && (PARTNER_EDIT.audience === 'people' || PARTNER_EDIT.audience === 'org' || PARTNER_AUD.leagues.length > 0); return !!(String(PARTNER_DRAFT.message||'').trim() && (PARTNER_AUD.kind !== 'leagues' || PARTNER_AUD.leagues.length) && (PARTNER_AUD.kind !== 'people' || PARTNER_AUD.people.length)); }
 function partnerPreviewHTML(){
-  const fake = { id:'apercu', profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id, author_name: myDisplayName(), avatar_url: CURRENT_PROFILE && CURRENT_PROFILE.avatar_url, message: String(PARTNER_DRAFT.message||'').trim() || 'Ton message apparaîtra ici', play_date: PARTNER_DRAFT.date || null, play_time: (PARTNER_DRAFT.date && PARTNER_DRAFT.time) || null, status:'open', interested:[], audience: (PARTNER_EDIT && PARTNER_EDIT.audience === 'org') ? 'org' : (PARTNER_AUD.kind === 'people' ? 'people' : 'leagues'), league_ids: PARTNER_AUD.leagues, target_profiles: PARTNER_AUD.people, created_at: new Date().toISOString() };
+  const fake = { id:'apercu', profile_id: CURRENT_PROFILE && CURRENT_PROFILE.id, author_name: myDisplayName(), avatar_url: CURRENT_PROFILE && CURRENT_PROFILE.avatar_url, message: String(PARTNER_DRAFT.message||'').trim() || 'Ton message apparaîtra ici', play_date: PARTNER_DRAFT.date || null, play_time: (PARTNER_DRAFT.date && PARTNER_DRAFT.time) || null, status:'open', interested:[], audience: (PARTNER_EDIT && PARTNER_EDIT.audience === 'org') ? 'org' : (PARTNER_AUD.kind === 'people' ? 'people' : 'leagues'), league_ids: PARTNER_AUD.leagues, league_roles: PARTNER_AUD.roles, target_profiles: PARTNER_AUD.people, created_at: new Date().toISOString() };
   return cmxCardHTML({ kind:'pt', dated:!!fake.play_date, past:false, x:fake }, false);
 }
 function partnerComposerSheetHTML(){
@@ -3486,9 +3505,9 @@ function partnerComposerSheetHTML(){
   const ini = n=> (n||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   const cards = [['leagues','','Ligues', A.leagues.length ? A.leagues.length + ' choisie' + (A.leagues.length>1?'s':'') : 'À choisir'],['people','','Des joueurs', A.people.length ? A.people.length + ' choisi' + (A.people.length>1?'s':'') : 'À choisir']];
   let detail = '';
-  if(A.kind === 'leagues') detail = leagues.length ? `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${A.leagues.indexOf(l.id)!==-1?'on':''}" onclick="pcSetLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>` : `<p class="ah-meta" style="padding:12px 2px;">Aucune ligue disponible.</p>`;
+  if(A.kind === 'leagues') detail = leagues.length ? `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${A.leagues.indexOf(l.id)!==-1?'on':''}" onclick="pcSetLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>${leagueRolesHTML(A.roles, 'pcSetRoles')}` : `<p class="ah-meta" style="padding:12px 2px;">Aucune ligue disponible.</p>`;
   if(A.kind === 'people') detail = people ? `<div class="pf-list an-people" style="margin-top:10px;">${people.length ? people.map(x=>{ const on = A.people.indexOf(x.id) !== -1; return `<button type="button" class="pf-row an-person ${on?'on':''}" onclick="pcTogglePerson('${x.id}')"><span class="member-avatar">${escapeHTML(ini(x.name))}</span><span class="t">${escapeHTML(x.name)}</span><span class="an-check">${on?'✓':''}</span></button>`; }).join('') : `<p class="ah-meta" style="padding:12px;">Personne d'autre n'a encore de compte dans l'organisation.</p>`}</div>` : `<p class="ah-meta" style="padding:12px;">Chargement…</p>`;
-  const to = A.kind === 'leagues' ? (leagueNamesLabel(A.leagues) || '—') : (A.people.length ? A.people.length + ' joueur' + (A.people.length>1?'s':'') : 'personne');
+  const to = A.kind === 'leagues' ? ((leagueNamesLabel(A.leagues) || '—') + (A.leagues.length ? leagueRolesSuffix(A.roles) : '')) : (A.people.length ? A.people.length + ' joueur' + (A.people.length>1?'s':'') : 'personne');
   return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
@@ -3789,13 +3808,14 @@ function socialEventFormHTML(e){
       <div id="eventStatus" class="pc-status"></div>
     </div>`;
 }
-let EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'', leagues:[] };
+let EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'', leagues:[], roles:'all' };
 function eventLeagueChoices(){ const org = currentLeagueOrgId(); return LEAGUES.filter(function(l){ return l.organization_id === org && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1); }); }
 function evDefaultLeagues(){ const ch = eventLeagueChoices().map(function(l){ return l.id; }); return ch.length ? [ch.indexOf(CURRENT_LEAGUE_ID) !== -1 ? CURRENT_LEAGUE_ID : ch[0]] : []; }
 function evToggleLeague(id){ evSave(); toggleInList(EVENT_DRAFT.leagues, id); renderSheet(); }
 // Étiquette des ligues visées par un événement (rien pour un ancien événement ouvert à toute l'organisation).
-function eventLeaguesTagHTML(e){ const nm = leagueNamesLabel(e.league_ids); return nm ? ' <span class="tag">' + escapeHTML(nm) + '</span>' : ''; }
-function openNewSocialEventModal(){ EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'', leagues: evDefaultLeagues() }; MODAL_UNDER = null; MODAL = { kind:'content', sheet:'ecompose', title:'' }; render(); focusComposer('eventTitleInput'); }
+function eventLeaguesTagHTML(e){ const nm = leagueNamesLabel(e.league_ids); return nm ? ' <span class="tag">' + escapeHTML(nm + leagueRolesSuffix(e.league_roles)) + '</span>' : ''; }
+function evSetRoles(r){ evSave(); EVENT_DRAFT.roles = leagueRolesOf(r); renderSheet(); }
+function openNewSocialEventModal(){ EVENT_DRAFT = { id:null, title:'', description:'', date:'', time:'', location:'', leagues: evDefaultLeagues(), roles:'all' }; MODAL_UNDER = null; MODAL = { kind:'content', sheet:'ecompose', title:'' }; render(); focusComposer('eventTitleInput'); }
 function evSave(){
   const g = (id, k)=>{ const el = document.getElementById(id); if(el) EVENT_DRAFT[k] = el.value; };
   g('eventTitleInput','title'); g('eventDescInput','description'); g('eventDateInput','date'); g('eventTimeInput','time'); g('eventLocationInput','location');
@@ -3835,12 +3855,13 @@ function eventComposerSheetHTML(){
         <textarea id="eventDescInput" rows="3" maxlength="500" oninput="evSave()" placeholder="Quoi apporter, comment s'inscrire, prix…">${escapeHTML(E.description||'')}</textarea>
         <div class="an-sec">Pour qui ?</div>
         <div class="an-chips" style="margin-top:0;">${eventLeagueChoices().map(l=>`<button type="button" class="an-chip ${(E.leagues||[]).indexOf(l.id)!==-1?'on':''}" onclick="evToggleLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>
+        ${leagueRolesHTML(E.roles, 'evSetRoles')}
         <div class="an-sec">Aperçu</div>
         <div id="evPreview" class="pc-preview">${eventPreviewHTML()}</div>
         <div id="eventStatus" class="pc-status"></div>
       </div>
       <div class="an-foot">
-        <div class="an-to"><small>Pour</small><b>${escapeHTML(leagueNamesLabel(E.leagues) || '—')}</b></div>
+        <div class="an-to"><small>Pour</small><b>${escapeHTML((leagueNamesLabel(E.leagues) || '—') + ((E.leagues||[]).length ? leagueRolesSuffix(E.roles) : ''))}</b></div>
         <button type="button" class="btn btn-primary an-send" id="evSend" ${(String(E.title||'').trim() && E.date && (E.leagues||[]).length)?'':'disabled'} onclick="evSave();saveSocialEvent(${editing?`'${E.id}'`:'null'}, this)">${editing ? 'Enregistrer' : 'Publier'}</button>
       </div>
     </div>
@@ -3851,7 +3872,7 @@ function openEditSocialEventModal(id){
   if(!e) return;
   // Ancien événement ouvert à toute l'organisation : toutes les ligues cochées.
   const lids = (e.league_ids && e.league_ids.length) ? e.league_ids.slice() : eventLeagueChoices().map(function(l){ return l.id; });
-  EVENT_DRAFT = { id:e.id, title:e.title||'', description:e.description||'', date:e.event_date||'', time:e.event_time||'', location:e.location||'', leagues: lids };
+  EVENT_DRAFT = { id:e.id, title:e.title||'', description:e.description||'', date:e.event_date||'', time:e.event_time||'', location:e.location||'', leagues: lids, roles: leagueRolesOf(e.league_roles) };
   MODAL_UNDER = null; MODAL = { kind:'content', sheet:'ecompose', title:'' }; render();
 }
 async function saveSocialEvent(id, btn){
@@ -3867,7 +3888,7 @@ async function saveSocialEvent(id, btn){
   if(!(EVENT_DRAFT.leagues||[]).length){ fail("Choisis au moins une ligue."); return; }
   if(!CURRENT_PROFILE || !orgId){ fail("Organisation introuvable : reconnecte-toi."); return; }
   if(btn){ btn.disabled = true; btn.textContent = 'Enregistrement…'; }
-  const payload = { organization_id: orgId, title: title.trim(), description: (description||'').trim() || null, event_date: date, event_time: time || null, location: (location||'').trim() || null, league_ids: EVENT_DRAFT.leagues.slice() };
+  const payload = { organization_id: orgId, title: title.trim(), description: (description||'').trim() || null, event_date: date, event_time: time || null, location: (location||'').trim() || null, league_ids: EVENT_DRAFT.leagues.slice(), league_roles: leagueRolesOf(EVENT_DRAFT.roles) };
   let error;
   if(id){
     ({ error } = await sb.from('social_events').update(payload).eq('id', id));
