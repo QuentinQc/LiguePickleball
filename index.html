@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 444">
+<meta name="app-build" content="Version 445">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1722,6 +1722,11 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .rg-n{width:22px;flex:none;font-size:13px;color:var(--muted);text-align:right;}
 .rg-name{flex:1;min-width:0;font-size:15px;display:flex;flex-direction:column;}
 .rg-name small{font-size:12px;color:#FF9F0A;}
+.rg-name small.rg-sub{color:var(--muted);}
+.rg-tag{flex:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);border:1px solid rgba(207,234,92,.4);}
+.rg-abs{margin-top:12px;}
+.rg-abs .rg-name small{color:var(--muted);}
+.rg-abs .rg-tag{background:rgba(255,159,10,.14);color:#FF9F0A;border-color:rgba(255,159,10,.4);}
 .rg-r{flex:none;font-family:var(--font-display);font-size:16px;color:var(--text);}
 .rl-banner{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:12px 14px;border-radius:18px;border:1px solid rgba(255,214,10,.35);background:rgba(255,214,10,.08);color:var(--text);font:inherit;text-align:left;cursor:pointer;}
 .rl-t{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -12696,33 +12701,72 @@ function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
 // ---- Rapport « Composition des groupes » : pour travailler à plusieurs sur la composition de départ ----
 function rgRating(p){ return typeof p.rating === 'number' ? p.rating : RATING_DEFAULT; }
 function rgFmt(n){ return n.toFixed(2).replace('.', ','); }
+// Personne qui joue dans un groupe pendant la session (joueur, remplaçant, joueur prêté, invité).
+function rgPerson(id){
+  if(isSubPoolId(id)){ const x = (DATA.substitutePool||[]).find(function(q){ return 'sub::' + q.id === id; }); return { id: id, name: x ? x.name : playerName(id), rating: x ? x.rating : null }; }
+  const p = DATA.players.find(function(q){ return q.id === id; });
+  return p ? { id: id, name: p.name, rating: p.rating } : { id: id, name: playerName(id), rating: null };
+}
 function reportsGroupsData(){
+  // Session en cours : état en temps réel de chaque groupe (qui joue ce soir), les absents à part.
+  const open = (!isRecLeague() && DATA.leagueFormat !== 'mlp') ? currentOpenSession() : null;
+  const absents = [];
   const groups = groupsSorted().map(function(g){
     // Même ordre que dans l'app (position dans le groupe), pas un tri par cote.
-    const pl = playersInGroup(g.id).slice().sort(function(a,b){ return (typeof a.order==='number'?a.order:0) - (typeof b.order==='number'?b.order:0) || a.name.localeCompare(b.name); });
+    let pl = playersInGroup(g.id).slice().sort(function(a,b){ return (typeof a.order==='number'?a.order:0) - (typeof b.order==='number'?b.order:0) || a.name.localeCompare(b.name); });
+    if(open){
+      const gd = open.groupsData.find(function(x){ return x.groupId === g.id; }) || {};
+      const subs = gd.substitutes || {};
+      const out = function(p){ return p.injured || isAbsent(open, p.id); };
+      const live = pl.filter(function(p){ return !out(p); }).map(function(p){ return { id: p.id, name: p.name, rating: p.rating, tag: '', sub: '' }; });
+      pl.forEach(function(p){
+        if(!out(p) || (open.loans && open.loans[p.id])) return; // prêté : il joue ailleurs, il n'est pas absent
+        const by = subs[p.id];
+        if(by){
+          const x = rgPerson(by), home = !isGuestOrSubId(by) ? DATA.players.find(function(q){ return q.id === by; }) : null;
+          const hg = home ? groupById(home.groupId) : null;
+          live.push({ id: by, name: x.name, rating: x.rating, tag: isGuestId(by) ? 'Invité' : (home ? 'Prêté' : 'Remplaçant'), sub: 'remplace ' + p.name + (hg && hg.id !== g.id ? ' · vient du ' + hg.name : '') });
+        }
+        absents.push({ id: p.id, name: p.name, rating: p.rating, group: g.name, reason: p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)'), by: by ? rgPerson(by).name : null });
+      });
+      (gd.extras || []).forEach(function(x){ const q = rgPerson(x); live.push({ id: x, name: q.name, rating: q.rating, tag: isGuestId(x) ? 'Invité' : 'Remplaçant', sub: 'en plus pour cette session' }); });
+      pl = live;
+    }
     const r = pl.map(rgRating);
     return { g: g, players: pl, avg: r.length ? r.reduce(function(a,b){ return a+b; }, 0) / r.length : null, min: r.length ? Math.min.apply(null, r) : null, max: r.length ? Math.max.apply(null, r) : null };
   });
   const ids = {}; DATA.groups.forEach(function(g){ ids[g.id] = 1; });
   const none = DATA.players.filter(function(p){ return !p.groupId || !ids[p.groupId]; }).sort(function(a,b){ return rgRating(b) - rgRating(a) || a.name.localeCompare(b.name); });
-  return { groups: groups, none: none };
+  return { groups: groups, none: none, open: open, absents: absents };
+}
+// Pour les exports : le statut (remplaçant, prêté…) à côté du nom, et les absents en liste à part.
+function rgExportPlayers(list){ return list.map(function(p){ return { name: p.tag ? p.name + ' (' + p.tag.toLowerCase() + (p.sub ? ', ' + p.sub : '') + ')' : p.name, rating: p.rating, injured: p.injured }; }); }
+function rgExportLists(d){
+  const lists = d.groups.map(function(x){ return { name: x.g.name, players: rgExportPlayers(x.players) }; });
+  if(d.absents && d.absents.length) lists.push({ name: 'Absents', players: d.absents.map(function(a){ return { name: a.name + ' (' + a.group + ' · ' + a.reason.toLowerCase() + (a.by ? ', remplacé par ' + a.by : ', non remplacé') + ')', rating: a.rating }; }), none: true });
+  if(d.none.length) lists.push({ name: 'Sans ' + grpWord(), players: d.none, none: true });
+  return lists;
 }
 function reportsGroupsHTML(){
   const d = reportsGroupsData(), rec = isRecLeague(), showR = !rec;
   const placed = d.groups.reduce(function(a,x){ return a + x.players.length; }, 0);
   const row = function(p, i){
     const tags = p.injured ? 'Blessé(e)' : '';
-    return `<div class="rg-p"><span class="rg-n">${i+1}</span><span class="rg-name">${escapeHTML(p.name)}${tags ? `<small>${escapeHTML(tags)}</small>` : ''}</span>${showR ? `<span class="rg-r">${rgFmt(rgRating(p))}</span>` : ''}</div>`;
+    return `<div class="rg-p"><span class="rg-n">${i+1}</span><span class="rg-name">${escapeHTML(p.name)}${tags ? `<small>${escapeHTML(tags)}</small>` : ''}${p.sub ? `<small class="rg-sub">${escapeHTML(p.sub)}</small>` : ''}</span>${p.tag ? `<span class="rg-tag">${escapeHTML(p.tag)}</span>` : ''}${showR ? `<span class="rg-r">${rgFmt(rgRating(p))}</span>` : ''}</div>`;
+  };
+  const absRow = function(a){
+    return `<div class="rg-p"><span class="rg-name">${escapeHTML(a.name)}<small>${escapeHTML(a.group)} · ${a.by ? 'remplacé(e) par ' + escapeHTML(a.by) : 'non remplacé(e)'}</small></span><span class="rg-tag">${escapeHTML(a.reason)}</span></div>`;
   };
   let h = `<div class="rg-head">
-      <div class="rg-kpis"><div><b>${d.groups.length}</b><span>${grpWord(d.groups.length > 1)}</span></div><div><b>${placed}</b><span>placé${placed>1?'s':''}</span></div><div><b>${d.none.length}</b><span>sans ${grpWord()}</span></div></div>
+      <div class="rg-kpis"><div><b>${d.groups.length}</b><span>${grpWord(d.groups.length > 1)}</span></div><div><b>${placed}</b><span>${d.open ? 'jouent' : 'placé' + (placed>1?'s':'')}</span></div>${d.open ? `<div><b>${d.absents.length}</b><span>absent${d.absents.length>1?'s':''}</span></div>` : `<div><b>${d.none.length}</b><span>sans ${grpWord()}</span></div>`}</div>
       <div class="rg-acts"><button type="button" class="btn btn-primary" onclick="openGroupsExport()">Exporter</button></div>
-      <p class="ah-meta" style="margin:10px 2px 0;">À envoyer aux autres organisateurs pour valider ensemble la composition de départ. Les déplacements se font ensuite dans l'onglet Joueurs.</p>
+      <p class="ah-meta" style="margin:10px 2px 0;">${d.open ? `État en direct de la ${isRecLeague() ? 'soirée' : 'session'} du ${escapeHTML(fdl(d.open.date))} : qui joue dans chaque ${grpWord()}, remplaçants compris. Les absents sont listés à part.` : "À envoyer aux autres organisateurs pour valider ensemble la composition de départ. Les déplacements se font ensuite dans l'onglet Joueurs."}</p>
     </div>`;
   h += `<div class="rg-grid">${d.groups.map(function(x){
     return `<div class="card rg-card"><div class="rg-top"><b>${escapeHTML(x.g.name)}</b><span>${x.players.length} joueur${x.players.length>1?'s':''}</span></div>
       ${x.players.length ? x.players.map(row).join('') : `<div class="ah-meta">Aucun joueur.</div>`}</div>`;
   }).join('')}</div>`;
+  if(d.open) h += `<div class="card rg-card rg-abs"><div class="rg-top"><b>Absents</b><span>${d.absents.length}</span></div>${d.absents.length ? d.absents.map(absRow).join('') : '<div class="ah-meta">Aucun absent.</div>'}</div>`;
   if(d.none.length) h += `<div class="card rg-card rg-none"><div class="rg-top"><b>Sans ${grpWord()}</b><span>${d.none.length} joueur${d.none.length>1?'s':''}</span></div>${d.none.map(row).join('')}</div>`;
   return h;
 }
@@ -12732,8 +12776,9 @@ function groupsReportText(){
   let t = 'Composition des ' + grpWord(true) + ' — ' + lg + '\n';
   d.groups.forEach(function(x){
     t += '\n' + x.g.name + ' (' + x.players.length + ' joueur' + (x.players.length > 1 ? 's' : '') + ')\n';
-    x.players.forEach(function(p, i){ t += (i+1) + '. ' + p.name + (showR ? ' — ' + rgFmt(rgRating(p)) : '') + (p.injured ? ' (blessé·e)' : '') + '\n'; });
+    rgExportPlayers(x.players).forEach(function(p, i){ t += (i+1) + '. ' + p.name + (showR ? ' — ' + rgFmt(rgRating(p)) : '') + (p.injured ? ' (blessé·e)' : '') + '\n'; });
   });
+  if(d.absents && d.absents.length){ t += '\nAbsents\n'; d.absents.forEach(function(a){ t += '- ' + a.name + ' (' + a.group + (a.by ? ', remplacé par ' + a.by : ', non remplacé') + ')\n'; }); }
   if(d.none.length){ t += '\nSans ' + grpWord() + '\n'; d.none.forEach(function(p){ t += '- ' + p.name + (showR ? ' — ' + rgFmt(rgRating(p)) : '') + '\n'; }); }
   return t;
 }
@@ -12762,8 +12807,7 @@ function exportGroupsReport(kind){
   const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
   const base = ('Composition ' + grpWord(true) + ' - ' + lg).replace(/[\\/:*?"<>|]+/g, '-');
   const when = new Date().toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' });
-  const lists = d.groups.map(function(x){ return { name: x.g.name, players: x.players }; });
-  if(d.none.length) lists.push({ name: 'Sans ' + grpWord(), players: d.none });
+  const lists = rgExportLists(d);
   if(kind === 'xls'){
     saveOrShareFile(groupsXlsxBlob(lists, lg, when, showR), base + '.xlsx');
     return;
@@ -12878,8 +12922,7 @@ function saveOrShareFile(blob, fname){
 function printGroupsReport(){
   const d = reportsGroupsData(), showR = !isRecLeague();
   const lg = (LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || {}).name || DATA.leagueName || 'Ligue';
-  const lists = d.groups.map(function(x){ return { name: x.g.name, players: x.players }; });
-  if(d.none.length) lists.push({ name: 'Sans ' + grpWord(), players: d.none, none: true });
+  const lists = rgExportLists(d);
   const placed = d.groups.reduce(function(a,x){ return a + x.players.length; }, 0);
   const block = function(L){
     return `<section class="rgp-g${L.none ? ' none' : ''}"><div class="rgp-h"><b>${escapeHTML(L.name)}</b><span>${L.players.length} joueur${L.players.length>1?'s':''}</span></div>
