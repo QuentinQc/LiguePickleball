@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 439">
+<meta name="app-build" content="Version 440">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1751,7 +1751,8 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .sd-top span{font-size:13px;color:var(--muted);}
 .sd-list{display:flex;gap:8px;overflow-x:auto;padding:10px 2px 4px;margin:0 -2px;scrollbar-width:none;}
 .sd-list::-webkit-scrollbar{display:none;}
-.sd-chip{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);font:inherit;font-weight:700;font-size:14px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;}
+.sd-chip{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid var(--line-soft-strong);background:var(--court-elevated-2);color:var(--text);font:inherit;font-weight:700;font-size:14px;cursor:grab;touch-action:pan-x pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;transition:transform .15s,box-shadow .15s;}
+.sd-chip.hold{transform:scale(1.04);box-shadow:0 0 0 2px var(--ball);}
 .sd-chip.dispo{border-color:rgba(207,234,92,.55);}
 .sd-chip small{font-weight:500;font-size:11px;color:var(--muted);}
 .sd-chip.pick{background:var(--ball);color:var(--court);}
@@ -11553,7 +11554,7 @@ function subDockHTML(open){
         ${absList.length ? `<div class="sd-abs-list">${absList.map(absChip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Aucune absence.</p>`}
       </div>
     </div>
-    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Glisse un remplaçant sur un absent. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Touche un remplaçant puis un absent, ou maintiens-le et glisse-le sur l’absent. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
   </div>`;
 }
 // Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
@@ -11569,7 +11570,7 @@ function placeSubAt(enc, gid, absentId){
   return false;
 }
 function subPick(enc){
-  if(SUB_DRAG && SUB_DRAG.moved) return;
+  if(SUB_DRAG && (SUB_DRAG.moved || SUB_DRAG.scrolled)) return;
   SUB_PICK = SUB_PICK === enc ? null : enc;
   render();
   if(SUB_PICK) document.body.classList.add('sd-picking');
@@ -11613,17 +11614,36 @@ function unplaceSub(d){
   else setSubstitute(d.fromG, d.fromA, '');
   return true;
 }
+// Au doigt, les pastilles de la bande des remplaçants laissent défiler la liste : un glissement
+// rapide fait défiler, et le glisser-déposer démarre après un appui maintenu (environ 0,3 s).
+// À la souris, et sur les poignées ⋮⋮, on glisse tout de suite comme avant.
+function subTouchBlock(e){ if(SUB_DRAG && SUB_DRAG.armed) e.preventDefault(); }
 function subDragStart(e){
   if(e.button !== undefined && e.button !== 0) return;
   const chip = e.currentTarget, enc = chip.getAttribute('data-enc');
   SUB_DRAG = { enc: enc, pid: chip.getAttribute('data-pid'), x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, chip: chip, id: e.pointerId,
-    fromG: chip.getAttribute('data-fg'), fromA: chip.getAttribute('data-fa'), fromX: chip.getAttribute('data-fx') === '1' };
+    fromG: chip.getAttribute('data-fg'), fromA: chip.getAttribute('data-fa'), fromX: chip.getAttribute('data-fx') === '1',
+    hold: e.pointerType === 'touch' && chip.classList.contains('sd-chip'), armed: false, scrolled: false, timer: null };
+  const d = SUB_DRAG;
+  if(d.hold){
+    d.timer = setTimeout(function(){
+      if(SUB_DRAG !== d || d.scrolled) return;
+      d.armed = true; chip.classList.add('hold');
+      try{ if(navigator.vibrate) navigator.vibrate(15); }catch(err){}
+    }, 280);
+    document.addEventListener('touchmove', subTouchBlock, { passive: false });
+  }
   document.addEventListener('pointermove', subDragMove, { passive: false });
   document.addEventListener('pointerup', subDragEnd);
   document.addEventListener('pointercancel', subDragEnd);
 }
 function subDragMove(e){
   const d = SUB_DRAG; if(!d) return;
+  if(d.hold && !d.armed){
+    // Le doigt bouge avant la fin de l'appui : c'est un défilement, pas un glisser.
+    if(Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) >= 8){ d.scrolled = true; clearTimeout(d.timer); }
+    return;
+  }
   if(!d.moved){
     if(Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 8) return;
     d.moved = true;
@@ -11649,7 +11669,10 @@ function subDragEnd(e){
   document.removeEventListener('pointermove', subDragMove);
   document.removeEventListener('pointerup', subDragEnd);
   document.removeEventListener('pointercancel', subDragEnd);
+  document.removeEventListener('touchmove', subTouchBlock);
   if(!d) return;
+  clearTimeout(d.timer);
+  if(d.chip) d.chip.classList.remove('hold');
   document.body.classList.remove('sd-dragging');
   if(d.ghost) d.ghost.remove();
   if(d.chip) d.chip.classList.remove('dragging');
