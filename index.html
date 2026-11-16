@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 436">
+<meta name="app-build" content="Version 437">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5910,6 +5910,19 @@ function finalizeSession(session){
     // repris parmi les descendants vers le groupe en-dessous (et inversement),
     // et le dernier mouvement appliqué écrasait silencieusement le premier.
     const movedPlayerIds = new Set();
+    // Joueur prêté : il change de groupe pour de bon (de son groupe d'origine au groupe où il a joué).
+    // Pour garder la taille des groupes, chaque frontière entre ces deux groupes fait passer
+    // une personne de plus dans l'autre sens (ex. prêté de D vers B : une descente de plus B→C et C→D).
+    const extraDown = {}, extraUp = {};
+    Object.keys(session.loans || {}).forEach(pid=>{
+      const pl = DATA.players.find(p=>p.id===pid);
+      const hostGid = session.loans[pid];
+      if(!pl || !standingsByGroup[hostGid] || !standingsByGroup[hostGid].some(r=>r.playerId===pid)) return;
+      const hi = sorted.findIndex(g=>g.id===hostGid), ho = sorted.findIndex(g=>g.id===pl.groupId);
+      if(hi < 0 || ho < 0 || hi === ho) return;
+      if(ho > hi){ for(let k=hi;k<ho;k++) extraDown[k] = (extraDown[k]||0) + 1; }
+      else { for(let k=ho;k<hi;k++) extraUp[k] = (extraUp[k]||0) + 1; }
+    });
     for(let i=0;i<sorted.length-1;i++){
       const upper = sorted[i];   // meilleur groupe (order plus petit)
       const lower = sorted[i+1];
@@ -5917,9 +5930,9 @@ function finalizeSession(session){
       // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
       const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestOrSubId(r.playerId) && !movedPlayerIds.has(r.playerId));
       const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestOrSubId(r.playerId) && !movedPlayerIds.has(r.playerId));
-      const nUp = Math.min(DATA.swapCount, upperStand.length, lowerStand.length);
+      const nUp = Math.min(DATA.swapCount + (extraUp[i]||0), upperStand.length, lowerStand.length);
       const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
-      const nDown = Math.max(0, Math.min(DATA.swapCount, upperStand.length, lowerStand.length) - absentFromUpper);
+      const nDown = Math.max(0, Math.min(DATA.swapCount + (extraDown[i]||0), upperStand.length, lowerStand.length) - absentFromUpper);
       for(let k=0;k<nUp;k++){
         const goingUp = lowerStand[k];          // top du groupe inférieur
         if(goingUp){ movements.push({ playerId: goingUp.playerId, fromGroupId: lower.id, toGroupId: upper.id }); movedPlayerIds.add(goingUp.playerId); }
@@ -5929,10 +5942,25 @@ function finalizeSession(session){
         if(goingDown){ movements.push({ playerId: goingDown.playerId, fromGroupId: upper.id, toGroupId: lower.id }); movedPlayerIds.add(goingDown.playerId); }
       }
     }
+    // Un joueur prêté est traité comme un régulier du groupe où il a joué, sans égard à son
+    // groupe d'origine : il monte ou descend à partir de ce groupe, sinon il y reste.
+    // homeGroupId garde son groupe d'origine pour pouvoir annuler la session.
+    const loanTransfers = [];
     movements.forEach(m=>{
       const pl = DATA.players.find(p=>p.id===m.playerId);
-      if(pl) pl.groupId = m.toGroupId;
+      if(!pl) return;
+      if(pl.groupId !== m.fromGroupId) m.homeGroupId = pl.groupId;
+      pl.groupId = m.toGroupId;
     });
+    Object.keys(session.loans || {}).forEach(pid=>{
+      const hostGid = session.loans[pid];
+      if(movedPlayerIds.has(pid) || !standingsByGroup[hostGid] || !standingsByGroup[hostGid].some(r=>r.playerId===pid)) return;
+      const pl = DATA.players.find(p=>p.id===pid);
+      if(!pl || pl.groupId === hostGid) return;
+      loanTransfers.push({ playerId: pid, fromGroupId: pl.groupId, toGroupId: hostGid });
+      pl.groupId = hostGid;
+    });
+    session.loanTransfers = loanTransfers;
 
     // Un joueur absent qui n'a pas été prêté ailleurs (donc n'a joué nulle part
     // cette session) descend automatiquement d'un groupe pour la session suivante.
@@ -13475,6 +13503,10 @@ function reopenLadderSession(sessionId){
     } else {
       (s.movements||[]).forEach(m=>{
         const pl = DATA.players.find(p=>p.id===m.playerId);
+        if(pl && pl.groupId===m.toGroupId) pl.groupId = m.homeGroupId || m.fromGroupId;
+      });
+      (s.loanTransfers||[]).forEach(m=>{
+        const pl = DATA.players.find(p=>p.id===m.playerId);
         if(pl && pl.groupId===m.toGroupId) pl.groupId = m.fromGroupId;
       });
     }
@@ -13484,7 +13516,7 @@ function reopenLadderSession(sessionId){
       pl.rating = Math.round(((typeof pl.rating==='number'?pl.rating:RATING_DEFAULT) - s.ratingDeltas[pid]) * 1000) / 1000;
       pl.ratingGames = Math.max(0, (typeof pl.ratingGames==='number'?pl.ratingGames:0) - ((s.ratingGamesDeltas && typeof s.ratingGamesDeltas[pid]==='number') ? s.ratingGamesDeltas[pid] : 1));
     });
-    delete s.standingsByGroup; delete s.movements; delete s.ratingDeltas; delete s.ratingGamesDeltas; delete s.preSnapshot;
+    delete s.standingsByGroup; delete s.movements; delete s.loanTransfers; delete s.ratingDeltas; delete s.ratingGamesDeltas; delete s.preSnapshot;
     s.status = 'open';
     s.reopenedAt = new Date().toISOString();
     VIEW = Object.assign(keepNavView(), { tab:'session', sessionSubTab:'groupes' });
@@ -13494,7 +13526,7 @@ function reopenLadderSession(sessionId){
 function deleteSession(sessionId){
   const s = DATA.sessions.find(x=>x.id===sessionId);
   if(!s) return;
-  const hasMovements = s.movements && s.movements.length > 0;
+  const hasMovements = (s.movements && s.movements.length > 0) || (s.loanTransfers && s.loanTransfers.length > 0);
   const hasRatingChanges = s.ratingDeltas && Object.keys(s.ratingDeltas).length > 0;
   if(!hasMovements && !hasRatingChanges){
     showConfirm("Supprimer définitivement cette session ? Cette action ne peut pas être annulée.", ()=>{
@@ -13508,6 +13540,12 @@ function deleteSession(sessionId){
   showConfirm("Supprimer cette session ? Les montées, descentes et changements de cote qu'elle a appliqués seront annulés, comme si elle n'avait pas eu lieu. Cette action ne peut pas être annulée.", ()=>{
     let skipped = [];
     (s.movements||[]).forEach(m=>{
+      const pl = DATA.players.find(p=>p.id===m.playerId);
+      if(!pl) return;
+      if(pl.groupId === m.toGroupId){ pl.groupId = m.homeGroupId || m.fromGroupId; }
+      else { skipped.push(pl.name); }
+    });
+    (s.loanTransfers||[]).forEach(m=>{
       const pl = DATA.players.find(p=>p.id===m.playerId);
       if(!pl) return;
       if(pl.groupId === m.toGroupId){ pl.groupId = m.fromGroupId; }
@@ -13576,6 +13614,15 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
     absenceDemotions.forEach(m=>{
       const fromG = groupById(m.fromGroupId), toG = groupById(m.toGroupId);
       body += `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(playerName(m.playerId))}<small>${escapeHTML(fromG?fromG.name:'—')} → ${escapeHTML(toG?toG.name:'—')}</small></span><span class="hs-mv down">▼</span></div>`;
+    });
+    body += `</div>`;
+  }
+  const loanStays = restrictGroupId ? [] : (s.loanTransfers||[]);
+  if(loanStays.length){
+    body += `<div class="hs-g">Joueurs prêtés qui restent dans le groupe où ils ont joué</div><div class="pf-list">`;
+    loanStays.forEach(m=>{
+      const fromG = groupById(m.fromGroupId), toG = groupById(m.toGroupId);
+      body += `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(playerName(m.playerId))}<small>${escapeHTML(fromG?fromG.name:'—')} → ${escapeHTML(toG?toG.name:'—')}</small></span></div>`;
     });
     body += `</div>`;
   }
