@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 440">
+<meta name="app-build" content="Version 441">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -12179,8 +12179,13 @@ function onPublishSession(){
 function onUnpublishSession(){
   const open = currentOpenSession();
   if(!open) return;
-  open.published = false;
-  saveAndRender();
+  const w = isRecLeague() ? 'soirée' : 'session';
+  showConfirm(`Masquer la ${w} du ${fdl(open.date)} aux joueurs ? Ils ne verront plus ${isRecLeague() ? 'leur terrain' : 'leurs groupes ni leurs matchs'} jusqu'à la prochaine publication, qui leur renverra une notification. Les scores déjà entrés sont conservés.`, function(){
+    const o = currentOpenSession();
+    if(!o) return;
+    o.published = false;
+    saveAndRender();
+  });
 }
 function scoreComplete(u, isMlp){ return isMlp ? !!u.winnerTeamId : (u.scoreA!=null && u.scoreB!=null); }
 // Repère discret « modifié » posé sur la ligne (ne change pas sa hauteur) ;
