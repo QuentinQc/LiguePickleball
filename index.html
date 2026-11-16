@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 443">
+<meta name="app-build" content="Version 444">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -4665,8 +4665,12 @@ function firstLossIndex(matches, pid){
 
 // Critères de départage disponibles — chacun retourne un nombre négatif si
 // "a" doit être classé avant "b" selon ce critère seul, 0 si égalité.
+// Moyenne de points par match joué : juste même quand toutes les parties n'ont pas pu être jouées
+// (un joueur qui a joué une partie de moins n'est pas désavantagé). Aucun match joué : classé derrière.
+function avgPtsKey(r){ return (r.played > 0) ? Math.round(r.pf * 1000 / r.played) : -1; }
+// Le critère « points » (clé gardée pour les ligues existantes) classe à la moyenne par match joué.
 const TIEBREAK_CRITERIA = {
-  points: { label: 'Total de points marqués', cmp: (a,b)=> b.pf - a.pf },
+  points: { label: 'Moyenne de points par match joué', cmp: (a,b)=> avgPtsKey(b) - avgPtsKey(a) },
   wins: { label: 'Victoires', cmp: (a,b)=> b.wins - a.wins },
   diff: { label: 'Différentiel de points (marqués − accordés)', cmp: (a,b)=> b.diff - a.diff },
   h2h: { label: 'Face-à-face direct', cmp: (a,b,matches)=> -headToHead(matches, a.playerId, b.playerId) },
@@ -13660,7 +13664,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
       const tags = (isGuest ? ' <span class="rs-tag">invité</span>' : '') + (isSub ? ' <span class="rs-tag">rempl.</span>' : '');
-      const sub = `${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}${incomplete ? ` · <span style="color:var(--paddle);">${played}/${scheduled} joués</span>` : ''}`;
+      const sub = `moy. ${avg} · ${r.wins}-${r.losses} · ${r.pf} pts${incomplete ? ` · <span style="color:var(--paddle);">${played}/${scheduled} joués</span>` : ''}`;
       const after = (showRating && typeof delta === 'number') ? ratingAfterSession(r.playerId, s) : null;
       const right = (showRating && typeof delta === 'number')
         ? `<span class="hs-rt">${after !== null ? `<b>${after.toFixed(2)}</b>` : ''}<span class="hs-dp ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span></span>` : '';
@@ -15897,7 +15901,7 @@ function lastSessionResultHTML(pid){
   const list = rows.map(function(r, i){
     const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
     const tag = isGuestId(r.playerId) ? ' <span class="rs-tag">invité</span>' : (subValues.has(r.playerId) ? ' <span class="rs-tag">rempl.</span>' : '');
-    return `<div class="pf-row hs-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(playerName(r.playerId))}${tag}<small>${r.wins}-${r.losses} · ${r.pf} pts · moy. ${avg}</small></span></div>`;
+    return `<div class="pf-row hs-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(playerName(r.playerId))}${tag}<small>moy. ${avg} · ${r.wins}-${r.losses} · ${r.pf} pts</small></span></div>`;
   }).join('');
   return `<div class="card">
     <div class="rs-top"><div class="pf-sec" style="margin:0;">Résultats — ${escapeHTML(frDateLong(s.date))}</div>${g ? `<span class="pf-chip acc">${escapeHTML(g.name)}</span>` : ''}</div>
