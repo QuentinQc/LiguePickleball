@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 437">
+<meta name="app-build" content="Version 438">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2451,15 +2451,18 @@ function notifyAdminsPlayerInjured(playerName){
 }
 // Un joueur déclare une absence prolongée (plage de dates) lui-même —
 // prévient les admins de cette ligue.
-function notifyAdminsPlannedAbsence(playerName, startDate, endDate){
-  if(!CURRENT_LEAGUE_ID) return;
+function notifyAdminsPlannedAbsence(playerName, startDate, endDate, leagueId){
+  const lid = leagueId || CURRENT_LEAGUE_ID;
+  if(!lid) return;
   const range = startDate===endDate ? `le ${startDate}` : `du ${startDate} au ${endDate}`;
+  const lg = LEAGUES.find(function(l){ return l.id === lid; });
+  const label = lid === CURRENT_LEAGUE_ID ? currentLeagueLabel() : ((lg && (lg.schedule_label || lg.name)) || 'Ligue');
   invokeSendNotification({
-    league_id: CURRENT_LEAGUE_ID,
+    league_id: lid,
     audience: 'admins', category: 'admin_alerts',
     title: 'Absence prolongée signalée',
-    body: `${playerName || 'Un joueur'} a indiqué être absent(e) ${range} (${currentLeagueLabel()}).`,
-    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':session')
+    body: `${playerName || 'Un joueur'} a indiqué être absent(e) ${range} (${label}).`,
+    url: goUrl('league:' + lid + ':session')
   });
 }
 // Un remplaçant s'indique disponible lui-même — prévient les admins de
@@ -14633,6 +14636,7 @@ function substituteMeHTML(sub){
     + `<div class="pf-sec">Mon jeu</div>
     <div class="pf-list">
       ${meRow('', 'Mes disponibilités', 'Indiquer si je peux dépanner', `openMyLeague('${CURRENT_LEAGUE_ID}')`)}
+      ${(function(){ const pl = myPlayerLeagueLinks(); return pl.length ? meRow('', 'Mes absences', 'Comme joueur : ' + pl.map(function(l){ return paLeagueName(l.league_id); }).join(', '), `absenceFromHome('${pl[0].league_id}')`) : ''; })()}
       ${meRow('', 'Sessions dépannées', 'Mon historique comme remplaçant', `openMyLeague('${CURRENT_LEAGUE_ID}');setPDet('hist')`)}
       ${meRow('', 'Mon agenda', 'Ajouter les sessions à mon calendrier', `openCalSubscribe()`)}
     </div>
@@ -15968,10 +15972,11 @@ function absenceHubContentHTML(playerId){
     </div>
     ${p.injured ? adminNote : ''}
     <div class="pf-sec">Absences prévues (vacances)</div>
+    ${paLeagueChoiceHTML(playerId)}
     <div class="pf-list">${planned.length ? planned.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.startDate))}${a.startDate!==a.endDate ? ' → ' + escapeHTML(frDateLong(a.endDate)) : ''}</span></div>`).join('') : `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div>`}</div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:10px;">
-      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" value="${escapeHTML(PA_DRAFT.start||'')}" onchange="PA_DRAFT.start=this.value" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" value="${escapeHTML(PA_DRAFT.end||'')}" onchange="PA_DRAFT.end=this.value" style="width:100%;min-width:0;box-sizing:border-box;"></div>
     </div>
     <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${playerId}')">+ Ajouter une absence prévue</button>
     <p class="small" style="color:var(--muted);margin:6px 2px 0;">Tu seras automatiquement ${gw(p,'absent','absente','absent(e)')} pour toute ${isRecLeague() ? 'soirée' : 'session'} dans cette plage.</p>
@@ -15985,22 +15990,68 @@ function confirmMyAbsence(pid){
 function confirmMyInjury(pid){
   showConfirm("Te déclarer blessé(e) ? Tu sortiras de ton groupe jusqu'à ce qu'un administrateur te réintègre.", function(){ toggleMyInjured(pid); openAbsenceHub(pid); });
 }
+// Absences prévues dans plusieurs ligues : une personne joueuse dans plus d'une ligue choisit
+// la ou les ligues visées (la ligue affichée est cochée par défaut).
+let PA_LEAGUES = null, PA_DRAFT = {};
+function myPlayerLeagueLinks(){ return (MY_LEAGUE_LINKS || []).filter(function(l){ return l.player_id && LEAGUES.some(function(x){ return x.id === l.league_id; }); }); }
+function paMultiFor(playerId){
+  const links = myPlayerLeagueLinks();
+  return links.length > 1 && links.some(function(l){ return l.league_id === CURRENT_LEAGUE_ID && l.player_id === playerId; }) ? links : null;
+}
+function paLeagueName(id){ const l = LEAGUES.find(function(x){ return x.id === id; }); return l ? l.name : 'Ligue'; }
+function paLeagueChoiceHTML(playerId){
+  const links = paMultiFor(playerId);
+  if(!links) return '';
+  if(!PA_LEAGUES) PA_LEAGUES = [CURRENT_LEAGUE_ID];
+  return `<div class="small" style="color:var(--muted);margin:0 2px 6px;">Pour quelle ligue ?</div>
+    <div class="an-chips" style="margin:0 0 10px;">${links.map(function(l){ return `<button type="button" class="an-chip ${PA_LEAGUES.indexOf(l.league_id)!==-1?'on':''}" onclick="paToggleLeague('${l.league_id}')">${escapeHTML(paLeagueName(l.league_id))}</button>`; }).join('')}</div>
+    <div class="small" style="color:var(--muted);margin:0 2px 8px;">Absences déjà prévues dans la ${escapeHTML(paLeagueName(CURRENT_LEAGUE_ID).replace(/^Ligue /,'ligue '))} :</div>`;
+}
+function paToggleLeague(id){
+  const s = document.getElementById('paStart'), e = document.getElementById('paEnd');
+  if(s) PA_DRAFT.start = s.value;
+  if(e) PA_DRAFT.end = e.value;
+  toggleInList(PA_LEAGUES, id); render();
+}
 function openAbsenceHub(playerId){
+  PA_LEAGUES = null; PA_DRAFT = {};
   showContentModal('Absence', ()=>absenceHubContentHTML(playerId));
 }
-function submitPlannedAbsence(playerId){
+async function submitPlannedAbsence(playerId){
   const start = document.getElementById('paStart').value;
   const end = document.getElementById('paEnd').value;
   if(!start || !end || start > end){ showAlert("Plage de dates invalide."); return; }
-  if(isPlayerActor()){
-    const hp = DATA.players.find(x=>x.id===playerId);
-    selfAction('planned_absence', { playerId, startDate:start, endDate:end }).then(ok=>{ if(ok){ notifyAdminsPlannedAbsence(hp && hp.name, start, end); socialRedrawAfterSelfChange(); } });
-    return;
+  const multi = paMultiFor(playerId);
+  const targets = multi ? (PA_LEAGUES || [CURRENT_LEAGUE_ID]).slice() : [CURRENT_LEAGUE_ID];
+  if(!targets.length){ showAlert("Choisis au moins une ligue."); return; }
+  const done = [], failed = [];
+  for(const lid of targets){
+    if(lid === CURRENT_LEAGUE_ID){
+      const hp = DATA.players.find(x=>x.id===playerId);
+      if(isPlayerActor()){
+        const ok = await selfAction('planned_absence', { playerId, startDate:start, endDate:end });
+        if(!ok) return; // selfAction a déjà affiché l'erreur
+        notifyAdminsPlannedAbsence(hp && hp.name, start, end);
+        socialRedrawAfterSelfChange();
+      } else {
+        addPlannedAbsence(playerId, start, end);
+        notifyAdminsPlannedAbsence(hp && hp.name, start, end);
+        saveData();
+      }
+      done.push(lid);
+    } else {
+      const link = (multi || []).find(function(l){ return l.league_id === lid; });
+      if(!link){ failed.push(lid); continue; }
+      const { error } = await sb.rpc('player_self_action', { p_league_id: lid, p_action: 'planned_absence', p_payload: { playerId: link.player_id, startDate: start, endDate: end } });
+      if(error){ console.error('absence prévue', error); failed.push(lid); continue; }
+      notifyAdminsPlannedAbsence(myDisplayName(), start, end, lid);
+      done.push(lid);
+    }
   }
-  addPlannedAbsence(playerId, start, end);
-  const p = DATA.players.find(x=>x.id===playerId);
-  notifyAdminsPlannedAbsence(p && p.name, start, end);
-  saveAndRender();
+  PA_DRAFT = {};
+  render();
+  if(failed.length) showAlert("L'absence n'a pas pu être ajoutée dans : " + failed.map(paLeagueName).join(', ') + ". Réessaie ou avise un organisateur.");
+  else if(multi) showToast('Absence prévue ajoutée : ' + done.map(paLeagueName).join(', '));
 }
 function playerHistoryHTML(me){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
