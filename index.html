@@ -5930,9 +5930,13 @@ function finalizeSession(session){
       // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
       const upperStand = (standingsByGroup[upper.id] || []).filter(r=> !isGuestOrSubId(r.playerId) && !movedPlayerIds.has(r.playerId));
       const lowerStand = (standingsByGroup[lower.id] || []).filter(r=> !isGuestOrSubId(r.playerId) && !movedPlayerIds.has(r.playerId));
-      const nUp = Math.min(DATA.swapCount + (extraUp[i]||0), upperStand.length, lowerStand.length);
+      // Montées : limitées par les joueurs disponibles du groupe du dessous seulement (les places libérées
+      // en haut par les montées et les absences doivent être comblées, sinon le groupe rapetisse).
       const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
-      const nDown = Math.max(0, Math.min(DATA.swapCount + (extraDown[i]||0), upperStand.length, lowerStand.length) - absentFromUpper);
+      // Plus d'absents que de descentes prévues : chaque absent en trop libère une place de plus à combler par en dessous.
+      const nUp = Math.min(DATA.swapCount + (extraUp[i]||0) + Math.max(0, absentFromUpper - DATA.swapCount - (extraDown[i]||0)), lowerStand.length);
+      // Les absents libèrent déjà des places : on les retire avant de limiter au nombre de joueurs disponibles.
+      const nDown = Math.min(Math.max(0, DATA.swapCount + (extraDown[i]||0) - absentFromUpper), upperStand.length);
       for(let k=0;k<nUp;k++){
         const goingUp = lowerStand[k];          // top du groupe inférieur
         if(goingUp){ movements.push({ playerId: goingUp.playerId, fromGroupId: lower.id, toGroupId: upper.id }); movedPlayerIds.add(goingUp.playerId); }
