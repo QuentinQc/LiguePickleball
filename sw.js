@@ -26,6 +26,18 @@ self.addEventListener('activate', function(event){
   event.waitUntil(self.clients.claim());
 });
 
+// Pastille sur l'icône de l'app : +1 à chaque notification reçue. L'app remet le compte exact
+// (non lues de la cloche) dès qu'elle s'ouvre.
+function bumpAppBadge(){
+  if(!self.navigator || !self.navigator.setAppBadge || !self.caches) return Promise.resolve();
+  return self.caches.open('dinkeo-badge').then(function(c){
+    return c.match('/__badge').then(function(r){ return r ? r.text() : '0'; }).then(function(t){
+      const n = (parseInt(t, 10) || 0) + 1;
+      return c.put('/__badge', new Response(String(n))).then(function(){ return self.navigator.setAppBadge(n); });
+    });
+  }).catch(function(){});
+}
+
 self.addEventListener('push', function(event){
   let data = {};
   try{
@@ -43,6 +55,7 @@ self.addEventListener('push', function(event){
   // L'app ouverte (ou en arrière-plan) est prévenue : elle recharge les données sans attendre.
   event.waitUntil(Promise.all([
     self.registration.showNotification(title, options),
+    bumpAppBadge(),
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list){
       list.forEach(function(c){ try{ c.postMessage({ type: 'push-received', url: options.data.url }); }catch(e){} });
     })
