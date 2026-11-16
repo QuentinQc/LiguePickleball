@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 441">
+<meta name="app-build" content="Version 442">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1340,6 +1340,12 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .an-card.on{border-color:var(--ball);background:rgba(207,234,92,.12);}
 .an-card.on b{color:var(--ball);}
 .an-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.paw-step{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ball);margin:2px 2px 4px;}
+.paw-lg{font-weight:700;font-size:15px;margin:16px 2px 2px;}
+.paw-chip.off{opacity:.45;cursor:default;text-decoration:line-through;}
+.paw-sum{background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:14px;padding:12px 14px;margin-top:10px;}
+.paw-sum b{display:block;font-size:15px;margin-bottom:4px;}
+.paw-sum span{display:block;color:var(--muted);font-size:14px;line-height:1.5;}
 .an-chip{border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:8px 14px;cursor:pointer;}
 .an-chip.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .an-search{margin-top:10px;margin-bottom:8px;}
@@ -2452,16 +2458,18 @@ function notifyAdminsPlayerInjured(playerName){
 }
 // Un joueur déclare une absence prolongée (plage de dates) lui-même —
 // prévient les admins de cette ligue.
-function notifyAdminsPlannedAbsence(playerName, startDate, endDate, leagueId){
+function notifyAdminsPlannedAbsence(playerName, startDate, endDate, leagueId, dates){
   const lid = leagueId || CURRENT_LEAGUE_ID;
   if(!lid) return;
-  const range = startDate===endDate ? `le ${startDate}` : `du ${startDate} au ${endDate}`;
+  // dates : liste de soirées précises (parcours « absence prévue ») ; sinon une plage.
+  const range = (dates && dates.length > 1) ? 'le ' + dates.map(fdl).join(', le ').replace(/, le ([^,]*)$/, ' et le $1')
+    : (startDate===endDate ? `le ${fdl(startDate)}` : `du ${fdl(startDate)} au ${fdl(endDate)}`);
   const lg = LEAGUES.find(function(l){ return l.id === lid; });
   const label = lid === CURRENT_LEAGUE_ID ? currentLeagueLabel() : ((lg && (lg.schedule_label || lg.name)) || 'Ligue');
   invokeSendNotification({
     league_id: lid,
     audience: 'admins', category: 'admin_alerts',
-    title: 'Absence prolongée signalée',
+    title: 'Absence prévue signalée',
     body: `${playerName || 'Un joueur'} a indiqué être absent(e) ${range} (${label}).`,
     url: goUrl('league:' + lid + ':session')
   });
@@ -2901,6 +2909,7 @@ function sheetModalHTML(){
   if(MODAL.sheet === 'publier') return publishSheetHTML();
   if(MODAL.sheet === 'inbox') return inboxSheetHTML();
   if(MODAL.sheet === 'ecompose') return eventComposerSheetHTML();
+  if(MODAL.sheet === 'pabs') return pawSheetHTML();
   if(MODAL.sheet === 'rotchrono') return rotationTimerSheetHTML();
   if(MODAL.sheet === 'courts') return courtsSheetHTML();
   const k = MODAL.sheet;
@@ -16012,14 +16021,9 @@ function absenceHubContentHTML(playerId){
     </div>
     ${p.injured ? adminNote : ''}
     <div class="pf-sec">Absences prévues (vacances)</div>
-    ${paLeagueChoiceHTML(playerId)}
     <div class="pf-list">${planned.length ? planned.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.startDate))}${a.startDate!==a.endDate ? ' → ' + escapeHTML(frDateLong(a.endDate)) : ''}</span></div>`).join('') : `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div>`}</div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:10px;">
-      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" value="${escapeHTML(PA_DRAFT.start||'')}" onchange="PA_DRAFT.start=this.value" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" value="${escapeHTML(PA_DRAFT.end||'')}" onchange="PA_DRAFT.end=this.value" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-    </div>
-    <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${playerId}')">+ Ajouter une absence prévue</button>
-    <p class="small" style="color:var(--muted);margin:6px 2px 0;">Tu seras automatiquement ${gw(p,'absent','absente','absent(e)')} pour toute ${isRecLeague() ? 'soirée' : 'session'} dans cette plage.</p>
+    <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="openPlannedAbsenceWizard('${playerId}')">Signaler une absence prévue</button>
+    <p class="small" style="color:var(--muted);margin:6px 2px 0;">Choisis la ou les ligues, puis les ${isRecLeague() ? 'soirées' : 'sessions'} ou la période où tu seras ${gw(p,'absent','absente','absent(e)')}.</p>
     ${absenceHistoryHTML(playerId)}`;
   return h;
 }
@@ -16056,6 +16060,159 @@ function paToggleLeague(id){
 function openAbsenceHub(playerId){
   PA_LEAGUES = null; PA_DRAFT = {};
   showContentModal('Absence', ()=>absenceHubContentHTML(playerId));
+}
+// ---- Parcours « Signaler une absence prévue » : 1) ligues 2) dates 3) confirmation ----
+// PAW : { pid, links:[{league_id, player_id}], step, leagues:[ids], mode:'dates'|'range', dates:{lid:[dates]}, start, end, info:{lid:{...}}, busy }
+let PAW = null;
+function pawLinksFor(playerId){
+  const multi = paMultiFor(playerId);
+  return multi ? multi.slice() : [{ league_id: CURRENT_LEAGUE_ID, player_id: playerId }];
+}
+function pawInfoFromData(d, playerId){
+  return { playDayOfWeek: d.playDayOfWeek, blockedDates: d.blockedDates || [], seasonStartDate: d.seasonStartDate, seasonEndDate: d.seasonEndDate,
+    rec: d.leagueFormat === 'social' || d.leagueType === 'recreational',
+    planned: (d.plannedAbsences || []).filter(function(a){ return a.playerId === playerId; }),
+    absentDates: (d.sessions || []).filter(function(x){ return (x.absences || []).indexOf(playerId) !== -1; }).map(function(x){ return x.date; }) };
+}
+async function openPlannedAbsenceWizard(playerId){
+  const links = pawLinksFor(playerId);
+  PAW = { pid: playerId, links: links, step: links.length > 1 ? 1 : 2, leagues: [CURRENT_LEAGUE_ID], mode: 'dates', dates: {}, start: '', end: '', info: {}, busy: false };
+  PAW.info[CURRENT_LEAGUE_ID] = pawInfoFromData(DATA, playerId);
+  MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pabs', title:'' }; render();
+  // Calendrier des autres ligues (jour de jeu, dates bloquées, absences déjà prévues).
+  await Promise.all(links.filter(function(l){ return l.league_id !== CURRENT_LEAGUE_ID; }).map(async function(l){
+    try{ const r = await fetchLeagueData(l.league_id); const d = r && r.data && r.data.data; if(d && PAW) PAW.info[l.league_id] = pawInfoFromData(d, l.player_id); }catch(e){}
+  }));
+  if(MODAL && MODAL.sheet === 'pabs') renderSheet();
+}
+function pawClose(){ const pid = PAW && PAW.pid; PAW = null; closeModal(); if(pid) openAbsenceHub(pid); }
+// Prochaines dates de jeu d'une ligue (12 au plus, sans les dates bloquées, jusqu'à la fin de saison).
+function pawUpcoming(info){
+  if(!info || typeof info.playDayOfWeek !== 'number') return [];
+  const today = fmtDate(new Date());
+  let d = new Date(((info.seasonStartDate && info.seasonStartDate > today) ? info.seasonStartDate : today) + 'T00:00:00');
+  d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + ((info.playDayOfWeek - d.getDay() + 7) % 7));
+  const out = [], blocked = new Set(info.blockedDates || []);
+  for(let i = 0; i < 30 && out.length < 12; i++){
+    const ds = fmtDate(d);
+    if(info.seasonEndDate && ds > info.seasonEndDate) break;
+    if(!blocked.has(ds)) out.push(ds);
+    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+  }
+  return out;
+}
+function pawAlreadyAbsent(info, ds){
+  if(!info) return false;
+  return (info.absentDates || []).indexOf(ds) !== -1 || (info.planned || []).some(function(a){ return ds >= a.startDate && ds <= a.endDate; });
+}
+function pawToggleLeague(id){ toggleInList(PAW.leagues, id); renderSheet(); }
+function pawSetMode(m){ pawSaveRange(); PAW.mode = m; renderSheet(); }
+function pawToggleDate(lid, ds){ const arr = PAW.dates[lid] = PAW.dates[lid] || []; toggleInList(arr, ds); renderSheet(); }
+function pawSaveRange(){ const a = document.getElementById('pawStart'), b = document.getElementById('pawEnd'); if(a) PAW.start = a.value; if(b) PAW.end = b.value; }
+function pawOnRange(){ pawSaveRange(); const btn = document.getElementById('pawNext'); if(btn) btn.disabled = !pawStepValid(); }
+function pawSelectedDates(lid){ return ((PAW.dates[lid] || []).slice()).sort(); }
+function pawStepValid(){
+  if(!PAW) return false;
+  if(PAW.step === 1) return PAW.leagues.length > 0;
+  if(PAW.step === 2){
+    if(PAW.mode === 'range') return !!(PAW.start && PAW.end && PAW.start <= PAW.end);
+    return PAW.leagues.some(function(lid){ return pawSelectedDates(lid).length > 0; });
+  }
+  return true;
+}
+function pawNext(){ pawSaveRange(); if(!pawStepValid()) return; PAW.step += 1; renderSheet(); }
+function pawBack(){ pawSaveRange(); if(PAW.step === 1 || (PAW.step === 2 && PAW.links.length === 1)){ pawClose(); return; } PAW.step -= 1; renderSheet(); }
+function pawRangeText(a, b){ return a === b ? frDateLong(a) : 'Du ' + fdl(a) + ' au ' + fdl(b); }
+function pawSheetHTML(){
+  const P = PAW; if(!P) return '';
+  const total = P.links.length > 1 ? 3 : 2, num = P.links.length > 1 ? P.step : P.step - 1;
+  const w = isRecLeague() ? 'soirées' : 'sessions';
+  let body = `<div class="paw-step">Étape ${num} sur ${total}</div>`;
+  if(P.step === 1){
+    body += `<div class="an-sec" style="margin-top:6px;">Pour quelle ligue ?</div>
+      <div class="an-chips" style="margin-top:0;">${P.links.map(function(l){ return `<button type="button" class="an-chip ${P.leagues.indexOf(l.league_id)!==-1?'on':''}" onclick="pawToggleLeague('${l.league_id}')">${escapeHTML(paLeagueName(l.league_id))}</button>`; }).join('')}</div>
+      <p class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Tu peux en choisir plusieurs.</p>`;
+  } else if(P.step === 2){
+    body += `<div class="an-sec" style="margin-top:6px;">Quand seras-tu absent(e) ?</div>
+      <div class="pf-seg"><button type="button" class="${P.mode==='dates'?'on':''}" onclick="pawSetMode('dates')">Des ${w} précises</button><button type="button" class="${P.mode==='range'?'on':''}" onclick="pawSetMode('range')">Une période</button></div>`;
+    if(P.mode === 'dates'){
+      P.leagues.forEach(function(lid){
+        const info = P.info[lid], dates = pawUpcoming(info);
+        body += `<div class="paw-lg">${escapeHTML(paLeagueName(lid))}</div>`;
+        if(!info) body += `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Chargement du calendrier…</p>`;
+        else if(!dates.length) body += `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Aucune date à venir connue pour cette ligue : choisis plutôt « Une période ».</p>`;
+        else body += `<div class="an-chips" style="margin-top:6px;">${dates.map(function(ds){
+          const already = pawAlreadyAbsent(info, ds), on = (P.dates[lid] || []).indexOf(ds) !== -1;
+          const lbl = escapeHTML(frDateParts(ds).day.slice(0,3) + '. ' + frDateParts(ds).rest);
+          return already ? `<span class="an-chip paw-chip off" title="Absence déjà prévue">${lbl}</span>` : `<button type="button" class="an-chip paw-chip ${on?'on':''}" onclick="pawToggleDate('${lid}','${ds}')">${lbl}</button>`;
+        }).join('')}</div>`;
+      });
+      body += `<p class="ah-meta" style="margin:12px 2px 0;font-size:13px;">Touche chaque ${isRecLeague() ? 'soirée' : 'session'} où tu seras absent(e). Les dates barrées sont déjà notées.</p>`;
+    } else {
+      body += `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:14px;">
+          <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="pawStart" type="date" value="${escapeHTML(P.start||'')}" onchange="pawOnRange()" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+          <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="pawEnd" type="date" value="${escapeHTML(P.end||'')}" onchange="pawOnRange()" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+        </div>
+        <p class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Tu seras absent(e) à toutes les ${w} ${P.leagues.length > 1 ? 'des ligues choisies' : 'de la ligue'} pendant cette période, par exemple pour des vacances.</p>`;
+    }
+  } else {
+    body += `<div class="an-sec" style="margin-top:6px;">Vérifie avant d'envoyer</div>`;
+    P.leagues.forEach(function(lid){
+      const txt = P.mode === 'range' ? pawRangeText(P.start, P.end) : pawSelectedDates(lid).map(frDateLong).join('<br>');
+      if(!txt) return;
+      body += `<div class="paw-sum"><b>${escapeHTML(paLeagueName(lid))}</b><span>${P.mode === 'range' ? escapeHTML(txt) : txt}</span></div>`;
+    });
+    body += `<p class="ah-meta" style="margin:12px 2px 0;font-size:13px;">Les organisateurs de chaque ligue seront avisés. Pour annuler une absence plus tard, communique avec un organisateur.</p>`;
+  }
+  const last = P.step === 3;
+  return `<div class="chat-overlay" onclick="if(event.target===this) pawClose()">
+    <div class="chat-sheet an-sheet">
+      <div class="chat-head">
+        <div class="chat-head-txt"><div class="chat-head-title">Absence prévue</div><div class="chat-head-sub">Vacances, voyage, empêchement</div></div>
+        <button type="button" class="chat-head-btn" onclick="pawClose()" aria-label="Fermer">✕</button>
+      </div>
+      <div class="sheet-body" data-key="pabs">${body}</div>
+      <div class="an-foot">
+        <button type="button" class="btn btn-secondary" onclick="pawBack()">${(P.step === 1 || (P.step === 2 && P.links.length === 1)) ? 'Annuler' : 'Retour'}</button>
+        <button type="button" class="btn btn-primary an-send" id="pawNext" ${pawStepValid() && !P.busy ? '' : 'disabled'} onclick="${last ? 'pawSubmit()' : 'pawNext()'}">${last ? (P.busy ? 'Envoi…' : "Signaler l'absence") : 'Suivant'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+// Une plage par date choisie (ou une seule plage pour une période), dans chaque ligue.
+async function pawSubmit(){
+  const P = PAW; if(!P || P.busy) return;
+  P.busy = true; renderSheet();
+  const done = [], failed = [];
+  for(const lid of P.leagues){
+    const ranges = P.mode === 'range' ? [[P.start, P.end]] : pawSelectedDates(lid).map(function(d){ return [d, d]; });
+    if(!ranges.length) continue;
+    const link = P.links.find(function(l){ return l.league_id === lid; });
+    if(!link){ failed.push(lid); continue; }
+    let ok = true;
+    for(const r of ranges){
+      try{
+        if(lid === CURRENT_LEAGUE_ID && !isPlayerActor()){ addPlannedAbsence(link.player_id, r[0], r[1]); }
+        else {
+          const { error } = await sb.rpc('player_self_action', { p_league_id: lid, p_action: 'planned_absence', p_payload: { playerId: link.player_id, startDate: r[0], endDate: r[1] } });
+          if(error){ console.error('absence prévue', error); ok = false; break; }
+        }
+      }catch(e){ console.error(e); ok = false; break; }
+    }
+    if(!ok){ failed.push(lid); continue; }
+    const nm = (lid === CURRENT_LEAGUE_ID ? ((DATA.players.find(function(x){ return x.id === link.player_id; }) || {}).name) : null) || myDisplayName();
+    const first = ranges[0][0], lastD = ranges[ranges.length-1][1];
+    notifyAdminsPlannedAbsence(nm, first, lastD, lid, P.mode === 'dates' ? ranges.map(function(r){ return r[0]; }) : null);
+    done.push(lid);
+  }
+  if(P.leagues.indexOf(CURRENT_LEAGUE_ID) !== -1){
+    if(isPlayerActor()){ try{ await scoreReloadFromServer(); }catch(e){} socialRedrawAfterSelfChange(); }
+    else saveData();
+  }
+  const pid = P.pid;
+  PAW = null; closeModal(); openAbsenceHub(pid);
+  if(failed.length) showAlert("L'absence n'a pas pu être enregistrée dans : " + failed.map(paLeagueName).join(', ') + ". Réessaie ou avise un organisateur.");
+  else showToast('Absence prévue enregistrée' + (done.length > 1 ? ' : ' + done.map(paLeagueName).join(', ') : ''));
 }
 async function submitPlannedAbsence(playerId){
   const start = document.getElementById('paStart').value;
