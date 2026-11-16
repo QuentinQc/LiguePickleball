@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 442">
+<meta name="app-build" content="Version 443">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5799,16 +5799,24 @@ function openAbsentSlots(open, gid){
   return playersInGroup(gid).filter(p=>(p.injured || isAbsent(open, p.id)) && !subs[p.id] && !(open.loans && open.loans[p.id])).map(p=>p.id);
 }
 function groupHasScores(gd){ return !!(gd && (gd.matches||[]).some(m=>m.scoreA!=null && m.scoreA!=='' || m.scoreB!=null && m.scoreB!=='')); }
+// Remplaçants ajoutés en plus (renfort) : dans la liste du groupe, après les remplaçants d'absents,
+// numérotés comme les autres et marqués « Remplaçant ».
+function extraRowsHTML(open, g, startIdx, rec){
+  if(!open || open.status !== 'open' || rec || DATA.leagueFormat === 'mlp') return '';
+  const gd = open.groupsData.find(x=>x.groupId===g.id);
+  return ((gd && gd.extras) || []).map(function(x, k){
+    const openFn = isSubPoolId(x) ? `openSubstituteDetailModal('${x.slice(5)}')` : (!isGuestOrSubId(x) ? `openPlayerDetailModal('${x}')` : '');
+    return `<div class="pf-row"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
+      <span class="sd-handle" data-enc="${x}" data-fg="${g.id}" data-fx="1" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
+      <span style="width:18px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${startIdx + k + 1}</span>
+      <span class="t">${escapeHTML(playerName(x))}<small>En plus pour cette session · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
+    </div>`;
+  }).join('');
+}
 function reinforcementHTML(open, g){
   if(!open || open.status !== 'open' || isRecLeague() || DATA.leagueFormat === 'mlp') return '';
   const gd = open.groupsData.find(x=>x.groupId===g.id); if(!gd) return '';
-  const extras = gd.extras || [];
   let h = '';
-  if(extras.length){
-    h += `<div class="pf-list" style="margin-top:10px;">${extras.map(x=>`<div class="pf-row" style="cursor:default;">
-      <span class="sd-handle" data-enc="${x}" data-fg="${g.id}" data-fx="1" onpointerdown="subDragStart(event)" aria-label="Déplacer ou retirer">⋮⋮</span>
-      <span class="t">${escapeHTML(playerName(x))}<small>Renfort pour cette session · glisse vers la bande du haut pour le retirer</small></span></div>`).join('')}</div>`;
-  }
   const used = subsUsedInSession(open);
   const pool = (DATA.substitutePool||[]).map(sp=>({ enc:'sub::'+sp.id, name:sp.name, dispo:(open.availableSubs||[]).includes(sp.id) })).filter(x=>!used.has(x.enc));
   pool.sort((a,b)=> (b.dispo - a.dispo) || a.name.localeCompare(b.name));
@@ -11438,7 +11446,8 @@ function adminGroupsHTML(){
           ${p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>` : ''}
         </div>`;
         }).join('')}
-        ${absentInGroup.map((p, ai)=>{
+        ${absentInGroup.filter(p=>gdSubs[p.id]).concat(['__RENFORTS__']).concat(absentInGroup.filter(p=>!gdSubs[p.id])).map((p, ai)=>{
+          if(p === '__RENFORTS__') return extraRowsHTML(open, g, ps.length + ai, rec);
           const gd = open.groupsData.find(x=>x.groupId===g.id);
           const subId = gd && gd.substitutes ? gd.substitutes[p.id] : null;
           if(subId){
@@ -15863,7 +15872,7 @@ function playerGroupRosterRows(open, gid, members){
   // Ordre logique : présents, remplaçants (et renforts), puis absents non remplacés en dernier.
   members.forEach(function(p){ if(!isOut(p)) h += row(p.id, p.name, '', false); });
   members.forEach(function(p){ const by = subs[p.id]; if(isOut(p) && by) h += row(by, playerName(by), `<span class="pf-chip on">Remplace ${escapeHTML(String(p.name).split(' ')[0])}</span>`, false); });
-  ((gd && gd.extras) || []).forEach(function(x){ h += row(x, playerName(x), '<span class="pf-chip on">Renfort</span>', false); });
+  ((gd && gd.extras) || []).forEach(function(x){ h += row(x, playerName(x), '<span class="pf-chip on">Remplaçant</span>', false); });
   if(!hideOut) members.forEach(function(p){ if(isOut(p) && !subs[p.id]) h += row(p.id, p.name, `<span class="pf-chip warn">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>`, true); });
   return h;
 }
