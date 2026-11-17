@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 458">
+<meta name="app-build" content="Version 459">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8567,11 +8567,11 @@ function adminAllPeopleHTML(){
   const rows = [];
   DATA.players.forEach(p=>{
     const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id), pr = profOf(link), g = groupById(p.groupId);
-    const waiting = !g && !p.injured;
+    const waiting = !g && !p.injured && !isRecLeague(); // récréatif : pas de groupe fixe, personne n'est « en attente »
     rows.push({ name:p.name, f:['reg'].concat(waiting?['wait']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
       tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}${waiting?' <span class="tag tag-stay">Sans groupe</span>':''}`,
-      sub:`Régulier · ${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' });
+      sub:`Régulier${isRecLeague() ? '' : ' · ' + escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' });
   });
   (DATA.substitutePool||[]).forEach(sb_=>{
     const link = LEAGUE_PLAYER_LINKS.find(l=>l.substitute_id===sb_.id), pr = profOf(link);
@@ -8587,7 +8587,7 @@ function adminAllPeopleHTML(){
   });
   const allArrow = k => allSort===k ? (allDir==='asc' ? ' ↑' : ' ↓') : '';
   return plListHTML({ id:'all', title:'Tous', hint:'Réguliers et remplaçants ensemble — touche une personne pour la gérer.', rows,
-    chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants'],['wait','En attente']],
+    chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants']].concat(isRecLeague() ? [] : [['wait','En attente']]),
     sorts:[['name','Nom A–Z']].concat(isRecLeague() ? [] : [['rating','Cote']]).map(([k,l])=>({ label:l, arrow:allArrow(k), active:allSort===k, onclick:`setAllSort('${k}')` })) });
 }
 // Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
@@ -8747,7 +8747,7 @@ async function openAddToLeagueModal(tab, teamId){
   const groups = DATA.groups || [];
   const nAcc = cands.filter(c=>c.profileId).length, nNo = cands.length - nAcc;
   const html = `
-    <div class="orgpick-intro">${ORG_PICK_TEAM ? `Choisis des personnes de l'organisation à ajouter à cette équipe (${ORG_PICK_MAX} place${ORG_PICK_MAX>1?'s':''} libre${ORG_PICK_MAX>1?'s':''}). Elles sont aussi ajoutées à la ligue.` : "Choisis qui ajouter à cette ligue. Les cotes, comptes et genres sont repris automatiquement."}</div>
+    <div class="orgpick-intro">${ORG_PICK_TEAM ? `Choisis des personnes de l'organisation à ajouter à cette équipe (${ORG_PICK_MAX} place${ORG_PICK_MAX>1?'s':''} libre${ORG_PICK_MAX>1?'s':''}). Elles sont aussi ajoutées à la ligue.` : "Choisis qui ajouter à cette ligue. " + (isRecLeague() ? "Les comptes et genres sont repris automatiquement." : "Les cotes, comptes et genres sont repris automatiquement.")}</div>
     ${cands.length ? `
     <div class="orgpick-toolbar">
       <input class="orgpick-search" placeholder="Rechercher un nom…" oninput="filterOrgPick(this.value)">
@@ -8773,7 +8773,7 @@ async function openAddToLeagueModal(tab, teamId){
     <div class="orgpick-footer">
       ${ORG_PICK_TEAM ? '' : `<div class="orgpick-opts">
         <select id="orgPickType" onchange="onOrgPickTypeChange()"><option value="joueur">Comme joueurs</option><option value="remplacant">Comme remplaçants</option></select>
-        <span id="orgPickPlaceWrap"><select id="orgPickPlace"><option value="wait">En attente</option>${groups.length ? '<option value="fill">Remplir les groupes</option>' : ''}</select></span>
+        <span id="orgPickPlaceWrap"${isRecLeague() ? ' data-rec="1" style="display:none;"' : ''}><select id="orgPickPlace"><option value="wait">En attente</option>${groups.length ? '<option value="fill">Remplir les groupes</option>' : ''}</select></span>
       </div>`}
       <button class="btn btn-primary orgpick-go" id="orgPickBtn" onclick="confirmAddFromOrg()" disabled>Ajouter</button>
     </div>`;
@@ -8837,7 +8837,7 @@ function updateOrgPickCount(){
 function onOrgPickTypeChange(){
   const t = document.getElementById('orgPickType').value;
   const w = document.getElementById('orgPickPlaceWrap');
-  if(w) w.style.display = t==='joueur' ? '' : 'none';
+  if(w) w.style.display = (t==='joueur' && !w.getAttribute('data-rec')) ? '' : 'none';
 }
 async function confirmAddFromOrg(){
   const picked = Array.from(document.querySelectorAll('.orgpick-cb:checked')).map(el=>ORG_PICK_CANDIDATES[parseInt(el.value,10)]).filter(Boolean);
@@ -10057,15 +10057,15 @@ function adminPlayersHTML(){
     const link = LEAGUE_PLAYER_LINKS.find(l=>l.player_id===p.id);
     const pr = link ? ALL_PROFILES.find(x=>x.id===link.profile_id) : null;
     const waiting = !g && !p.injured;
-    return { name:p.name, f:[g?'g_'+g.id:'wait'].concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
+    return { name:p.name, f:(isRecLeague() ? [] : [g?'g_'+g.id:'wait']).concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
       tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}`,
-      sub:`${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' };
+      sub:isRecLeague() ? (link ? 'Compte' : 'Sans compte') : `${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' };
   });
   const nInj = rows.filter(r=>r.f.includes('inj')).length;
-  const chips = [['all','Tous']].concat(groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), [['wait','En attente']], nInj ? [['inj','Blessés']] : []);
-  return plListHTML({ id:'reg', title:'Réguliers', hint: isRecLeague() ? 'Touche un joueur pour le renommer, le déplacer, gérer son compte ou le retirer.' : 'Touche un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte ou le retirer.', rows, chips,
-    sorts:[['name','Nom'],['group',grpWord(false,true)]].concat(isRecLeague() ? [] : [['rating','Cote']]).map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setRegularsSort('${k}')` })),
+  const chips = [['all','Tous']].concat(isRecLeague() ? [] : groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), isRecLeague() ? [] : [['wait','En attente']], nInj ? [['inj','Blessés']] : []);
+  return plListHTML({ id:'reg', title:'Réguliers', hint: isRecLeague() ? 'Touche un joueur pour le renommer, gérer son compte ou le retirer.' : 'Touche un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte ou le retirer.', rows, chips,
+    sorts:(isRecLeague() ? [['name','Nom']] : [['name','Nom'],['group',grpWord(false,true)],['rating','Cote']]).map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setRegularsSort('${k}')` })),
     empty:'Aucun joueur pour l\'instant.' });
 }
 // Contenu détaillé (pop-up) pour gérer un joueur : infos, actions, et compte lié.
@@ -10622,7 +10622,7 @@ function leagueTypeRowHTML(l, checkboxClass, defaultType, withRating){
       <option value="joueur" ${rem?'':'selected'}>Joueur</option>
       <option value="remplacant" ${rem?'selected':''}>Remplaçant</option>
     </select>
-    ${withRating ? `<label class="lg-rating" onclick="event.stopPropagation()"><span>Cote de départ</span><input type="text" inputmode="decimal" class="${checkboxClass}Rating" data-league-id="${l.id}" placeholder="${RATING_DEFAULT.toFixed(2)}" autocomplete="off"><small>Vide = ${RATING_DEFAULT.toFixed(2)}</small></label>` : ''}
+    ${(withRating && !leagueIsRec(l.id)) ? `<label class="lg-rating" onclick="event.stopPropagation()"><span>Cote de départ</span><input type="text" inputmode="decimal" class="${checkboxClass}Rating" data-league-id="${l.id}" placeholder="${RATING_DEFAULT.toFixed(2)}" autocomplete="off"><small>Vide = ${RATING_DEFAULT.toFixed(2)}</small></label>` : ''}
   </div>`;
 }
 function toggleLgTile(tile){
@@ -12848,7 +12848,10 @@ function reportsHealthHTML(){
 // Rapport de session (stats calculées à partir de l'historique).
 function adminReportsSectionHTML(){
   const sub = VIEW.reportsSubTab || 'bilan';
-  const subTabs = [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session'],['reglement','Règlement']];
+  // Récréatif : ni groupes fixes, ni scores, ni cotes. Seuls le bilan de présence, la liste et le règlement ont du sens.
+  const subTabs = isRecLeague() ? [['bilan','Bilan'],['liste','Liste'],['reglement','Règlement']]
+    : [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session'],['reglement','Règlement']];
+  if(!subTabs.some(function(t){ return t[0] === sub; })){ VIEW.reportsSubTab = 'bilan'; return adminReportsSectionHTML(); }
   let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
   html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : (sub === 'reglement' ? reportsRulesHTML() : reportsHealthHTML())));
   return html;
@@ -13431,8 +13434,8 @@ function remindRules(){
   });
 }
 function reportsListHTML(){
-  const sortBy = VIEW.reportsListSortBy || (isRecLeague() ? 'name' : 'rating');
-  const sortDir = VIEW.reportsListSortDir || 'desc';
+  const sortBy = isRecLeague() ? 'name' : (VIEW.reportsListSortBy || 'rating');
+  const sortDir = isRecLeague() ? (VIEW.reportsListSortBy === 'name' ? (VIEW.reportsListSortDir || 'asc') : 'asc') : (VIEW.reportsListSortDir || 'desc');
   const ratingList = DATA.players.slice().sort((a,b)=>{
     let av, bv;
     if(sortBy==='group'){ av=(groupById(a.groupId)||{order:999}).order; bv=(groupById(b.groupId)||{order:999}).order; }
@@ -13448,11 +13451,11 @@ function reportsListHTML(){
     <div class="pf-list" style="margin-bottom:14px;"><button class="pf-row" onclick="printReportsList()"><span class="t">Imprimer…</span><span class="ch">›</span></button></div>
     <div class="card">
       <div class="rs-top"><div class="pf-sec" style="margin:0;">Joueurs (${ratingList.length})</div></div>
-      ${rpSortHTML((isRecLeague() ? [] : [['rating','Cote']]).concat([['name','Nom'],['group',grpWord(false,true)]]), sortBy, sortDir, 'setReportsListSort')}
+      ${rpSortHTML(isRecLeague() ? [['name','Nom']] : [['rating','Cote'],['name','Nom'],['group',grpWord(false,true)]], sortBy, sortDir, 'setReportsListSort')}
       ${ratingList.length ? `<div class="pf-list">${ratingList.map(p=>{
         const g = groupById(p.groupId);
         const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-        return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}<small>${escapeHTML(g?g.name:'Sans '+grpWord(false,false))}</small></span>${isRecLeague() ? '' : `<span class="rp-v">${rating.toFixed(2)}</span>`}</div>`;
+        return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}${isRecLeague() ? '' : `<small>${escapeHTML(g?g.name:'Sans '+grpWord(false,false))}</small>`}</span>${isRecLeague() ? '' : `<span class="rp-v">${rating.toFixed(2)}</span>`}</div>`;
       }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
     </div>
     <div class="card">
@@ -13537,8 +13540,8 @@ function reportsSessionHTML(){
 }
 // ---------- Export PDF des rapports (impression du navigateur) ----------
 function reportsListPrintableHTML(){
-  const sortBy = VIEW.reportsListSortBy || (isRecLeague() ? 'name' : 'rating');
-  const sortDir = VIEW.reportsListSortDir || 'desc';
+  const sortBy = isRecLeague() ? 'name' : (VIEW.reportsListSortBy || 'rating');
+  const sortDir = isRecLeague() ? (VIEW.reportsListSortBy === 'name' ? (VIEW.reportsListSortDir || 'asc') : 'asc') : (VIEW.reportsListSortDir || 'desc');
   const ratingList = DATA.players.slice().sort((a,b)=>{
     let av, bv;
     if(sortBy==='group'){ av=(groupById(a.groupId)||{order:999}).order; bv=(groupById(b.groupId)||{order:999}).order; }
@@ -13584,7 +13587,7 @@ const PRINT_COLS = {
   ]
 };
 let PRINT_SEL = {};
-function printColsAll(kind){ return isRecLeague() ? PRINT_COLS[kind].filter(c=>c[0]!=='cote' && c[0]!=='dcote') : PRINT_COLS[kind]; }
+function printColsAll(kind){ return isRecLeague() ? PRINT_COLS[kind].filter(c=>c[0]!=='cote' && c[0]!=='dcote' && c[0]!=='groupe') : PRINT_COLS[kind]; }
 function printSelCols(kind){
   const all = printColsAll(kind);
   const sel = PRINT_SEL[kind];
@@ -13764,7 +13767,30 @@ function setReportsSort(col){
 function adminHistoryHTML(){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
   if(closed.length===0) return `<div class="card"><p class="empty">Aucune session terminée pour l'instant.</p></div>`;
+  if(isRecLeague()) return closed.map((s,i)=>recSessionSummaryHTML(s, i===0)).join('');
   return closed.map((s,i)=>sessionSummaryHTML(s, true, null, i===0)).join('');
+}
+// Soirée récréative terminée : qui était là, qui était absent, remplaçants venus. Pas de classement ni de scores.
+function recSessionSummaryHTML(s, isOpen){
+  const seen = {}, present = [];
+  const add = function(id){ if(id && !seen[id]){ seen[id] = 1; present.push(id); } };
+  Object.keys(s.standingsByGroup || {}).forEach(function(gid){ (s.standingsByGroup[gid] || []).forEach(function(r){ add(r.playerId); }); });
+  (s.groupsData || []).forEach(function(gd){ Object.keys(gd.substitutes || {}).forEach(function(k){ add(gd.substitutes[k]); }); (gd.extras || []).forEach(add); });
+  const subs = present.filter(function(id){ return isSubPoolId(id) || isGuestId(id); });
+  const regs = present.filter(function(id){ return subs.indexOf(id) === -1; });
+  const abs = (s.absences || []).filter(function(id){ return !seen[id]; });
+  const byName = function(a, b){ return playerName(a).localeCompare(playerName(b)); };
+  const list = function(ids, tag){ return `<div class="pf-list">${ids.slice().sort(byName).map(function(id){ return `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(playerName(id))}${tag ? ` <span class="rs-tag">${tag(id)}</span>` : ''}</span></div>`; }).join('')}</div>`; };
+  const n = present.length;
+  const chips = [`<span class="pf-chip on">${n} présent${n > 1 ? 's' : ''}</span>`].concat(abs.length ? [`<span class="pf-chip warn">${abs.length} absent${abs.length > 1 ? 's' : ''}</span>`] : []);
+  let body = regs.length ? `<div class="hs-g">Présents</div>` + list(regs) : `<p class="ah-meta">Aucune présence enregistrée pour cette soirée.</p>`;
+  if(subs.length) body += `<div class="hs-g">Remplaçants</div>` + list(subs, function(id){ return isGuestId(id) ? 'invité' : 'rempl.'; });
+  if(abs.length) body += `<div class="hs-g">Absents</div>` + list(abs);
+  body += `<div class="pf-list hs-acts"><button class="pf-row hs-del" onclick="deleteSession('${s.id}')"><span class="t">Supprimer cette soirée</span><span class="ch">›</span></button></div>`;
+  return `<details class="card hs-card"${isOpen?' open':''}>
+    <summary class="hs-sum"><span class="hs-t"><b>${escapeHTML(frDateLong(s.date))}</b><span class="hs-chips">${chips.join('')}</span></span><span class="hs-ch">›</span></summary>
+    <div class="hs-body">${body}</div>
+  </details>`;
 }
 // Retrouve le groupe où un joueur a réellement joué lors d'une session donnée
 // (peut différer de son groupe actuel s'il a été déplacé depuis, ou prêté ce jour-là).
@@ -14084,7 +14110,7 @@ function adminSettingsSectionHTML(){
     rec ? '' : settingsRow('', 'Mode test', 'Moins de matchs par groupe, pour essayer l\'app ou faire une démonstration · ' + (DATA.testMode ? 'activé' : 'désactivé'), 'openTestModeModal()')
   ]);
   if(!isOrganizerOnly()) html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
-    <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions':'groupes, historique'} et classement. Les comptes des joueurs sont conservés.</p>`;
+    <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions et classement':(rec?'soirées et historique':'groupes, historique et classement')}. Les comptes des joueurs sont conservés.</p>`;
   return html;
 }
 // Onglets visibles pour les joueurs et les remplaçants (au moins un reste toujours visible).
@@ -14581,7 +14607,7 @@ function openMlpRosterSizeModal(){
 }
 function openGeneralInfoModal(){
   const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social:'Rotation sociale (terrains tirés au hasard à chaque soirée)' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
+  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social: isRotationMode() ? 'Récréatif · rotation chronométrée' : 'Récréatif · terrains tirés au sort à chaque soirée' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
   const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
   const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : '';
   const html = `
@@ -14916,14 +14942,21 @@ function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
 }
 function settingsGuideHTML(){
+  const rec = isRecLeague(), rot = isRotationMode();
+  const recSteps = rot
+    ? `1. <b>Lancer la soirée</b> : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Présences</b> : chaque joueur présent reçoit un numéro tiré au sort ; un absent sort de la liste.<br>3. <b>Horaire</b> : les rondes de la soirée, avec qui joue avec qui et sur quel terrain.<br>4. <b>Publier la soirée</b> : chacun voit son numéro et ses matchs dans l'app.<br>5. <b>Chrono</b> : démarre chaque ronde ; tous les joueurs voient le même chrono.<br>6. <b>Terminer la soirée</b> : elle est rangée dans l'historique.`
+    : `1. <b>Lancer la soirée</b> : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Terrains</b> : les joueurs présents sont tirés au sort sur les terrains ; tu peux refaire le tirage.<br>3. <b>Publier la soirée</b> : chacun voit son terrain dans l'app.<br>4. <b>Terminer la soirée</b> : elle est rangée dans l'historique.`;
   return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
-  + guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`)
-  + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant, avec sa cote de départ. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
+  + (rec ? guideSec('Une soirée, étape par étape', `<p class="small">${recSteps}</p><p class="small">En récréatif, il n'y a ni scores, ni classement, ni cotes, ni montées et descentes.</p>`) : '')
+  + (rec ? '' : guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`))
+  + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant${rec ? '' : ', avec sa cote de départ'}. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
   + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Ils peuvent aussi approuver les demandes d'adhésion à leur ligue et ajouter des personnes à l'organisation (Organisations › Membres et Comptes). Les réglages de l'organisation, les autres ligues et la suppression de membres restent aux administrateurs.</p>`)
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
-  + guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`)
-  + guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`)
-  + guideSec('Dépannage', `<p class="small">• Un joueur ne voit pas ses matchs : la session est-elle publiée ?<br>• Un joueur ne reçoit pas les notifications : demande-lui de toucher « Tester » dans Moi › Notifications, et d'ouvrir l'app depuis son icône.<br>• Un nouvel inscrit n'arrive pas à confirmer son courriel : vérifie Organisations › Comptes, sa demande peut y être en attente.<br>• L'app semble ancienne : la fermer complètement puis la rouvrir.<br>• Nombre de matchs inattendu : vérifie le mode test dans Réglages › Avancé.</p>`)
+  + (rec ? guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque soirée passée, avec les présents, les remplaçants et les absents. <b>Rapports</b> : Bilan de présence, Liste des joueurs et suivi du <b>Règlement</b>.</p>`) : '')
+  + (rec ? '' : guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`))
+  + (rec ? guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : formule de la soirée (rotation chronométrée ou terrains tirés au sort), terrains disponibles. <b>Ce que voient les joueurs</b> : terrain avant publication, onglets.</p>`) : '')
+  + (rec ? '' : guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`))
+  + guideSec('Dépannage', `<p class="small">• Un joueur ne voit pas ${rec ? 'sa soirée : la soirée' : 'ses matchs : la session'} est-elle publiée ?<br>• Un joueur ne reçoit pas les notifications : demande-lui de toucher « Tester » dans Moi › Notifications, et d'ouvrir l'app depuis son icône.<br>• Un nouvel inscrit n'arrive pas à confirmer son courriel : vérifie Organisations › Comptes, sa demande peut y être en attente.<br>• L'app semble ancienne : la fermer complètement puis la rouvrir.${rec ? '' : '<br>• Nombre de matchs inattendu : vérifie le mode test dans Réglages › Avancé.'}</p>`)
   + `<div class="card"><button class="btn-ghost" onclick="showPlayerGuideModal()">Aperçu du guide du joueur</button></div>`;
 }
 
@@ -15697,12 +15730,14 @@ function playerGuideHTML(){
   const hasRules = !!DATA.rulesText;
   let h = guideSec("L'app en bref", `<p class="small">En bas de l'écran : <b>Accueil</b> (tes ligues et ce qui s'en vient), <b>Organisations</b>, <b>Calendrier</b> et <b>Communauté</b>. Touche ta photo en haut à gauche pour ouvrir <b>Moi</b> (profil, absences, notifications, aide). La <b>cloche</b> en haut à droite garde tes notifications des 14 derniers jours.</p>`);
   if(sub){
-    h += guideSec('Indiquer ta disponibilité', `<p class="small">À chaque nouvelle session, tu reçois une notification. Sur l'Accueil, touche <b>« Je suis disponible »</b> sur la carte de ta ligue. L'organisateur te place s'il a besoin de toi : tu reçois alors « Tu joues… » avec ton ${g}. S'il change d'idée, tu en es aussi averti.</p>`);
+    h += guideSec('Indiquer ta disponibilité', `<p class="small">À chaque nouvelle ${rec ? 'soirée' : 'session'}, tu reçois une notification. Sur l'Accueil, touche <b>« Je suis disponible »</b> sur la carte de ta ligue. L'organisateur te place s'il a besoin de toi : tu reçois alors « Tu joues… »${rec ? '' : ' avec ton ' + g}. S'il change d'idée, tu en es aussi averti.</p>`);
   } else {
     h += guideSec('Ta ligue', `<p class="small">Sur l'Accueil, chaque ligue a sa carte : date de la prochaine ${rec ? 'soirée' : 'session'}, état (en préparation, publiée…) et boutons rapides. Touche la carte pour ouvrir <b>${myGroupLabel()}</b>${rec ? '' : ', <b>Statistiques</b> et <b>Historique</b>'}.</p>`);
     h += guideSec('Signaler une absence', `<p class="small">Touche <b>« Je serai absent(e) »</b> sur la carte de ta ligue, le plus tôt possible : l'organisateur peut ainsi te trouver un remplaçant. Pour plusieurs dates d'avance (vacances) ou une <b>blessure</b>, va dans <b>Moi › Mes absences</b>.${rec ? '' : ` Une absence sans remplaçant entraîne une descente automatique d'un ${g}, sauf si tu as toi-même joué ailleurs comme remplaçant ce jour-là.`}</p>`);
     h += rec
-      ? guideSec('Ton terrain', `<p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. Les joueurs présents sont répartis au hasard sur les terrains, en évitant de rejouer avec les mêmes personnes. Ton terrain apparaît dès que l'organisateur publie la soirée.</p>`)
+      ? (isRotationMode()
+        ? guideSec('Ta soirée', `<p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. Chaque joueur présent reçoit un numéro tiré au sort. Dès que l'organisateur publie la soirée, tu vois ton numéro et tes matchs de chaque ronde (avec qui, contre qui, sur quel terrain). Pendant la soirée, le chrono commun s'affiche dans l'app.</p>`)
+        : guideSec('Ton terrain', `<p class="small">Ici on joue pour le plaisir : aucun score, aucune cote, aucun classement. Les joueurs présents sont répartis au hasard sur les terrains, en évitant de rejouer avec les mêmes personnes. Ton terrain apparaît dès que l'organisateur publie la soirée.</p>`))
       : guideSec('Tes matchs et les scores', `<p class="small">Dès que l'organisateur publie la session, tu reçois une notification et tes matchs apparaissent dans ${myGroupLabel()}.${DATA.allowPlayerScoreEntry ? ' Le jour de la session, les joueurs entrent eux-mêmes les scores, match après match.' : " Les scores sont entrés par l'organisateur."} À la fin de la session, les premiers de chaque ${g} montent et les derniers descendent.</p>`);
     if(!rec) h += guideSec('Statistiques et historique', `<p class="small"><b>Statistiques</b> : ton bilan de la saison, tes meilleurs partenaires et adversaires${showR ? ', et l\'évolution de ta cote' : ''}. <b>Historique</b> : le classement de chaque session passée et le détail des matchs${showR ? ', avec ta cote après chaque session' : ''}.</p>`);
     if(showR && !rec) h += guideSec('La cote', `<p class="small">Ta cote évolue après chaque match compté, selon l'adversaire affronté et l'écart au score. L'explication complète est dans <b>Moi › Comment fonctionne la cote ?</b></p>`);
@@ -15746,6 +15781,7 @@ function showLeagueRulesModal(){
 // Résumé des règles actuelles de la ligue, généré à partir des réglages en
 // vigueur — s'ajuste donc automatiquement si l'admin les modifie.
 function leagueRulesHTML(){
+  if(isRecLeague()) return recLeagueRulesHTML();
   const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes', single:'Division unique', social:'Rotation sociale' }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
   const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
   return `
@@ -15763,6 +15799,23 @@ function leagueRulesHTML(){
     <h3 style="margin-top:14px;">Ordre de départage en cas d'égalité</h3>
     ${enabledCriteria.length ? `<ol style="margin:0;padding-left:20px;">${enabledCriteria.map(c=>`<li class="small">${c}</li>`).join('')}</ol>` : `<p class="small">Aucun critère activé — les égalités ne sont pas départagées.</p>`}
     ${DATA.autoStartSessions ? `<h3 style="margin-top:14px;">Calendrier</h3><p class="small">Les sessions démarrent automatiquement chaque semaine${DATA.seasonEndDate ? ', jusqu\'au '+DATA.seasonEndDate : ''}.</p>` : ''}
+    <p class="small" style="margin-top:14px;">Ce résumé reflète toujours les réglages actuels de la ligue.</p>`;
+}
+// Récréatif : la formule de la soirée, sans groupes, scores, cotes ni départage.
+function recLeagueRulesHTML(){
+  const st = rotationSettings(), K = parseInt(DATA.socialMaxCourts, 10) || 0;
+  const formule = isRotationMode()
+    ? `<p class="small">Chaque joueur présent reçoit un numéro tiré au sort. La soirée se joue en <b>${st.rounds} rondes de ${st.round} minutes</b>, avec ${st.change} minute${st.change>1?'s':''} pour changer de terrain entre les rondes. À chaque ronde, tu joues avec d'autres partenaires et d'autres adversaires ; l'horaire indique avec qui et sur quel terrain. Un chrono commun annonce le début et la fin de chaque ronde.</p>`
+    : `<p class="small">À chaque soirée, les joueurs présents sont répartis au hasard sur les terrains, en évitant de rejouer avec les mêmes personnes.</p>`;
+  return `
+    <div class="stat-chips">
+      <div class="stat-chip"><span class="stat-label">Format</span><span class="stat-value" style="font-size:14px;">Récréatif</span></div>
+      <div class="stat-chip"><span class="stat-label">Terrains</span><span class="stat-value">${K ? 'Jusqu\'à ' + K : 'Selon les présences'}</span></div>
+    </div>
+    <h3 style="margin-top:14px;">La soirée</h3>
+    ${formule}
+    <p class="small">On joue pour le plaisir : aucun score, aucun classement, aucune cote.</p>
+    ${DATA.autoStartSessions ? `<h3 style="margin-top:14px;">Calendrier</h3><p class="small">Les soirées démarrent automatiquement chaque semaine${DATA.seasonEndDate ? ', jusqu\'au ' + fdl(DATA.seasonEndDate) : ''}.</p>` : ''}
     <p class="small" style="margin-top:14px;">Ce résumé reflète toujours les réglages actuels de la ligue.</p>`;
 }
 // ---------- Profil joueur enrichi (photo + bio + genre) ----------
