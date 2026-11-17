@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 447">
+<meta name="app-build" content="Version 448">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13482,8 +13482,73 @@ function closePrintOverlay(){
   const o = document.getElementById('printOverlay'); if(o) o.remove();
   const st = document.getElementById('printOverlayCss'); if(st) st.remove();
 }
+// Sur iPhone/iPad, l'app ajoutée à l'écran d'accueil ne peut pas ouvrir la fenêtre d'impression
+// (iOS ignore window.print). Le bouton crée alors un vrai PDF et ouvre le menu de partage
+// (Imprimer avec AirPrint, courriel, Messenger, Fichiers). Ailleurs : impression habituelle.
+const PDF_LIBS = [
+  ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H', 'html2canvas'],
+  ['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk', 'jspdf']
+];
+function loadScriptOnce(url, integrity, globalName){
+  if(window[globalName]) return Promise.resolve();
+  return new Promise(function(resolve, reject){
+    const el = document.createElement('script'); el.src = url; el.integrity = integrity; el.crossOrigin = 'anonymous';
+    el.onload = function(){ resolve(); }; el.onerror = function(){ reject(new Error('chargement impossible')); };
+    document.head.appendChild(el);
+  });
+}
+function printNeedsPdf(){ return isIOSDevice() && isRunningStandalone(); }
+function onPrintClick(){ if(printNeedsPdf()) printOverlayToPdf(); else window.print(); }
+let PRINT_TITLE = 'Dinkeo', PRINT_LANDSCAPE = false, PDF_BUSY = false;
+async function printOverlayToPdf(){
+  if(PDF_BUSY) return;
+  const content = document.getElementById('printContent'); if(!content) return;
+  const btn = document.getElementById('printBtn');
+  PDF_BUSY = true; if(btn){ btn.disabled = true; btn.textContent = 'Création du PDF…'; }
+  const oldW = content.style.width;
+  try{
+    for(const L of PDF_LIBS) await loadScriptOnce(L[0], L[1], L[2]);
+    // Mise en page fixe (largeur d'une feuille) le temps de la capture, pour un PDF identique sur tous les téléphones.
+    const pageWpx = PRINT_LANDSCAPE ? 1040 : 760;
+    content.style.width = pageWpx + 'px';
+    await new Promise(function(r){ setTimeout(r, 60); });
+    const top0 = content.getBoundingClientRect().top;
+    // Coupures de page : jamais au milieu d'un bloc, et une nouvelle page avant chaque feuille de match.
+    const cuts = [], forced = [];
+    content.querySelectorAll('section, tr, .ms-match, .rgp-g, .print-table, h1, h2, h3, p, .ms-page').forEach(function(el){ const r = el.getBoundingClientRect(); cuts.push(r.bottom - top0); });
+    content.querySelectorAll('.ms-page').forEach(function(el, i){ if(i > 0) forced.push(el.getBoundingClientRect().top - top0); });
+    const canvas = await window.html2canvas(content, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: pageWpx + 40, logging: false });
+    const jsPDF = window.jspdf.jsPDF;
+    const pdf = new jsPDF({ orientation: PRINT_LANDSCAPE ? 'landscape' : 'portrait', unit: 'pt', format: 'letter' });
+    const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight(), m = 28;
+    const ratio = (pw - 2*m) / pageWpx, pageHpx = (ph - 2*m) / ratio, scale = canvas.width / pageWpx;
+    const totalH = canvas.height / scale;
+    let y = 0, first = true;
+    while(y < totalH - 1){
+      let end = Math.min(y + pageHpx, totalH);
+      const f = forced.filter(function(v){ return v > y + 20 && v < end; });
+      if(f.length) end = Math.min.apply(null, f);
+      else if(end < totalH){ const c = cuts.filter(function(v){ return v > y + pageHpx * 0.4 && v <= end; }); if(c.length) end = Math.max.apply(null, c); }
+      const sliceH = end - y;
+      const part = document.createElement('canvas'); part.width = canvas.width; part.height = Math.ceil(sliceH * scale);
+      part.getContext('2d').drawImage(canvas, 0, Math.floor(y * scale), canvas.width, part.height, 0, 0, canvas.width, part.height);
+      if(!first) pdf.addPage();
+      pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', m, m, pw - 2*m, sliceH * ratio);
+      first = false; y = end;
+    }
+    const fname = (PRINT_TITLE || 'Dinkeo').replace(/[\\/:*?"<>|]+/g, '-') + '.pdf';
+    saveOrShareFile(pdf.output('blob'), fname);
+  }catch(e){
+    console.error('PDF', e);
+    showAlert("Impossible de créer le PDF (" + (e && e.message ? e.message : 'erreur') + "). Vérifie ta connexion Internet et réessaie, ou ouvre dinkeo.ca dans Safari pour imprimer.");
+  }finally{
+    content.style.width = oldW; PDF_BUSY = false;
+    if(btn){ btn.disabled = false; btn.textContent = printNeedsPdf() ? 'PDF / Imprimer' : 'Imprimer'; }
+  }
+}
 function openPrintOverlay(title, bodyHtml, landscape){
   closePrintOverlay();
+  PRINT_TITLE = title || 'Dinkeo'; PRINT_LANDSCAPE = !!landscape;
   const st = document.createElement('style'); st.id = 'printOverlayCss';
   st.textContent = `
     @page{size:${landscape ? 'landscape' : 'portrait'};margin:12mm;}
@@ -13506,7 +13571,7 @@ function openPrintOverlay(title, bodyHtml, landscape){
     #printOverlay .ms-page{background:#fff;color:#000;}`;
   document.head.appendChild(st);
   const o = document.createElement('div'); o.id = 'printOverlay';
-  o.innerHTML = `<div class="print-toolbar"><button type="button" onclick="window.print()">Imprimer</button><button type="button" class="primary" onclick="closePrintOverlay()">✕ Fermer</button></div>${bodyHtml}`;
+  o.innerHTML = `<div class="print-toolbar"><button type="button" id="printBtn" onclick="onPrintClick()">${printNeedsPdf() ? 'PDF / Imprimer' : 'Imprimer'}</button><button type="button" class="primary" onclick="closePrintOverlay()">✕ Fermer</button></div><div id="printContent" style="background:#fff;">${bodyHtml}</div>`;
   document.body.appendChild(o);
   o.scrollTop = 0;
 }
