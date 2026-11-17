@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 459">
+<meta name="app-build" content="Version 460">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -14093,7 +14093,7 @@ function adminSettingsSectionHTML(){
   const vue = [adminOwnLink('player') ? settingsRow('', 'Voir comme un joueur', "Passe dans ton espace joueur pour voir l'app comme tes joueurs", 'toggleAdminPlayerView()') : '',
     (playerTabDefs().length > 1 || subTabDefs().length > 1) ? settingsRow('', 'Onglets visibles', 'Sections offertes aux joueurs et remplaçants · ' + (hiddenN ? hiddenN + ' masquée' + (hiddenN>1?'s':'') : 'toutes visibles'), 'openTabVisibilityModal()') : ''];
   if(rec){
-    vue.push(stSwitchRow('', 'Terrain avant publication', 'Les joueurs voient leur terrain avant que tu publies la soirée', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
+    if(!isRotationMode()) vue.push(stSwitchRow('', 'Terrain avant publication', 'Les joueurs voient leur terrain avant que tu publies la soirée', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
   } else {
     vue.push(stSwitchRow('', 'Cote des joueurs', 'Chaque joueur voit sa cote et celle des joueurs de son groupe. Toi, tu la vois toujours.', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`));
     vue.push(stSwitchRow('', 'Cote des remplaçants', 'Chaque remplaçant voit sa propre cote', DATA.showRatingToSubs, `setDataFlag('showRatingToSubs',this.checked)`));
@@ -15357,7 +15357,7 @@ function summarizeLeagueData(data, link, leagueId){
   out.injured = !!me.injured;
   const open = (data.sessions||[]).find(x=>x.status==='open');
   if(open){
-    out.open = { date: open.date, published: !!open.published, canScore: !!data.allowPlayerScoreEntry && scoreDayOpen(open.date), visible: !!(open.published || data.showGroupBeforePublish), rec: isRecLeague(data), absent: !!(open.absences && open.absences.includes(me.id)) };
+    out.open = { date: open.date, published: !!open.published, canScore: !!data.allowPlayerScoreEntry && scoreDayOpen(open.date), visible: !!(open.published || (data.showGroupBeforePublish && !isRotationMode(data))), rec: isRecLeague(data), absent: !!(open.absences && open.absences.includes(me.id)) };
   }
   return out;
 }
@@ -16316,7 +16316,8 @@ function playerGroupHTML(me){
   if(planned.length) absenceBadges.push(`<span class="pf-chip acc">${planned.length} absence${planned.length>1?'s':''} prévue${planned.length>1?'s':''}</span>`);
   // Le groupe n'est montré que lorsqu'une session est PUBLIÉE (et que le joueur n'y est pas absent) :
   // avant, la composition peut encore changer et ne reflète pas la session à venir.
-  const groupVisible = !!(open && (open.published || DATA.showGroupBeforePublish) && !isAbsent(open, me.id));
+  // Rotation chronométrée : le numéro et l'horaire n'existent qu'à la publication (pas de « terrain » avant).
+  const groupVisible = !!(open && (open.published || (DATA.showGroupBeforePublish && !isRotationMode())) && !isAbsent(open, me.id));
   let html = `<div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:${absenceBadges.length?'8px':'12px'};">
       <div class="grp-title"><h2 style="margin:0;">${groupVisible ? escapeHTML(g ? g.name : (isRecLeague() ? 'Pas de terrain' : '—')) : myGroupLabel()}</h2>${(groupVisible && g) ? courtSubHTML(open, g.id) : ''}</div>
