@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 449">
+<meta name="app-build" content="Version 450">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1170,6 +1170,10 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-p i{font-style:normal;font-size:11px;font-weight:800;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:rgba(207,234,92,.16);color:var(--ball);display:inline-flex;align-items:center;justify-content:center;}
 .rot-p.me i{background:var(--ball);color:var(--court);}
 .rot-nums{display:flex;flex-wrap:wrap;gap:4px 8px;}
+.pr-row .pr-n{flex:none;min-width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:15px;background:rgba(207,234,92,.16);color:var(--ball);}
+.pr-row .pr-n.off{background:rgba(255,255,255,.06);color:var(--muted);}
+.pr-btn{flex:none;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font:inherit;font-size:13px;font-weight:700;border-radius:999px;padding:7px 12px;cursor:pointer;}
+.pr-btn.back{border-color:rgba(207,234,92,.5);color:var(--ball);}
 .rot-courts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:10px;}
 .rot-court{padding:10px 12px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
 .rot-court b{display:block;font-family:var(--font-display);color:var(--ball);margin-bottom:4px;}
@@ -5381,7 +5385,6 @@ function rotationAdminHTML(open){
       <button class="btn btn-secondary" style="width:auto;" onclick="printRotation()">Imprimer l'horaire</button>
       <button class="btn-ghost" onclick="rotationRedo()">Refaire le tirage</button>
     </div></div>`;
-  h += `<div class="card"><div class="pf-sec" style="margin-top:0;">Numéros de la soirée</div><div class="rot-nums">${rot.players.slice().sort(function(a, b){ return rot.numbers[a] - rot.numbers[b]; }).map(function(id){ return rotNameHTML(id, rot); }).join('')}</div></div>`;
   rot.rounds.forEach(function(rd, i){
     h += `<div class="card rot-round"><div class="rs-top"><div class="rs-name">Ronde ${i + 1}</div></div>
       ${rd.rest.length ? `<div class="ah-meta" style="margin-top:4px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</div>` : ''}
@@ -11399,9 +11402,37 @@ async function unlinkAccount(profileId, leagueId){
   });
 }
 
+// Rotation chronométrée (ligue récréative) : la page Présences montre le tirage des numéros et la liste
+// des joueurs (présent / absent) ; les terrains de chaque ronde sont dans l'onglet Horaire.
+function rotationPresenceHTML(open){
+  if(!open) return `<div class="card"><p class="empty">Aucune soirée en cours. Lance la soirée pour faire le tirage.</p></div>`;
+  const rot = rotationFor(open), N = rot.players.length;
+  let h = '';
+  if(rotationStale(open)) h += `<div class="rs-warn">Les présences ont changé depuis la publication. <button type="button" class="btn-ghost" style="margin-left:6px;" onclick="rotationRedo()">Refaire l'horaire</button></div>`;
+  h += `<div class="card"><div class="rs-top"><div class="rs-name">Tirage de la soirée</div><span class="ah-st ${open.published ? 'on' : 'wait'}">${open.published ? 'Publié' : 'Aperçu'}</span></div>
+    <div class="ah-meta" style="margin-bottom:10px;">${N} joueur${N>1?'s':''} présent${N>1?'s':''} · chacun a un numéro pour la soirée${open.published ? '' : ". Le tirage suit les présences jusqu'à la publication."}</div>
+    ${N ? `<div class="rot-nums">${rot.players.slice().sort(function(a, b){ return rot.numbers[a] - rot.numbers[b]; }).map(function(id){ return rotNameHTML(id, rot); }).join('')}</div>` : `<p class="empty">Aucun joueur présent.</p>`}
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn-ghost" onclick="rotationRedo()">Refaire le tirage</button></div></div>`;
+  const all = DATA.players.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'fr'); });
+  const out = function(p){ return p.injured || isAbsent(open, p.id); };
+  const present = all.filter(function(p){ return !out(p); }).sort(function(a, b){ return (rot.numbers[a.id] || 999) - (rot.numbers[b.id] || 999); });
+  const absent = all.filter(out);
+  const row = function(p, isOut){
+    const n = rot.numbers[p.id];
+    const btn = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`
+      : `<button type="button" class="pr-btn${isOut ? ' back' : ''}" onclick="event.stopPropagation();toggleAbsence('${p.id}')">${isOut ? 'Présent' : 'Absent'}</button>`;
+    return `<div class="pf-row pr-row" onclick="openPlayerDetailModal('${p.id}')"><span class="pr-n${isOut ? ' off' : ''}">${!isOut && n ? n : '–'}</span><span class="t">${escapeHTML(p.name)}</span>${btn}</div>`;
+  };
+  h += `<div class="card"><div class="rs-top"><div class="rs-name">Présents</div><span class="ah-meta">${present.length}</span></div>
+    <div class="pf-list" style="margin-top:8px;">${present.length ? present.map(function(p){ return row(p, false); }).join('') : '<div class="ah-meta">Personne pour l\'instant.</div>'}</div></div>`;
+  h += `<div class="card"><div class="rs-top"><div class="rs-name">Absents</div><span class="ah-meta">${absent.length}</span></div>
+    <div class="pf-list" style="margin-top:8px;">${absent.length ? absent.map(function(p){ return row(p, true); }).join('') : '<div class="ah-meta">Aucun absent.</div>'}</div></div>`;
+  return h;
+}
 function adminGroupsHTML(){
   const open = currentOpenSession();
   const rec = isRecLeague();
+  if(isRotationMode()) return rotationPresenceHTML(open);
   let html = rec
     ? `<div class="card"><p class="small">${open ? "Les terrains sont tirés au hasard parmi les joueurs présents. Marque les absences dans la fiche du joueur : tant que la soirée n'est pas publiée, le tirage est refait automatiquement." : "Aucune soirée en cours : les terrains seront tirés au hasard au démarrage de la prochaine."}</p></div>`
     : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse un joueur par sa poignée ⋮⋮ vers un autre groupe ci-dessous. ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
