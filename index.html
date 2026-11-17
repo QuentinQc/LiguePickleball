@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 448">
+<meta name="app-build" content="Version 449">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8406,7 +8406,7 @@ function plListHTML(o){
     <div class="pl-list">${rows.map(r=>`<div class="pl-row" style="${r.style||''}${(st.f!=='all' && !(r.f||[]).includes(st.f))?'display:none;':''}" data-name="${escapeHTML(normSearch(r.name))}" data-f="${(r.f||[]).join(' ')}" onclick="${r.click}">
       ${avatarHTML('pl-av', partnerInitials(r.name), r.avatarUrl, r.avStyle||'')}
       <span class="pl-main"><span class="pl-name">${escapeHTML(r.name)}${r.tags||''}</span><span class="pl-sub">${r.sub||''}</span>${r.role ? `<span class="pl-role">${r.role}</span>` : ''}</span>
-      ${typeof r.rating==='number' ? `<span class="pl-rating">${r.rating.toFixed(2)}</span>` : ''}${r.right||''}
+      ${(typeof r.rating==='number' && !isRecLeague()) ? `<span class="pl-rating">${r.rating.toFixed(2)}</span>` : ''}${r.right||''}
     </div>`).join('')}
       <div class="orgpick-noresult" style="display:none;">Aucun résultat</div>
     </div>` : `<p class="empty">${o.empty||'Personne pour l\'instant.'}</p>`}
@@ -8476,7 +8476,7 @@ function adminAllPeopleHTML(){
   const allArrow = k => allSort===k ? (allDir==='asc' ? ' ↑' : ' ↓') : '';
   return plListHTML({ id:'all', title:'Tous', hint:'Réguliers et remplaçants ensemble — touche une personne pour la gérer.', rows,
     chips:[['all','Tous'],['reg','Réguliers'],['sub','Remplaçants'],['wait','En attente']],
-    sorts:[['name','Nom A–Z'],['rating','Cote']].map(([k,l])=>({ label:l, arrow:allArrow(k), active:allSort===k, onclick:`setAllSort('${k}')` })) });
+    sorts:[['name','Nom A–Z']].concat(isRecLeague() ? [] : [['rating','Cote']]).map(([k,l])=>({ label:l, arrow:allArrow(k), active:allSort===k, onclick:`setAllSort('${k}')` })) });
 }
 // Formulaire d'ajout unifié — peu importe l'onglet actif ou le format de
 // ligue (échelle ou MLP), permet d'ajouter un régulier, un remplaçant ou un
@@ -8506,7 +8506,7 @@ function addPersonFormHTML(){
           ${groups.map(g=>`<option value="${g.id}">${escapeHTML(g.name)}</option>`).join('')}
         </select>
       </div>` : ''}
-      <div class="field"><label>Cote (optionnel)</label><input id="addPersonRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="${RATING_DEFAULT.toFixed(1)} par défaut"></div>
+      ${isRecLeague() ? '' : `<div class="field"><label>Cote (optionnel)</label><input id="addPersonRating" type="number" step="0.1" min="${RATING_MIN}" max="${RATING_MAX}" placeholder="${RATING_DEFAULT.toFixed(1)} par défaut"></div>`}
     </div>
     <div id="addPersonSubFields" style="display:none;">
       <div class="field"><label>Courriel (optionnel)</label><input id="addPersonSubEmail" type="email"></div>
@@ -8829,7 +8829,7 @@ function adminSubstitutePoolHTML(){
   });
   return plListHTML({ id:'sub', title:'Remplaçants', hint:'Touche un remplaçant pour le modifier, gérer son compte ou le retirer. Ils apparaissent comme choix rapides lors d\'une absence en session.', rows,
     chips:[['all','Tous'],['acc','Avec compte'],['noacc','Sans compte']],
-    sorts:[['name','Nom'],['rating','Cote'],['email','Courriel']].map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setSubsSort('${k}')` })),
+    sorts:[['name','Nom']].concat(isRecLeague() ? [] : [['rating','Cote']], [['email','Courriel']]).map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setSubsSort('${k}')` })),
     actions: '',
     empty:'Aucun remplaçant enregistré pour l\'instant.' });
 }
@@ -9952,8 +9952,8 @@ function adminPlayersHTML(){
   });
   const nInj = rows.filter(r=>r.f.includes('inj')).length;
   const chips = [['all','Tous']].concat(groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), [['wait','En attente']], nInj ? [['inj','Blessés']] : []);
-  return plListHTML({ id:'reg', title:'Réguliers', hint:'Touche un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte ou le retirer.', rows, chips,
-    sorts:[['name','Nom'],['group','Groupe'],['rating','Cote']].map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setRegularsSort('${k}')` })),
+  return plListHTML({ id:'reg', title:'Réguliers', hint: isRecLeague() ? 'Touche un joueur pour le renommer, le déplacer, gérer son compte ou le retirer.' : 'Touche un joueur pour le renommer, changer sa cote, le déplacer, gérer son compte ou le retirer.', rows, chips,
+    sorts:[['name','Nom'],['group',grpWord(false,true)]].concat(isRecLeague() ? [] : [['rating','Cote']]).map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setRegularsSort('${k}')` })),
     empty:'Aucun joueur pour l\'instant.' });
 }
 // Contenu détaillé (pop-up) pour gérer un joueur : infos, actions, et compte lié.
@@ -10493,7 +10493,10 @@ async function refreshAfterOrgRosterChange(affectedLeagueIds){
 // type (joueur/remplaçant) — une même personne peut très bien être régulière
 // dans une ligue et remplaçante dans une autre, donc le type ne peut pas être
 // un seul choix global appliqué à toutes les ligues cochées à la fois.
+// Ligue récréative (aucune cote) : la ligue affichée, sinon le résumé chargé pour l'accueil admin.
+function leagueIsRec(id){ if(id === CURRENT_LEAGUE_ID) return isRecLeague(); const x = ADMIN_SUMMARY && ADMIN_SUMMARY[id]; return !!(x && x.rec); }
 function leagueTypeRowHTML(l, checkboxClass, defaultType, withRating){
+  if(withRating && leagueIsRec(l.id)) withRating = false;
   const rem = defaultType==='remplacant';
   return `<div class="lg-tile" onclick="toggleLgTile(this)">
     <input type="checkbox" class="${checkboxClass}" value="${l.id}">
@@ -10870,7 +10873,7 @@ function addMemberToLeague(idx, leagueId, type){
   if(!entry) return;
   showContentModal('', `<div class="pf-sec" style="margin-top:0;">${type==='remplacant' ? 'Remplaçant' : 'Joueur'} · ${escapeHTML(lg.name || 'Ligue')}</div>
     <p class="small" style="margin:0 2px 12px;color:var(--muted);">${escapeHTML(entry.name)} sera ajouté(e) à cette ligue.</p>
-    <label class="lg-rating" style="display:flex;border-top:0;padding-top:0;"><span>Cote de départ</span><input type="text" inputmode="decimal" id="addMemberRating" placeholder="${RATING_DEFAULT.toFixed(2)}" autocomplete="off"><small>Vide = ${RATING_DEFAULT.toFixed(2)}</small></label>
+    ${leagueIsRec(leagueId) ? '' : `<label class="lg-rating" style="display:flex;border-top:0;padding-top:0;"><span>Cote de départ</span><input type="text" inputmode="decimal" id="addMemberRating" placeholder="${RATING_DEFAULT.toFixed(2)}" autocomplete="off"><small>Vide = ${RATING_DEFAULT.toFixed(2)}</small></label>`}
     <div id="addMemberErr" class="small" style="display:none;color:#ff8a80;margin:8px 2px 0;"></div>
     <div class="row" style="gap:8px;margin-top:16px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="openOrgMemberDetailModal(${idx})">Annuler</button>
@@ -13285,7 +13288,7 @@ function remindRules(){
   });
 }
 function reportsListHTML(){
-  const sortBy = VIEW.reportsListSortBy || 'rating';
+  const sortBy = VIEW.reportsListSortBy || (isRecLeague() ? 'name' : 'rating');
   const sortDir = VIEW.reportsListSortDir || 'desc';
   const ratingList = DATA.players.slice().sort((a,b)=>{
     let av, bv;
@@ -13302,11 +13305,11 @@ function reportsListHTML(){
     <div class="pf-list" style="margin-bottom:14px;"><button class="pf-row" onclick="printReportsList()"><span class="t">Imprimer…</span><span class="ch">›</span></button></div>
     <div class="card">
       <div class="rs-top"><div class="pf-sec" style="margin:0;">Joueurs (${ratingList.length})</div></div>
-      ${rpSortHTML([['rating','Cote'],['name','Nom'],['group',grpWord(false,true)]], sortBy, sortDir, 'setReportsListSort')}
+      ${rpSortHTML((isRecLeague() ? [] : [['rating','Cote']]).concat([['name','Nom'],['group',grpWord(false,true)]]), sortBy, sortDir, 'setReportsListSort')}
       ${ratingList.length ? `<div class="pf-list">${ratingList.map(p=>{
         const g = groupById(p.groupId);
         const rating = typeof p.rating==='number' ? p.rating : RATING_DEFAULT;
-        return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}<small>${escapeHTML(g?g.name:'Sans '+grpWord(false,false))}</small></span><span class="rp-v">${rating.toFixed(2)}</span></div>`;
+        return `<div class="pf-row" style="cursor:default;"><span class="member-avatar">${escapeHTML(ini(p.name))}</span><span class="t">${escapeHTML(p.name)}<small>${escapeHTML(g?g.name:'Sans '+grpWord(false,false))}</small></span>${isRecLeague() ? '' : `<span class="rp-v">${rating.toFixed(2)}</span>`}</div>`;
       }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
     </div>
     <div class="card">
@@ -13391,7 +13394,7 @@ function reportsSessionHTML(){
 }
 // ---------- Export PDF des rapports (impression du navigateur) ----------
 function reportsListPrintableHTML(){
-  const sortBy = VIEW.reportsListSortBy || 'rating';
+  const sortBy = VIEW.reportsListSortBy || (isRecLeague() ? 'name' : 'rating');
   const sortDir = VIEW.reportsListSortDir || 'desc';
   const ratingList = DATA.players.slice().sort((a,b)=>{
     let av, bv;
@@ -13438,8 +13441,9 @@ const PRINT_COLS = {
   ]
 };
 let PRINT_SEL = {};
+function printColsAll(kind){ return isRecLeague() ? PRINT_COLS[kind].filter(c=>c[0]!=='cote' && c[0]!=='dcote') : PRINT_COLS[kind]; }
 function printSelCols(kind){
-  const all = PRINT_COLS[kind];
+  const all = printColsAll(kind);
   const sel = PRINT_SEL[kind];
   return sel ? all.filter(c=>sel.includes(c[0])) : (kind==='remp' ? all : all);
 }
@@ -13449,7 +13453,7 @@ function printTableHTML(cols, rows){
 }
 function printColsPickerHTML(kind, label){
   const sel = PRINT_SEL[kind];
-  return `<p class="small" style="margin:0 0 6px;">${label}</p><div class="acc-group" style="padding:4px 12px;">${PRINT_COLS[kind].map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;font-size:16px;"><input type="checkbox" class="pc-col-${kind}" value="${c[0]}" ${(!sel || sel.includes(c[0]))?'checked':''} style="width:20px;height:20px;"> ${c[1]}</label>`).join('')}</div>`;
+  return `<p class="small" style="margin:0 0 6px;">${label}</p><div class="acc-group" style="padding:4px 12px;">${printColsAll(kind).map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 0;font-size:16px;"><input type="checkbox" class="pc-col-${kind}" value="${c[0]}" ${(!sel || sel.includes(c[0]))?'checked':''} style="width:20px;height:20px;"> ${c[1]}</label>`).join('')}</div>`;
 }
 function openPrintPicker(report){
   let body;
@@ -13754,7 +13758,7 @@ function deleteSession(sessionId){
 }
 function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
   const restrictGroupId = viewerPlayerId ? playerSessionGroupId(s, viewerPlayerId) : null;
-  const showRating = !viewerPlayerId || DATA.showRatingToPlayers; // toujours visible pour l'admin (pas de viewerPlayerId)
+  const showRating = !isRecLeague() && (!viewerPlayerId || DATA.showRatingToPlayers); // toujours visible pour l'admin (pas de viewerPlayerId), jamais en récréatif
   const mvs = (s.movements||[]);
   const ups = mvs.filter(m=>m.reason!=='absence' && m.toGroupId===groupAbove(m.fromGroupId)).length;
   const downs = mvs.length - ups;
@@ -15126,7 +15130,7 @@ let MY_LEAGUE_SUMMARY = {}, MY_SUMMARY_AT = 0, MY_SUMMARY_LOADING = false;
 let MY_SUMMARY_TRIED = {}; // ligues déjà lues au moins une fois (même en erreur) : évite de relire en boucle
 function summarizeLeagueData(data, link, leagueId){
   const lg = LEAGUES.find(x=>x.id===leagueId) || {};
-  const out = { leagueId, name: lg.name || 'Ligue', schedule: lg.schedule_label || '', orgId: lg.organization_id || null, isSub: !!link.substitute_id, showRating: !!(data && data.showRatingToPlayers), open: null, groupName: null, rating: null, injured: false, playerId: link.player_id || null };
+  const out = { leagueId, name: lg.name || 'Ligue', schedule: lg.schedule_label || '', orgId: lg.organization_id || null, isSub: !!link.substitute_id, showRating: !!(data && data.showRatingToPlayers && !isRecLeague(data)), open: null, groupName: null, rating: null, injured: false, playerId: link.player_id || null };
   if(data){
     out.rulesText = data.rulesText || ''; out.rulesVersion = data.rulesVersion || 0; out.rulesRequire = !!data.rulesRequire;
     out.rec = isRecLeague(data);
@@ -16548,6 +16552,8 @@ function migrateData(){
   if(DATA.manualMatchupTemplate5 === undefined) DATA.manualMatchupTemplate5 = [];
   if(DATA.substitutePool === undefined) DATA.substitutePool = [];
   if(DATA.showRatingToSubs === undefined) DATA.showRatingToSubs = false;
+  // Ligue récréative : pas de score, donc pas de cote à montrer (ni aux joueurs, ni aux remplaçants, ni à l'admin).
+  if(isRecLeague()){ DATA.showRatingToPlayers = false; DATA.showRatingToSubs = false; }
   if(DATA.hiddenPlayerTabs === undefined) DATA.hiddenPlayerTabs = [];
   if(DATA.hiddenSubTabs === undefined) DATA.hiddenSubTabs = [];
   (DATA.players||[]).forEach(p=>{
