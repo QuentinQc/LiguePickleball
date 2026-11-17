@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 446">
+<meta name="app-build" content="Version 447">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13709,6 +13709,12 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
     const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===g.id) : null;
     const subValues = new Set((gd && gd.substitutes ? Object.values(gd.substitutes) : []).concat((gd && gd.extras) || []));
     body += `<div class="hs-g">${escapeHTML(g.name)}</div><div class="pf-list">`;
+    // Zones de l'échelle : les N premiers (montée) et les N derniers (descente) parmi les joueurs classés,
+    // colorés même si une absence leur a laissé leur place (ex. 4e qui reste parce qu'un absent descend).
+    const ladder = DATA.leagueFormat !== 'pools' && DATA.leagueFormat !== 'single' && DATA.leagueFormat !== 'social' && DATA.leagueFormat !== 'mlp';
+    const elig = rows.filter(x=>!isGuestId(x.playerId) && !subValues.has(x.playerId)).map(x=>x.playerId);
+    const swapN = Math.max(0, DATA.swapCount || 0);
+    const hasAbove = !!groupAbove(g.id), hasBelow = !!groupBelow(g.id);
     rows.forEach((r,i)=>{
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
@@ -13722,10 +13728,13 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const after = (showRating && typeof delta === 'number') ? ratingAfterSession(r.playerId, s) : null;
       const right = (showRating && typeof delta === 'number')
         ? `<span class="hs-rt">${after !== null ? `<b>${after.toFixed(2)}</b>` : ''}<span class="hs-dp ${delta>=0?'p':'n'}">${delta>=0?'+':''}${delta.toFixed(3)}</span></span>` : '';
-      const mvCls = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? ' up' : ' down') : '';
+      const e = elig.indexOf(r.playerId);
+      const zone = (!ladder || e < 0) ? '' : ((hasAbove && e < swapN) ? ' up' : ((hasBelow && e >= elig.length - swapN) ? ' down' : ''));
+      const mvCls = (!isGuest && mv) ? (mv.toGroupId===groupAbove(g.id) ? ' up' : ' down') : zone;
+      const stays = !mv && zone && !(s.loanTransfers||[]).some(x=>x.playerId===r.playerId) ? ` · <span style="color:var(--muted);">reste dans le ${escapeHTML(g.name)}</span>` : '';
       body += `<div class="pf-row hs-row${mvCls ? ' mv' + mvCls : ''}" style="cursor:default;">
         <span class="hs-rk${mvCls}">${i+1}</span>
-        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}</small></span>
+        <span class="t">${escapeHTML(playerName(r.playerId))}${tags}<small>${sub}${stays}</small></span>
         ${right}
       </div>`;
     });
