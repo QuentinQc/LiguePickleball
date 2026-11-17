@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 453">
+<meta name="app-build" content="Version 454">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -7591,7 +7591,8 @@ async function onAuthResolved(user){
     try{
       const r = await sb.rpc('redeem_invitation', { p_code: code });
       let msg = null;
-      if(r && r.data){
+      if(r && r.data && r.data.confirm){ setTimeout(function(){ askInviteForOtherPerson(code, r.data); }, 400); }
+      else if(r && r.data){
         if(r.data.ok && r.data.org_pending) notifyAdminsOrgJoin(r.data.organization_id);
         else if(r.data.ok && r.data.pending){ notifyAdminsJoinRequest(r.data.league_id, r.data.league_name || null, 'join'); rememberJoinPending(r.data.league_id); }
         if(r.data.ok) msg = r.data.org_pending ? orgPendingMsg(r.data) : (r.data.pending ? "Demande envoyée. Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait." : inviteAcceptedMsg(r.data));
@@ -7817,11 +7818,26 @@ function inviteAcceptedMsg(d){
   if(names.length > 1) return "Invitation acceptée. Tu as rejoint " + names.slice(0,-1).join(', ') + ' et ' + names[names.length-1] + ' !';
   return "Invitation acceptée. Bienvenue dans " + (names[0] ? names[0] : 'la ligue') + ' !';
 }
+// Invitation personnelle destinée à quelqu'un d'autre que le compte connecté (ex. ouverte sur le
+// téléphone d'un proche) : on demande avant de relier la fiche à ce compte.
+function askInviteForOtherPerson(code, d){
+  const who = d.invitee || "une autre personne", me = d.account || 'ce compte';
+  showConfirm(`Cette invitation est pour ${who}. Tu es connecté(e) en tant que ${me}.\n\nSi ${who} a son propre téléphone, ne continue pas : envoie-lui le lien pour qu'il ou elle crée son compte.\n\nRelier quand même ${who} à ton compte ?`, async function(){
+    const r = await sb.rpc('redeem_invitation', { p_code: code, p_confirm: true });
+    const data = r && r.data;
+    if(r && r.error){ showAlert("Erreur : " + r.error.message); return; }
+    if(!data || !data.ok){ showAlert((data && data.error) || 'Code invalide ou expiré.'); return; }
+    const { data: { user } } = await sb.auth.getUser();
+    await onAuthResolved(user);
+    showAlert(inviteAcceptedMsg(data));
+  });
+}
 function openInviteCodePrompt(){
   showPrompt("Entre ton code d'invitation :", '', async (code)=>{
     if(!code || !code.trim()) return;
     const { data, error } = await sb.rpc('redeem_invitation', { p_code: code.trim() });
     if(error){ showAlert("Erreur : " + error.message); return; }
+    if(data && data.confirm){ askInviteForOtherPerson(code.trim(), data); return; }
     if(!data || !data.ok){ showAlert((data && data.error) || 'Code invalide ou expiré.'); return; }
     if(data.org_pending){ notifyAdminsOrgJoin(data.organization_id); const { data: { user } } = await sb.auth.getUser(); await onAuthResolved(user); showAlert(orgPendingMsg(data)); return; }
     if(data.pending){ notifyAdminsJoinRequest(data.league_id, data.league_name || null, 'join'); rememberJoinPending(data.league_id); render(); showAlert("Demande envoyée. Un administrateur doit l'approuver. Tu seras averti(e) dès que ce sera fait."); return; }
