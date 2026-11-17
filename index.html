@@ -14076,7 +14076,7 @@ function adminSettingsSectionHTML(){
   let regles;
   if(mlp) regles = [settingsRow('', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()')];
   else if(rec){
-    const lim = socialCourtLimits(), K = parseInt(DATA.socialMaxCourts, 10) || 0;
+    const lim = socialCourtLimits(), K = isRotationMode() ? rotationSettings().maxCourts : (parseInt(DATA.socialMaxCourts, 10) || 0);
     regles = [settingsRow('', 'Formule de la soirée', isRotationMode() ? (function(){ const st = rotationSettings(); return 'Rotation chronométrée · ' + st.rounds + ' rondes de ' + st.round + ' min + ' + st.change + ' min de changement'; })() : 'Terrains tirés au sort pour la soirée', 'openSocialModeModal()'),
       isRotationMode() ? '' : settingsRow('', 'Joueurs par terrain', 'Nombre de joueurs placés sur chaque terrain au tirage · ' + lim.label, 'openCourtSizeModal()'),
       settingsRow('', 'Terrains disponibles', K ? 'Le tirage utilise au plus ' + K + ' terrain' + (K>1?'s':'') : 'Le tirage utilise autant de terrains que nécessaire', 'openMaxCourtsModal()')];
@@ -15803,7 +15803,7 @@ function leagueRulesHTML(){
 }
 // Récréatif : la formule de la soirée, sans groupes, scores, cotes ni départage.
 function recLeagueRulesHTML(){
-  const st = rotationSettings(), K = parseInt(DATA.socialMaxCourts, 10) || 0;
+  const st = rotationSettings(), K = isRotationMode() ? st.maxCourts : (parseInt(DATA.socialMaxCourts, 10) || 0);
   const formule = isRotationMode()
     ? `<p class="small">Chaque joueur présent reçoit un numéro tiré au sort. La soirée se joue en <b>${st.rounds} rondes de ${st.round} minutes</b>, avec ${st.change} minute${st.change>1?'s':''} pour changer de terrain entre les rondes. À chaque ronde, tu joues avec d'autres partenaires et d'autres adversaires ; l'horaire indique avec qui et sur quel terrain. Un chrono commun annonce le début et la fin de chaque ronde.</p>`
     : `<p class="small">À chaque soirée, les joueurs présents sont répartis au hasard sur les terrains, en évitant de rejouer avec les mêmes personnes.</p>`;
