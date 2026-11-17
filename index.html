@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 460">
+<meta name="app-build" content="Version 461">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1786,7 +1786,8 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .sd-chip.dragging{opacity:.35;}
 .sd-av{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ball),#8FBF3F);color:var(--court);font-family:var(--font-display);font-weight:700;font-size:11px;}
 .sd-ghost{position:fixed;left:0;top:0;z-index:10000;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.5);border-color:var(--ball);transform-origin:0 0;}
-.sd-handle{width:22px;flex:none;text-align:center;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:6px 0;}
+.sd-handle{width:30px;flex:none;align-self:stretch;display:flex;align-items:center;justify-content:center;margin:-8px 0 -8px -6px;color:var(--muted);font-weight:800;letter-spacing:-2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.sd-handle:active{cursor:grabbing;color:var(--ball);}
 body.sd-dragging #subDock{outline:2px dashed rgba(207,234,92,.5);outline-offset:-2px;}
 #subDock.sd-over{outline:2px solid var(--ball) !important;}
 .ab-pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(255,159,10,.14);color:#FF9F0A;}
@@ -2614,7 +2615,7 @@ function annSheetHTML(){
   const valid = (a.text||'').trim() && (a.kind !== 'leagues' || a.leagues.length) && (a.kind !== 'people' || a.people.length);
   const to = a.kind === 'leagues' ? ((leagueNamesLabel(a.leagues) || '—') + (a.leagues.length ? leagueRolesSuffix(a.roles) : '')) : (a.people.length ? a.people.length + ' joueur' + (a.people.length>1?'s':'') : 'personne');
   const n = annAccountCount(a.kind);
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
         <div class="chat-head-ico"></div>
@@ -2723,7 +2724,7 @@ function inboxSheetHTML(){
   const rows = list.length ? `<div class="ib-list">${list.map(function(x){
     return `<div class="ib-item"><button type="button" class="ib-row${x.read_at ? '' : ' new'}" onclick="openInboxItem('${x.id}')"><span class="ib-dot"></span><span class="ib-t"><span class="ib-l1"><b>${escapeHTML(x.title || 'Dinkeo')}</b><small>${escapeHTML(partnerRelTime(x.created_at))}</small></span>${x.body ? `<span>${escapeHTML(x.body)}</span>` : ''}</span></button><button type="button" class="ib-del" onclick="deleteInboxItems(['${x.id}'])" aria-label="Supprimer">✕</button></div>`;
   }).join('')}</div>` : `<p class="empty" style="margin-top:8px;">Aucune notification ces 14 derniers jours.</p>`;
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet">
       <div class="chat-head">
         <div class="chat-head-txt"><div class="chat-head-title">Notifications</div><div class="chat-head-sub">Les 14 derniers jours</div></div>
@@ -2948,7 +2949,7 @@ function sheetModalHTML(){
   const title = og ? og[1] : k==='partenaire' ? 'Partenaire' : k==='calendrier' ? 'Calendrier' : 'Événements';
   const sub = og ? og[2] : k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
   const body = k==='org-membres' ? organizationMembersCardHTML() : k==='org-comptes' ? organizationAccountsHTML() : k==='org-rapport' ? organizationReportHTML() : k==='org-general' ? organizationGeneralHTML() : k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet${og?' chat-sheet-lg':''}">
       <div class="chat-head">
         <div class="chat-head-ico">${ico}</div>
@@ -3436,7 +3437,7 @@ function publishSheetHTML(){
   const tiles = [['', 'Chercher un partenaire', 'Une partie, un match amical, un remplaçant', 'openPartnerComposer()']];
   if(isAdmin) tiles.push(['', 'Organiser un événement', 'Soirée, tournoi, rencontre', 'openNewSocialEventModal()']);
   if(isAdmin && (PUSH_SUPPORTED || isIOSDevice())) tiles.push(['', 'Envoyer une annonce', "Une notification à une ou plusieurs ligues, ou à des joueurs", 'openSendAnnouncementModal()']);
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet pub-sheet">
       <div class="chat-head">
         <div class="chat-head-ico">＋</div>
@@ -3561,7 +3562,7 @@ function partnerComposerSheetHTML(){
   if(A.kind === 'leagues') detail = leagues.length ? `<div class="an-chips">${leagues.map(l=>`<button type="button" class="an-chip ${A.leagues.indexOf(l.id)!==-1?'on':''}" onclick="pcSetLeague('${l.id}')">${escapeHTML(l.name)}</button>`).join('')}</div>${leagueRolesHTML(A.roles, 'pcSetRoles')}` : `<p class="ah-meta" style="padding:12px 2px;">Aucune ligue disponible.</p>`;
   if(A.kind === 'people') detail = people ? `<div class="pf-list an-people" style="margin-top:10px;">${people.length ? people.map(x=>{ const on = A.people.indexOf(x.id) !== -1; return `<button type="button" class="pf-row an-person ${on?'on':''}" onclick="pcTogglePerson('${x.id}')"><span class="member-avatar">${escapeHTML(ini(x.name))}</span><span class="t">${escapeHTML(x.name)}</span><span class="an-check">${on?'✓':''}</span></button>`; }).join('') : `<p class="ah-meta" style="padding:12px;">Personne d'autre n'a encore de compte dans l'organisation.</p>`}</div>` : `<p class="ah-meta" style="padding:12px;">Chargement…</p>`;
   const to = A.kind === 'leagues' ? ((leagueNamesLabel(A.leagues) || '—') + (A.leagues.length ? leagueRolesSuffix(A.roles) : '')) : (A.people.length ? A.people.length + ' joueur' + (A.people.length>1?'s':'') : 'personne');
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
         <div class="chat-head-ico"></div>
@@ -3886,7 +3887,7 @@ function eventPreviewHTML(){
 function eventComposerSheetHTML(){
   const E = EVENT_DRAFT, editing = !!E.id;
   const qd = quickDates().filter(x=>x[0]);
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
         <div class="chat-head-ico"></div>
@@ -4388,7 +4389,7 @@ function wizardSheetHTML(){
   const last = WIZ.si === total - 1;
   const anim = WIZ.anim ? ' wz-anim' : ''; WIZ.anim = false;
   const showNext = key !== 'type';
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeWizard()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeWizard()">
     <div class="chat-sheet wz-sheet">
       <div class="wz-top">
         <button type="button" class="wz-iconbtn" ${WIZ.si>0?'':'disabled'} onclick="wizBack()" aria-label="Retour">←</button>
@@ -5515,7 +5516,7 @@ function rotationCourtsBoardHTML(rot, i){
   return `<div class="pf-sec" style="text-align:center;">Ronde ${i + 1}</div><div class="rot-courts big">${rd.courts.map(function(m){ return `<div class="rot-court"><b>Terrain ${m.c}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div>${rd.rest.length ? `<p class="ah-meta" style="text-align:center;margin-top:10px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</p>` : ''}`;
 }
 function rotationTimerSheetHTML(){
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet chat-sheet-lg">
       <div class="chat-head"><div class="chat-head-ico"></div><div class="chat-head-txt"><div class="chat-head-title">Écran chrono</div><div class="chat-head-sub">À afficher sur une tablette ou une télé</div></div><button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button></div>
       <div class="sheet-body" data-key="rotchrono"><div id="rotChrono">${rotationChronoInnerHTML()}</div></div>
@@ -5669,7 +5670,7 @@ function courtsSheetHTML(){
   const rows = D.courts.map(function(c, i){ return `<div class="ct-row"><span class="ct-n">${i + 1}</span><input class="ct-name" data-i="${i}" maxlength="40" value="${escapeHTML(c.name)}" placeholder="Nom du terrain (commanditaire)"><button type="button" class="ct-b" aria-label="Monter" ${i === 0 ? 'disabled' : ''} onclick="courtsMove(${i},-1)">▲</button><button type="button" class="ct-b" aria-label="Descendre" ${i === D.courts.length - 1 ? 'disabled' : ''} onclick="courtsMove(${i},1)">▼</button><button type="button" class="ct-b x" aria-label="Retirer" onclick="courtsDel(${i})">✕</button></div>`; }).join('');
   const opts = function(sel){ return D.courts.map(function(c){ return `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${escapeHTML(c.name || 'Terrain sans nom')}</option>`; }).join(''); };
   const starts = groups.map(function(g, i){ const sel = D.start[g.id] || (D.courts[i % Math.max(1, D.courts.length)] || {}).id; return `<div class="ct-row"><span class="t" style="flex:1;font-weight:600;">${escapeHTML(g.name)}</span><select class="ct-start" data-g="${g.id}" ${D.start[g.id] ? 'data-t="1"' : ''} onchange="this.setAttribute('data-t','1')">${opts(sel)}</select></div>`; }).join('');
-  return `<div class="chat-overlay" onclick="if(event.target===this) closeModal()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head"><div class="chat-head-ico"></div><div class="chat-head-txt"><div class="chat-head-title">Terrains</div><div class="chat-head-sub">Où joue chaque ${grpWord()}</div></div><button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button></div>
       <div class="sheet-body" data-key="courts">
@@ -7365,7 +7366,7 @@ function drawerHTML(contextHTML, subtitle){
   const scheduleLabel = (currentLeagueMeta && currentLeagueMeta.schedule_label) || '';
   const headerInfo = [orgName, scheduleLabel, subtitle].filter(Boolean).join(' · ');
   return `
-  <div class="drawer-overlay" onclick="if(event.target===this) closeDrawer()">
+  <div class="drawer-overlay" onclick="if(event.target===this && ovDown(this)) closeDrawer()">
     <div class="drawer-panel">
       <div class="drawer-header">
         <img src="${LOGO_DATA_URI}" alt="Logo">
@@ -8136,6 +8137,11 @@ async function openAdminLeague(leagueId, tab){
   VIEW = { atab: fromHome ? 'accueil' : 'orgs', adet:true, aorgOpen:true, tab: tab || 'session', pcomm: VIEW.pcomm };
   render();
 }
+// Fond d'une fenêtre : elle ne se ferme que si le clic a aussi COMMENCÉ sur le fond (un glisser
+// commencé dans la fenêtre et relâché à côté ne la ferme plus).
+let LAST_PD_TARGET = null;
+document.addEventListener('pointerdown', function(e){ LAST_PD_TARGET = e.target; }, true);
+function ovDown(el){ return !LAST_PD_TARGET || LAST_PD_TARGET === el; }
 function closeAdminLeague(){ VIEW.adet = false; render(); }
 // Garde l'écran d'origine et le panneau de ligue ouvert quand une action remet VIEW à zéro.
 function keepNavView(){ return { atab: VIEW.atab, adet: VIEW.adet, aorgOpen: VIEW.aorgOpen, pcomm: VIEW.pcomm, ptab: VIEW.ptab, porg: VIEW.porg, pdet: VIEW.pdet }; }
@@ -8166,7 +8172,7 @@ function lgNavHTML(items, cur, fn){
 // Cadre commun du panneau de ligue (admin et joueur) : en-tête fixe, onglets, contenu qui défile.
 function leagueSheetHTML(lg, orgName, closeFn, tabsHTML, body, key){
   const sub = [lg.schedule_label || '', orgName || ''].filter(Boolean).join(' · ');
-  return `<div class="chat-overlay lg-ov" onclick="if(event.target===this) ${closeFn}">
+  return `<div class="chat-overlay lg-ov" onclick="if(event.target===this && ovDown(this)) ${closeFn}">
     <div class="chat-sheet chat-sheet-lg lg-sheet" role="dialog" aria-label="${escapeHTML(lg.name)}">
       <div class="chat-head">
         <div class="chat-head-ico">${pbIcon()}</div>
@@ -11556,7 +11562,7 @@ function adminGroupsHTML(){
         const lastGroup = p.lastGroupId ? groupById(p.lastGroupId) : null;
         const chip = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`
           : (rec && open && isAbsent(open, p.id) ? `<span class="pf-chip warn">${gw(p,'Absent','Absente','Absent(e)')}</span>` : '<span class="pf-chip acc">En attente</span>');
-        return `<div class="pf-row draggable-row" draggable="true" ondragstart="onPlayerDragStart(event,'${p.id}')" onclick="openPlayerDetailModal('${p.id}')">
+        return `<div class="pf-row" onclick="openPlayerDetailModal('${p.id}')">
           <span class="sd-handle" data-pid="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer">⋮⋮</span>
           <span class="t">${escapeHTML(p.name)}${lastGroup ? `<small>${rec ? 'Dernier terrain' : 'Dernier groupe'} : ${escapeHTML(lastGroup.name)}</small>` : ''}</span>${chip}
         </div>`;
@@ -11593,8 +11599,7 @@ function adminGroupsHTML(){
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
           const prevText = prev ? `Dernière session : ${escapeHTML(prev.groupName)}, ${prev.position}${prev.position===1?'er':'e'} sur ${prev.total}` : '';
-          return `<div class="pf-row draggable-row" draggable="true"
-          ondragstart="onPlayerDragStart(event,'${p.id}')"
+          return `<div class="pf-row"
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
           ondrop="onRowDrop(event,'${g.id}','${p.id}')"
@@ -14948,7 +14953,7 @@ function settingsGuideHTML(){
     : `1. <b>Lancer la soirée</b> : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Terrains</b> : les joueurs présents sont tirés au sort sur les terrains ; tu peux refaire le tirage.<br>3. <b>Publier la soirée</b> : chacun voit son terrain dans l'app.<br>4. <b>Terminer la soirée</b> : elle est rangée dans l'historique.`;
   return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
   + (rec ? guideSec('Une soirée, étape par étape', `<p class="small">${recSteps}</p><p class="small">En récréatif, il n'y a ni scores, ni classement, ni cotes, ni montées et descentes.</p>`) : '')
-  + (rec ? '' : guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur par glisser-déposer. La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`))
+  + (rec ? '' : guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur en le glissant par sa poignée ⋮⋮ (le reste de la ligne ne se glisse pas). La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`))
   + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant${rec ? '' : ', avec sa cote de départ'}. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
   + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Ils peuvent aussi approuver les demandes d'adhésion à leur ligue et ajouter des personnes à l'organisation (Organisations › Membres et Comptes). Les réglages de l'organisation, les autres ligues et la suppression de membres restent aux administrateurs.</p>`)
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
@@ -16523,7 +16528,7 @@ function pawSheetHTML(){
     body += `<p class="ah-meta" style="margin:12px 2px 0;font-size:13px;">Les organisateurs de chaque ligue seront avisés. Pour annuler une absence plus tard, communique avec un organisateur.</p>`;
   }
   const last = P.step === 3;
-  return `<div class="chat-overlay" onclick="if(event.target===this) pawClose()">
+  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) pawClose()">
     <div class="chat-sheet an-sheet">
       <div class="chat-head">
         <div class="chat-head-txt"><div class="chat-head-title">Absence prévue</div><div class="chat-head-sub">Vacances, voyage, empêchement</div></div>
@@ -16684,7 +16689,7 @@ function modalHTML(){
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
         <button class="btn btn-primary" onclick="modalFormSaveClick()">${escapeHTML(MODAL.saveLabel || 'Enregistrer')}</button>
       </div>` : ''}`;
-    return `<div class="m-ov" style="${overlay}" onclick="if(event.target===this) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}</div></div>`;
+    return `<div class="m-ov" style="${overlay}" onclick="if(event.target===this && ovDown(this)) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}</div></div>`;
   }
   const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:380px;width:100%;border:1px solid rgba(255,255,255,0.15);';
   let inner = `<p style="margin:0 0 14px;white-space:pre-line;">${escapeHTML(MODAL.message)}</p>`;
@@ -16705,7 +16710,7 @@ function modalHTML(){
   } else { // alert
     inner += `<div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
   }
-  return `<div style="${overlay}" onclick="if(event.target===this) closeModal()"><div style="${box}">${inner}</div></div>`;
+  return `<div style="${overlay}" onclick="if(event.target===this && ovDown(this)) closeModal()"><div style="${box}">${inner}</div></div>`;
 }
 
 // ---------- sauvegarde manuelle (fonctionne peu importe l'environnement) ----------
