@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 445">
+<meta name="app-build" content="Version 446">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2415,16 +2415,25 @@ function notifySubsAfterSave(session){
 }
 // Appelé quand l'admin finalise une session (montées/descentes appliquées) —
 // prévient les joueurs que les résultats/le classement sont à jour.
-function notifySessionResultsPublished(finishedDate, corrected){
+// Seulement aux personnes qui ont joué ce soir-là (joueurs présents et remplaçants placés) :
+// un absent ou un remplaçant resté sur la liste n'a pas de résultat à consulter.
+async function notifySessionResultsPublished(finishedDate, corrected, participantIds){
   if(!CURRENT_LEAGUE_ID || !finishedDate) return;
-  invokeSendNotification({
-    league_id: CURRENT_LEAGUE_ID, category: 'league_results',
+  const leagueId = CURRENT_LEAGUE_ID, orgId = currentLeagueOrgId();
+  const msg = { category: 'league_results',
     title: corrected ? 'Résultats corrigés' : 'Résultats publiés',
     body: corrected
       ? `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} ont été CORRIGÉS. Scores${DATA.showRatingToPlayers ? ', classement et cotes sont mis' : ' et classement sont mis'} à jour : jette un œil à ta position.`
       : `${currentLeagueLabel()} — les résultats de la session du ${finishedDate} sont disponibles.`,
-    url: goUrl('league:' + CURRENT_LEAGUE_ID + ':hist')
-  });
+    url: goUrl('league:' + leagueId + ':hist') };
+  if(!participantIds){ invokeSendNotification(Object.assign({ league_id: leagueId }, msg)); return; } // format MLP : inchangé
+  const want = {}; participantIds.forEach(function(id){ want[id] = 1; });
+  try{ if(!ALL_PROFILE_PLAYERS.length) await loadAllProfilePlayers(); }catch(e){}
+  const profileIds = Array.from(new Set((ALL_PROFILE_PLAYERS || []).filter(function(l){
+    return l.league_id === leagueId && ((l.player_id && want[l.player_id]) || (l.substitute_id && want['sub::' + l.substitute_id]));
+  }).map(function(l){ return l.profile_id; })));
+  if(!profileIds.length || !orgId) return; // personne à aviser : ne jamais envoyer à toute la ligue par défaut
+  invokeSendNotification(Object.assign({ organization_id: orgId, league_ids: [leagueId], profile_ids: profileIds }, msg));
 }
 // Appelé quand un admin lie un compte en attente à un joueur d'une ligue —
 // prévient la personne que son compte est maintenant actif.
@@ -12450,7 +12459,9 @@ function onFinalize(){
     finalizeSession(open);
     // Récréatif : aucun résultat ni palmarès à annoncer.
     if(!isRecLeague()){
-      notifySessionResultsPublished(finishedDate, wasCorrection);
+      const played = [];
+      Object.keys(open.standingsByGroup || {}).forEach(function(gid){ (open.standingsByGroup[gid] || []).forEach(function(r){ if(r.played > 0) played.push(r.playerId); }); });
+      notifySessionResultsPublished(finishedDate, wasCorrection, played);
     }
     if(DATA.autoStartSessions){
       autoStartNextSession(finishedDate);
