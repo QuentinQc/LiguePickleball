@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 451">
+<meta name="app-build" content="Version 452">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1179,6 +1179,13 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-court b{display:block;font-family:var(--font-display);color:var(--ball);margin-bottom:4px;}
 .rot-vs{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:2px 0;}
 .rot-big{text-align:center;padding:18px 0 12px;}
+.rpc{display:flex;flex-direction:column;gap:6px;}
+.rpc-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.rpc-r{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.rpc-t{font-family:var(--font-display);font-size:56px;line-height:1;color:var(--ball);font-variant-numeric:tabular-nums;}
+.rpc-t.off{color:var(--muted);}
+.rpc-s{font-size:13px;color:var(--muted);}
+.rpc-now{margin-top:6px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.1);border:1px solid rgba(207,234,92,.3);font-size:15px;line-height:1.5;}
 .rot-big small{display:block;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
 .rot-big b{display:block;font-family:var(--font-display);font-size:min(28vw,150px);line-height:1;color:var(--ball);}
 .rot-big.chg b{color:#FFD60A;}
@@ -5314,7 +5321,7 @@ function rotationRedo(){
     open.rotation = open.published ? rotationBuild(open, rotationPresentIds(open), open.rotationSeed) : null;
     open.rotationRound = null; open.rotationTimerStart = null;
     saveAndRender();
-    if(open.published) notifySocialRedraw(open);
+    if(open.published){ notifySocialRedraw(open); SAVE_CHAIN.then(function(){ rotationBroadcast(open, true); }); }
   });
 }
 // Ronde en cours d'après le chrono (null si le chrono n'est pas lancé).
@@ -5342,7 +5349,7 @@ function rotationCurrentRound(session, rot){
 function rotationSettle(open){
   if(!open || !open.rotationTimerStart) return;
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
-  if(cur && !cur.running){ open.rotationRound = cur.index; open.rotationTimerStart = null; open.rotationDone = !!cur.finished; saveData(); }
+  if(cur && !cur.running){ open.rotationRound = cur.index; open.rotationTimerStart = null; open.rotationDone = !!cur.finished; saveData(); rotationBroadcast(open); }
 }
 function rotNameHTML(id, rot, meId){
   const n = rot.numbers[id];
@@ -5354,7 +5361,8 @@ function rotationPlayerHTML(me, open){
   const n = rot.numbers[me.id];
   if(!n) return `<div class="card"><h2 style="margin:0 0 6px;">Rotation</h2><p class="small" style="margin:0;color:var(--muted);">Tu n'es pas inscrit(e) à l'horaire de cette soirée. Vois avec l'organisateur.</p></div>`;
   const cur = rotationCurrentRound(open, rot);
-  let h = `<div class="card rot-me">
+  ensureChronoChannel();
+  let h = `<div class="card" id="rotPlayerChrono">${rotationPlayerChronoInnerHTML(me.id, open)}</div><div class="card rot-me">
     <div class="rot-num"><small>Ton numéro</small><b>${n}</b></div>
     <div class="rot-meta"><b>${escapeHTML(frDateLong(open.date))}</b><span>${rot.rounds.length} rondes de ${rot.round} min · ${rot.courts} terrain${rot.courts > 1 ? 's' : ''}</span><span>Change de partenaire, d'adversaires et de terrain à chaque ronde.</span></div>
   </div><div class="card"><div class="pf-sec" style="margin-top:0;">Ma soirée</div><div class="rot-list">`;
@@ -5372,6 +5380,7 @@ function rotationPlayerHTML(me, open){
 }
 // Vue organisateur : horaire complet, ronde par ronde.
 function rotationAdminHTML(open){
+  ensureChronoChannel();
   const rot = rotationFor(open);
   const st = rotationSettings();
   const N = rot.players.length;
@@ -5394,7 +5403,7 @@ function rotationAdminHTML(open){
 }
 // Écran chrono (tablette ou télé) : compte à rebours, ronde en cours et terrains.
 let ROT_TIMER = null;
-function openRotationTimer(){ MODAL_UNDER = null; MODAL = { kind:'content', sheet:'rotchrono', title:'' }; render(); rotationTick(); }
+function openRotationTimer(){ ensureChronoChannel(); MODAL_UNDER = null; MODAL = { kind:'content', sheet:'rotchrono', title:'' }; render(); rotationTick(); }
 function rotationTick(){
   if(ROT_TIMER) clearInterval(ROT_TIMER);
   ROT_TIMER = setInterval(function(){
@@ -5403,12 +5412,67 @@ function rotationTick(){
     const el = document.getElementById('rotChrono'); if(el) el.innerHTML = rotationChronoInnerHTML();
   }, 1000);
 }
+// ---- Chrono partagé : un canal temps réel par ligue. L'organisateur diffuse chaque changement
+// (démarrer, arrêter, changer de ronde, refaire l'horaire) ; joueurs et autres écrans l'appliquent
+// aussitôt. Le compte à rebours est calculé partout à partir de la même heure de départ.
+let CHRONO_CH = null, CHRONO_CH_LEAGUE = null, CHRONO_TICK = null, CHRONO_POLL_AT = 0;
+function ensureChronoChannel(){
+  try{
+    if(!CURRENT_LEAGUE_ID || !isRotationMode() || typeof sb === 'undefined' || !sb || !sb.channel) return;
+    if(CHRONO_CH && CHRONO_CH_LEAGUE === CURRENT_LEAGUE_ID) return;
+    if(CHRONO_CH){ try{ sb.removeChannel(CHRONO_CH); }catch(e){} CHRONO_CH = null; }
+    CHRONO_CH_LEAGUE = CURRENT_LEAGUE_ID;
+    CHRONO_CH = sb.channel('chrono-' + CURRENT_LEAGUE_ID, { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'chrono' }, function(msg){ onChronoMessage(msg && msg.payload); })
+      .subscribe();
+  }catch(e){ console.error('chrono temps réel', e); }
+  if(!CHRONO_TICK) CHRONO_TICK = setInterval(chronoTickPlayers, 1000);
+}
+function rotationBroadcast(open, reload){
+  if(!open || !CHRONO_CH) return;
+  try{ CHRONO_CH.send({ type: 'broadcast', event: 'chrono', payload: { sid: open.id, round: open.rotationRound === undefined ? null : open.rotationRound, start: open.rotationTimerStart || null, done: !!open.rotationDone, reload: !!reload } }); }catch(e){}
+}
+function onChronoMessage(p){
+  if(!p) return;
+  const open = currentOpenSession();
+  if(!open || p.sid !== open.id || p.reload){ refreshAfterPush(true); return; }
+  open.rotationRound = p.round; open.rotationTimerStart = p.start; open.rotationDone = !!p.done;
+  if(document.getElementById('rotChrono')){ const el = document.getElementById('rotChrono'); el.innerHTML = rotationChronoInnerHTML(); if(p.start) rotationTick(); }
+  if(!appBusyEditing() && !MODAL) render(); else chronoTickPlayers();
+}
+// Rafraîchit chaque seconde le chrono affiché aux joueurs ; filet de sécurité : relit la ligue toutes les 45 s.
+function chronoTickPlayers(){
+  const el = document.getElementById('rotPlayerChrono');
+  if(!el) return;
+  const open = currentOpenSession(), me = SESSION_USER && SESSION_USER.playerId;
+  if(open && me) el.innerHTML = rotationPlayerChronoInnerHTML(me, open);
+  if(document.visibilityState === 'visible' && Date.now() - CHRONO_POLL_AT > 45000){ CHRONO_POLL_AT = Date.now(); refreshAfterPush(true); }
+}
+function rotationPlayerChronoInnerHTML(meId, open){
+  const rot = rotationFor(open), cur = rotationCurrentRound(open, rot), n = rot.rounds.length;
+  const fmt = function(m){ const t = Math.max(0, Math.ceil(m * 60)), mm = Math.floor(t / 60), ss = t % 60; return mm + ':' + (ss < 10 ? '0' : '') + ss; };
+  let top, time, sub, idx = null;
+  if(!cur){ top = 'Soirée pas encore commencée'; time = rot.round + ':00'; sub = "Le chrono démarrera quand l'organisateur lancera la ronde 1."; idx = 0; }
+  else if(cur.finished){ top = 'Ronde ' + n + ' sur ' + n; time = '0:00'; sub = 'Dernière ronde terminée. Merci !'; }
+  else if(cur.running){ idx = cur.index; top = 'Ronde ' + (idx + 1) + ' sur ' + n; time = fmt(cur.left); sub = 'Temps restant'; }
+  else { idx = cur.index; top = 'Ronde ' + (idx + 1) + ' sur ' + n; time = rot.round + ':00'; sub = 'Prochaine ronde : change de terrain et attends le départ'; }
+  let now = '';
+  if(idx !== null && rot.rounds[idx]){
+    const m = rot.rounds[idx].courts.find(function(x){ return x.a.indexOf(meId) !== -1 || x.b.indexOf(meId) !== -1; });
+    if(!m) now = `<div class="rpc-now"><b>Repos</b> pendant la ronde ${idx + 1}</div>`;
+    else {
+      const mate = (m.a.indexOf(meId) !== -1 ? m.a : m.b).filter(function(x){ return x !== meId; })[0], vs = m.a.indexOf(meId) !== -1 ? m.b : m.a;
+      now = `<div class="rpc-now"><b>Terrain ${m.c}</b> · avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</div>`;
+    }
+  }
+  return `<div class="rpc"><div class="rpc-top"><span class="rpc-r">${escapeHTML(top)}</span></div><div class="rpc-t${cur && cur.running ? '' : ' off'}">${time}</div><div class="rpc-s">${escapeHTML(sub)}</div>${now}</div>`;
+}
 function rotationStartTimer(){
   const open = currentOpenSession(); if(!open) return;
   if(open.rotationRound === null || open.rotationRound === undefined) open.rotationRound = 0;
   open.rotationDone = false;
   open.rotationTimerStart = new Date().toISOString();
-  saveData(); render(); rotationTick();
+  saveData(); rotationBroadcast(open); render(); rotationTick();
 }
 // Arrêter : on garde la ronde atteinte (la suivante si on était pendant le changement).
 function rotationStopTimer(){
@@ -5416,7 +5480,7 @@ function rotationStopTimer(){
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot);
   if(cur) open.rotationRound = cur.index;
   open.rotationTimerStart = null;
-  saveData(); render();
+  saveData(); rotationBroadcast(open); render();
 }
 // Flèches : changer de ronde (le chrono doit être arrêté).
 function rotationJump(delta){
@@ -5425,7 +5489,7 @@ function rotationJump(delta){
   const rot = rotationFor(open);
   open.rotationRound = Math.max(0, Math.min(rot.rounds.length - 1, (open.rotationRound || 0) + delta));
   open.rotationDone = false;
-  saveData(); render();
+  saveData(); rotationBroadcast(open); render();
 }
 function rotationChronoInnerHTML(){
   const open = currentOpenSession(); if(!open) return '';
