@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 454">
+<meta name="app-build" content="Version 455">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -12577,7 +12577,11 @@ function onFinalize(){
     // Récréatif : aucun résultat ni palmarès à annoncer.
     if(!isRecLeague()){
       const played = [];
-      Object.keys(open.standingsByGroup || {}).forEach(function(gid){ (open.standingsByGroup[gid] || []).forEach(function(r){ if(r.played > 0) played.push(r.playerId); }); });
+      // Correction : seulement les groupes dont les scores ont changé depuis la réouverture.
+      const snap = wasCorrection ? open.reopenScores : null;
+      const changed = function(gid){ if(!snap) return true; const gd = (open.groupsData||[]).find(function(x){ return x.groupId === gid; }); return snap[gid] !== groupScoreSignature(gd); };
+      Object.keys(open.standingsByGroup || {}).forEach(function(gid){ if(!changed(gid)) return; (open.standingsByGroup[gid] || []).forEach(function(r){ if(r.played > 0) played.push(r.playerId); }); });
+      delete open.reopenScores;
       notifySessionResultsPublished(finishedDate, wasCorrection, played);
     }
     if(DATA.autoStartSessions){
@@ -13788,6 +13792,7 @@ function isLatestClosedSession(s){
   const closed = (DATA.sessions||[]).filter(x=>x.status==='closed');
   return closed.length>0 && closed[closed.length-1].id===s.id;
 }
+function groupScoreSignature(gd){ return JSON.stringify(((gd && gd.matches) || []).map(function(m){ return [m.teamA, m.teamB, m.scoreA === undefined ? null : m.scoreA, m.scoreB === undefined ? null : m.scoreB]; })); }
 function reopenLadderSession(sessionId){
   const s = DATA.sessions.find(x=>x.id===sessionId);
   if(!s || s.status!=='closed') return;
@@ -13825,6 +13830,9 @@ function reopenLadderSession(sessionId){
     delete s.standingsByGroup; delete s.movements; delete s.loanTransfers; delete s.ratingDeltas; delete s.ratingGamesDeltas; delete s.preSnapshot;
     s.status = 'open';
     s.reopenedAt = new Date().toISOString();
+    // Empreinte des scores au moment de rouvrir : à la nouvelle clôture, seuls les groupes
+    // dont les scores ont changé reçoivent « Résultats corrigés ».
+    s.reopenScores = {}; (s.groupsData||[]).forEach(function(gd){ s.reopenScores[gd.groupId] = groupScoreSignature(gd); });
     VIEW = Object.assign(keepNavView(), { tab:'session', sessionSubTab:'groupes' });
     saveAndRender();
   });
