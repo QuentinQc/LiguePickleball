@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 452">
+<meta name="app-build" content="Version 453">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1158,8 +1158,12 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-meta b{font-family:var(--font-display);font-size:20px;text-transform:uppercase;}
 .rot-meta span{font-size:13px;color:var(--muted);}
 .rot-list{display:flex;flex-direction:column;gap:8px;}
-.rot-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:6px 12px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
-.rot-row.rest{grid-template-columns:auto 1fr;opacity:.75;}
+.rot-row{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.rot-row.rest{opacity:.75;}
+.rot-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.rot-hd .rot-now{margin-left:auto;}
+.rot-l{font-size:15px;line-height:1.6;}
+.rot-l em{font-style:normal;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:inline-block;min-width:58px;}
 .rot-row.now{border-color:var(--ball);box-shadow:0 0 0 1px var(--ball) inset;}
 .rot-row.past{opacity:.45;}
 .rot-r{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
@@ -5370,11 +5374,11 @@ function rotationPlayerHTML(me, open){
     const m = rd.courts.find(function(x){ return x.a.indexOf(me.id) !== -1 || x.b.indexOf(me.id) !== -1; });
     const now = cur && !cur.finished && cur.index === i;
     const past = cur && (cur.finished || cur.index > i);
-    if(!m){ h += `<div class="rot-row rest${now ? ' now' : ''}${past ? ' past' : ''}"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-what">Repos</span></div>`; return; }
+    if(!m){ h += `<div class="rot-row rest${now ? ' now' : ''}${past ? ' past' : ''}"><div class="rot-hd"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Repos</span>${now ? `<span class="rot-now">En cours</span>` : ''}</div></div>`; return; }
     const mate = (m.a.indexOf(me.id) !== -1 ? m.a : m.b).filter(function(x){ return x !== me.id; })[0];
     const vs = m.a.indexOf(me.id) !== -1 ? m.b : m.a;
-    h += `<div class="rot-row${now ? ' now' : ''}${past ? ' past' : ''}"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Terrain ${m.c}</span>
-      <span class="rot-what">avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</span>${now ? `<span class="rot-now">En cours</span>` : ''}</div>`;
+    h += `<div class="rot-row${now ? ' now' : ''}${past ? ' past' : ''}"><div class="rot-hd"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Terrain ${m.c}</span>${now ? `<span class="rot-now">En cours</span>` : (past ? '' : '')}</div>
+      <div class="rot-l"><em>Avec</em>${rotNameHTML(mate, rot)}</div><div class="rot-l"><em>Contre</em>${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' ')}</div></div>`;
   });
   return h + `</div></div>`;
 }
