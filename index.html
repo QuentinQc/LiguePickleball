@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 457">
+<meta name="app-build" content="Version 458">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5686,6 +5686,7 @@ function courtsSheetHTML(){
 function startNewSession(explicitDate){
   const session = { id: uid('s'), date: explicitDate || nextSessionDate(), status:'open', groupsData: DATA.groups.map(g=>({ groupId:g.id, matches:[] })), movements: null, absences: [], published: false };
   applyPlannedAbsencesToSession(session);
+  restoreCarriedSessionInputs(session);
   if(DATA.leagueFormat === 'social'){
     socialShuffleGroups(session);
     session.groupsData = DATA.groups.map(g=>({ groupId:g.id, matches:[] }));
@@ -5703,6 +5704,23 @@ function startNewSession(explicitDate){
 // la date tombe dans la plage, sans devoir y penser session par session.
 function plannedAbsencesForPlayer(playerId){
   return (DATA.plannedAbsences||[]).filter(a=>a.playerId===playerId).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+}
+// Session suivante supprimée par la réouverture d'une session (correction de scores) :
+// les absences signalées et les disponibilités des remplaçants sont gardées de côté,
+// puis remises dans la session recréée à la même date.
+function restoreCarriedSessionInputs(session){
+  (DATA.sessions||[]).forEach(function(x){
+    const c = x.carryNext;
+    if(!c) return;
+    delete x.carryNext;
+    if(c.date !== session.date) return;
+    (c.absences||[]).forEach(function(pid){
+      if(session.absences.indexOf(pid) === -1 && (DATA.players||[]).some(function(p){ return p.id === pid; })) session.absences.push(pid);
+    });
+    const subs = (c.availableSubs||[]).filter(function(id){ return (DATA.substitutePool||[]).some(function(sp){ return sp.id === id; }); });
+    if(subs.length) session.availableSubs = subs;
+    if(c.subsNotified) session.subsNotified = true;
+  });
 }
 function dateInPlannedAbsence(a, dateStr){ return dateStr >= a.startDate && dateStr <= a.endDate; }
 function applyPlannedAbsencesToSession(session){
@@ -6104,6 +6122,13 @@ function finalizeSession(session){
 
   applyRatingUpdates(session);
   reorderGroupsAfterMovements(standingsByGroup, movements);
+  // Session rouverte pour une correction : on refait les changements de groupe faits à la main
+  // entre la première clôture et la réouverture.
+  (session.manualMoves||[]).forEach(function(mm){
+    const pl = DATA.players.find(function(p){ return p.id === mm.playerId; });
+    if(pl && groupById(mm.groupId)){ pl.groupId = mm.groupId; if(typeof mm.order === 'number') pl.order = mm.order; }
+  });
+  delete session.manualMoves;
 
   session.movements = movements;
   session.status = 'closed';
@@ -13802,10 +13827,25 @@ function reopenLadderSession(sessionId){
   if(hasScores){ showAlert("La session suivante (" + open.date + ") a déjà des scores. Termine-la ou annule-la d'abord, puis rouvre celle-ci."); return; }
   const exact = !!s.preSnapshot;
   const msg = "Rouvrir la session du " + s.date + " ? Les montées/descentes et les changements de cote seront annulés, et tu pourras corriger les scores puis la terminer de nouveau."
-    + (open ? " La session suivante (" + open.date + "), encore vide, sera supprimée." : "")
+    + (open ? " La session suivante (" + open.date + "), encore vide, sera recréée à la nouvelle clôture : les absences déjà signalées et les disponibilités des remplaçants seront conservées." : "")
+    + " Les changements de groupe faits à la main depuis la clôture seront refaits après la correction."
     + (exact ? "" : " Cette session est ancienne : les groupes seront restaurés, mais l'ordre des joueurs dans chaque groupe pourrait différer légèrement.");
   showConfirm(msg, ()=>{
-    if(open) DATA.sessions = DATA.sessions.filter(x=>x.id!==open.id);
+    // Changements de groupe faits à la main après la clôture : on compare les groupes actuels
+    // à ceux que la clôture avait donnés, pour les refaire à la nouvelle clôture.
+    if(exact){
+      const after = {};
+      s.preSnapshot.forEach(snap=>{ after[snap.id] = snap.groupId; });
+      (s.movements||[]).forEach(m=>{ after[m.playerId] = m.toGroupId; });
+      (s.loanTransfers||[]).forEach(m=>{ after[m.playerId] = m.toGroupId; });
+      const manual = [];
+      (DATA.players||[]).forEach(p=>{ if(after.hasOwnProperty(p.id) && p.groupId && after[p.id] !== p.groupId) manual.push({ playerId: p.id, groupId: p.groupId, order: p.order }); });
+      if(manual.length) s.manualMoves = manual; else delete s.manualMoves;
+    }
+    if(open){
+      s.carryNext = { date: open.date, absences: (open.absences||[]).slice(), availableSubs: (open.availableSubs||[]).slice(), subsNotified: !!open.subsNotified };
+      DATA.sessions = DATA.sessions.filter(x=>x.id!==open.id);
+    }
     if(exact){
       s.preSnapshot.forEach(snap=>{
         const pl = DATA.players.find(p=>p.id===snap.id);
