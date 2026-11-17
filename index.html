@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 450">
+<meta name="app-build" content="Version 451">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -11419,8 +11419,7 @@ function rotationPresenceHTML(open){
   const absent = all.filter(out);
   const row = function(p, isOut){
     const n = rot.numbers[p.id];
-    const btn = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>`
-      : `<button type="button" class="pr-btn${isOut ? ' back' : ''}" onclick="event.stopPropagation();toggleAbsence('${p.id}')">${isOut ? 'Présent' : 'Absent'}</button>`;
+    const btn = p.injured ? `<span class="pf-chip warn">${gw(p,'Blessé','Blessée','Blessé(e)')}</span>` : '';
     return `<div class="pf-row pr-row" onclick="openPlayerDetailModal('${p.id}')"><span class="pr-n${isOut ? ' off' : ''}">${!isOut && n ? n : '–'}</span><span class="t">${escapeHTML(p.name)}</span>${btn}</div>`;
   };
   h += `<div class="card"><div class="rs-top"><div class="rs-name">Présents</div><span class="ah-meta">${present.length}</span></div>
