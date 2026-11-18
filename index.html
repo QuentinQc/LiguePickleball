@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 461">
+<meta name="app-build" content="Version 462">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5140,6 +5140,16 @@ function socialBestGrouping(ids, sizes, hist){
   }
   return best;
 }
+// Récréatif : nom d'un terrain (n à partir de 1), choisi dans Réglages › Noms des terrains, sinon « Terrain n ».
+function recCourtName(n){
+  const v = (DATA.recCourtNames || [])[n - 1];
+  return (v && String(v).trim()) ? String(v).trim() : 'Terrain ' + n;
+}
+// Les terrains du tirage (groupes du récréatif) portent le nom choisi, selon leur position.
+function applyRecCourtNames(){
+  if(DATA.leagueFormat !== 'social') return;
+  groupsSorted().forEach(function(g, i){ g.name = recCourtName(i + 1); });
+}
 function socialShuffleGroups(session){
   let present = DATA.players.filter(function(p){ return !p.injured && !isAbsent(session, p.id); }).map(function(p){ return p.id; });
   const plan = socialPlanFor(present.length);
@@ -5150,7 +5160,7 @@ function socialShuffleGroups(session){
   }
   while(DATA.groups.length < plan.sizes.length){
     const n = DATA.groups.length + 1;
-    DATA.groups.push({ id: uid('g'), name: 'Terrain ' + n, order: n });
+    DATA.groups.push({ id: uid('g'), name: recCourtName(n), order: n });
   }
   const grouping = plan.sizes.length ? socialBestGrouping(present, plan.sizes, socialPairHistory(session.id)) : [];
   const placed = {};
@@ -5378,7 +5388,7 @@ function rotationPlayerHTML(me, open){
     if(!m){ h += `<div class="rot-row rest${now ? ' now' : ''}${past ? ' past' : ''}"><div class="rot-hd"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Repos</span>${now ? `<span class="rot-now">En cours</span>` : ''}</div></div>`; return; }
     const mate = (m.a.indexOf(me.id) !== -1 ? m.a : m.b).filter(function(x){ return x !== me.id; })[0];
     const vs = m.a.indexOf(me.id) !== -1 ? m.b : m.a;
-    h += `<div class="rot-row${now ? ' now' : ''}${past ? ' past' : ''}"><div class="rot-hd"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">Terrain ${m.c}</span>${now ? `<span class="rot-now">En cours</span>` : (past ? '' : '')}</div>
+    h += `<div class="rot-row${now ? ' now' : ''}${past ? ' past' : ''}"><div class="rot-hd"><span class="rot-r">Ronde ${i + 1}</span><span class="rot-c">${escapeHTML(recCourtName(m.c))}</span>${now ? `<span class="rot-now">En cours</span>` : (past ? '' : '')}</div>
       <div class="rot-l"><em>Avec</em>${rotNameHTML(mate, rot)}</div><div class="rot-l"><em>Contre</em>${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' ')}</div></div>`;
   });
   return h + `</div></div>`;
@@ -5402,7 +5412,7 @@ function rotationAdminHTML(open){
   rot.rounds.forEach(function(rd, i){
     h += `<div class="card rot-round"><div class="rs-top"><div class="rs-name">Ronde ${i + 1}</div></div>
       ${rd.rest.length ? `<div class="ah-meta" style="margin-top:4px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</div>` : ''}
-      <div class="rot-courts">${rd.courts.map(function(m){ return `<div class="rot-court"><b>Terrain ${m.c}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div></div>`;
+      <div class="rot-courts">${rd.courts.map(function(m){ return `<div class="rot-court"><b>${escapeHTML(recCourtName(m.c))}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div></div>`;
   });
   return h;
 }
@@ -5467,7 +5477,7 @@ function rotationPlayerChronoInnerHTML(meId, open){
     if(!m) now = `<div class="rpc-now"><b>Repos</b> pendant la ronde ${idx + 1}</div>`;
     else {
       const mate = (m.a.indexOf(meId) !== -1 ? m.a : m.b).filter(function(x){ return x !== meId; })[0], vs = m.a.indexOf(meId) !== -1 ? m.b : m.a;
-      now = `<div class="rpc-now"><b>Terrain ${m.c}</b> · avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</div>`;
+      now = `<div class="rpc-now"><b>${escapeHTML(recCourtName(m.c))}</b> · avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</div>`;
     }
   }
   return `<div class="rpc"><div class="rpc-top"><span class="rpc-r">${escapeHTML(top)}</span></div><div class="rpc-t${cur && cur.running ? '' : ' off'}">${time}</div><div class="rpc-s">${escapeHTML(sub)}</div>${now}</div>`;
@@ -5513,7 +5523,7 @@ function rotationChronoInnerHTML(){
 }
 function rotationCourtsBoardHTML(rot, i){
   const rd = rot.rounds[i]; if(!rd) return '';
-  return `<div class="pf-sec" style="text-align:center;">Ronde ${i + 1}</div><div class="rot-courts big">${rd.courts.map(function(m){ return `<div class="rot-court"><b>Terrain ${m.c}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div>${rd.rest.length ? `<p class="ah-meta" style="text-align:center;margin-top:10px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</p>` : ''}`;
+  return `<div class="pf-sec" style="text-align:center;">Ronde ${i + 1}</div><div class="rot-courts big">${rd.courts.map(function(m){ return `<div class="rot-court"><b>${escapeHTML(recCourtName(m.c))}</b><div>${m.a.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div><span class="rot-vs">contre</span><div>${m.b.map(function(x){ return rotNameHTML(x, rot); }).join('')}</div></div>`; }).join('')}</div>${rd.rest.length ? `<p class="ah-meta" style="text-align:center;margin-top:10px;">Repos : ${rd.rest.map(function(id){ return rotNameHTML(id, rot); }).join(' ')}</p>` : ''}`;
 }
 function rotationTimerSheetHTML(){
   return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
@@ -5529,7 +5539,7 @@ function printRotation(){
   const nm = function(id){ return '<b>' + rot.numbers[id] + '</b> ' + escapeHTML(playerName(id)); };
   let body = `<h1>${escapeHTML(currentLeagueLabel())} — ${escapeHTML(frDateLong(open.date))}</h1><p>${rot.rounds.length} rondes de ${rot.round} min + ${rot.change} min de changement</p>`;
   rot.rounds.forEach(function(rd, i){
-    body += `<div class="rd"><h2>Ronde ${i + 1}</h2><table>${rd.courts.map(function(m){ return `<tr><td class="c">Terrain ${m.c}</td><td>${m.a.map(nm).join(' &amp; ')}</td><td class="v">contre</td><td>${m.b.map(nm).join(' &amp; ')}</td></tr>`; }).join('')}</table>${rd.rest.length ? `<p class="r">Repos : ${rd.rest.map(nm).join(', ')}</p>` : ''}</div>`;
+    body += `<div class="rd"><h2>Ronde ${i + 1}</h2><table>${rd.courts.map(function(m){ return `<tr><td class="c">${escapeHTML(recCourtName(m.c))}</td><td>${m.a.map(nm).join(' &amp; ')}</td><td class="v">contre</td><td>${m.b.map(nm).join(' &amp; ')}</td></tr>`; }).join('')}</table>${rd.rest.length ? `<p class="r">Repos : ${rd.rest.map(nm).join(', ')}</p>` : ''}</div>`;
   });
   const w = window.open('', '_blank'); if(!w){ showAlert("Autorise les fenêtres pour imprimer."); return; }
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Horaire</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 6px}.rd{break-inside:avoid;margin:14px 0;padding:10px;border:1px solid #ccc;border-radius:8px}table{border-collapse:collapse;width:100%}td{padding:4px 6px;border-top:1px solid #eee;font-size:13px}.c{font-weight:bold;width:80px}.v{color:#777;width:60px;text-align:center}.r{font-size:12px;color:#555;margin:6px 0 0}</style></head><body>${body}</body></html>`);
@@ -14084,6 +14094,7 @@ function adminSettingsSectionHTML(){
     const lim = socialCourtLimits(), K = isRotationMode() ? rotationSettings().maxCourts : (parseInt(DATA.socialMaxCourts, 10) || 0);
     regles = [settingsRow('', 'Formule de la soirée', isRotationMode() ? (function(){ const st = rotationSettings(); return 'Rotation chronométrée · ' + st.rounds + ' rondes de ' + st.round + ' min + ' + st.change + ' min de changement'; })() : 'Terrains tirés au sort pour la soirée', 'openSocialModeModal()'),
       isRotationMode() ? '' : settingsRow('', 'Joueurs par terrain', 'Nombre de joueurs placés sur chaque terrain au tirage · ' + lim.label, 'openCourtSizeModal()'),
+      settingsRow('', 'Noms des terrains', (DATA.recCourtNames||[]).some(function(x){ return x && String(x).trim(); }) ? recCourtNamesSummary() : 'Terrain 1, Terrain 2… · touche pour les nommer (ex. : nom des partenaires)', 'openRecCourtNamesModal()'),
       settingsRow('', 'Terrains disponibles', K ? 'Le tirage utilise au plus ' + K + ' terrain' + (K>1?'s':'') : 'Le tirage utilise autant de terrains que nécessaire', 'openMaxCourtsModal()')];
   } else {
     const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
@@ -14512,6 +14523,34 @@ function openCourtSizeModal(){
   const cur = DATA.socialCourtSize || '46';
   showContentModal('Joueurs par terrain', `<p class="small" style="margin-bottom:12px;">Au tirage, chaque terrain reçoit ce nombre de joueurs. Les terrains de 4 sont privilégiés.</p>
     <div style="display:flex;flex-direction:column;gap:10px;">${Object.keys(COURT_SIZE_OPTS).map(k=>`<button class="btn ${k===cur?'btn-primary':'btn-secondary'}" style="height:52px;font-size:17px;" onclick="setCourtSetting('socialCourtSize','${k}')">${COURT_SIZE_OPTS[k][2]}</button>`).join('')}</div>`);
+}
+function recCourtCount(){
+  const named = (DATA.recCourtNames || []).length;
+  const max = isRotationMode() ? rotationSettings().maxCourts : (parseInt(DATA.socialMaxCourts, 10) || 0);
+  return Math.max(max || 0, (DATA.groups || []).length, named, 4);
+}
+function recCourtNamesSummary(){
+  const n = recCourtCount(), out = [];
+  for(let i = 1; i <= n; i++) out.push(recCourtName(i));
+  return out.join(', ');
+}
+function openRecCourtNamesModal(){
+  const n = Math.min(12, recCourtCount());
+  showFormModal('Noms des terrains', function(){
+    let rows = '';
+    for(let i = 1; i <= n; i++){
+      const v = (DATA.recCourtNames || [])[i - 1] || '';
+      rows += `<div class="field" style="margin:0 0 10px;"><label>Terrain ${i}</label><input class="rcn-in" data-i="${i - 1}" maxlength="40" value="${escapeHTML(v)}" placeholder="Terrain ${i}"></div>`;
+    }
+    return `<p class="small" style="color:var(--muted);margin:0 0 12px;">Le nom apparaît partout où les joueurs voient leur terrain : horaire, chrono, fiche imprimée. Laisse vide pour garder « Terrain 1, 2… ».</p>${rows}`;
+  }, function(){
+    const names = [];
+    document.querySelectorAll('.rcn-in').forEach(function(el){ names[parseInt(el.getAttribute('data-i'), 10)] = String(el.value || '').trim().slice(0, 40); });
+    while(names.length && !names[names.length - 1]) names.pop();
+    DATA.recCourtNames = names;
+    applyRecCourtNames();
+    setTimeout(function(){ showToast('Noms des terrains enregistrés'); }, 50);
+  });
 }
 function openMaxCourtsModal(){
   const cur = parseInt(DATA.socialMaxCourts, 10) || 0;
@@ -14959,7 +14998,7 @@ function settingsGuideHTML(){
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
   + (rec ? guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque soirée passée, avec les présents, les remplaçants et les absents. <b>Rapports</b> : Bilan de présence, Liste des joueurs et suivi du <b>Règlement</b>.</p>`) : '')
   + (rec ? '' : guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`))
-  + (rec ? guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : formule de la soirée (rotation chronométrée ou terrains tirés au sort), terrains disponibles. <b>Ce que voient les joueurs</b> : terrain avant publication, onglets.</p>`) : '')
+  + (rec ? guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : formule de la soirée (rotation chronométrée ou terrains tirés au sort), noms des terrains, terrains disponibles. <b>Ce que voient les joueurs</b> : terrain avant publication, onglets.</p>`) : '')
   + (rec ? '' : guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`))
   + guideSec('Dépannage', `<p class="small">• Un joueur ne voit pas ${rec ? 'sa soirée : la soirée' : 'ses matchs : la session'} est-elle publiée ?<br>• Un joueur ne reçoit pas les notifications : demande-lui de toucher « Tester » dans Moi › Notifications, et d'ouvrir l'app depuis son icône.<br>• Un nouvel inscrit n'arrive pas à confirmer son courriel : vérifie Organisations › Comptes, sa demande peut y être en attente.<br>• L'app semble ancienne : la fermer complètement puis la rouvrir.${rec ? '' : '<br>• Nombre de matchs inattendu : vérifie le mode test dans Réglages › Avancé.'}</p>`)
   + `<div class="card"><button class="btn-ghost" onclick="showPlayerGuideModal()">Aperçu du guide du joueur</button></div>`;
