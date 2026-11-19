@@ -1831,6 +1831,36 @@ body.desk.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 66px);}
 body.desk .lg-ov, body.desk .chat-overlay.dk-page{left:248px;padding:0;background:var(--court);align-items:stretch;justify-content:stretch;z-index:900;}
 body.desk .lg-ov > .chat-sheet, body.desk .chat-overlay.dk-page > .chat-sheet{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none;animation:none;}
 body.desk .lg-ov .sheet-body, body.desk .dk-page .sheet-body, body.desk .lg-ov .chat-head, body.desk .dk-page .chat-head{padding-left:max(24px, calc((100% - 1240px) / 2));padding-right:max(24px, calc((100% - 1240px) / 2));}
+
+/* Membres en tableau (poste de travail) */
+.dk-tbl-wrap{overflow-x:auto;border:1px solid var(--line-soft-strong);border-radius:14px;background:rgba(0,0,0,.12);margin-top:10px;}
+.dk-tbl{width:100%;border-collapse:collapse;font-size:14px;}
+.dk-tbl th{text-align:left;font:600 11px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:11px 10px;border-bottom:1px solid var(--line-soft-strong);white-space:nowrap;}
+.dk-tbl td{padding:9px 10px;border-top:1px solid var(--line-soft);vertical-align:middle;}
+.dk-tbl tbody tr{cursor:pointer;}
+.dk-tbl tbody tr:hover{background:rgba(255,255,255,.04);}
+.dk-tbl tbody tr.sel{background:rgba(207,234,92,.08);}
+.dk-tbl tbody tr.cur{box-shadow:inset 3px 0 0 var(--ball);}
+.dk-tbl .dk-cb{width:34px;}
+.dk-tbl input[type=checkbox]{width:18px;height:18px;accent-color:var(--ball);cursor:pointer;}
+.dk-tbl .dk-nm{display:flex;align-items:center;gap:10px;}
+.dk-tbl .dk-nm .member-avatar{width:32px;height:32px;font-size:12px;flex:none;}
+.dk-tbl .dk-nm b{font-weight:600;}
+.dk-tbl .dk-nm small{display:block;color:var(--muted);font-size:12px;}
+.dk-tbl .dk-lg{display:flex;flex-wrap:wrap;gap:4px;}
+.dk-tbl .dk-lg span{font-size:12px;border:1px solid var(--line-soft-strong);border-radius:999px;padding:2px 9px;white-space:nowrap;}
+.dk-tbl .dk-lg span.sub{color:var(--muted);border-style:dashed;}
+.dk-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.1);border:1px solid rgba(207,234,92,.35);}
+.dk-bulk b{margin-right:6px;}
+.dk-bulk button{font:600 13px var(--font-body);color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line-soft-strong);border-radius:9px;padding:7px 12px;cursor:pointer;}
+.dk-bulk button.pri{background:var(--ball);color:var(--court);border-color:var(--ball);}
+.dk-bulk .dk-x{margin-left:auto;background:none;border:0;color:var(--muted);}
+/* Fiche d'une personne : un panneau à droite sur ordinateur, la liste reste visible. */
+body.desk .m-ov.dk-panel{left:auto !important;width:460px;justify-content:flex-end !important;align-items:stretch !important;padding:0 !important;background:transparent !important;}
+body.desk .m-ov.dk-panel .m-box{max-width:460px !important;width:460px !important;max-height:none !important;height:100%;border-radius:0 !important;border:0 !important;border-left:1px solid var(--line-soft-strong) !important;box-shadow:-12px 0 40px rgba(0,0,0,.4);animation:dkPanelIn .18s ease-out;}
+body.desk .dk-page.dk-has-panel .sheet-body{padding-right:484px;}
+@keyframes dkPanelIn{from{transform:translateX(30px);opacity:.6;}to{transform:none;opacity:1;}}
+body.desk .dk-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -6510,7 +6540,12 @@ function renderInner(){
     div.id = 'modalRoot';
     // Même fenêtre qu'au rendu précédent (simple mise à jour) : pas d'animation d'ouverture, sinon elle « flashe ».
     if(MODAL === LAST_RENDERED_MODAL) div.className = 'm-still';
-    div.innerHTML = modalHTML();
+    let under = '';
+    if(document.body.classList.contains('desk') && MODAL.under && MODAL_UNDER && MODAL_UNDER.sheet && MODAL_UNDER.sheet.indexOf('org-') === 0){
+      const top = MODAL; MODAL = MODAL_UNDER; try{ under = sheetModalHTML(); }catch(e){} MODAL = top;
+      if(top.panel) under = under.replace('chat-overlay dk-page', 'chat-overlay dk-page dk-has-panel');
+    }
+    div.innerHTML = under + modalHTML();
     document.body.appendChild(div);
   }
   LAST_RENDERED_MODAL = MODAL;
@@ -8297,7 +8332,8 @@ function dkLeague(id){ dkClose(); openAdminLeague(id, 'session'); }
 function dkTab(t){ dkClose(); VIEW.adet = true; setAdminTab(t); }
 function deskSideHTML(){
   const org = (MY_ORGANIZATIONS||[]).find(function(o){ return o.id === CURRENT_ORGANIZATION_ID; });
-  const orgSheet = MODAL && MODAL.sheet && MODAL.sheet.indexOf('org-') === 0 ? MODAL.sheet.slice(4) : null;
+  const ms = (MODAL && MODAL.sheet) ? MODAL : ((MODAL && MODAL.under && MODAL_UNDER) ? MODAL_UNDER : null);
+  const orgSheet = ms && ms.sheet && ms.sheet.indexOf('org-') === 0 ? ms.sheet.slice(4) : null;
   const inLeague = !!VIEW.adet && !orgSheet;
   const home = !inLeague && !orgSheet;
   let pend = 0;
@@ -10046,7 +10082,7 @@ function openSubstituteDetailModal(subId){
   const s = (DATA.substitutePool||[]).find(x=>x.id===subId);
   if(!s) return;
   if(subId !== PF_PID){ PF_PID = subId; PF_TAB = 'gestion'; }
-  showContentModal('', function(){ return substituteDetailModalHTML(subId); });
+  showPanelModal('', function(){ return substituteDetailModalHTML(subId); });
 }
 // Convertit un joueur régulier en remplaçant : il quitte son groupe et la
 // liste des Réguliers, rejoint le bassin de Remplaçants. Son compte lié (s'il
@@ -10278,7 +10314,7 @@ function openPlayerDetailModal(pid){
     : loadPlayerNotesForPlayer(CURRENT_LEAGUE_ID, pid);
   loadPromise.then(()=>{
     // Contenu recalculé à chaque affichage : les onglets et les actions se mettent à jour sans recharger.
-    showContentModal('', function(){ return playerDetailModalHTML(pid); });
+    showPanelModal('', function(){ return playerDetailModalHTML(pid); });
   });
 }
 async function loadPlayerNotesForProfile(profileId){
@@ -10937,7 +10973,10 @@ function openOrgMemberDetailModal(idx){
   if(!entry) return;
   const key = 'm:' + (entry.orgMemberId || entry.name);
   if(key !== PF_PID){ PF_PID = key; PF_TAB = 'ligues'; }
-  showContentModal('', function(){ return orgMemberDetailModalHTML(idx); });
+  if(MODAL && MODAL.dkNav) dropModal(); // autre personne : on remplace le panneau, la page reste dessous
+  showPanelModal('', function(){ return orgMemberDetailModalHTML(idx); });
+  if(MODAL){ MODAL.dkNav = true; MODAL.dkIdx = idx; }
+  ORG_CUR = idx;
 }
 // Recharge les données affectées puis reconstruit la fiche à jour, pour que
 // retirer/ajouter une ligue se reflète immédiatement sans fermer la fiche.
@@ -14458,8 +14497,97 @@ function orgUpdateCount(shown, total){
   const el = document.getElementById('orgFilterCount');
   if(el) el.textContent = shown + ' sur ' + total;
 }
+// ---- Membres en tableau (poste de travail) ----
+let ORG_SEL = {};   // personnes cochées (clé = fiche membre, sinon nom)
+let ORG_CUR = -1;   // personne dont la fiche est ouverte à droite
+function orgKey(e){ return e.orgMemberId || ('n:' + e.name.trim().toLowerCase()); }
+function orgSelected(){ return (ORG_ROSTER_ENTRIES_CACHE||[]).filter(function(e){ return ORG_SEL[orgKey(e)]; }); }
+function orgRefreshList(){ const el = document.getElementById('orgListBody'); if(el) el.innerHTML = orgMembersBodyHTML(); }
+function orgSelToggle(i, on){ const e = ORG_ROSTER_ENTRIES_CACHE[i]; if(!e) return; if(on) ORG_SEL[orgKey(e)] = 1; else delete ORG_SEL[orgKey(e)]; orgRefreshList(); }
+function orgSelAll(on){ orgFilteredEntries(ORG_ROSTER_ENTRIES_CACHE).forEach(function(x){ if(on) ORG_SEL[orgKey(x.e)] = 1; else delete ORG_SEL[orgKey(x.e)]; }); orgRefreshList(); }
+function orgSelClear(){ ORG_SEL = {}; orgRefreshList(); }
+function orgDeskTableHTML(entries, list){
+  const initialsOf = function(name){ return (name||'').split(' ').filter(Boolean).slice(0,2).map(function(w){ return w[0].toUpperCase(); }).join('') || '?'; };
+  const sel = orgSelected();
+  const allOn = list.length > 0 && list.every(function(x){ return ORG_SEL[orgKey(x.e)]; });
+  const withAcc = sel.filter(function(e){ return e.profileId; }).length;
+  const bulk = sel.length ? `<div class="dk-bulk"><b>${sel.length} sélectionné${sel.length>1?'s':''}</b>
+      <button type="button" class="pri" onclick="orgBulkAddToLeague()">Ajouter à une ligue</button>
+      <button type="button" onclick="orgBulkMessage()" ${withAcc ? '' : 'disabled title="Aucune de ces personnes n\'a de compte"'}>Envoyer un message${withAcc && withAcc < sel.length ? ' (' + withAcc + ' avec compte)' : ''}</button>
+      <button type="button" onclick="orgBulkExport()">Exporter la sélection</button>
+      <button type="button" class="dk-x" onclick="orgSelClear()">Tout désélectionner</button></div>` : '';
+  const rows = list.map(function(x){
+    const e = x.e, i = x.i, on = !!ORG_SEL[orgKey(e)];
+    const av = e.profileId ? (ALL_PROFILES.find(function(p){ return p.id === e.profileId; }) || {}).avatar_url : null;
+    return `<tr class="${on ? 'sel' : ''}${i === ORG_CUR && MODAL && MODAL.dkNav ? ' cur' : ''}" onclick="openOrgMemberDetailModal(${i})">
+      <td class="dk-cb" onclick="event.stopPropagation()"><input type="checkbox" ${on ? 'checked' : ''} onchange="orgSelToggle(${i}, this.checked)" aria-label="Sélectionner ${escapeHTML(e.name)}"></td>
+      <td><div class="dk-nm">${avatarHTML('member-avatar', initialsOf(e.name), av)}<span><b>${escapeHTML(e.name)}</b>${staffTagsHTML(e.profileId, null)}<small>${escapeHTML(e.email || 'Sans courriel')}</small></span></div></td>
+      <td>${memberAccountStatus(e).tag}</td>
+      <td><div class="dk-lg">${e.rows.length ? e.rows.map(function(r){ return `<span class="${r.type === 'remplaçant' ? 'sub' : ''}">${escapeHTML(r.leagueLabel)}${r.type === 'remplaçant' ? ' · rempl.' : ''}</span>`; }).join('') : '<span class="sub">Aucune ligue</span>'}</div></td>
+      <td style="text-align:right;white-space:nowrap;">${(e.orgMemberId && !e.rows.length && !isOrganizerOnly()) ? `<button class="btn-ghost-danger" onclick="event.stopPropagation();confirmDeleteOrgMember(${i})">Retirer</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  return bulk + `<div class="dk-tbl-wrap"><table class="dk-tbl">
+    <thead><tr><th class="dk-cb"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="orgSelAll(this.checked)" aria-label="Tout sélectionner"></th><th>Nom</th><th>Compte</th><th>Ligues</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    ${entries.length === 0 ? `<p class="empty">Aucun membre pour l'instant</p>` : (list.length === 0 ? `<p class="empty">Aucun résultat avec ces filtres</p>` : '')}`;
+}
+function orgBulkAddToLeague(){
+  const sel = orgSelected(); if(!sel.length) return;
+  const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
+  showFormModal('Ajouter à une ligue', `<p class="small" style="margin:0 0 12px;">${sel.length} personne${sel.length>1?'s':''} sélectionnée${sel.length>1?'s':''}. Celles déjà dans la ligue choisie ne sont pas ajoutées une deuxième fois.</p>
+    <div class="field"><label>Ligue</label><select id="obLeague">${leagues.map(function(l){ return `<option value="${l.id}">${escapeHTML(l.name)}</option>`; }).join('')}</select></div>
+    <div class="field"><label>Comme</label><select id="obType"><option value="joueur">Joueurs réguliers</option><option value="remplacant">Remplaçants</option></select></div>`, function(){
+    const lid = document.getElementById('obLeague').value, type = document.getElementById('obType').value;
+    const todo = sel.filter(function(e){ return !e.rows.some(function(r){ return r.leagueId === lid; }); });
+    const skipped = sel.length - todo.length;
+    (async function(){
+      let n = 0;
+      for(const e of todo){ const id = await addNamedEntryToLeague(lid, e.name, type, e.email, e.orgMemberId, null, e.profileId); if(id) n++; }
+      ORG_SEL = {};
+      await refreshAfterOrgRosterChange([lid]);
+      showToast(n + ' ajouté' + (n>1?'s':'') + (skipped ? ' · ' + skipped + ' déjà dans la ligue' : ''));
+    })();
+  });
+}
+function orgBulkMessage(){
+  const ids = Array.from(new Set(orgSelected().map(function(e){ return e.profileId; }).filter(Boolean)));
+  if(!ids.length) return;
+  showFormModal('Envoyer un message', `<p class="small" style="margin:0 0 12px;">Notification envoyée aux ${ids.length} personne${ids.length>1?'s':''} sélectionnée${ids.length>1?'s':''} qui ont un compte.</p>
+    <div class="field"><label>Titre</label><input id="obTitle" maxlength="80" placeholder="ex. : Rappel"></div>
+    <div class="field"><label>Message</label><textarea id="obBody" rows="4" maxlength="500"></textarea></div>`, function(){
+    const t = String(document.getElementById('obTitle').value || '').trim(), b = String(document.getElementById('obBody').value || '').trim();
+    if(!t || !b){ showAlert('Écris un titre et un message.'); return false; }
+    invokeSendNotification({ organization_id: CURRENT_ORGANIZATION_ID, profile_ids: ids, category: 'league_announce', title: t, body: b });
+    setTimeout(function(){ showToast('Message envoyé à ' + ids.length + ' personne' + (ids.length>1?'s':'')); }, 50);
+  });
+}
+function orgBulkExport(){
+  const leagues = myOrgLeagues().slice().sort(function(a,b){ return (a.schedule_label||a.name).localeCompare(b.schedule_label||b.name); });
+  const esc = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  const lines = [['Nom','Courriel','Compte lié'].concat(leagues.map(function(l){ return l.schedule_label || l.name; })).map(esc).join(',')];
+  orgSelected().forEach(function(e){
+    lines.push([e.name, e.email || '', e.profileId ? 'Oui' : 'Non'].concat(leagues.map(function(l){ const r = e.rows.find(function(x){ return x.leagueId === l.id; }); return r ? (r.type === 'remplaçant' ? 'Remplaçant' : 'Joueur') : ''; })).map(esc).join(','));
+  });
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'membres-selection.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+// Flèches haut/bas : personne précédente ou suivante dans la liste filtrée ; Échap : fermer le panneau.
+document.addEventListener('keydown', function(ev){
+  if(!MODAL || !MODAL.dkNav || !document.body.classList.contains('desk')) return;
+  const tg = ev.target && ev.target.tagName; if(tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return;
+  if(ev.key === 'Escape'){ ev.preventDefault(); closeModal(); return; }
+  if(ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+  const list = orgFilteredEntries(ORG_ROSTER_ENTRIES_CACHE || []);
+  const pos = list.findIndex(function(x){ return x.i === MODAL.dkIdx; });
+  const nx = list[pos + (ev.key === 'ArrowDown' ? 1 : -1)];
+  if(!nx) return;
+  ev.preventDefault();
+  dropModal(); openOrgMemberDetailModal(nx.i);
+});
 function orgMembersBodyHTML(){
   const entries = ORG_ROSTER_ENTRIES_CACHE;
+  if(isDesk() && document.body.classList.contains('desk')){ const dl = orgFilteredEntries(entries); setTimeout(function(){ orgUpdateCount(dl.length, entries.length); }, 0); return orgDeskTableHTML(entries, dl); }
   const list = orgFilteredEntries(entries);
   const initialsOf = (name)=> (name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
   setTimeout(()=>orgUpdateCount(list.length, entries.length), 0);
@@ -16750,6 +16878,8 @@ function showAlert(message){ setModal({ kind:'alert', message }); render(); }
 function showPrompt(message, defaultValue, onConfirm){ setModal({ kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }); render(); }
 function showChoice(message, choices, onConfirm){ setModal({ kind:'choice', message, choices, onConfirm }); render(); }
 function showContentModal(title, htmlContent){ setModal({ kind:'content', title, htmlContent }); render(); }
+// Fiche d'une personne : panneau à droite sur ordinateur (la liste reste visible), fenêtre ailleurs.
+function showPanelModal(title, htmlContent){ setModal({ kind:'content', title, htmlContent, panel:true }); render(); }
 // Pop-up formulaire réutilisable : affiche du HTML (avec des champs), un
 // bouton Enregistrer qui appelle onSave() (qui lit les champs elle-même,
 // pendant que le pop-up est encore ouvert), puis referme et rafraîchit.
@@ -16796,7 +16926,7 @@ function modalHTML(){
         <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
         <button class="btn btn-primary" onclick="modalFormSaveClick()">${escapeHTML(MODAL.saveLabel || 'Enregistrer')}</button>
       </div>` : ''}`;
-    return `<div class="m-ov" style="${overlay}" onclick="if(event.target===this && ovDown(this)) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}</div></div>`;
+    return `<div class="m-ov${MODAL.panel ? ' dk-panel' : ''}" style="${overlay}" onclick="if(event.target===this && ovDown(this)) closeModal()"><div class="m-box" style="${box}"><div class="m-grab"></div>${inner}${MODAL.panel && MODAL.dkNav ? '<div class="dk-hint">Flèches ↑ ↓ : personne précédente ou suivante · Échap : fermer</div>' : ''}</div></div>`;
   }
   const box = 'background:var(--court-light);border-radius:var(--radius);padding:18px;max-width:380px;width:100%;border:1px solid rgba(255,255,255,0.15);';
   let inner = `<p style="margin:0 0 14px;white-space:pre-line;">${escapeHTML(MODAL.message)}</p>`;
