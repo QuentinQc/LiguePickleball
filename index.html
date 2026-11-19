@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 473">
+<meta name="app-build" content="Version 474">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8964,7 +8964,7 @@ function jpTableHTML(){
       <td><div class="dk-nm"><span class="member-avatar">${escapeHTML(ini(r.name))}</span><b>${escapeHTML(r.name)}</b></div></td>
       <td>${r.type}</td>
       ${rec ? '' : `<td>${escapeHTML(r.group)}</td><td class="num" style="color:var(--ball);font-family:var(--font-display);">${r.rating.toFixed(2)}</td>`}
-      <td><span class="jp-pill${r.profile ? ' ok' : ' w'}">${r.profile ? 'Relié' : 'Sans compte'}</span></td>
+      <td>${r.profile ? '<span class="jp-pill ok">Relié</span>' : ''}</td>
       ${open ? `<td><span class="jp-pill ${r.wc}">${escapeHTML(r.wk)}</span></td>` : ''}
       ${DATA.rulesText ? `<td><span class="jp-pill${r.rules === 'En attente' ? ' w' : ''}">${r.rules}</span></td>` : ''}
     </tr>`;
@@ -9789,7 +9789,7 @@ function adminSubstitutePoolHTML(){
       sub:[linkedSubIds.has(x.id)?'Compte':null, x.email?escapeHTML(x.email):null, x.notes?escapeHTML(x.notes):null].filter(Boolean).join(' · ') || '—' };
   });
   return plListHTML({ id:'sub', title:'Remplaçants', hint:'Touche un remplaçant pour le modifier, gérer son compte ou le retirer. Ils apparaissent comme choix rapides lors d\'une absence en session.', rows,
-    chips:[['all','Tous'],['acc','Avec compte'],['noacc','Sans compte']],
+    chips:[],
     sorts:[['name','Nom']].concat(isRecLeague() ? [] : [['rating','Cote']], [['email','Courriel']]).map(([k,l])=>({ label:l, arrow:arrow(k), active:sortBy===k, onclick:`setSubsSort('${k}')` })),
     actions: '',
     empty:'Aucun remplaçant enregistré pour l\'instant.' });
@@ -10909,7 +10909,7 @@ function adminPlayersHTML(){
     return { name:p.name, f:(isRecLeague() ? [] : [g?'g_'+g.id:'wait']).concat(p.injured?['inj']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
       tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}`,
-      sub:isRecLeague() ? (link ? 'Compte' : 'Sans compte') : `${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' };
+      sub:isRecLeague() ? (link ? 'Compte' : '') : `${escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' };
   });
   const nInj = rows.filter(r=>r.f.includes('inj')).length;
   const chips = [['all','Tous']].concat(isRecLeague() ? [] : groups.map(g=>['g_'+g.id, escapeHTML(g.name)]), isRecLeague() ? [] : [['wait','En attente']], nInj ? [['inj','Blessés']] : []);
