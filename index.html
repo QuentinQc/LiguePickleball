@@ -6480,6 +6480,19 @@ function finalizeSession(session){
     if(pl && groupById(mm.groupId)){ pl.groupId = mm.groupId; if(typeof mm.order === 'number') pl.order = mm.order; }
   });
   delete session.manualMoves;
+  // Positions dans les groupes : reprises telles qu'avant la correction pour chaque groupe
+  // qui a gardé exactement les mêmes joueurs (sinon, l'ordre automatique s'applique).
+  if(session.manualOrder){
+    const before = {};
+    session.manualOrder.forEach(function(x){ if(x[1]) (before[x[1]] = before[x[1]] || {})[x[0]] = x[2]; });
+    groupsSorted().forEach(function(g){
+      const prev = before[g.id]; if(!prev) return;
+      const now = playersInGroup(g.id);
+      if(now.length !== Object.keys(prev).length || now.some(function(p){ return !(p.id in prev); })) return;
+      now.forEach(function(p){ if(typeof prev[p.id] === 'number') p.order = prev[p.id]; });
+    });
+    delete session.manualOrder;
+  }
 
   session.movements = movements;
   session.status = 'closed';
@@ -14814,7 +14827,7 @@ function reopenLadderSession(sessionId){
   const exact = !!s.preSnapshot;
   const msg = "Rouvrir la session du " + s.date + " ? Les montées/descentes et les changements de cote seront annulés, et tu pourras corriger les scores puis la terminer de nouveau."
     + (open ? " La session suivante (" + open.date + "), encore vide, sera recréée à la nouvelle clôture : les absences, les disponibilités, les remplaçants déjà placés et la publication seront conservés." : "")
-    + " Les changements de groupe faits à la main depuis la clôture seront refaits après la correction."
+    + " Les changements de groupe et de position faits à la main depuis la clôture seront refaits après la correction."
     + (exact ? "" : " Cette session est ancienne : les groupes seront restaurés, mais l'ordre des joueurs dans chaque groupe pourrait différer légèrement.");
   showConfirm(msg, ()=>{
     // Changements de groupe faits à la main après la clôture : on compare les groupes actuels
@@ -14828,6 +14841,8 @@ function reopenLadderSession(sessionId){
       (DATA.players||[]).forEach(p=>{ if(after.hasOwnProperty(p.id) && p.groupId && after[p.id] !== p.groupId) manual.push({ playerId: p.id, groupId: p.groupId, order: p.order }); });
       if(manual.length) s.manualMoves = manual; else delete s.manualMoves;
     }
+    // Ordre des joueurs dans chaque groupe tel qu'il est maintenant (positions changées à la main comprises).
+    s.manualOrder = (DATA.players||[]).map(function(p){ return [p.id, p.groupId || null, p.order]; });
     if(open){
       // Tout ce qui avait déjà été préparé pour la session suivante : absences, disponibilités,
       // remplaçants placés, renforts, joueurs prêtés, publication.
