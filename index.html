@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 480">
+<meta name="app-build" content="Version 481">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -6051,6 +6051,26 @@ function restoreCarriedSessionInputs(session){
     const subs = (c.availableSubs||[]).filter(function(id){ return (DATA.substitutePool||[]).some(function(sp){ return sp.id === id; }); });
     if(subs.length) session.availableSubs = subs;
     if(c.subsNotified) session.subsNotified = true;
+    // Remplaçants placés, renforts et prêts : remis là où ils étaient, s'ils ont encore un sens
+    // après la correction (l'absent est toujours absent et toujours dans ce groupe).
+    const loans = {};
+    Object.keys(c.loans || {}).forEach(function(pid){
+      if((DATA.players||[]).some(function(p){ return p.id === pid; }) && session.absences.indexOf(pid) !== -1 && groupById(c.loans[pid])) loans[pid] = c.loans[pid];
+    });
+    const used = {};
+    Object.keys(c.placed || {}).forEach(function(gid){
+      const gd = (session.groupsData||[]).find(function(x){ return x.groupId === gid; }); if(!gd) return;
+      const pl = c.placed[gid];
+      Object.keys(pl.substitutes || {}).forEach(function(absId){
+        const enc = pl.substitutes[absId], ap = (DATA.players||[]).find(function(p){ return p.id === absId; });
+        if(!ap || ap.groupId !== gid || session.absences.indexOf(absId) === -1 || used[enc]) return;
+        if(!isSubPoolId(enc) && !isGuestId(enc) && !loans[enc]) return; // joueur prêté dont le prêt n'a plus de sens
+        gd.substitutes = gd.substitutes || {}; gd.substitutes[absId] = enc; used[enc] = 1;
+      });
+      (pl.extras || []).forEach(function(enc){ if(!used[enc]){ gd.extras = (gd.extras || []).concat([enc]); used[enc] = 1; } });
+    });
+    if(Object.keys(loans).length) session.loans = loans;
+    if(c.published) session.published = true;
   });
 }
 function dateInPlannedAbsence(a, dateStr){ return dateStr >= a.startDate && dateStr <= a.endDate; }
@@ -14793,7 +14813,7 @@ function reopenLadderSession(sessionId){
   if(hasScores){ showAlert("La session suivante (" + open.date + ") a déjà des scores. Termine-la ou annule-la d'abord, puis rouvre celle-ci."); return; }
   const exact = !!s.preSnapshot;
   const msg = "Rouvrir la session du " + s.date + " ? Les montées/descentes et les changements de cote seront annulés, et tu pourras corriger les scores puis la terminer de nouveau."
-    + (open ? " La session suivante (" + open.date + "), encore vide, sera recréée à la nouvelle clôture : les absences déjà signalées et les disponibilités des remplaçants seront conservées." : "")
+    + (open ? " La session suivante (" + open.date + "), encore vide, sera recréée à la nouvelle clôture : les absences, les disponibilités, les remplaçants déjà placés et la publication seront conservés." : "")
     + " Les changements de groupe faits à la main depuis la clôture seront refaits après la correction."
     + (exact ? "" : " Cette session est ancienne : les groupes seront restaurés, mais l'ordre des joueurs dans chaque groupe pourrait différer légèrement.");
   showConfirm(msg, ()=>{
@@ -14809,7 +14829,12 @@ function reopenLadderSession(sessionId){
       if(manual.length) s.manualMoves = manual; else delete s.manualMoves;
     }
     if(open){
-      s.carryNext = { date: open.date, absences: (open.absences||[]).slice(), availableSubs: (open.availableSubs||[]).slice(), subsNotified: !!open.subsNotified };
+      // Tout ce qui avait déjà été préparé pour la session suivante : absences, disponibilités,
+      // remplaçants placés, renforts, joueurs prêtés, publication.
+      const placed = {};
+      (open.groupsData||[]).forEach(function(gd){ if((gd.substitutes && Object.keys(gd.substitutes).length) || (gd.extras && gd.extras.length)) placed[gd.groupId] = { substitutes: Object.assign({}, gd.substitutes||{}), extras: (gd.extras||[]).slice() }; });
+      s.carryNext = { date: open.date, absences: (open.absences||[]).slice(), availableSubs: (open.availableSubs||[]).slice(), subsNotified: !!open.subsNotified,
+        placed: placed, loans: Object.assign({}, open.loans||{}), published: !!open.published };
       DATA.sessions = DATA.sessions.filter(x=>x.id!==open.id);
     }
     if(exact){
