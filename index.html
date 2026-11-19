@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 470">
+<meta name="app-build" content="Version 471">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1859,12 +1859,16 @@ body.desk .lg-ov .sheet-body, body.desk .dk-page .sheet-body, body.desk .lg-ov .
 body.desk .m-ov.dk-panel{left:auto !important;width:460px;justify-content:flex-end !important;align-items:stretch !important;padding:0 !important;background:transparent !important;}
 body.desk .m-ov.dk-panel .m-box{max-width:460px !important;width:460px !important;max-height:none !important;height:100%;box-sizing:border-box;padding-top:calc(18px + env(safe-area-inset-top)) !important;border-radius:0 !important;border:0 !important;border-left:1px solid var(--line-soft-strong) !important;box-shadow:-12px 0 40px rgba(0,0,0,.4);animation:dkPanelIn .18s ease-out;}
 body.desk .dk-page.dk-has-panel .sheet-body{padding-right:484px;}
+body.desk.dk-panel-open .lg-ov .sheet-body{padding-right:484px;}
 @keyframes dkPanelIn{from{transform:translateX(30px);opacity:.6;}to{transform:none;opacity:1;}}
 body.desk .dk-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;}
 
 /* Session sur ordinateur : groupes côte à côte, scores en grille */
 body.desk .grp-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;align-items:start;}
 body.desk .grp-board > .card{margin:0;}
+body.desk .grp-board .grp-hint{display:none;}
+body.desk .grp-board .pf-row .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+body.desk .grp-board .pf-row{padding-top:8px;padding-bottom:8px;}
 body.desk .rs-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;align-items:start;}
 body.desk .rs-board > .card{margin:0;}
 .dk-toast .dk-undo{margin-left:14px;font:700 13px var(--font-body);color:var(--ball);background:var(--court);border:0;border-radius:8px;padding:5px 12px;cursor:pointer;pointer-events:auto;}
@@ -1948,6 +1952,48 @@ body.desk .rp-grid > .card{margin:0;}
 .wo-card h3{margin:0 0 4px;}
 .wo-acts{display:flex;gap:10px;margin-top:12px;}
 .wo-acts .btn{flex:1;}
+
+/* Session compacte (poste de travail) */
+.sb-bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:12px 14px;margin:0 0 12px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);}
+.sb-when small{display:block;font-size:12px;color:var(--muted);}
+.sb-when b{font:600 21px var(--font-display);text-transform:uppercase;letter-spacing:.02em;}
+.sb-when .sess-chip{margin-left:8px;vertical-align:middle;}
+.sb-steps{list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:8px;flex:1 1 320px;font-size:13px;color:var(--muted);}
+.sb-steps li{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.sb-steps li i{width:20px;height:20px;box-sizing:border-box;border-radius:50%;border:2px solid #4C6E64;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800;}
+.sb-steps li.done{color:var(--ball);font-weight:600;}
+.sb-steps li.done i{background:var(--ball);border-color:var(--ball);color:var(--court);}
+.sb-steps li.cur{color:var(--text);font-weight:600;}
+.sb-steps li.cur i{border-color:var(--ball);}
+.sb-steps .sep{color:#4C6E64;}
+.sb-go{font:700 15px var(--font-body);color:var(--court);background:var(--ball);border:0;border-radius:12px;padding:11px 20px;cursor:pointer;}
+.sb-go.alt{background:transparent;color:var(--ball);box-shadow:inset 0 0 0 1px var(--ball);}
+.sb-more{width:44px;height:44px;border-radius:12px;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-size:20px;cursor:pointer;}
+body.desk .lg-ov #sessSubtabs{position:sticky;top:0;z-index:6;background:var(--court);margin:0 0 10px !important;padding:6px 0;}
+body.desk .lg-ov .lg-sheet .sd-dock{top:58px;padding:10px 12px;}
+body.desk .sd-cols{grid-template-columns:3fr minmax(220px,1fr);}
+body.desk .sd-col .sd-list{flex-direction:row;flex-wrap:wrap;gap:6px;max-height:84px;}
+body.desk .sd-col .sd-chip{width:auto;}
+body.desk .sd-abs-list{max-height:84px;}
+body.desk .sd-dock:not(.picking) .sd-foot > .ah-meta{display:none;}
+.sd-q{display:none;}
+body.desk .sd-q{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line-soft-strong);background:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0;}
+/* Joueurs en tableau (poste de travail) */
+.jp-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin:0 0 12px;}
+.jp-head h2{margin:0;font:600 26px var(--font-display);text-transform:uppercase;}
+.jp-head h2 small{font:500 15px var(--font-body);color:var(--muted);text-transform:none;}
+.jp-head .row{gap:8px;}
+.jp-head .btn{width:auto;}
+.jp-search{width:100%;box-sizing:border-box;margin:0 0 8px;}
+.jp-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px;}
+.jp-chips button{font:500 13px var(--font-body);color:var(--text);background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);border-radius:999px;padding:6px 12px;cursor:pointer;}
+.jp-chips button.on{background:var(--ball);color:var(--court);border-color:var(--ball);font-weight:700;}
+.jp-chips button.w{color:var(--paddle);}
+.jp-chips button.on.w{color:var(--court);}
+.jp-pill{font-size:12px;border-radius:999px;padding:2px 9px;white-space:nowrap;border:1px solid var(--line-soft-strong);color:var(--muted);}
+.jp-pill.ok{background:var(--ball);border-color:var(--ball);color:var(--court);font-weight:600;}
+.jp-pill.w{color:var(--paddle);border-color:rgba(242,153,74,.45);}
+.jp-pill.g{color:var(--ball);border-color:rgba(207,234,92,.45);}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -6722,6 +6768,7 @@ function renderInner(){
   else { renderPlayer(SESSION_USER.playerId); }
   const existing = document.getElementById('modalRoot');
   if(existing) existing.remove();
+  if(!MODAL) document.body.classList.remove('dk-panel-open');
   if(MODAL){
     const div = document.createElement('div');
     div.id = 'modalRoot';
@@ -6733,6 +6780,7 @@ function renderInner(){
       if(top.panel) under = under.replace('chat-overlay dk-page', 'chat-overlay dk-page dk-has-panel');
     }
     div.innerHTML = under + modalHTML();
+    document.body.classList.toggle('dk-panel-open', !!MODAL.panel);
     document.body.appendChild(div);
   }
   LAST_RENDERED_MODAL = MODAL;
@@ -8779,6 +8827,150 @@ function deskHomeHTML(){
     <div class="dkh-grid">${leagues.map(deskLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>
     ${deskActivityHTML()}`;
 }
+
+// ==================== Session compacte (poste de travail) ====================
+function sessBarHTML(open){
+  const rec = isRecLeague();
+  let tot = 0, dn = 0;
+  (open.groupsData||[]).forEach(function(gd){ (gd.matches||[]).forEach(function(m){ tot++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') dn++; }); });
+  const allIn = tot > 0 && dn === tot;
+  const lg = LEAGUES.find(function(l){ return l.id === CURRENT_LEAGUE_ID; }) || { id: CURRENT_LEAGUE_ID, name: '' };
+  const sm = summarizeAdminLeague(DATA, lg);
+  const ready = !sm.unassigned;
+  const st = function(state, label){ return `<li class="${state}"><i>${state === 'done' ? '✓' : ''}</i>${label}</li>`; };
+  const steps = [st(ready ? 'done' : 'cur', rec ? 'Présences prêtes' : 'Groupes prêts'), st(open.published ? 'done' : (ready ? 'cur' : ''), 'Publier')];
+  if(!rec) steps.push(st(allIn ? 'done' : (open.published ? 'cur' : ''), 'Scores ' + dn + '/' + tot));
+  let go;
+  if(!open.published) go = `<button type="button" class="sb-go" onclick="onPublishSession()">Publier la session</button>`;
+  else if(rec) go = `<button type="button" class="sb-go" onclick="onFinalize()">Terminer la soirée</button>`;
+  else if(!allIn) go = `<button type="button" class="sb-go" onclick="goSessionTab('resultats')">Entrer les scores</button>`;
+  else go = `<button type="button" class="sb-go" onclick="onFinalize()">Terminer la session</button>`;
+  return `<div class="sb-bar">
+    <div class="sb-when"><small>${escapeHTML(lg.name || '')}${lg.schedule_label ? ' · ' + escapeHTML(lg.schedule_label) : ''}</small><b>${escapeHTML(frDateLong(open.date))}</b><span class="sess-chip ${open.published ? 'on' : 'off'}">${open.published ? 'Publiée' : 'Non publiée'}</span></div>
+    <ol class="sb-steps" aria-label="Étapes">${steps.join('<li class="sep" aria-hidden="true">›</li>')}</ol>
+    ${go}<button type="button" class="sb-more" onclick="dkSessMenu()" aria-label="Autres actions">⋯</button>
+  </div>`;
+}
+function dkSessMenu(){
+  const open = currentOpenSession(); if(!open) return;
+  const rec = isRecLeague(), labels = [], fns = [];
+  if(!rec){ labels.push('Imprimer les feuilles de match'); fns.push(function(){ printMatchSheets(open.id); }); }
+  if(open.published){ labels.push('Masquer la session aux joueurs'); fns.push(onUnpublishSession); }
+  else { labels.push('Publier la session aux joueurs'); fns.push(onPublishSession); }
+  labels.push(rec ? 'Terminer la soirée' : 'Terminer la session'); fns.push(onFinalize);
+  if(DATA.testMode && !rec){ labels.push('Générer des scores aléatoires (test)'); fns.push(autoFillAllScores); }
+  labels.push('Annuler la session'); fns.push(onCancelSession);
+  showChoice((rec ? 'Soirée du ' : 'Session du ') + frDateLong(open.date).toLowerCase(), labels, function(i){ if(fns[i]) fns[i](); });
+}
+
+// ==================== Joueurs en tableau (poste de travail) ====================
+let JP_SEL = {}, JP_ORDER = [], JP_CUR = null;
+function jpRows(){
+  const open = currentOpenSession(), rec = isRecLeague();
+  const used = open ? subsUsedInSession(open) : new Set();
+  const rules = (DATA.rulesText && RULES_REPORT && RULES_REPORT.leagueId === CURRENT_LEAGUE_ID && RULES_REPORT.rows) ? RULES_REPORT.rows : null;
+  if(DATA.rulesText && !(RULES_REPORT && RULES_REPORT.leagueId === CURRENT_LEAGUE_ID)) setTimeout(function(){ try{ loadRulesReport(); }catch(e){} }, 0);
+  const accOf = function(pid){ if(!rules || !pid) return null; return rules.some(function(r){ return r.profile_id === pid; }); };
+  const out = [];
+  (DATA.players||[]).forEach(function(p){
+    const lk = LEAGUE_PLAYER_LINKS.find(function(l){ return l.player_id === p.id; }), g = groupById(p.groupId);
+    let wk = '—', wc = '';
+    if(open){ if(p.injured){ wk = gw(p,'Blessé','Blessée','Blessé(e)'); wc = 'w'; } else if(isAbsent(open, p.id)){ wk = gw(p,'Absent','Absente','Absent(e)'); wc = 'w'; } else { wk = 'Présent' + (p.gender === 'F' ? 'e' : ''); } }
+    const ra = accOf(lk && lk.profile_id);
+    out.push({ key: 'p:' + p.id, kind: 'p', id: p.id, name: p.name, type: 'Régulier', group: rec ? '—' : (g ? g.name : 'Sans groupe'), grpOrder: g ? g.order : 999, nogrp: !rec && !g && !p.injured,
+      rating: typeof p.rating === 'number' ? p.rating : RATING_DEFAULT, profile: lk ? lk.profile_id : null, wk: wk, wc: wc,
+      rules: !DATA.rulesText ? '' : (!lk ? '—' : (ra === null ? '…' : (ra ? 'Accepté' : 'En attente'))) });
+  });
+  (DATA.substitutePool||[]).forEach(function(sp){
+    const lk = LEAGUE_PLAYER_LINKS.find(function(l){ return l.substitute_id === sp.id; });
+    let wk = '—', wc = '';
+    if(open){ if(used.has('sub::' + sp.id)){ wk = 'Placé(e)'; wc = 'g'; } else if((open.availableSubs||[]).indexOf(sp.id) !== -1){ wk = 'Disponible'; wc = 'g'; } }
+    const ra = accOf(lk && lk.profile_id);
+    out.push({ key: 's:' + sp.id, kind: 's', id: sp.id, name: sp.name, type: 'Remplaçant', group: '—', grpOrder: 1000, nogrp: false,
+      rating: typeof sp.rating === 'number' ? sp.rating : RATING_DEFAULT, profile: lk ? lk.profile_id : null, wk: wk, wc: wc,
+      rules: !DATA.rulesText ? '' : (!lk ? '—' : (ra === null ? '…' : (ra ? 'Accepté' : 'En attente'))) });
+  });
+  return out;
+}
+function jpFiltered(){
+  const f = VIEW.jpF || 'all', q = dupNorm(VIEW.jpQ || ''), key = VIEW.jpSort || 'name', dir = VIEW.jpDir || 1;
+  let rows = jpRows().filter(function(r){ return (f === 'all') || (f === 'reg' && r.kind === 'p') || (f === 'sub' && r.kind === 's') || (f === 'nogrp' && r.nogrp); });
+  if(q) rows = rows.filter(function(r){ return dupNorm(r.name).indexOf(q) !== -1; });
+  rows.sort(function(a, b){
+    let c = 0;
+    if(key === 'rating') c = a.rating - b.rating;
+    else if(key === 'group') c = a.grpOrder - b.grpOrder;
+    else if(key === 'type') c = a.type.localeCompare(b.type);
+    else if(key === 'acc') c = (a.profile ? 0 : 1) - (b.profile ? 0 : 1);
+    else if(key === 'wk') c = a.wk.localeCompare(b.wk);
+    return (c * dir) || a.name.localeCompare(b.name) * (key === 'name' ? dir : 1);
+  });
+  return rows;
+}
+function jpSortBy(k){ if((VIEW.jpSort || 'name') === k) VIEW.jpDir = -(VIEW.jpDir || 1); else { VIEW.jpSort = k; VIEW.jpDir = 1; } jpRefresh(); }
+function jpSetF(f){ VIEW.jpF = f; render(); }
+function jpRefresh(){ const el = document.getElementById('jpBody'); if(el) el.innerHTML = jpTableHTML(); else render(); }
+function jpTableHTML(){
+  const rows = jpFiltered(), rec = isRecLeague(), open = currentOpenSession();
+  JP_ORDER = rows.map(function(r){ return r.key; });
+  const sel = rows.filter(function(r){ return JP_SEL[r.key]; });
+  const key = VIEW.jpSort || 'name', dir = VIEW.jpDir || 1;
+  const th = function(k, l, cls){ return `<th class="srt${key === k ? ' on' : ''}${cls ? ' ' + cls : ''}" onclick="jpSortBy('${k}')">${l}${key === k ? (dir > 0 ? ' ▲' : ' ▼') : ''}</th>`; };
+  const allOn = rows.length && rows.every(function(r){ return JP_SEL[r.key]; });
+  const selP = sel.filter(function(r){ return r.kind === 'p'; }), withAcc = sel.filter(function(r){ return r.profile; });
+  const bulk = sel.length ? `<div class="dk-bulk"><b>${sel.length} sélectionné${sel.length > 1 ? 's' : ''}</b>
+    <button type="button" onclick="jpBulkMessage()" ${withAcc.length ? '' : 'disabled'}>Envoyer un message${withAcc.length && withAcc.length < sel.length ? ' (' + withAcc.length + ' avec compte)' : ''}</button>
+    ${(open && selP.length) ? `<button type="button" onclick="jpBulkAbsent()">Marquer absent${selP.length > 1 ? 's' : ''} · ${escapeHTML(fdl(open.date))}</button>` : ''}
+    <button type="button" class="dk-x" onclick="JP_SEL={};jpRefresh()">Tout désélectionner</button></div>` : '';
+  const ini = function(n){ return (n || '').split(/[ -]/).filter(Boolean).slice(0, 2).map(function(w){ return w[0].toUpperCase(); }).join(''); };
+  const body = rows.map(function(r){
+    const on = !!JP_SEL[r.key];
+    return `<tr class="${on ? 'sel' : ''}${JP_CUR === r.key ? ' cur' : ''}" onclick="jpOpen('${r.key}')">
+      <td class="dk-cb" onclick="event.stopPropagation()"><input type="checkbox" ${on ? 'checked' : ''} onchange="if(this.checked) JP_SEL['${r.key}']=1; else delete JP_SEL['${r.key}']; jpRefresh()" aria-label="Sélectionner ${escapeHTML(r.name)}"></td>
+      <td><div class="dk-nm"><span class="member-avatar">${escapeHTML(ini(r.name))}</span><b>${escapeHTML(r.name)}</b></div></td>
+      <td>${r.type}</td>
+      ${rec ? '' : `<td>${escapeHTML(r.group)}</td><td class="num" style="color:var(--ball);font-family:var(--font-display);">${r.rating.toFixed(2)}</td>`}
+      <td><span class="jp-pill${r.profile ? ' ok' : ' w'}">${r.profile ? 'Relié' : 'Sans compte'}</span></td>
+      ${open ? `<td><span class="jp-pill ${r.wc}">${escapeHTML(r.wk)}</span></td>` : ''}
+      ${DATA.rulesText ? `<td><span class="jp-pill${r.rules === 'En attente' ? ' w' : ''}">${r.rules}</span></td>` : ''}
+    </tr>`;
+  }).join('');
+  return bulk + `<div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>
+      <th class="dk-cb"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="jpFiltered().forEach(function(r){ if(this.checked) JP_SEL[r.key]=1; else delete JP_SEL[r.key]; }, this); jpRefresh()" aria-label="Tout sélectionner"></th>
+      ${th('name', 'Nom')}${th('type', 'Type')}${rec ? '' : th('group', escapeHTML(grpWord(false, true))) + th('rating', 'Cote', 'num')}${th('acc', 'Compte')}${open ? th('wk', escapeHTML(fdl(open.date))) : ''}${DATA.rulesText ? '<th>Règlement</th>' : ''}
+    </tr></thead><tbody>${body}</tbody></table></div>${rows.length ? '' : '<p class="empty">Aucun joueur avec ces filtres.</p>'}`;
+}
+function jpOpen(key){
+  if(MODAL && MODAL.panel && !MODAL.under) dropModal();
+  JP_CUR = key; // la fiche s'ouvre un instant plus tard (notes chargées d'abord)
+  if(key.indexOf('p:') === 0) openPlayerDetailModal(key.slice(2)); else openSubstituteDetailModal(key.slice(2));
+  const el = document.getElementById('jpBody'); if(el) el.innerHTML = jpTableHTML();
+}
+function jpBulkMessage(){
+  const ids = Array.from(new Set(jpRows().filter(function(r){ return JP_SEL[r.key] && r.profile; }).map(function(r){ return r.profile; })));
+  writeToProfiles(ids, ids.length + ' personne' + (ids.length > 1 ? 's' : ''));
+}
+function jpBulkAbsent(){
+  const open = currentOpenSession(); if(!open) return;
+  const ids = jpRows().filter(function(r){ return JP_SEL[r.key] && r.kind === 'p' && !isAbsent(open, r.id); }).map(function(r){ return r.id; });
+  if(!ids.length){ showAlert('Les joueurs choisis sont déjà absents.'); return; }
+  showConfirm('Marquer ' + ids.length + ' joueur' + (ids.length > 1 ? 's' : '') + ' absent' + (ids.length > 1 ? 's' : '') + ' pour la session du ' + fdl(open.date) + ' ?', function(){
+    ids.forEach(function(id){ if(!isAbsent(open, id)) toggleAbsence(id); });
+    JP_SEL = {}; render(); showToast(ids.length + ' absence' + (ids.length > 1 ? 's' : '') + ' enregistrée' + (ids.length > 1 ? 's' : ''));
+  });
+}
+function jpDeskHTML(){
+  const nP = (DATA.players||[]).length, nS = (DATA.substitutePool||[]).length, nW = waitlistFor(CURRENT_LEAGUE_ID).length, rec = isRecLeague();
+  const nG = rec ? 0 : (DATA.players||[]).filter(function(p){ return !p.groupId && !p.injured; }).length;
+  const f = VIEW.jpF || 'all';
+  const chip = function(k, l, n, cls){ return `<button type="button" class="${f === k ? 'on' : ''}${cls ? ' ' + cls : ''}" onclick="jpSetF('${k}')">${l} ${n}</button>`; };
+  const chips = chip('all', 'Tous', nP + nS) + chip('reg', 'Réguliers', nP) + chip('sub', 'Remplaçants', nS) + (rec ? '' : chip('nogrp', 'Sans ' + grpWord(false, false), nG)) + (nW || f === 'attente' ? chip('attente', "Liste d'attente", nW, 'w') : '');
+  return `<div class="jp-head"><h2>Joueurs <small>· ${nP} régulier${nP > 1 ? 's' : ''}, ${nS} remplaçant${nS > 1 ? 's' : ''}</small></h2>
+      <div class="row"><button class="btn btn-secondary" onclick="openOrgSheet('membres')">Membres de l'organisation</button><button class="btn btn-primary" onclick="openAddToLeagueModal()">+ Ajouter</button></div></div>
+    ${f === 'attente' ? '' : `<input type="search" class="jp-search" placeholder="Rechercher un nom…" value="${escapeHTML(VIEW.jpQ || '')}" oninput="VIEW.jpQ=this.value;jpRefresh()">`}
+    <div class="jp-chips">${chips}</div>
+    ${f === 'attente' ? adminWaitlistHTML() : `<div id="jpBody">${jpTableHTML()}</div>`}`;
+}
 // ==================== À faire (accueil du poste de travail) ====================
 function deskTodoHTML(){
   let pend = 0, interest = 0, dups = 0;
@@ -8851,6 +9043,7 @@ document.addEventListener('keydown', function(ev){
   else if(ev.key === 'Escape'){ ev.preventDefault(); closeModal(); }
 });
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
+  if(isDesk()) document.body.classList.add('desk'); // avant de construire les écrans, qui en tiennent compte
   const tabs = [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
   const active = (tabs.some(t=>t[0]===VIEW.atab) || VIEW.atab==='moi') ? VIEW.atab : 'accueil';
   const aName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Admin';
@@ -9047,6 +9240,8 @@ function adminSessionSectionHTML(){
   let html = '';
   if(!open){
     html += launchSessionHTML();
+  } else if(isDesk() && document.body.classList.contains('desk')){
+    html += sessBarHTML(open);
   } else {
     html += `<div class="sess-card">
       <div class="sess-head">
@@ -9098,6 +9293,7 @@ function adminPlayersSectionHTML(){
   const subTabs = isMlp ? [['tous','Joueurs'],['remplacants','Remplaçants'],['prospects','Prospects']] : [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants']].concat(nWait || sub === 'attente' ? [['attente',"Liste d'attente"]] : []);
   const nPlayers = (DATA.players||[]).length, nSubs = (DATA.substitutePool||[]).length, nProspects = (DATA.prospects||[]).length;
   const counts = { tous: isMlp ? nPlayers : nPlayers + nSubs, reguliers: nPlayers, remplacants: nSubs, prospects: nProspects, attente: nWait };
+  if(!isMlp && isDesk() && document.body.classList.contains('desk')){ if(VIEW.playersSubTab === 'attente'){ VIEW.jpF = 'attente'; VIEW.playersSubTab = null; } return jpDeskHTML(); }
   let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}<span class="tab-count"> ${counts[k]}</span></div>`).join('')}</div>`;
   if(sub !== 'prospects' && sub !== 'attente'){
     html += isMlp ? `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -12190,11 +12386,12 @@ function adminGroupsHTML(){
   let html = rec
     ? `<div class="card"><p class="small">${open ? "Les terrains sont tirés au hasard parmi les joueurs présents. Marque les absences dans la fiche du joueur : tant que la soirée n'est pas publiée, le tirage est refait automatiquement." : "Aucune soirée en cours : les terrains seront tirés au hasard au démarrage de la prochaine."}</p></div>`
     : `<div class="card"><p class="small">Vue d'ensemble de l'échelle — pour ajouter, renommer ou déplacer un joueur, utilise l'onglet « Joueurs » (sous-onglet Réguliers), ou glisse un joueur par sa poignée ⋮⋮ vers un autre groupe ci-dessous. ${open ? 'Les absences/remplaçants de la session en cours se gèrent directement dans le groupe concerné, ci-dessous.' : ''}</p></div>`;
-  html = subDockHTML(open) + html;
+  const dk = isDesk() && document.body.classList.contains('desk');
+  html = subDockHTML(open) + (dk ? '' : html);
   const unassigned = DATA.players.filter(p=>!p.groupId);
   // Les absents restent affichés dans leur groupe (pastille « absent ») : pas de doublon ici.
   const absentNow = rec && open ? DATA.players.filter(p=>p.groupId && isAbsent(open, p.id) && !(open.loans && open.loans[p.id])) : [];
-  html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
+  if(!dk || unassigned.length + absentNow.length) html += `<div class="card drop-target" id="waitCard" ondragover="onGroupDragOver(event)" ondragleave="onGroupDragLeave(event)" ondrop="onGroupDrop(event,'')">
     <h2>${rec ? 'Sans terrain' : "En attente d'assignation"} <span class="small">(${unassigned.length + absentNow.length})</span></h2>
     <p class="small">${rec ? 'Joueurs absents, blessés, ou qui cèdent leur place quand les terrains sont pleins.' : "Glisse-dépose un joueur ici pour le retirer de son groupe, ou glisse-le d'ici vers un groupe pour l'assigner."}</p>
     <div class="pf-list" style="margin-top:8px;">
@@ -12274,7 +12471,7 @@ function adminGroupsHTML(){
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
       </div>
       ${(open && !rec) ? groupFormatLineHTML(open, g.id) : ''}
-      ${rec ? '' : `<p class="small" style="color:var(--muted);margin:8px 2px 0;">Glisse un joueur par sa poignée ⋮⋮ pour changer sa position ou son groupe. Il continue ensuite à partir de ce groupe.</p>`}
+      ${rec ? '' : `<p class="small grp-hint" style="color:var(--muted);margin:8px 2px 0;">Glisse un joueur par sa poignée ⋮⋮ pour changer sa position ou son groupe. Il continue ensuite à partir de ce groupe.</p>`}
       ${open && !(DATA.substitutePool||[]).length ? groupAbsenceManagementHTML(open, g) : ''}
       ${open ? reinforcementHTML(open, g) : ''}
     </div>`;
@@ -12368,10 +12565,10 @@ function subDockHTML(open){
     const free = !x.by;
     return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-abs-n">${escapeHTML(x.p.name)}</span><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : 'remplacé(e) par ' + escapeHTML(String(playerName(x.by)).split(' ')[0]))}</small></div>`;
   };
-  return `<div class="card sd-dock" id="subDock">
+  return `<div class="card sd-dock${SUB_PICK ? ' picking' : ''}" id="subDock">
     <div class="sd-cols">
       <div class="sd-col">
-        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em></div>
+        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em><button type="button" class="sd-q" aria-label="Comment placer un remplaçant" onclick="showAlert('Touche un remplaçant puis un absent, ou glisse-le sur l’absent. Pour le retirer, glisse-le de son groupe vers cette bande.')">?</button></div>
         ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">${all.length ? "Aucun n'a encore indiqué sa disponibilité." : 'Tous déjà placés.'}</p>`}
       </div>
       <div class="sd-col">
@@ -15138,6 +15335,14 @@ function orgBulkExport(){
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'membres-selection.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
+document.addEventListener('keydown', function(ev){
+  if(!MODAL || !MODAL.panel || !JP_CUR || !document.getElementById('jpBody') || !document.body.classList.contains('desk')) return;
+  const tg = ev.target && ev.target.tagName; if(tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return;
+  if(ev.key === 'Escape'){ ev.preventDefault(); closeModal(); return; }
+  if(ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+  const i = JP_ORDER.indexOf(JP_CUR), nx = JP_ORDER[i + (ev.key === 'ArrowDown' ? 1 : -1)];
+  if(nx){ ev.preventDefault(); jpOpen(nx); }
+});
 // Flèches haut/bas : personne précédente ou suivante dans la liste filtrée ; Échap : fermer le panneau.
 document.addEventListener('keydown', function(ev){
   if(!MODAL || !MODAL.dkNav || !document.body.classList.contains('desk')) return;
