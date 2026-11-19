@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 476">
+<meta name="app-build" content="Version 477">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2013,6 +2013,17 @@ body.desk .sd-q{display:inline-flex;align-items:center;justify-content:center;wi
 .of-list input{width:18px;height:18px;accent-color:var(--ball);}
 .of-acts{display:flex;gap:8px;margin-top:16px;}
 .of-acts .btn{flex:1;}
+
+/* Poste de travail : plus de barre flottante en haut, ses boutons sont dans le menu de gauche */
+body.desk .topbar.shell-top, body.desk .shell-top-spacer{display:none !important;}
+body.desk #tabContent{padding-top:calc(24px + env(safe-area-inset-top));}
+/* Bandeaux du haut (notifications bloquées, stockage) : même marge que la page, sous la barre d'état de l'iPad */
+body.desk #app > .card{margin:calc(16px + env(safe-area-inset-top)) max(24px, calc((100% - 1192px) / 2)) 0;}
+body.desk #app > .card ~ #tabContent{padding-top:20px;}
+body.desk .dk-top{display:flex;flex-direction:column;gap:2px;margin:0 0 4px;}
+body.desk .dk-it svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;flex:none;}
+body.desk .dk-me{display:flex;align-items:center;gap:10px;}
+body.desk .dk-me .shell-me-av{width:30px;height:30px;font-size:12px;flex:none;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -8728,6 +8739,15 @@ function deskSideHTML(){
   const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
   const secs = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
   let h = `<div class="dk-brand">${pbIcon()}<span>DINKEO</span></div>`;
+  // Ce qui était dans la barre du haut : notifications et passage à la vue joueur / remplaçant.
+  const unread = (typeof inboxUnread === 'function') ? inboxUnread() : 0;
+  if(INBOX_FETCHED) syncAppBadge(unread);
+  const asP = !!adminOwnLink('player'), asS = !asP && !!adminOwnLink('substitute');
+  h += `<div class="dk-top">
+    <button type="button" class="dk-it" onclick="openInbox()"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG.bell}</svg>Notifications${unread ? `<span class="dk-n">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
+    ${asP ? `<button type="button" class="dk-it" onclick="toggleAdminPlayerView()"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG.joueurs}</svg>Passer en vue joueur</button>` : ''}
+    ${asS ? `<button type="button" class="dk-it" onclick="toggleAdminSubView()"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG.joueurs}</svg>Passer en vue remplaçant</button>` : ''}
+  </div>`;
   h += `<div class="dk-sec">${escapeHTML(org ? org.name : 'Organisation')}</div>`;
   h += it(home && VIEW.atab !== 'cal' && VIEW.atab !== 'comm' && VIEW.atab !== 'moi' && VIEW.atab !== 'orgs', 'Accueil', "dkHome('accueil')");
   h += it(orgSheet === 'membres', 'Membres', "dkOrg('membres')");
@@ -8743,7 +8763,8 @@ function deskSideHTML(){
     if(on) h += `<div class="dk-sub">${secs.map(function(x){ return it((VIEW.tab || 'session') === x[0], x[1], `dkTab('${x[0]}')`); }).join('')}</div>`;
   });
   if((MY_ORGANIZATIONS||[]).length > 1) h += it(home && VIEW.atab === 'orgs', 'Changer d\'organisation', "dkHome('orgs')");
-  h += `<div class="dk-foot">${it(home && VIEW.atab === 'moi', 'Moi', "dkHome('moi')")}<button type="button" class="dk-k" onclick="openDeskSearch()">Rechercher · Ctrl + K</button></div>`;
+  const meName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Moi';
+  h += `<div class="dk-foot"><button type="button" class="dk-it dk-me${home && VIEW.atab === 'moi' ? ' on' : ''}" onclick="dkHome('moi')">${avatarHTML('shell-me-av', partnerInitials(meName), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, '')}${escapeHTML(meName)}</button><button type="button" class="dk-k" onclick="openDeskSearch()">Rechercher · Ctrl + K</button></div>`;
   return `<aside class="dk-side" aria-label="Menu principal">${h}</aside>`;
 }
 
