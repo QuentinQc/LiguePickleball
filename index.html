@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 486">
+<meta name="app-build" content="Version 487">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2023,6 +2023,31 @@ body.desk .dk-add{color:var(--muted);}
 .tn-fmt small{display:block;color:var(--muted);font-size:12px;max-width:300px;}
 .tn-fmt-help{color:var(--muted);margin:-4px 0 12px;}
 .tn-fmt-m{display:none;}
+.tn-grp{border-top:1px solid var(--line-soft);padding-top:12px;margin:4px 0 12px;}
+.tn-grp-t{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.tn-grp-s{color:var(--muted);margin:-4px 0 10px;}
+.tn-seg{display:flex;flex-wrap:wrap;gap:6px;}
+.tn-seg button{flex:1 1 0;min-width:0;font:600 14px var(--font-body);color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:10px;padding:10px 8px;cursor:pointer;white-space:nowrap;transition:background .15s, border-color .15s;}
+.tn-seg button:hover{border-color:rgba(207,234,92,.5);}
+.tn-seg button.on{background:var(--ball);border-color:var(--ball);color:var(--court);}
+.tn-seg button:focus-visible, .tn-fmtc:focus-visible, .tn-stepper button:focus-visible{outline:2px solid var(--ball);outline-offset:2px;}
+.tn-seg-st{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+.tn-seg-st button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;white-space:normal;}
+.tn-seg-st button small{font-weight:400;font-size:11px;opacity:.75;}
+.tn-stepper{display:inline-flex;align-items:center;border:1px solid var(--line-soft-strong);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.04);}
+.tn-stepper button{width:46px;height:44px;background:none;border:0;color:var(--ball);font:600 22px var(--font-body);cursor:pointer;}
+.tn-stepper button:hover{background:rgba(207,234,92,.1);}
+.tn-form .field .tn-stepper input{width:64px;height:44px;text-align:center;border:0;border-left:1px solid var(--line-soft);border-right:1px solid var(--line-soft);border-radius:0;background:transparent;font:600 20px var(--font-display);color:var(--text);padding:0;-moz-appearance:textfield;}
+.tn-stepper input::-webkit-outer-spin-button, .tn-stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.tn-fmts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.tn-fmtc{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;font:inherit;transition:background .15s, border-color .15s;}
+.tn-fmtc:hover{border-color:rgba(207,234,92,.5);}
+.tn-fmtc svg{width:64px;height:36px;color:var(--muted);flex:none;}
+.tn-fmtc span{display:flex;flex-direction:column;gap:3px;}
+.tn-fmtc b{font-size:14px;line-height:1.2;}
+.tn-fmtc small{font-size:12px;color:var(--muted);line-height:1.35;}
+.tn-fmtc.on{border-color:var(--ball);background:rgba(207,234,92,.1);box-shadow:inset 0 0 0 1px var(--ball);}
+.tn-fmtc.on svg{color:var(--ball);}
 .tn-note{background:rgba(207,234,92,.08);border:1px solid rgba(207,234,92,.3);border-radius:12px;padding:12px 14px;font-size:14px;margin-top:12px;}
 .tn-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;}
 .tn-search{margin-top:10px;}
@@ -2081,6 +2106,9 @@ body.desk .dk-add{color:var(--muted);}
   .tn-teams th:nth-child(4), .tn-teams td:nth-child(4){display:none;}
   .tn-divs th:nth-child(6), .tn-divs td:nth-child(6){display:none;}
   .tn-fmt-m{display:block;color:var(--muted);font-size:12px;}
+  .tn-fmts{grid-template-columns:1fr;}
+  .tn-fmtc{flex-direction:row;align-items:center;gap:12px;}
+  .tn-seg-st{grid-template-columns:1fr 1fr;}
   .tn-head-r{width:100%;}
   .tn-head-r .btn{flex:1;}
 }
@@ -9047,15 +9075,17 @@ function openTournForm(id){
     </div>
     ${tournField('Lieu', `<input id="tfVenue" maxlength="120" value="${escapeHTML(v.venue || '')}" placeholder="Centre Pickleball Saguenay">`)}
     ${tournField('Terrains', `<input id="tfCourts" maxlength="400" value="${escapeHTML((Array.isArray(v.courts) ? v.courts : []).join(', '))}" placeholder="Pulsar, P3B, Optique Santé">`, 'Noms séparés par des virgules. Ils serviront à l\'horaire.')}
-    <div class="tn-row3">
-      ${tournField('Poules', tournSel('tfPool', [[11,'Match à 11'],[15,'Match à 15'],[21,'Match à 21']], v.pool_points))}
-      ${tournField('Tableau', tournSel('tfBracket', [[11,'Match à 11'],[15,'Match à 15'],[21,'Match à 21']], v.bracket_points))}
-      ${tournField('Finale', tournSel('tfFinal', [[1,'1 match'],[3,'2 de 3 à 11']], v.final_best_of))}
+    <div class="tn-grp"><div class="tn-grp-t">Points par défaut</div>
+      <p class="small tn-grp-s">Proposés à chaque nouvelle catégorie, qui peut ensuite avoir sa propre formule.</p>
+      <div class="tn-row3">
+        ${tournField('Poules', tournSeg('tfPool', [[11,'11'],[15,'15'],[21,'21']], v.pool_points))}
+        ${tournField('Tableau', tournSeg('tfBracket', [[11,'11'],[15,'15'],[21,'21']], v.bracket_points))}
+        ${tournField('Finale', tournSeg('tfFinal', [[1,'1 match'],[3,'2 de 3']], v.final_best_of))}
+      </div>
     </div>
-    <p class="small" style="color:var(--muted);margin:-4px 0 12px;">Points proposés par défaut à chaque nouvelle catégorie. Chaque catégorie peut ensuite avoir sa propre formule.</p>
-    <div class="tn-row3">
-      ${tournField('Statut', tournSel('tfStatus', [['draft','Brouillon'],['open','Inscriptions ouvertes'],['closed','Inscriptions fermées'],['done','Terminé']], v.status))}
-      ${tournField('Date limite d\'inscription', `<input id="tfDeadline" type="date" value="${escapeHTML(v.reg_deadline || '')}">`)}
+    <div class="tn-grp"><div class="tn-grp-t">Inscriptions</div>
+      ${tournSeg('tfStatus', [['draft','<b>Brouillon</b><small>Invisible au public</small>'],['open','<b>Ouvertes</b><small>Le lien fonctionne</small>'],['closed','<b>Fermées</b><small>Plus d\'inscriptions</small>'],['done','<b>Terminé</b><small>Tournoi joué</small>']], v.status, null, 'tn-seg-st')}
+      <div style="margin-top:12px;">${tournField('Date limite d\'inscription', `<input id="tfDeadline" type="date" value="${escapeHTML(v.reg_deadline || '')}">`, 'Facultatif. Après cette date, le lien n\'accepte plus d\'inscriptions.')}</div>
     </div>
     ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}
     <div class="tn-form-acts">
@@ -9066,6 +9096,37 @@ function openTournForm(id){
     </div></div>`;
   setModal({ kind:'content', title: t ? 'Modifier le tournoi' : 'Nouveau tournoi', htmlContent: html });
   render();
+}
+// Choix en boutons (un seul actif) : la valeur est gardée dans un champ caché, lu par tfVal().
+function tournSeg(id, opts, cur, onpick, cls){
+  return `<div class="tn-seg${cls ? ' ' + cls : ''}" role="radiogroup"><input type="hidden" id="${id}" value="${escapeHTML(String(cur))}">${opts.map(function(o){
+    const on = String(o[0]) === String(cur);
+    return `<button type="button" role="radio" aria-checked="${on}" class="${on ? 'on' : ''}" onclick="tournSegPick(this,'${id}','${o[0]}'${onpick ? `,'${onpick}'` : ''})">${o[1]}</button>`;
+  }).join('')}</div>`;
+}
+function tournSegPick(btn, id, v, fn){
+  const box = btn.parentNode;
+  box.querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); });
+  btn.classList.add('on'); btn.setAttribute('aria-checked', 'true');
+  const el = document.getElementById(id); if(el) el.value = v;
+  if(fn && typeof window[fn] === 'function') window[fn](v);
+}
+// Compteur − / + pour un nombre.
+function tournStepper(id, val, min, max){
+  return `<div class="tn-stepper"><button type="button" aria-label="Moins" onclick="tournStep('${id}',-1,${min},${max})">−</button><input id="${id}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${val}" aria-label="Nombre"><button type="button" aria-label="Plus" onclick="tournStep('${id}',1,${min},${max})">+</button></div>`;
+}
+function tournStep(id, d, min, max){ const el = document.getElementById(id); if(!el) return; el.value = Math.max(min, Math.min(max, (parseInt(el.value, 10) || min) + d)); }
+var TOURN_FMT_SVG = {
+  pools_ko: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="3" width="16" height="12" rx="3"/><rect x="2" y="21" width="16" height="12" rx="3"/><path d="M18 9h10v18H18M28 18h10"/><path d="M38 10h10v16H38M48 18h12"/><circle cx="60" cy="18" r="2" fill="currentColor"/></svg>',
+  round_robin: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M32 4L50 16 43 32H21L14 16Z"/><path d="M32 4L43 32M32 4L21 32M14 16h36M14 16l29 16M50 16L21 32" stroke-width="1.2" opacity=".7"/><g fill="currentColor"><circle cx="32" cy="4" r="3"/><circle cx="50" cy="16" r="3"/><circle cx="43" cy="32" r="3"/><circle cx="21" cy="32" r="3"/><circle cx="14" cy="16" r="3"/></g></svg>',
+  double_elim: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 3h10v10H4M14 8h10M24 8h10v10M34 18h12"/><path d="M4 23h10v10H4M14 28h10M24 28h10v-10" opacity=".55"/><path d="M46 18h14"/><circle cx="60" cy="18" r="2" fill="currentColor"/></svg>'
+};
+function tournFmtCards(cur){
+  const desc = { pools_ko:'Poules, puis les meilleures équipes passent au tableau final.', round_robin:'Une seule poule, tout le monde se rencontre. Idéal pour 7 équipes et moins.', double_elim:'Tableau dès le départ ; éliminé après la deuxième défaite.' };
+  return `<div class="tn-fmts" role="radiogroup"><input type="hidden" id="tdFormat" value="${cur}">${['pools_ko','round_robin','double_elim'].map(function(k){
+    const on = k === cur;
+    return `<button type="button" role="radio" aria-checked="${on}" class="tn-fmtc${on ? ' on' : ''}" onclick="tournSegPick(this,'tdFormat','${k}','tournDivFmt')">${TOURN_FMT_SVG[k]}<span><b>${TOURN_FMT[k]}</b><small>${desc[k]}</small></span></button>`;
+  }).join('')}</div>`;
 }
 function tfVal(id){ const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
 async function tournSave(id){
@@ -9115,22 +9176,21 @@ function openTournDivForm(tid, divId){
   const show = function(list){ return list.indexOf(r.format) !== -1 ? '' : ' style="display:none"'; };
   const html = `<div class="tn-form">
     ${tournField('Nom de la catégorie', `<input id="tdName" maxlength="60" value="${escapeHTML(v.name || '')}" placeholder="Mixte 3.5">`)}
-    <div class="tn-row3">
-      ${tournField('Genre', tournSel('tdGender', [['mixte','Mixte'],['hommes','Hommes'],['femmes','Femmes'],['ouvert','Ouvert']], v.gender))}
+    ${tournField('Genre', tournSeg('tdGender', [['mixte','Mixte'],['hommes','Hommes'],['femmes','Femmes'],['ouvert','Ouvert']], v.gender || 'mixte'))}
+    <div class="tn-row2">
       ${tournField('Niveau', `<input id="tdLevel" maxlength="20" value="${escapeHTML(v.level || '')}" placeholder="3.5 (vide = tous)">`)}
       ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="50 ans + (vide = tous)">`)}
     </div>
-    <div class="tn-row2">
-      ${tournField('Nombre maximum d\'équipes', `<input id="tdMax" type="number" min="2" max="64" value="${v.max_teams || 12}">`)}
-      ${tournField('Formule', `<select id="tdFormat" onchange="tournDivFmt(this.value)">${['pools_ko','round_robin','double_elim'].map(function(k){ return `<option value="${k}"${k === r.format ? ' selected' : ''}>${TOURN_FMT[k]}</option>`; }).join('')}</select>`)}
-    </div>
-    <p class="small tn-fmt-help" id="tdFmtHelp">${tournFmtHelp(r.format)}</p>
-    <div class="tn-row3">
-      <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Équipes par poule', tournSel('tdPool', [[3,'3 équipes'],[4,'4 équipes'],[5,'5 équipes'],[6,'6 équipes']], r.pool_size))}</div>
-      <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Qualifiés par poule', tournSel('tdQual', [[1,'Le 1er'],[2,'Les 2 premiers']], r.qualifiers))}</div>
-      <div data-f="pools_ko round_robin"${show(['pools_ko','round_robin'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' ? 'Matchs' : 'Matchs de poule'}</span>`, tournSel('tdPoolPts', pts, r.pool_points))}</div>
-      <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Matchs du tableau', tournSel('tdBrPts', pts, r.bracket_points))}</div>
-      <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Finale', tournSel('tdFinal', [[1,'1 match'],[3,'2 de 3 à 11']], r.final_best_of))}</div>
+    ${tournField('Nombre maximum d\'équipes', tournStepper('tdMax', v.max_teams || 12, 2, 64), 'Au-delà, les équipes vont en liste d\'attente.')}
+    <div class="tn-grp"><div class="tn-grp-t">Formule</div>
+      ${tournFmtCards(r.format)}
+      <div class="tn-row2" style="margin-top:12px;">
+        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6']], r.pool_size))}</div>
+        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'Le 1er'],[2,'Les 2 premiers']], r.qualifiers))}</div>
+        <div data-f="pools_ko round_robin"${show(['pools_ko','round_robin'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points))}</div>
+        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points))}</div>
+        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of))}</div>
+      </div>
     </div>
     <div class="tn-form-acts">
       ${d ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDivDelete('${d.id}')" ${n ? 'disabled title="Des équipes sont inscrites dans cette catégorie"' : ''}>Supprimer</button>` : ''}
@@ -9148,7 +9208,7 @@ function tournFmtHelp(f){
 }
 function tournDivFmt(f){
   document.querySelectorAll('.tn-form [data-f]').forEach(function(el){ el.style.display = (' ' + el.getAttribute('data-f') + ' ').indexOf(' ' + f + ' ') !== -1 ? '' : 'none'; });
-  const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' ? 'Matchs' : 'Matchs de poule';
+  const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' ? 'Points des matchs' : 'Points des poules';
   const h = document.getElementById('tdFmtHelp'); if(h) h.textContent = tournFmtHelp(f);
 }
 async function tournDivSave(tid, divId){
