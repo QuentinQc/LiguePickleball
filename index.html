@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 477">
+<meta name="app-build" content="Version 478">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -13553,16 +13553,22 @@ function autoStartNextSession(lastSessionDate){
 }
 
 // ---------- Rapports (statistiques calculées à partir de l'historique) ----------
+const STD_GAME_POINTS = 9; // format standard d'un match pour comparer les moyennes
 function computePlayerReports(){
   const closed = DATA.sessions.filter(s=>s.status==='closed');
   const stats = {};
-  DATA.players.forEach(p=>{ stats[p.id] = { wins:0, losses:0, played:0, scheduled:0, totalPoints:0, sessionsAbsent:0, sessionsAppeared:0, promotions:0, relegations:0, ratingChange:0, subCount:0 }; });
+  DATA.players.forEach(p=>{ stats[p.id] = { wins:0, losses:0, played:0, scheduled:0, totalPoints:0, normPoints:0, sessionsAbsent:0, sessionsAppeared:0, promotions:0, relegations:0, ratingChange:0, subCount:0 }; });
   closed.forEach(s=>{
     const appeared = new Set();
     if(s.standingsByGroup){
       Object.keys(s.standingsByGroup).forEach(gid=>{
+        // Points ramenés au format standard (match de 9 points) : un groupe de 4 ou de 6 joue à 11.
+        const size = (s.standingsByGroup[gid]||[]).length;
+        const target = size <= 4 ? (DATA.rules4Points||11) : (size === 5 ? (DATA.rules5Points||9) : (DATA.rules6Points||11));
+        const scale = STD_GAME_POINTS / (target || STD_GAME_POINTS);
         (s.standingsByGroup[gid]||[]).forEach(r=>{
           if(!stats[r.playerId]) return; // invité ou joueur retiré depuis
+          stats[r.playerId].normPoints += (r.pf||0) * scale;
           stats[r.playerId].wins += r.wins||0;
           stats[r.playerId].losses += r.losses||0;
           stats[r.playerId].played += r.played||0;
@@ -13597,7 +13603,7 @@ function computePlayerReports(){
       player: p,
       wins: st.wins, losses: st.losses,
       winRate: totalGames>0 ? st.wins/totalGames : null,
-      played: st.played, scheduled: st.scheduled, totalPoints: st.totalPoints,
+      played: st.played, scheduled: st.scheduled, totalPoints: st.totalPoints, normPoints: st.normPoints,
       sessionsAbsent: st.sessionsAbsent, sessionsAppeared: st.sessionsAppeared,
       absenceRate: totalRelevant>0 ? st.sessionsAbsent/totalRelevant : null,
       promotions: st.promotions, relegations: st.relegations,
@@ -14393,7 +14399,7 @@ function reportsSessionHTML(){
     let av, bv;
     if(sortBy==='name'){ av=a.player.name.toLowerCase(); bv=b.player.name.toLowerCase(); }
     else if(sortBy==='winRate'){ av=a.winRate===null?-1:a.winRate; bv=b.winRate===null?-1:b.winRate; }
-    else if(sortBy==='avgPts'){ av=a.played?a.totalPoints/a.played:-1; bv=b.played?b.totalPoints/b.played:-1; }
+    else if(sortBy==='avgPts'){ av=a.played?a.normPoints/a.played:-1; bv=b.played?b.normPoints/b.played:-1; }
     else if(sortBy==='totalPoints'){ av=a.totalPoints; bv=b.totalPoints; }
     else if(sortBy==='wins'){ av=a.wins; bv=b.wins; }
     else if(sortBy==='losses'){ av=a.losses; bv=b.losses; }
@@ -14427,25 +14433,20 @@ function reportsSessionHTML(){
     </div>
   </div>
   <div class="card">
-    <div class="pf-sec" style="margin-top:0;">Classement cumulatif</div>
-    <div class="ah-meta" style="margin:0 2px 10px;">Total des points sur toutes les sessions terminées.</div>
-    ${reports.length ? `<div class="pf-list">${reports.slice().sort((a,b)=>b.totalPoints-a.totalPoints).map((r,i)=>`<div class="pf-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(r.player.name)}<small>${r.wins}-${r.losses}</small></span><span class="rp-v">${r.totalPoints}</span></div>`).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
-  </div>
-  <div class="card">
     <div class="pf-sec" style="margin-top:0;">Par joueur</div>
     ${isDesk() ? '' : rpSortHTML([['avgPts','Pts moyens'],['wins','Victoires'],['losses','Défaites'],['totalPoints','Pts totaux'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
     ${(sorted.length && isDesk()) ? (function(){
       const th = function(k, l, num){ const on = sortBy === k; return `<th class="srt${on ? ' on' : ''}${num ? ' num' : ''}" onclick="setReportsSort('${k}')">${l}${on ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`; };
-      return `<div class="rp-acts"><button type="button" class="btn btn-secondary" onclick="exportPlayerReportsCSV()">Exporter (Excel)</button></div><div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>${th('name','Joueur')}<th>${escapeHTML(grpWord(false, true))}</th>${th('avgPts','Pts moyens',1)}${th('wins','Victoires',1)}${th('losses','Défaites',1)}${th('totalPoints','Pts totaux',1)}</tr></thead><tbody>${sorted.map(function(r){
+      return `<div class="rp-acts"><button type="button" class="btn btn-secondary" onclick="exportPlayerReportsCSV()">Exporter (Excel)</button></div><div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>${th('name','Joueur')}<th>${escapeHTML(grpWord(false, true))}</th>${th('avgPts','Pts moyens (sur 9)',1)}${th('wins','Victoires',1)}${th('losses','Défaites',1)}${th('totalPoints','Pts totaux',1)}</tr></thead><tbody>${sorted.map(function(r){
         const g = groupById(r.player.groupId);
-        const avg = r.played ? (r.totalPoints / r.played).toFixed(1).replace('.', ',') : '—';
+        const avg = r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '—';
         return `<tr onclick="openPlayerDetailModal('${r.player.id}')"><td><b>${escapeHTML(r.player.name)}</b></td><td>${escapeHTML(g ? g.name : '—')}</td><td class="num" style="color:var(--ball);font-family:var(--font-display);font-size:15px;">${avg}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td><td class="num">${r.totalPoints}</td></tr>`;
       }).join('')}</tbody></table></div>`; })() : sorted.length ? `<div class="pf-list">${sorted.map(r=>{
-      const avg = r.played ? (r.totalPoints / r.played).toFixed(1).replace('.', ',') : '—';
+      const avg = r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '—';
       const bits = [`moy. ${avg}`, `${r.wins}-${r.losses}`, `${r.totalPoints} pts`];
       return `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(r.player.name)}<small>${bits.join(' · ')}</small></span></div>`;
     }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
-    <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Points moyens : points marqués par match joué, sur toutes les sessions terminées.</div>
+    <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Points moyens : points marqués par match joué, ramenés sur un match de 9 points (un match de 11 compte pour 9/11), sur toutes les sessions terminées. Les points totaux restent les points réellement marqués.</div>
   </div>`;
   return html;
 }
@@ -14686,11 +14687,11 @@ function exportPlayerReportsCSV(){
   const rows = computePlayerReports();
   const pct = function(x){ return x === null ? '' : Math.round(x * 100) + ' %'; };
   const esc = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
-  const head = ['Joueur', grpWord(false, true) + ' actuel', 'Points moyens', 'Victoires', 'Défaites', 'Points totaux', 'Matchs joués'];
+  const head = ['Joueur', grpWord(false, true) + ' actuel', 'Points moyens (sur 9)', 'Victoires', 'Défaites', 'Points totaux', 'Matchs joués'];
   const lines = [head.map(esc).join(',')];
   rows.forEach(function(r){
     const g = groupById(r.player.groupId);
-    lines.push([r.player.name, g ? g.name : '', r.played ? (r.totalPoints / r.played).toFixed(1).replace('.', ',') : '', r.wins, r.losses, r.totalPoints, r.played].map(esc).join(','));
+    lines.push([r.player.name, g ? g.name : '', r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '', r.wins, r.losses, r.totalPoints, r.played].map(esc).join(','));
   });
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rapport-joueurs.csv'; document.body.appendChild(a); a.click(); a.remove();
