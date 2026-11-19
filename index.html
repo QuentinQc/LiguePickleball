@@ -1810,7 +1810,7 @@ body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px das
 /* ===== Poste de travail (ordinateur, 1100 px et plus, organisateurs) ===== */
 .dk-side{display:none;}
 body.desk #app{max-width:none;margin:0;padding:0 0 0 248px;}
-body.desk .dk-side{display:flex;flex-direction:column;gap:2px;position:fixed;left:0;top:0;bottom:0;width:248px;box-sizing:border-box;padding:18px 12px;background:#0A2420;border-right:1px solid var(--line-soft-strong);overflow-y:auto;z-index:960;}
+body.desk .dk-side{display:flex;flex-direction:column;gap:2px;position:fixed;left:0;top:0;bottom:0;width:248px;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));background:#0A2420;border-right:1px solid var(--line-soft-strong);overflow-y:auto;z-index:960;}
 body.desk .dk-brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;font:600 21px var(--font-display);letter-spacing:.03em;color:var(--text);}
 body.desk .dk-brand .pbi{width:30px;height:30px;}
 body.desk .dk-sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:14px 10px 4px;}
@@ -1828,7 +1828,7 @@ body.desk.modern-nav .topbar.shell-top{left:272px;right:24px;--tb-x:24px;}
 body.desk #tabContent{max-width:1240px;margin:0 auto;padding:0 24px 40px;}
 body.desk.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 66px);}
 /* Ligue et panneaux de l'organisation : une vraie page à droite du menu, plus une fenêtre par-dessus. */
-body.desk .lg-ov, body.desk .chat-overlay.dk-page{left:248px;padding:0;background:var(--court);align-items:stretch;justify-content:stretch;z-index:900;}
+body.desk .lg-ov, body.desk .chat-overlay.dk-page{left:248px;padding:env(safe-area-inset-top) 0 0 0;background:var(--court);align-items:stretch;justify-content:stretch;z-index:900;}
 body.desk .lg-ov > .chat-sheet, body.desk .chat-overlay.dk-page > .chat-sheet{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none;animation:none;}
 body.desk .lg-ov .sheet-body, body.desk .dk-page .sheet-body, body.desk .lg-ov .chat-head, body.desk .dk-page .chat-head{padding-left:max(24px, calc((100% - 1240px) / 2));padding-right:max(24px, calc((100% - 1240px) / 2));}
 
@@ -1857,7 +1857,7 @@ body.desk .lg-ov .sheet-body, body.desk .dk-page .sheet-body, body.desk .lg-ov .
 .dk-bulk .dk-x{margin-left:auto;background:none;border:0;color:var(--muted);}
 /* Fiche d'une personne : un panneau à droite sur ordinateur, la liste reste visible. */
 body.desk .m-ov.dk-panel{left:auto !important;width:460px;justify-content:flex-end !important;align-items:stretch !important;padding:0 !important;background:transparent !important;}
-body.desk .m-ov.dk-panel .m-box{max-width:460px !important;width:460px !important;max-height:none !important;height:100%;border-radius:0 !important;border:0 !important;border-left:1px solid var(--line-soft-strong) !important;box-shadow:-12px 0 40px rgba(0,0,0,.4);animation:dkPanelIn .18s ease-out;}
+body.desk .m-ov.dk-panel .m-box{max-width:460px !important;width:460px !important;max-height:none !important;height:100%;box-sizing:border-box;padding-top:calc(18px + env(safe-area-inset-top)) !important;border-radius:0 !important;border:0 !important;border-left:1px solid var(--line-soft-strong) !important;box-shadow:-12px 0 40px rgba(0,0,0,.4);animation:dkPanelIn .18s ease-out;}
 body.desk .dk-page.dk-has-panel .sheet-body{padding-right:484px;}
 @keyframes dkPanelIn{from{transform:translateX(30px);opacity:.6;}to{transform:none;opacity:1;}}
 body.desk .dk-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;}
