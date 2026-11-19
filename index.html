@@ -1868,6 +1868,28 @@ body.desk .grp-board > .card{margin:0;}
 body.desk .rs-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;align-items:start;}
 body.desk .rs-board > .card{margin:0;}
 .dk-toast .dk-undo{margin-left:14px;font:700 13px var(--font-body);color:var(--ball);background:var(--court);border:0;border-radius:8px;padding:5px 12px;cursor:pointer;pointer-events:auto;}
+
+/* Doublons, À faire, recherche (poste de travail) */
+.dup-card{border:1px solid rgba(242,153,74,.45) !important;}
+.dup-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.dup-pair > div{background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);border-radius:12px;padding:10px 12px;font-size:13px;}
+.dup-pair > div.keep{border-color:var(--ball);}
+.dup-pair small{display:block;color:var(--muted);}
+.dup-pair .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.dup-pair .keep .k{color:var(--ball);}
+.dup-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;}
+.dk-todo{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:4px 0 18px;}
+.dk-todo button{text-align:left;background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);border-radius:16px;padding:14px;color:var(--text);font:500 14px var(--font-body);cursor:pointer;}
+.dk-todo button:hover{background:rgba(255,255,255,.09);}
+.dk-todo b{display:block;font:600 28px var(--font-display);color:var(--paddle);}
+.dk-todo small{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+.dk-todo .ok b{color:var(--ball);}
+.dk-srch input{width:100%;font-size:17px;}
+.dk-srch-res{display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:56vh;overflow-y:auto;}
+.dk-srch-res button{display:flex;justify-content:space-between;gap:10px;text-align:left;background:rgba(255,255,255,.04);border:1px solid transparent;border-radius:10px;padding:10px 12px;color:var(--text);font:500 14px var(--font-body);cursor:pointer;}
+.dk-srch-res button:hover, .dk-srch-res button.on{border-color:var(--ball);background:rgba(207,234,92,.08);}
+.dk-srch-res small{color:var(--muted);}
+body.desk .dk-k{margin:6px 0 0;font-size:12px;color:var(--muted);background:none;border:1px dashed var(--line-soft-strong);border-radius:10px;padding:8px 10px;text-align:left;cursor:pointer;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -8360,7 +8382,7 @@ function adminLeagueCardHTML(lg){
 // Organisateurs et administrateurs sur un écran de 1100 px et plus : menu fixe à gauche,
 // la ligue et les panneaux de l'organisation s'ouvrent en pleine page à droite.
 function isDesk(){ try{ return window.matchMedia('(min-width:1100px)').matches; }catch(e){ return false; } }
-let DESK_LAST = null;
+let DESK_LAST = null, DESK_ROSTER_ASKED = false;
 window.addEventListener('resize', function(){ const d = isDesk(); if(DESK_LAST !== null && d !== DESK_LAST && SESSION_USER && SESSION_USER.role === 'admin') render(); DESK_LAST = d; });
 function dkClose(){ if(MODAL){ MODAL_UNDER = null; dropModal(); } }
 function dkHome(t){ dkClose(); VIEW.adet = false; setAAcc(t); }
@@ -8394,9 +8416,140 @@ function deskSideHTML(){
     if(on) h += `<div class="dk-sub">${secs.map(function(x){ return it((VIEW.tab || 'session') === x[0], x[1], `dkTab('${x[0]}')`); }).join('')}</div>`;
   });
   if((MY_ORGANIZATIONS||[]).length > 1) h += it(home && VIEW.atab === 'orgs', 'Changer d\'organisation', "dkHome('orgs')");
-  h += `<div class="dk-foot">${it(home && VIEW.atab === 'moi', 'Moi', "dkHome('moi')")}</div>`;
+  h += `<div class="dk-foot">${it(home && VIEW.atab === 'moi', 'Moi', "dkHome('moi')")}<button type="button" class="dk-k" onclick="openDeskSearch()">Rechercher · Ctrl + K</button></div>`;
   return `<aside class="dk-side" aria-label="Menu principal">${h}</aside>`;
 }
+
+// ==================== Doublons de fiches membres ====================
+// Deux fiches au même nom (accents et majuscules ignorés) : on propose de les fusionner.
+function dupNorm(n){ return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s*\(\d+\)\s*$/, '').replace(/\s+/g, ' ').trim(); }
+function dupIgnored(){ try{ return JSON.parse(localStorage.getItem('dk-dup-ignore') || '[]'); }catch(e){ return []; } }
+function dupPairs(){
+  const entries = ORG_ROSTER_ENTRIES_CACHE || [], by = {}, out = [], ign = dupIgnored();
+  entries.forEach(function(e){ if(!e.orgMemberId) return; const k = dupNorm(e.name); (by[k] = by[k] || []).push(e); });
+  Object.keys(by).forEach(function(k){
+    const g = by[k]; if(g.length < 2) return;
+    // On garde la fiche reliée à un compte, sinon celle qui a un courriel, sinon la plus ancienne.
+    const score = function(e){ return (e.profileId ? 4 : 0) + (e.email ? 2 : 0); };
+    const created = function(e){ const m = ORG_MEMBERS.find(function(x){ return x.id === e.orgMemberId; }); return m ? String(m.created_at || '') : ''; };
+    g.sort(function(a, b){ return score(b) - score(a) || created(a).localeCompare(created(b)); });
+    for(let j = 1; j < g.length; j++){
+      const id = [g[0].orgMemberId, g[j].orgMemberId].sort().join('|');
+      if(ign.indexOf(id) === -1 && !(g[0].profileId && g[j].profileId && g[0].profileId !== g[j].profileId)) out.push({ keep: g[0], drop: g[j], id: id });
+    }
+  });
+  return out;
+}
+function dupIgnore(id){ const a = dupIgnored(); a.push(id); try{ localStorage.setItem('dk-dup-ignore', JSON.stringify(a)); }catch(e){} render(); }
+function orgDupCardHTML(){
+  if(isOrganizerOnly()) return '';
+  const pairs = dupPairs(); if(!pairs.length) return '';
+  const side = function(e, keep){ return `<div class="${keep ? 'keep' : ''}"><span class="k">${keep ? 'On garde' : 'À fusionner'}</span><br><b>${escapeHTML(e.name)}</b><small>${escapeHTML(e.email || 'Sans courriel')} · ${e.profileId ? 'compte relié' : 'sans compte'}</small><small>${e.rows.length ? e.rows.map(function(r){ return escapeHTML(r.leagueLabel) + (r.type === 'remplaçant' ? ' (rempl.)' : ''); }).join(', ') : 'Aucune ligue'}</small></div>`; };
+  return `<div class="card dup-card"><h3 style="margin:0;color:var(--paddle);">Doublons possibles · ${pairs.length}</h3>
+    <p class="small" style="margin:6px 0 0;">Même nom, deux fiches. Fusionner garde la fiche reliée au compte, y ramène ses ligues et retire les inscriptions en double qui n'ont jamais servi.</p>
+    ${pairs.map(function(pr, k){ return `<div class="dup-pair">${side(pr.keep, true)}${side(pr.drop, false)}</div>
+      <div class="dup-acts"><button type="button" class="btn btn-secondary" onclick="dupIgnore('${pr.id}')">Ce n'est pas la même personne</button><button type="button" class="btn btn-primary" onclick="confirmMergeDup(${k})">Fusionner</button></div>`; }).join('')}</div>`;
+}
+function confirmMergeDup(k){
+  const pr = dupPairs()[k]; if(!pr) return;
+  showConfirm('Fusionner les deux fiches « ' + pr.keep.name + ' » ? La fiche sans compte est supprimée et ses ligues passent sur l\'autre. Cette action ne peut pas être annulée.', function(){ mergeOrgMembers(pr.keep, pr.drop); });
+}
+async function mergeOrgMembers(keep, drop){
+  const affected = Array.from(new Set(drop.rows.map(function(r){ return r.leagueId; })));
+  let removed = 0, moved = 0;
+  for(const lid of affected){
+    const { data, error } = await sb.from('league_data').select('data').eq('league_id', lid).single();
+    if(error || !data || !data.data){ showAlert('Fusion interrompue : ' + (error ? error.message : 'ligue introuvable')); return; }
+    const d = data.data, used = JSON.stringify(d.sessions || []);
+    const linked = ALL_PROFILE_PLAYERS.filter(function(pp){ return pp.league_id === lid; });
+    ['players', 'substitutePool'].forEach(function(key){
+      const list = d[key] || [];
+      const keepHas = list.some(function(x){ return x.orgMemberId === keep.orgMemberId; });
+      d[key] = list.filter(function(x){
+        if(x.orgMemberId !== drop.orgMemberId) return true;
+        const isLinked = linked.some(function(pp){ return pp.player_id === x.id || pp.substitute_id === x.id; });
+        if(keepHas && !isLinked && used.indexOf(x.id) === -1){ removed++; return false; } // inscription en double jamais utilisée
+        x.orgMemberId = keep.orgMemberId; if(!x.email && keep.email) x.email = keep.email; moved++;
+        return true;
+      });
+    });
+    const { error: e2 } = await sb.from('league_data').update({ data: d, updated_at: new Date().toISOString() }).eq('league_id', lid);
+    if(e2){ showAlert('Fusion interrompue : ' + e2.message); return; }
+  }
+  if(!keep.email && drop.email) await sb.from('org_members').update({ email: drop.email }).eq('id', keep.orgMemberId);
+  const { error: e3 } = await sb.from('org_members').delete().eq('id', drop.orgMemberId);
+  if(e3){ showAlert('Les ligues ont été fusionnées, mais la fiche en double n\'a pas pu être supprimée : ' + e3.message); }
+  await refreshAfterOrgRosterChange(affected);
+  ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries();
+  render();
+  showToast('Fiches fusionnées' + (removed ? ' · ' + removed + ' doublon' + (removed > 1 ? 's' : '') + ' retiré' + (removed > 1 ? 's' : '') : ''));
+}
+
+// ==================== À faire (accueil du poste de travail) ====================
+function deskTodoHTML(){
+  let pend = 0, interest = 0, dups = 0;
+  try{ if(ALL_PROFILES && ALL_PROFILES.length) pend = approvalsCountForOrg(CURRENT_ORGANIZATION_ID); }catch(e){}
+  try{ interest = interestCountForOrg(CURRENT_ORGANIZATION_ID); }catch(e){}
+  try{ if((ORG_ROSTER_ENTRIES_CACHE || []).length) dups = isOrganizerOnly() ? 0 : dupPairs().length; }catch(e){}
+  const tiles = [];
+  if(pend) tiles.push(`<button type="button" onclick="dkOrg('comptes')"><b>${pend}</b>Comptes et demandes à traiter<small>Organisation › Comptes</small></button>`);
+  if(interest) tiles.push(`<button type="button" onclick="dkOrg('comptes')"><b>${interest}</b>Personne${interest>1?'s':''} intéressée${interest>1?'s':''} par une ligue complète<small>liste d'intérêt</small></button>`);
+  if(dups) tiles.push(`<button type="button" onclick="dkOrg('membres')"><b>${dups}</b>Doublon${dups>1?'s':''} possible${dups>1?'s':''}<small>fiches au même nom</small></button>`);
+  myOrgLeagues().forEach(function(l){
+    if(isOrganizerOnly() && ORGANIZER_LEAGUES.indexOf(l.id) === -1) return;
+    const sm = adminSummaryFor(l); if(!sm || !sm.open) return;
+    if(!sm.open.published) tiles.push(`<button type="button" onclick="dkLeague('${l.id}')"><b>!</b>${escapeHTML(l.name)} : session à publier<small>${escapeHTML(fdl(sm.open.date))}</small></button>`);
+  });
+  if(!tiles.length) tiles.push(`<button type="button" class="ok" onclick="dkOrg('membres')"><b>✓</b>Rien en attente<small>toutes les demandes sont traitées</small></button>`);
+  return `<div class="pf-sec" style="margin-top:4px;">À faire</div><div class="dk-todo">${tiles.join('')}</div>`;
+}
+
+// ==================== Recherche Ctrl+K (poste de travail) ====================
+let DK_SRCH = { q: '', sel: 0 };
+function openDeskSearch(){
+  DK_SRCH = { q: '', sel: 0 };
+  const safe = function(f){ return Promise.resolve().then(f).catch(function(e){ console.error(e); }); };
+  Promise.all([safe(loadAllProfilePlayers), safe(loadOrgRoster), safe(loadOrgMembers)]).then(function(){
+    ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries();
+    showContentModal('Rechercher', function(){ return `<div class="dk-srch"><input id="dkSrchIn" placeholder="Nom d'un membre, d'une ligue…" autocomplete="off" oninput="DK_SRCH.q=this.value;DK_SRCH.sel=0;dkSrchPaint()"></div><div class="dk-srch-res" id="dkSrchRes">${dkSrchResHTML()}</div><p class="small" style="margin:10px 2px 0;color:var(--muted);">↑ ↓ pour choisir · Entrée pour ouvrir · Échap pour fermer</p>`; });
+    if(MODAL) MODAL.dkSearch = true;
+    setTimeout(function(){ const el = document.getElementById('dkSrchIn'); if(el) el.focus(); }, 30);
+  });
+}
+function dkSrchItems(){
+  const q = dupNorm(DK_SRCH.q); const out = [];
+  myOrgLeagues().forEach(function(l){ if(isOrganizerOnly() && ORGANIZER_LEAGUES.indexOf(l.id) === -1) return; if(!q || dupNorm(l.name).indexOf(q) !== -1) out.push({ t: 'Ligue', label: l.name, sub: l.schedule_label || '', go: "dkSrchGo('L','" + l.id + "')" }); });
+  if(q) (ORG_ROSTER_ENTRIES_CACHE || []).forEach(function(e, i){ if(dupNorm(e.name).indexOf(q) !== -1 || dupNorm(e.email || '').indexOf(q) !== -1) out.push({ t: 'Membre', label: e.name, sub: e.rows.map(function(r){ return r.leagueLabel; }).join(', ') || 'Aucune ligue', go: "dkSrchGo('M','" + escapeHTML(orgKey(e)).replace(/'/g, '&#39;') + "')" }); });
+  return out.slice(0, 30);
+}
+function dkSrchResHTML(){
+  const it = dkSrchItems();
+  if(!it.length) return '<p class="ah-meta" style="padding:6px 4px;">Aucun résultat.</p>';
+  return it.map(function(x, k){ return `<button type="button" class="${k === DK_SRCH.sel ? 'on' : ''}" onclick="${x.go}"><span><b>${escapeHTML(x.label)}</b><br><small>${escapeHTML(x.sub)}</small></span><small>${x.t}</small></button>`; }).join('');
+}
+function dkSrchPaint(){ const el = document.getElementById('dkSrchRes'); if(el) el.innerHTML = dkSrchResHTML(); }
+function dkSrchGo(kind, id){
+  dropModal(); MODAL_UNDER = null;
+  if(kind === 'L'){ dkLeague(id); return; }
+  VIEW.adet = false; openOrgSheet('membres');
+  let tries = 0;
+  const t = setInterval(function(){
+    tries++;
+    if(MODAL && MODAL.sheet === 'org-membres'){
+      clearInterval(t);
+      const i = (ORG_ROSTER_ENTRIES_CACHE || []).findIndex(function(e){ return orgKey(e) === id; });
+      if(i >= 0) openOrgMemberDetailModal(i);
+    } else if(tries > 40) clearInterval(t);
+  }, 100);
+}
+document.addEventListener('keydown', function(ev){
+  if((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K') && document.body.classList.contains('desk')){ ev.preventDefault(); openDeskSearch(); return; }
+  if(!MODAL || !MODAL.dkSearch) return;
+  const it = dkSrchItems();
+  if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){ ev.preventDefault(); DK_SRCH.sel = Math.max(0, Math.min(it.length - 1, DK_SRCH.sel + (ev.key === 'ArrowDown' ? 1 : -1))); dkSrchPaint(); }
+  else if(ev.key === 'Enter'){ ev.preventDefault(); const x = it[DK_SRCH.sel]; if(x){ const b = document.querySelectorAll('#dkSrchRes button')[DK_SRCH.sel]; if(b) b.click(); } }
+  else if(ev.key === 'Escape'){ ev.preventDefault(); closeModal(); }
+});
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
   const tabs = [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
   const active = (tabs.some(t=>t[0]===VIEW.atab) || VIEW.atab==='moi') ? VIEW.atab : 'accueil';
@@ -8444,6 +8597,10 @@ function adminHomeHTML(){
     <div class="ah-grid">${ls.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
   });
   html += accUpcomingHTML();
+  if(isDesk()){
+    if(!(ORG_ROSTER_ENTRIES_CACHE || []).length && !DESK_ROSTER_ASKED){ DESK_ROSTER_ASKED = true; Promise.all([loadOrgRoster(), loadOrgMembers()]).then(function(){ ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries(); if(!MODAL && !VIEW.adet && (VIEW.atab === undefined || VIEW.atab === 'accueil')) render(); }).catch(function(){}); }
+    html = deskTodoHTML() + html;
+  }
   setTimeout(()=>refreshAdminSummaries(false), 0);
   return html;
 }
@@ -14659,6 +14816,7 @@ function organizationMembersCardHTML(){
       <button class="btn btn-secondary" onclick="openAddOrgMemberModal()">+ Nouvelle personne</button>
     </div>
     <p class="small" style="margin:8px 0 4px;">Ajoute quelqu'un une seule fois ici, puis choisis dans quelle(s) ligue(s) l'assigner — plus besoin de le recréer séparément dans chacune.</p>
+    ${orgDupCardHTML()}
     ${orgFilterBarHTML('membres')}
     <div id="orgListBody">${orgMembersBodyHTML()}</div>
   </div>`;
@@ -15230,6 +15388,7 @@ function settingsGuideHTML(){
   return guideSec("L'app en bref", `<p class="small"><b>Accueil</b> : une carte par ligue (prochaine session, état, boutons « Lancer la session », « Entrer les scores »…). <b>Organisations</b> : membres, comptes, rapport et paramètres de l'organisation. <b>Calendrier</b> et <b>Communauté</b> comme pour les joueurs. Le sélecteur <b>Admin / Joueur</b> en haut te montre l'app comme tes joueurs. La <b>cloche</b> garde les notifications des 14 derniers jours (demandes d'adhésion, absences, remplaçants disponibles…).</p>`)
   + (rec ? guideSec('Une soirée, étape par étape', `<p class="small">${recSteps}</p><p class="small">En récréatif, il n'y a ni scores, ni classement, ni cotes, ni montées et descentes.</p>`) : '')
   + (rec ? '' : guideSec('Une session, étape par étape', `<p class="small">1. <b>Lancer la session</b> (une confirmation est demandée) : les remplaçants sont prévenus pour indiquer leur disponibilité.<br>2. <b>Groupes</b> : vérifie les ${grpWord(true)}, déplace un joueur en le glissant par sa poignée ⋮⋮ (le reste de la ligne ne se glisse pas). La bande <b>« Remplaçants disponibles »</b> en haut permet de glisser un remplaçant sur une place vide, de le déplacer avec sa poignée ⋮⋮ ou de le retirer en le glissant vers la bande. Le remplaçant est prévenu à chaque fois.<br>3. <b>Publier la session</b> (avec confirmation) : les joueurs reçoivent leurs ${grpWord(true)} et leurs matchs.<br>4. <b>Résultats</b> : scores entrés par les joueurs ou par toi, feuilles de match à imprimer.<br>5. <b>Terminer la session</b> : montées et descentes appliquées, résultats publiés.</p>`))
+  + guideSec('Sur ordinateur', `<p class="small">Sur un écran large (1100 px et plus), l'app passe en <b>poste de travail</b> : un menu fixe à gauche (organisation, ligues et leurs sections), les ligues et les membres en pleine page. <b>Membres</b> : un tableau, des cases à cocher pour ajouter plusieurs personnes à une ligue ou leur écrire, la fiche qui s'ouvre à droite (flèches ↑ ↓ pour passer à la suivante). <b>Session</b> : les groupes côte à côte, « Annuler » après chaque déplacement, et dans les résultats la touche Entrée passe à la case suivante. <b>Ctrl + K</b> : rechercher un membre ou une ligue de n'importe où. L'accueil montre ce qui est à faire et les doublons possibles à fusionner.</p>`)
   + guideSec('Membres et comptes', `<p class="small">Tout se gère dans <b>Organisations › Membres</b> : ajouter une personne, l'inscrire dans une ou plusieurs ligues comme joueur ou remplaçant${rec ? '' : ', avec sa cote de départ'}. <b>Comptes</b> : demandes d'adhésion à approuver, comptes à relier, rôle admin. Le lien d'invitation de l'organisation (Paramètres) permet de s'inscrire sans code.</p>`)
   + guideSec('Organisateurs de ligue', `<p class="small">Dans <b>Réglages › Organisateurs</b> d'une ligue, coche les comptes qui t'aident à la gérer. Ils voient seulement cette ligue : sessions, groupes, scores, absences, remplaçants, publications et alertes. Ils peuvent aussi approuver les demandes d'adhésion à leur ligue et ajouter des personnes à l'organisation (Organisations › Membres et Comptes). Les réglages de l'organisation, les autres ligues et la suppression de membres restent aux administrateurs.</p>`)
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
