@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 464">
+<meta name="app-build" content="Version 465">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1901,6 +1901,11 @@ body.desk .lg-ov .lg-sheet .sd-dock{top:0;}
 .apv-bar label{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;}
 .apv-bar input, .apv-ck{width:20px;height:20px;accent-color:var(--ball);cursor:pointer;flex:none;}
 .apv-bar .btn{margin-left:auto;}
+
+/* Organisateurs présents sur la même ligue */
+.live-peers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px;font-size:13px;color:var(--muted);}
+.live-peers span.pp{display:inline-flex;align-items:center;gap:6px;color:var(--text);background:rgba(207,234,92,.1);border:1px solid rgba(207,234,92,.35);border-radius:999px;padding:3px 10px;font-weight:600;}
+.live-peers span.pp::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ball);}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -2992,12 +2997,81 @@ async function saveDataNow(){
     if(guarded && (!rows || !rows.length)){ await onSaveConflict(leagueId); return; }
     if(rows && rows[0] && rows[0].updated_at){ DATA_VERSION = rows[0].updated_at; DATA_VERSION_FOR = leagueId; }
     SAVE_ERROR = null;
+    liveNotifySaved();
     STORAGE_OK = true;
   }catch(e){
     SAVE_ERROR = "La sauvegarde a échoué : " + (e && e.message ? e.message : 'erreur inconnue');
     console.error('Erreur de sauvegarde', e);
   }
 }
+
+// ==================== Mises à jour en direct ====================
+// Chaque enregistrement (organisateur, ou joueur qui entre un score) est annoncé aux autres
+// appareils ouverts sur la même ligue, qui rechargent la ligue dès qu'ils ne sont pas en train
+// de saisir. Filet de sécurité : la version de la ligue est relue régulièrement.
+// Les organisateurs voient aussi qui d'autre travaille sur la ligue en ce moment.
+let LIVE_CH = null, LIVE_CH_LEAGUE = null, LIVE_PEERS = [], LIVE_T = null, LIVE_POLL_AT = 0, LIVE_RELOADING = false;
+function liveIsStaff(){ return !!(SESSION_USER && SESSION_USER.role === 'admin' && !ADMIN_VIEWING_AS); }
+function ensureLiveChannel(){
+  try{
+    if(!CURRENT_LEAGUE_ID || SIM || typeof sb === 'undefined' || !sb || !sb.channel || !SESSION_USER || SESSION_USER.role === 'pending') return;
+    if(LIVE_CH && LIVE_CH_LEAGUE === CURRENT_LEAGUE_ID) return;
+    if(LIVE_CH){ try{ sb.removeChannel(LIVE_CH); }catch(e){} LIVE_CH = null; LIVE_PEERS = []; }
+    LIVE_CH_LEAGUE = CURRENT_LEAGUE_ID;
+    const me = (CURRENT_PROFILE && CURRENT_PROFILE.id) || ('anon-' + Math.random().toString(36).slice(2));
+    const ch = sb.channel('league-' + CURRENT_LEAGUE_ID, { config: { broadcast: { self: false }, presence: { key: me } } });
+    ch.on('broadcast', { event: 'saved' }, function(msg){ liveOnRemoteSave(msg && msg.payload); })
+      .on('presence', { event: 'sync' }, function(){
+        try{
+          const st = ch.presenceState(), out = [];
+          Object.keys(st).forEach(function(k){ if(k === me) return; const m = (st[k] || [])[0]; if(m && m.staff && out.indexOf(m.name) === -1) out.push(m.name); });
+          const changed = out.join('|') !== LIVE_PEERS.join('|');
+          LIVE_PEERS = out;
+          if(changed && liveIsStaff() && !appBusyEditing()){ const el = document.getElementById('livePeers'); if(el) el.outerHTML = livePeersHTML(); }
+        }catch(e){}
+      })
+      .subscribe(function(status){
+        if(status === 'SUBSCRIBED' && liveIsStaff()){ try{ ch.track({ name: scoreAdminLabel(), staff: true }); }catch(e){} }
+      });
+    LIVE_CH = ch;
+  }catch(e){ console.error('temps réel', e); }
+}
+function livePeersHTML(){
+  if(!liveIsStaff() || !LIVE_PEERS.length) return '<div id="livePeers"></div>';
+  return `<div id="livePeers" class="live-peers">Aussi sur cette ligue en ce moment : ${LIVE_PEERS.map(function(n){ return `<span class="pp">${escapeHTML(n)}</span>`; }).join('')}</div>`;
+}
+function liveNotifySaved(){
+  try{ if(LIVE_CH && LIVE_CH_LEAGUE === CURRENT_LEAGUE_ID) LIVE_CH.send({ type: 'broadcast', event: 'saved', payload: { v: DATA_VERSION || null } }); }catch(e){}
+}
+function liveOnRemoteSave(p){
+  if(p && p.v && p.v === DATA_VERSION) return; // on a déjà cette version
+  clearTimeout(LIVE_T);
+  LIVE_T = setTimeout(liveReload, 600);
+}
+function liveBusy(){ return appBusyEditing() || !!(typeof SUB_DRAG !== 'undefined' && SUB_DRAG) || LIVE_RELOADING; }
+async function liveReload(){
+  if(!CURRENT_LEAGUE_ID || SIM) return;
+  if(liveBusy() || document.visibilityState !== 'visible'){ clearTimeout(LIVE_T); LIVE_T = setTimeout(liveReload, 2000); return; }
+  LIVE_RELOADING = true;
+  try{
+    try{ await SAVE_CHAIN; }catch(e){}
+    const id = CURRENT_LEAGUE_ID;
+    const fresh = await loadData(id);
+    if(fresh && id === CURRENT_LEAGUE_ID && !appBusyEditing()){ DATA = fresh; migrateData(); ADMIN_SUMMARY_AT = 0; MY_SUMMARY_AT = 0; render(); }
+  }catch(e){ console.error('rechargement en direct', e); }
+  finally{ LIVE_RELOADING = false; }
+}
+// Filet de sécurité : relit seulement la version de la ligue (toutes les 30 s un soir de session publiée, sinon toutes les 2 min).
+setInterval(function(){
+  try{
+    if(!SESSION_USER || !CURRENT_LEAGUE_ID || SIM || document.visibilityState !== 'visible' || typeof DATA === 'undefined' || !DATA) return;
+    const open = currentOpenSession();
+    const every = (open && open.published) ? 30000 : 120000;
+    if(Date.now() - LIVE_POLL_AT < every) return;
+    LIVE_POLL_AT = Date.now();
+    fetchLeagueVersion(CURRENT_LEAGUE_ID).then(function(v){ if(v && DATA_VERSION && v !== DATA_VERSION && DATA_VERSION_FOR === CURRENT_LEAGUE_ID) liveReload(); });
+  }catch(e){}
+}, 10000);
 // La ligue a changé ailleurs depuis son chargement : on recharge plutôt que d'écraser.
 let SAVE_CONFLICT_SHOWN = false;
 async function onSaveConflict(leagueId){
@@ -3007,7 +3081,7 @@ async function onSaveConflict(leagueId){
   render();
   if(!SAVE_CONFLICT_SHOWN){
     SAVE_CONFLICT_SHOWN = true;
-    showAlert("La ligue venait d'être modifiée ailleurs (un joueur ou un autre admin). Elle a été rechargée pour ne rien effacer : vérifie ta dernière modification et refais-la au besoin.");
+    showAlert("Un autre organisateur ou un joueur a modifié la ligue au même moment. La ligue a été rechargée avec sa modification, pour ne rien effacer : vérifie ta dernière action et refais-la au besoin." + (LIVE_PEERS.length ? "\n\nAussi sur cette ligue : " + LIVE_PEERS.join(', ') + "." : ''));
     setTimeout(function(){ SAVE_CONFLICT_SHOWN = false; }, 4000);
   }
 }
@@ -6586,6 +6660,7 @@ function render(){
 let LAST_RENDERED_MODAL = null;
 function renderInner(){
   applyModernNavClass();
+  ensureLiveChannel();
   document.body.classList.remove('desk');
   if(PENDING_GO && !GO_RUNNING && SESSION_USER && SESSION_USER.role !== 'pending' && CURRENT_PROFILE) setTimeout(applyPendingGo, 250);
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
@@ -8299,7 +8374,7 @@ function adminLeagueSheetHTML(){
   else if(cur==='historique') body = adminHistoryHTML();
   else if(cur==='rapports') body = adminReportsSectionHTML();
   else body = adminSettingsSectionHTML();
-  return leagueSheetHTML(lg, org ? org.name : '', 'closeAdminLeague()', lgNavHTML(sections, cur, 'setAdminTab'), body, cur);
+  return leagueSheetHTML(lg, org ? org.name : '', 'closeAdminLeague()', lgNavHTML(sections, cur, 'setAdminTab'), livePeersHTML() + body, cur);
 }
 // Menu des sections d'une ligue : boutons égaux icône + libellé (style de la barre du bas),
 // collé en haut du panneau pendant le défilement.
@@ -12836,6 +12911,7 @@ function processPendingRegen(){
 }
 async function scoreReloadFromServer(){
   try{ const l = await loadData(CURRENT_LEAGUE_ID); if(l){ DATA = l; migrateData(); } }catch(e){ console.error(e); }
+  liveNotifySaved(); // le score (ou l'absence) d'un joueur apparaît tout de suite chez les autres
   render();
 }
 // Bloc de contrôle affiché sous un match / affrontement côté joueur
