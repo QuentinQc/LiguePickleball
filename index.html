@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 465">
+<meta name="app-build" content="Version 466">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1912,6 +1912,28 @@ body.desk .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));ga
 body.desk .rp-grid > .card{margin:0;}
 .rp-acts{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px;}
 .dk-tbl td.num, .dk-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+/* Accueil du poste de travail */
+.dkh-head{display:flex;flex-direction:column;gap:2px;margin:4px 0 16px;}
+.dkh-head small{color:var(--muted);font-size:13px;}
+.dkh-head h1{margin:0;font:600 28px var(--font-display);text-transform:uppercase;letter-spacing:.02em;}
+.dkh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:18px;}
+.dkh-card{background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.dkh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.dkh-top b{display:block;font:600 19px var(--font-display);text-transform:uppercase;letter-spacing:.02em;}
+.dkh-top small{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+.dkh-n{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.dkh-n div{background:rgba(0,0,0,.18);border-radius:12px;padding:9px 10px;}
+.dkh-n b{display:block;font:600 22px var(--font-display);}
+.dkh-n span{font-size:11px;color:var(--muted);}
+.dkh-n .w b{color:var(--paddle);}
+.dkh-n .g b{color:var(--ball);}
+.dkh-acts{display:flex;gap:8px;}
+.dkh-acts .btn{flex:1;}
+.dkh-acts .btn-secondary{flex:0 0 auto;}
+.dkh-act{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px;font-size:13px;}
+.dkh-act div{color:var(--text);padding:6px 0;border-top:1px solid var(--line-soft);}
+.dkh-act small{color:var(--muted);margin-right:6px;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -8310,6 +8332,17 @@ function summarizeAdminLeague(data, lg){
     (open.groupsData||[]).forEach(gd=>(gd.matches||[]).forEach(m=>{ total++; if(m.scoreA!=null && m.scoreB!=null && m.scoreA!=='' && m.scoreB!=='') done++; }));
     const absNames = (open.absences||[]).map(function(id){ const pl = players.find(function(x){ return x.id === id; }); return pl ? String(pl.name || '').split(' ')[0] : null; }).filter(Boolean);
     out.open = { date: open.date, published: !!open.published, total, done, absences: (open.absences||[]).length, absNames: absNames };
+    // Places libres : absent sans remplaçant (ni prêt) dans son groupe. En récréatif, le tirage s'ajuste : aucune place libre.
+    let free = 0;
+    if(!out.rec) (open.absences||[]).forEach(function(id){
+      if(open.loans && open.loans[id]) return;
+      const pl = players.find(function(x){ return x.id === id; }); if(!pl || !pl.groupId) return;
+      const gd = (open.groupsData||[]).find(function(x){ return x.groupId === pl.groupId; });
+      if(!(gd && gd.substitutes && gd.substitutes[id])) free++;
+    });
+    out.open.free = free;
+    out.open.subsDispo = (open.availableSubs||[]).length;
+    out.open.present = players.filter(function(p){ return !p.injured && !(open.absences||[]).includes(p.id); }).length;
     if(out.rec){
       const courts = {};
       players.forEach(p=>{ if(p.groupId && !p.injured && !(open.absences||[]).includes(p.id)) courts[p.groupId] = 1; });
@@ -8577,6 +8610,40 @@ async function mergeOrgMembers(keep, drop){
   showToast('Fiches fusionnées' + (removed ? ' · ' + removed + ' doublon' + (removed > 1 ? 's' : '') + ' retiré' + (removed > 1 ? 's' : '') : ''));
 }
 
+
+// ==================== Accueil du poste de travail ====================
+function dkLeagueTab(id, t){ dkClose(); openAdminLeague(id, t); }
+function deskLeagueCardHTML(lg){
+  const sum = adminSummaryFor(lg), st = adminLeagueState(sum), o = sum && sum.open;
+  const when = o ? ('Prochaine : ' + fdl(o.date) + (sum.playTime ? ' · ' + fmtHM(sum.playTime) : ''))
+    : (lg.schedule_label ? escapeHTML(lg.schedule_label) + ' · aucune session en cours' : 'Aucune session en cours');
+  const nP = o ? o.present : (sum ? sum.players : 0);
+  const tiles = `<div class="dkh-n">
+      <div><b>${nP}</b><span>${o ? 'présents' : 'joueurs'}</span></div>
+      <div class="${o && o.absences ? 'w' : ''}"><b>${o ? o.absences : '—'}</b><span>absent${o && o.absences > 1 ? 's' : ''}</span></div>
+      <div class="${o && o.subsDispo ? 'g' : ''}"><b>${o ? o.subsDispo : '—'}</b><span>rempl. dispo</span></div>
+    </div>`;
+  return `<article class="dkh-card">
+    <div class="dkh-top"><div><b>${escapeHTML(lg.name)}</b><small>${when}</small></div><span class="ah-st ${st.cls}">${st.label}</span></div>
+    ${tiles}
+    <div class="dkh-acts"><button type="button" class="btn btn-primary" onclick="dkLeague('${lg.id}')">${escapeHTML(st.cta || 'Ouvrir la ligue')}</button><button type="button" class="btn btn-secondary" onclick="dkLeagueTab('${lg.id}','joueurs')">Joueurs</button></div>
+  </article>`;
+}
+function deskActivityHTML(){
+  if(!INBOX_FETCHED) return '';
+  const items = (INBOX || []).slice(0, 8);
+  if(!items.length) return '';
+  return `<div class="pf-sec">Activité récente</div><div class="card"><div class="dkh-act">${items.map(function(x){ return `<div><small>${escapeHTML(partnerRelTime(x.created_at))}</small>${escapeHTML(x.body || x.title || '')}</div>`; }).join('')}</div></div>`;
+}
+function deskHomeHTML(){
+  const first = String((CURRENT_PROFILE && (CURRENT_PROFILE.display_name || '')) || '').split(' ')[0];
+  const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
+  return `<div class="dkh-head"><small>${escapeHTML(frDateLong(fmtDate(new Date())))}</small><h1>${first ? 'Bonjour ' + escapeHTML(first) + ', voici ta semaine' : 'Voici ta semaine'}</h1></div>
+    ${deskTodoHTML()}
+    <div class="pf-sec">Ligues</div>
+    <div class="dkh-grid">${leagues.map(deskLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>
+    ${deskActivityHTML()}`;
+}
 // ==================== À faire (accueil du poste de travail) ====================
 function deskTodoHTML(){
   let pend = 0, interest = 0, dups = 0;
@@ -8591,9 +8658,10 @@ function deskTodoHTML(){
     if(isOrganizerOnly() && ORGANIZER_LEAGUES.indexOf(l.id) === -1) return;
     const sm = adminSummaryFor(l); if(!sm || !sm.open) return;
     if(!sm.open.published) tiles.push(`<button type="button" onclick="dkLeague('${l.id}')"><b>!</b>${escapeHTML(l.name)} : session à publier<small>${escapeHTML(fdl(sm.open.date))}</small></button>`);
+    if(sm.open.free) tiles.push(`<button type="button" onclick="dkLeague('${l.id}')"><b>${sm.open.free}</b>Place${sm.open.free>1?'s':''} libre${sm.open.free>1?'s':''} · ${escapeHTML(l.name)}<small>${sm.open.subsDispo ? sm.open.subsDispo + ' remplaçant' + (sm.open.subsDispo>1?'s':'') + ' disponible' + (sm.open.subsDispo>1?'s':'') : 'aucun remplaçant disponible pour l\'instant'}</small></button>`);
   });
   if(!tiles.length) tiles.push(`<button type="button" class="ok" onclick="dkOrg('membres')"><b>✓</b>Rien en attente<small>toutes les demandes sont traitées</small></button>`);
-  return `<div class="pf-sec" style="margin-top:4px;">À faire</div><div class="dk-todo">${tiles.join('')}</div>`;
+  return `<div class="pf-sec" style="margin-top:4px;">À faire maintenant</div><div class="dk-todo">${tiles.join('')}</div>`;
 }
 
 // ==================== Recherche Ctrl+K (poste de travail) ====================
@@ -8691,7 +8759,7 @@ function adminHomeHTML(){
   html += accUpcomingHTML();
   if(isDesk()){
     if(!(ORG_ROSTER_ENTRIES_CACHE || []).length && !DESK_ROSTER_ASKED){ DESK_ROSTER_ASKED = true; Promise.all([loadOrgRoster(), loadOrgMembers()]).then(function(){ ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries(); if(!MODAL && !VIEW.adet && (VIEW.atab === undefined || VIEW.atab === 'accueil')) render(); }).catch(function(){}); }
-    html = deskTodoHTML() + html;
+    html = deskHomeHTML() + accUpcomingHTML();
   }
   setTimeout(()=>refreshAdminSummaries(false), 0);
   return html;
