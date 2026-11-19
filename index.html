@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 471">
+<meta name="app-build" content="Version 472">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8818,13 +8818,28 @@ function deskActivityHTML(){
   if(!items.length) return '';
   return `<div class="pf-sec">Activité récente</div><div class="card"><div class="dkh-act">${items.map(function(x){ return `<div><small>${escapeHTML(partnerRelTime(x.created_at))}</small>${escapeHTML(x.body || x.title || '')}</div>`; }).join('')}</div></div>`;
 }
+// L'accueil montre seulement les ligues dont on est organisateur (les admins compris) ;
+// les autres ligues de l'organisation restent dans le menu et dans Organisations.
+let HOME_ORGZ_ASKED = false, HOME_ORGZ_READY = false;
+function homeOrganizerLeaguesReady(){
+  if(isOrganizerOnly()) return true;
+  if(!HOME_ORGZ_ASKED && CURRENT_PROFILE){
+    HOME_ORGZ_ASKED = true;
+    loadMyOrganizerLeagues(CURRENT_PROFILE.id).then(function(){ HOME_ORGZ_READY = true; if(!MODAL && !VIEW.adet) render(); }, function(){ HOME_ORGZ_READY = true; });
+  }
+  return HOME_ORGZ_READY;
+}
+function isMyHomeLeague(l){ return ORGANIZER_LEAGUES.indexOf(l.id) !== -1; }
+function homeNoLeagueHTML(){
+  return `<div class="card"><p class="empty" style="margin:0;">Tu n'es organisateur d'aucune ligue.</p><p class="small" style="margin:6px 0 0;color:var(--muted);">Les ligues de l'organisation restent accessibles ${isDesk() ? 'dans le menu de gauche' : 'dans Organisations'}. Pour qu'une ligue apparaisse ici, ajoute-toi dans ses Réglages › Organisateurs.</p></div>`;
+}
 function deskHomeHTML(){
   const first = String((CURRENT_PROFILE && (CURRENT_PROFILE.display_name || '')) || '').split(' ')[0];
-  const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
+  const ready = homeOrganizerLeaguesReady();
+  const leagues = myOrgLeagues().filter(isMyHomeLeague);
   return `<div class="dkh-head"><small>${escapeHTML(frDateLong(fmtDate(new Date())))}</small><h1>${first ? 'Bonjour ' + escapeHTML(first) + ', voici ta semaine' : 'Voici ta semaine'}</h1></div>
-    ${deskTodoHTML()}
-    <div class="pf-sec">Ligues</div>
-    <div class="dkh-grid">${leagues.map(deskLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>
+    <div class="pf-sec">Mes ligues</div>
+    ${!ready ? '<p class="small">Chargement…</p>' : (leagues.length ? `<div class="dkh-grid">${leagues.map(deskLeagueCardHTML).join('')}</div>` : homeNoLeagueHTML())}
     ${deskActivityHTML()}`;
 }
 
@@ -9070,7 +9085,8 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
 let ADMIN_HOME_PRELOADED = false;
 function adminHomeHTML(){
   const orgs = adminHomeOrgs();
-  const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1)); };
+  const homeReady = homeOrganizerLeaguesReady();
+  const leaguesOf = function(oid){ return LEAGUES.filter(l=>l.organization_id===oid && isMyHomeLeague(l)); };
   if(!ADMIN_HOME_PRELOADED){ ADMIN_HOME_PRELOADED = true; Promise.all([loadAllProfiles(), loadAllProfilePlayers()]).then(()=>{ if(!MODAL && (VIEW.atab===undefined || VIEW.atab==='accueil')) render(); }).catch(function(){}); }
   const ready = ALL_PROFILES && ALL_PROFILES.length && ALL_PROFILE_PLAYERS && ALL_PROFILE_PLAYERS.length;
   let html = '';
@@ -9089,7 +9105,7 @@ function adminHomeHTML(){
       ? `<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${btns.join('').replace(/class="ah-pend"/g, 'class="ah-pend" style="margin-left:0;"')}</span>`
       : `<span class="ah-org-r">${ls.length} ligue${ls.length>1?'s':''}</span>`;
     html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
-    <div class="ah-grid">${ls.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
+    ${ls.length ? `<div class="ah-grid">${ls.map(adminLeagueCardHTML).join('')}</div>` : (homeReady ? homeNoLeagueHTML() : '<p class="small">Chargement…</p>')}`;
   });
   html += accUpcomingHTML();
   if(isDesk()){
