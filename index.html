@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 463">
+<meta name="app-build" content="Version 464">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1890,6 +1890,17 @@ body.desk .rs-board > .card{margin:0;}
 .dk-srch-res button:hover, .dk-srch-res button.on{border-color:var(--ball);background:rgba(207,234,92,.08);}
 .dk-srch-res small{color:var(--muted);}
 body.desk .dk-k{margin:6px 0 0;font-size:12px;color:var(--muted);background:none;border:1px dashed var(--line-soft-strong);border-radius:10px;padding:8px 10px;text-align:left;cursor:pointer;}
+
+/* Ligue sur ordinateur : les sections sont dans le menu de gauche, pas de deuxième rangée d'onglets. */
+body.desk .lg-ov .lg-nav{display:none;}
+body.desk .lg-ov .lg-sheet .sd-dock{top:0;}
+.dk-tbl th.srt{cursor:pointer;user-select:none;}
+.dk-tbl th.srt:hover{color:var(--text);}
+.dk-tbl th.srt.on{color:var(--ball);}
+.apv-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(207,234,92,.08);border:1px solid var(--line-soft-strong);}
+.apv-bar label{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;}
+.apv-bar input, .apv-ck{width:20px;height:20px;accent-color:var(--ball);cursor:pointer;flex:none;}
+.apv-bar .btn{margin-left:auto;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -11518,7 +11529,7 @@ function organizationAccountsHTML(){
       .concat(unlinkedSubstitutesByLeague(r.league_id).map(x=>({ value:'s::'+x.id, person:x })));
     const m = bestApprovalMatch(cands, r.email, r.display_name);
     return { name: r.display_name || '—', email: r.email || '', label: initialsOf(r.display_name||r.email), source: escapeHTML(leagueLbl(r.league_id)),
-      select: `<select id="reqSel_${r.id}">${reqOptions(r, m ? m.value : 'j::__new__')}</select>`, note: matchNote(m),
+      select: `<select id="reqSel_${r.id}">${reqOptions(r, m ? m.value : 'j::__new__')}</select>`, note: matchNote(m), ck: r.kind === 'interest' ? '' : `<input type="checkbox" class="apv-ck" data-k="r" data-id="${r.id}" aria-label="Sélectionner ${escapeHTML(r.display_name || r.email || '')}">`,
       buttons: `<button class="btn btn-primary" style="flex:1;" onclick="approveJoinRequest('${r.id}')">${r.kind==='interest' ? 'Ajouter à la ligue' : 'Approuver'}</button><button class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">${r.kind==='interest' ? 'Retirer' : 'Refuser'}</button>`, admin: '' };
   };
   const items = reqs.map(reqItem).concat(pending.map(pr=>{
@@ -11530,7 +11541,7 @@ function organizationAccountsHTML(){
     const m = bestApprovalMatch(cands, pr.email, pr.display_name);
     const cur = m ? m.value : (orgLeagues.length===1 ? orgLeagues[0].id + '::j::__new__' : '');
     return { name: pr.display_name || '—', badge: pr.role==='admin' ? ' <span class="tag tag-up">Admin</span>' : '', email: pr.email || '', label: initialsOf(pr.display_name||pr.email), source: 'À placer dans une ligue',
-      select: `<select id="linkSelect_${pr.id}"><option value="">— choisir une ligue et un joueur —</option>${optionsFor(pr, cur)}</select>`, note: matchNote(m),
+      select: `<select id="linkSelect_${pr.id}"><option value="">— choisir une ligue et un joueur —</option>${optionsFor(pr, cur)}</select>`, note: matchNote(m), ck: `<input type="checkbox" class="apv-ck" data-k="a" data-id="${pr.id}" aria-label="Sélectionner ${escapeHTML(pr.display_name || pr.email || '')}">`,
       buttons: `<button class="btn btn-primary" style="flex:1;" onclick="linkAccount('${pr.id}')">Approuver</button>`, admin: `<div style="margin-top:6px;">${roleButton(pr)}</div>` };
   }));
   const reqHTML = `<div class="card">
@@ -11539,6 +11550,7 @@ function organizationAccountsHTML(){
       <button class="btn-ghost" onclick="refreshAccountsTab()">↻ rafraîchir</button>
     </div>
     <p class="small" style="margin:8px 0 4px;">Personnes qui veulent accéder à l'application. Le joueur correspondant est proposé quand on le reconnaît (courriel ou nom) : vérifie-le, puis approuve.</p>
+    ${items.length > 1 ? `<div class="apv-bar"><label><input type="checkbox" onchange="document.querySelectorAll('.apv-ck').forEach(function(c){ c.checked = this.checked; }, this)"> Tout cocher</label><span class="small" style="color:var(--muted);">Vérifie le joueur proposé de chaque personne cochée.</span><button type="button" class="btn btn-primary" onclick="approveSelected()">Approuver la sélection</button></div>` : ''}
     ${itemsHTML(items, 'Rien à approuver')}
   </div>`;
   const interestHTML = !interest.length ? '' : `<div class="card">
@@ -11550,7 +11562,7 @@ function organizationAccountsHTML(){
   function itemsHTML(list, emptyText){ return `<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
       ${list.map(it=>`<div class="pf-list" style="padding:14px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <div class="member-avatar">${escapeHTML(it.label)}</div>
+          ${it.ck || ''}<div class="member-avatar">${escapeHTML(it.label)}</div>
           <div style="min-width:0;flex:1;">
             <div style="font-weight:700;font-size:16px;">${escapeHTML(it.name)}${it.badge || ''}</div>
             <div class="small" style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(it.email)} · ${it.source}</div>
@@ -11678,10 +11690,10 @@ async function manageJoinCode(leagueId, action){
   await loadAllProfiles();
   render();
 }
-async function approveJoinRequest(reqId){
+async function approveJoinRequest(reqId, rawIn){
   const r = (ALL_JOIN_REQUESTS||[]).find(x=>x.id===reqId); if(!r) return;
   const sel = document.getElementById('reqSel_'+reqId);
-  const raw = sel && sel.value; if(!raw){ showAlert('Choisis qui est cette personne dans la ligue.'); return; }
+  const raw = rawIn || (sel && sel.value); if(!raw){ showAlert('Choisis qui est cette personne dans la ligue.'); return; }
   const parts = raw.split('::'); const kind = parts[0]; let val = parts[1];
   if(val === '__new__'){
     val = await addNamedEntryToLeague(r.league_id, r.display_name || r.email, kind==='s' ? 'remplacant' : 'joueur', r.email, null, undefined, r.profile_id);
@@ -11694,6 +11706,27 @@ async function approveJoinRequest(reqId){
   const lm = LEAGUES.find(l=>l.id===r.league_id);
   try{ notifyAccountApproved(r.profile_id, lm && (lm.schedule_label || lm.name)); }catch(e){}
   await refreshAfterAccountChange(r.profile_id, r.league_id);
+}
+// Approbation en lot : chaque personne cochée est approuvée avec le joueur choisi dans sa liste.
+function approveSelected(){
+  const picks = Array.prototype.slice.call(document.querySelectorAll('.apv-ck:checked')).map(function(c){
+    const k = c.getAttribute('data-k'), id = c.getAttribute('data-id');
+    const sel = document.getElementById((k === 'r' ? 'reqSel_' : 'linkSelect_') + id);
+    return { k: k, id: id, raw: sel ? sel.value : '' };
+  });
+  if(!picks.length){ showAlert('Coche au moins une personne.'); return; }
+  if(picks.some(function(x){ return !x.raw; })){ showAlert('Choisis le joueur correspondant pour chaque personne cochée.'); return; }
+  // Deux personnes reliées au même joueur existant : on arrête avant de rien changer.
+  const key = function(x){ if(x.raw.indexOf('__new__') !== -1) return null; if(x.k === 'a') return x.raw.split('::').slice(1).join('::') + '@' + x.raw.split('::')[0]; const r = (ALL_JOIN_REQUESTS||[]).find(function(q){ return q.id === x.id; }); return x.raw + '@' + (r ? r.league_id : ''); };
+  const seen = {}, dup = picks.some(function(x){ const kk = key(x); if(!kk) return false; if(seen[kk]) return true; seen[kk] = 1; return false; });
+  if(dup){ showAlert('Deux personnes cochées sont reliées au même joueur. Corrige le choix avant d\'approuver.'); return; }
+  showConfirm('Approuver ' + picks.length + ' personne' + (picks.length > 1 ? 's' : '') + ' avec le joueur choisi pour chacune ?', async function(){
+    let n = 0;
+    for(const x of picks){
+      try{ if(x.k === 'r') await approveJoinRequest(x.id, x.raw); else await linkAccount(x.id, x.raw); n++; }catch(e){ console.error(e); }
+    }
+    showToast(n + ' demande' + (n > 1 ? 's' : '') + ' traitée' + (n > 1 ? 's' : ''));
+  });
 }
 // Même personne inscrite dans d'autres ligues de l'organisation : reliée en même temps.
 async function linkSamePersonElsewhere(profileId, leagueId, key){
@@ -11757,9 +11790,9 @@ async function refreshAfterAccountChange(profileId, leagueId){
 }
 // La ligue à lier n'est plus fixée d'avance (CURRENT_LEAGUE_ID) : elle est
 // choisie dans le menu déroulant, encodée dans sa valeur en "leagueId::playerId".
-async function linkAccount(profileId){
+async function linkAccount(profileId, rawIn){
   const select = document.getElementById('linkSelect_'+profileId);
-  const raw = select.value;
+  const raw = rawIn || (select ? select.value : '');
   if(!raw) return;
   const [leagueId, kind, val] = raw.split('::');
   const pr = ALL_PROFILES.find(p=>p.id===profileId);
@@ -14622,8 +14655,8 @@ function orgFilteredEntries(entries){
   const byName = (x,y)=>x.e.name.localeCompare(y.e.name);
   list.sort((x,y)=>{
     let c = 0;
-    if(f.sort==='leagues') c = y.e.rows.length - x.e.rows.length;
-    else if(f.sort==='compte') c = (y.e.profileId?1:0) - (x.e.profileId?1:0);
+    if(f.sort==='leagues') c = (y.e.rows.length - x.e.rows.length) * f.sortDir;
+    else if(f.sort==='compte') c = ((y.e.profileId?1:0) - (x.e.profileId?1:0)) * f.sortDir;
     else if(f.sort && f.sort.indexOf('L:')===0){ const id=f.sort.slice(2); c = (rank(x.e,id)-rank(y.e,id)) * f.sortDir; }
     else if(f.sort==='name') c = byName(x,y) * f.sortDir;
     return c || byName(x,y);
@@ -14726,9 +14759,14 @@ function orgDeskTableHTML(entries, list){
     </tr>`;
   }).join('');
   return bulk + `<div class="dk-tbl-wrap"><table class="dk-tbl">
-    <thead><tr><th class="dk-cb"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="orgSelAll(this.checked)" aria-label="Tout sélectionner"></th><th>Nom</th><th>Compte</th><th>Ligues</th><th></th></tr></thead>
+    <thead><tr><th class="dk-cb"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="orgSelAll(this.checked)" aria-label="Tout sélectionner"></th>${orgSortTh('name','Nom')}${orgSortTh('compte','Compte')}${orgSortTh('leagues','Ligues')}<th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
     ${entries.length === 0 ? `<p class="empty">Aucun membre pour l'instant</p>` : (list.length === 0 ? `<p class="empty">Aucun résultat avec ces filtres</p>` : '')}`;
+}
+// En-tête de colonne cliquable : trie, puis inverse l'ordre au deuxième clic.
+function orgSortTh(key, label){
+  const f = orgFilterState(), on = (f.sort || 'name') === key;
+  return `<th class="srt${on ? ' on' : ''}" onclick="setOrgReportSort('${key}')" aria-sort="${on ? (f.sortDir > 0 ? 'ascending' : 'descending') : 'none'}">${label}${on ? (f.sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
 }
 function orgBulkAddToLeague(){
   const sel = orgSelected(); if(!sel.length) return;
