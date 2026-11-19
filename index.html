@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 472">
+<meta name="app-build" content="Version 473">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1994,6 +1994,25 @@ body.desk .sd-q{display:inline-flex;align-items:center;justify-content:center;wi
 .jp-pill.ok{background:var(--ball);border-color:var(--ball);color:var(--court);font-weight:600;}
 .jp-pill.w{color:var(--paddle);border-color:rgba(242,153,74,.45);}
 .jp-pill.g{color:var(--ball);border-color:rgba(207,234,92,.45);}
+
+/* Membres : un bouton « Filtres » (choix multiples) */
+.org-fbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.org-fbar input[type=search]{flex:1 1 240px;margin:0;}
+.org-fbtn{display:inline-flex;align-items:center;gap:8px;font:600 14px var(--font-body);color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line-soft-strong);border-radius:12px;padding:10px 14px;cursor:pointer;}
+.org-fbtn.on{border-color:var(--ball);color:var(--ball);}
+.org-fbtn b{background:var(--ball);color:var(--court);border-radius:999px;font-size:12px;padding:0 7px;}
+.org-fbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;}
+.org-fmeta{display:flex;align-items:center;gap:10px;margin-left:auto;font-size:13px;color:var(--muted);}
+.org-fmeta button{background:none;border:0;color:var(--ball);font:600 13px var(--font-body);cursor:pointer;padding:4px;}
+.org-fchips{display:flex;flex-wrap:wrap;gap:6px;}
+.org-fchips button{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--font-body);color:var(--court);background:var(--ball);border:0;border-radius:999px;padding:5px 10px;cursor:pointer;}
+.of-sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:14px 2px 6px;}
+.of-sec:first-child{margin-top:0;}
+.of-list{display:flex;flex-wrap:wrap;gap:8px;}
+.of-list label{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;border:1px solid var(--line-soft-strong);cursor:pointer;font-size:14px;}
+.of-list input{width:18px;height:18px;accent-color:var(--ball);}
+.of-acts{display:flex;gap:8px;margin-top:16px;}
+.of-acts .btn{flex:1;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -15171,22 +15190,30 @@ function organizationGeneralHTML(){
 // compte (profil lié) ou, à défaut, le même nom. Voir loadOrgRoster().
 // ---- Filtres / tri partagés par Membres et Rapport (état gardé dans VIEW).
 function orgFilterState(){
-  if(!VIEW.orgFilter) VIEW.orgFilter = { q:'', league:'', status:'', sort:'name', sortDir:1 };
-  return VIEW.orgFilter;
+  if(!VIEW.orgFilter) VIEW.orgFilter = { q:'', leagues:[], st:[], sort:'name', sortDir:1 };
+  const f = VIEW.orgFilter;
+  if(!f.leagues) f.leagues = f.league ? [f.league] : [];
+  if(!f.st) f.st = f.status ? [f.status] : [];
+  return f;
 }
+// Statuts : un choix par groupe se combine en « ou », les groupes entre eux en « et ».
+const ORG_ST = { joueur:['role','Joueur'], 'remplaçant':['role','Remplaçant'], 'sans-ligue':['role','Sans ligue'], compte:['acc','Avec compte'], 'sans-compte':['acc','Sans compte'] };
 function orgEntryMatches(e){
   const f = orgFilterState();
   const q = (f.q||'').trim().toLowerCase();
   if(q && !((e.name||'').toLowerCase().includes(q) || (e.email||'').toLowerCase().includes(q))) return false;
-  const rows = f.league ? e.rows.filter(r=>r.leagueId===f.league) : e.rows;
-  if(f.league && !rows.length) return false;
-  switch(f.status){
+  const rows = f.leagues.length ? e.rows.filter(r=>f.leagues.indexOf(r.leagueId)!==-1) : e.rows;
+  if(f.leagues.length && !rows.length) return false;
+  const test = function(k){ switch(k){
     case 'joueur': return rows.some(r=>r.type==='joueur');
     case 'remplaçant': return rows.some(r=>r.type==='remplaçant');
     case 'sans-ligue': return e.rows.length===0;
     case 'compte': return !!e.profileId;
     case 'sans-compte': return !e.profileId;
-  }
+  } return true; };
+  const role = f.st.filter(k=>ORG_ST[k] && ORG_ST[k][0]==='role'), acc = f.st.filter(k=>ORG_ST[k] && ORG_ST[k][0]==='acc');
+  if(role.length && !role.some(test)) return false;
+  if(acc.length && !acc.some(test)) return false;
   return true;
 }
 // Retourne [{e, i}] filtrés et triés ; i = index dans ORG_ROSTER_ENTRIES_CACHE
@@ -15208,25 +15235,45 @@ function orgFilteredEntries(entries){
 }
 function orgFilterBarHTML(kind){
   const f = orgFilterState();
-  const leagues = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
-  const chip = (key,val,label)=>`<button type="button" class="org-chip ${f[key]===val?'active':''}" onclick="setOrgFilter('${key}','${val}')">${label}</button>`;
-  const statuses = [['','Tous'],['joueur','Joueur'],['remplaçant','Remplaçant'],['sans-ligue','Sans ligue'],['compte','Compte lié'],['sans-compte','Sans compte']];
+  const lgs = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
+  const n = f.leagues.length + f.st.length;
+  const active = f.leagues.map(function(id){ const l = lgs.find(function(x){ return x.id === id; }); return l ? `<button type="button" onclick="orgDropFilter('L','${id}')">${escapeHTML(l.schedule_label || l.name)} ✕</button>` : ''; }).join('')
+    + f.st.map(function(k){ return ORG_ST[k] ? `<button type="button" onclick="orgDropFilter('S','${k}')">${ORG_ST[k][1]} ✕</button>` : ''; }).join('');
+  const sortSel = (kind === 'membres' && !(isDesk() && document.body.classList.contains('desk'))) ? `<select aria-label="Trier" onchange="setOrgFilter('sort',this.value)" style="width:auto;margin:0;">
+      <option value="name" ${f.sort==='name'?'selected':''}>Trier : nom</option>
+      <option value="leagues" ${f.sort==='leagues'?'selected':''}>Trier : nombre de ligues</option>
+      <option value="compte" ${f.sort==='compte'?'selected':''}>Trier : compte lié d'abord</option>
+    </select>` : '';
   return `<div class="org-filter">
-    <input type="search" id="orgFilterQ" placeholder="Rechercher un nom ou un courriel…" value="${escapeHTML(f.q||'')}" oninput="setOrgFilter('q',this.value,true)">
-    <div class="org-filter-row"><span class="org-filter-label">Ligue</span>${chip('league','','Toutes')}${leagues.map(l=>chip('league',l.id,escapeHTML(l.schedule_label||l.name))).join('')}</div>
-    <div class="org-filter-row"><span class="org-filter-label">Statut</span>${statuses.map(([v,l])=>chip('status',v,l)).join('')}</div>
-    <div class="org-filter-row">
-      ${kind==='membres' ? `<span class="org-filter-label">Trier par</span>
-      <select onchange="setOrgFilter('sort',this.value)" style="width:auto;">
-        <option value="name" ${f.sort==='name'?'selected':''}>Nom (A→Z)</option>
-        <option value="leagues" ${f.sort==='leagues'?'selected':''}>Nombre de ligues</option>
-        <option value="compte" ${f.sort==='compte'?'selected':''}>Compte lié d'abord</option>
-      </select>` : ''}
-      <span class="org-filter-count" id="orgFilterCount"></span>
-      <button type="button" class="org-chip" onclick="resetOrgFilters()">Réinitialiser</button>
-      <button type="button" class="org-chip" onclick="exportOrgListCSV()">Exporter (CSV)</button>
+    <div class="org-fbar">
+      <input type="search" id="orgFilterQ" placeholder="Rechercher un nom ou un courriel…" value="${escapeHTML(f.q||'')}" oninput="setOrgFilter('q',this.value,true)">
+      <button type="button" class="org-fbtn${n ? ' on' : ''}" onclick="openOrgFilters()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>Filtres${n ? ` <b>${n}</b>` : ''}</button>
+      ${sortSel}
+      <span class="org-fmeta"><span id="orgFilterCount"></span>${n || f.q ? '<button type="button" onclick="resetOrgFilters()">Tout effacer</button>' : ''}<button type="button" onclick="exportOrgListCSV()">Exporter</button></span>
     </div>
+    ${active ? `<div class="org-fchips">${active}</div>` : ''}
   </div>`;
+}
+function orgDropFilter(kind, v){
+  const f = orgFilterState();
+  if(kind === 'L') f.leagues = f.leagues.filter(function(x){ return x !== v; }); else f.st = f.st.filter(function(x){ return x !== v; });
+  render();
+}
+function openOrgFilters(){
+  const f = orgFilterState();
+  const lgs = myOrgLeagues().slice().sort((a,b)=>(a.schedule_label||a.name).localeCompare(b.schedule_label||b.name));
+  const box = function(cls, v, label, on){ return `<label><input type="checkbox" class="${cls}" value="${escapeHTML(v)}" ${on ? 'checked' : ''}>${label}</label>`; };
+  showContentModal('Filtres', `<div class="of-sec">Ligues</div><div class="of-list">${lgs.map(function(l){ return box('of-l', l.id, escapeHTML(l.schedule_label || l.name), f.leagues.indexOf(l.id) !== -1); }).join('')}</div>
+    <div class="of-sec">Rôle</div><div class="of-list">${['joueur','remplaçant','sans-ligue'].map(function(k){ return box('of-s', k, ORG_ST[k][1], f.st.indexOf(k) !== -1); }).join('')}</div>
+    <div class="of-sec">Compte</div><div class="of-list">${['compte','sans-compte'].map(function(k){ return box('of-s', k, ORG_ST[k][1], f.st.indexOf(k) !== -1); }).join('')}</div>
+    <p class="small" style="margin:12px 2px 0;color:var(--muted);">Plusieurs choix dans une même section : l'un ou l'autre. Entre les sections : les deux à la fois.</p>
+    <div class="of-acts"><button type="button" class="btn btn-secondary" onclick="document.querySelectorAll('.of-l,.of-s').forEach(function(c){ c.checked = false; })">Tout décocher</button><button type="button" class="btn btn-primary" onclick="applyOrgFilters()">Appliquer</button></div>`);
+}
+function applyOrgFilters(){
+  const f = orgFilterState();
+  f.leagues = Array.prototype.slice.call(document.querySelectorAll('.of-l:checked')).map(function(c){ return c.value; });
+  f.st = Array.prototype.slice.call(document.querySelectorAll('.of-s:checked')).map(function(c){ return c.value; });
+  closeModal();
 }
 function setOrgFilter(key, val, keepFocus){
   const f = orgFilterState();
@@ -15269,7 +15316,7 @@ function exportOrgListCSV(){
 }
 function orgUpdateCount(shown, total){
   const el = document.getElementById('orgFilterCount');
-  if(el) el.textContent = shown + ' sur ' + total;
+  if(el) el.textContent = shown === total ? total + ' membre' + (total > 1 ? 's' : '') : shown + ' sur ' + total;
 }
 // ---- Membres en tableau (poste de travail) ----
 let ORG_SEL = {};   // personnes cochées (clé = fiche membre, sinon nom)
@@ -15429,7 +15476,7 @@ function orgReportBodyHTML(){
   };
   const arrow = key=> f.sort===key ? (f.sortDir>0?' ▲':' ▼') : '';
   const th = (key,label)=>`<th class="sortable ${f.sort===key?'active':''}" onclick="setOrgReportSort('${key}')">${label}${arrow(key)}</th>`;
-  const shownLeagues = f.league ? leagues.filter(l=>l.id===f.league) : leagues;
+  const shownLeagues = f.leagues.length ? leagues.filter(l=>f.leagues.indexOf(l.id)!==-1) : leagues;
   return `<div style="overflow-x:auto;"><table>
     <tr>${th('name','Nom')}${shownLeagues.map(l=>th('L:'+l.id, escapeHTML(l.schedule_label||l.name))).join('')}</tr>
     ${list.map(({e,i})=>`<tr>
