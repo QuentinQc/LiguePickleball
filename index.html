@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 478">
+<meta name="app-build" content="Version 479">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -14433,17 +14433,17 @@ function reportsSessionHTML(){
     </div>
   </div>
   <div class="card">
-    <div class="pf-sec" style="margin-top:0;">Par joueur</div>
-    ${isDesk() ? '' : rpSortHTML([['avgPts','Pts moyens'],['wins','Victoires'],['losses','Défaites'],['totalPoints','Pts totaux'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
+    <div class="pf-sec" style="margin-top:0;">Classement cumulatif</div>
+    ${isDesk() ? '' : rpSortHTML([['avgPts','Pts moyens'],['wins','Victoires'],['losses','Défaites'],['winRate','% victoires'],['totalPoints','Pts totaux'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
     ${(sorted.length && isDesk()) ? (function(){
       const th = function(k, l, num){ const on = sortBy === k; return `<th class="srt${on ? ' on' : ''}${num ? ' num' : ''}" onclick="setReportsSort('${k}')">${l}${on ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`; };
-      return `<div class="rp-acts"><button type="button" class="btn btn-secondary" onclick="exportPlayerReportsCSV()">Exporter (Excel)</button></div><div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>${th('name','Joueur')}<th>${escapeHTML(grpWord(false, true))}</th>${th('avgPts','Pts moyens (sur 9)',1)}${th('wins','Victoires',1)}${th('losses','Défaites',1)}${th('totalPoints','Pts totaux',1)}</tr></thead><tbody>${sorted.map(function(r){
+      return `<div class="rp-acts"><button type="button" class="btn btn-secondary" onclick="exportPlayerReportsCSV()">Exporter (Excel)</button></div><div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>${th('name','Joueur')}<th>${escapeHTML(grpWord(false, true))}</th>${th('avgPts','Pts moyens (sur 9)',1)}${th('wins','Victoires',1)}${th('losses','Défaites',1)}${th('winRate','% victoires',1)}${th('totalPoints','Pts totaux',1)}</tr></thead><tbody>${sorted.map(function(r){
         const g = groupById(r.player.groupId);
         const avg = r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '—';
-        return `<tr onclick="openPlayerDetailModal('${r.player.id}')"><td><b>${escapeHTML(r.player.name)}</b></td><td>${escapeHTML(g ? g.name : '—')}</td><td class="num" style="color:var(--ball);font-family:var(--font-display);font-size:15px;">${avg}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td><td class="num">${r.totalPoints}</td></tr>`;
+        return `<tr onclick="openPlayerDetailModal('${r.player.id}')"><td><b>${escapeHTML(r.player.name)}</b></td><td>${escapeHTML(g ? g.name : '—')}</td><td class="num" style="color:var(--ball);font-family:var(--font-display);font-size:15px;">${avg}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td><td class="num">${pct(r.winRate)}</td><td class="num">${r.totalPoints}</td></tr>`;
       }).join('')}</tbody></table></div>`; })() : sorted.length ? `<div class="pf-list">${sorted.map(r=>{
       const avg = r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '—';
-      const bits = [`moy. ${avg}`, `${r.wins}-${r.losses}`, `${r.totalPoints} pts`];
+      const bits = [`moy. ${avg}`, `${r.wins}-${r.losses}`, pct(r.winRate), `${r.totalPoints} pts`];
       return `<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(r.player.name)}<small>${bits.join(' · ')}</small></span></div>`;
     }).join('')}</div>` : `<div class="ah-meta">Aucun joueur pour l'instant.</div>`}
     <div class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Points moyens : points marqués par match joué, ramenés sur un match de 9 points (un match de 11 compte pour 9/11), sur toutes les sessions terminées. Les points totaux restent les points réellement marqués.</div>
@@ -14687,11 +14687,11 @@ function exportPlayerReportsCSV(){
   const rows = computePlayerReports();
   const pct = function(x){ return x === null ? '' : Math.round(x * 100) + ' %'; };
   const esc = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
-  const head = ['Joueur', grpWord(false, true) + ' actuel', 'Points moyens (sur 9)', 'Victoires', 'Défaites', 'Points totaux', 'Matchs joués'];
+  const head = ['Joueur', grpWord(false, true) + ' actuel', 'Points moyens (sur 9)', 'Victoires', 'Défaites', '% victoires', 'Points totaux', 'Matchs joués'];
   const lines = [head.map(esc).join(',')];
   rows.forEach(function(r){
     const g = groupById(r.player.groupId);
-    lines.push([r.player.name, g ? g.name : '', r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '', r.wins, r.losses, r.totalPoints, r.played].map(esc).join(','));
+    lines.push([r.player.name, g ? g.name : '', r.played ? (r.normPoints / r.played).toFixed(1).replace('.', ',') : '', r.wins, r.losses, pct(r.winRate), r.totalPoints, r.played].map(esc).join(','));
   });
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rapport-joueurs.csv'; document.body.appendChild(a); a.click(); a.remove();
