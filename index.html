@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 466">
+<meta name="app-build" content="Version 467">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1934,6 +1934,20 @@ body.desk .rp-grid > .card{margin:0;}
 .dkh-act{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px;font-size:13px;}
 .dkh-act div{color:var(--text);padding:6px 0;border-top:1px solid var(--line-soft);}
 .dkh-act small{color:var(--muted);margin-right:6px;}
+
+/* Liste d'attente */
+.wl-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px;}
+.wl-rk{width:34px;height:34px;flex:none;border-radius:50%;background:rgba(207,234,92,.14);color:var(--ball);font:600 16px var(--font-display);display:flex;align-items:center;justify-content:center;}
+.wl-who{flex:1 1 220px;min-width:0;}
+.wl-who b{font-size:16px;}
+.wl-who small{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+.wl-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.wl-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;flex:1 1 280px;}
+.wl-acts .btn{width:auto;padding:9px 14px;font-size:14px;}
+.wo-card{border:1px solid var(--ball) !important;background:rgba(207,234,92,.08) !important;}
+.wo-card h3{margin:0 0 4px;}
+.wo-acts{display:flex;gap:10px;margin-top:12px;}
+.wo-acts .btn{flex:1;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -2650,7 +2664,7 @@ function notifyAdminsJoinRequest(leagueId, leagueName, kind){
     league_id: leagueId,
     audience: 'admins', category: 'admin_alerts',
     title: (kind === 'interest' ? 'Nouvel intérêt : ' : "Demande d'adhésion : ") + who,
-    body: `${who} ${kind === 'interest' ? 'aimerait jouer dans' : 'demande à rejoindre'} ${leagueName || 'ta ligue'}. À traiter dans Organisation › Comptes.`,
+    body: `${who} ${kind === 'interest' ? 'aimerait jouer dans' : 'demande à rejoindre'} ${leagueName || 'ta ligue'}. ${kind === 'interest' ? 'Ajouté(e) à la liste d\'attente : ligue › Joueurs › Liste d\'attente.' : 'À traiter dans Organisation › Comptes.'}`,
     url: goUrl('comptes')
   });
 }
@@ -6726,6 +6740,7 @@ function renderInner(){
   try{ const nv = document.querySelector('#lgSheetBody .lg-nav'); if(nv) document.getElementById('lgSheetBody').style.setProperty('--lgnav-h', nv.offsetHeight + 'px'); }catch(e){}
   applyQuickView();
   modernizeSubtabs();
+  if(SESSION_USER && SESSION_USER.role !== 'admin'){ ensureMyOffers(); injectMyOffers(); }
   if(PENDING_GO) setTimeout(applyPendingGo, 0);
   afterRenderNav();
 }
@@ -8503,6 +8518,114 @@ function adminLeagueCardHTML(lg){
   </div>`;
 }
 
+
+// ==================== Liste d'attente (ligue complète) ====================
+// Les personnes qui ont signalé leur intérêt pour une ligue complète, par ordre d'arrivée.
+// L'organisateur offre une place (la personne a 48 h pour l'accepter dans l'app), l'ajoute
+// comme remplaçant en attendant (elle garde son rang) ou la retire de la liste.
+function waitlistFor(leagueId){
+  return (ALL_JOIN_REQUESTS || []).filter(function(r){ return r.status === 'pending' && r.kind === 'interest' && r.league_id === leagueId; })
+    .sort(function(a, b){ return String(a.created_at).localeCompare(String(b.created_at)); });
+}
+function waitlistOfferState(r){
+  if(!r.offered_at) return null;
+  const left = new Date(r.offer_expires_at).getTime() - Date.now();
+  if(left <= 0) return { expired: true, label: 'Offre expirée sans réponse' };
+  const h = Math.max(1, Math.round(left / 3600000));
+  return { expired: false, label: 'Place offerte · réponse attendue d\'ici ' + h + ' h' };
+}
+function adminWaitlistHTML(){
+  const list = waitlistFor(CURRENT_LEAGUE_ID);
+  if(!list.length) return `<div class="card"><p class="empty">Personne en liste d'attente.</p><p class="small" style="margin:6px 0 0;">Quand la ligue est affichée « complète » (Réglages › Visibilité et lieu), les joueurs qui la trouvent dans la recherche peuvent s'inscrire sur cette liste.</p></div>`;
+  const otherLeagues = function(pid){ return Array.from(new Set((ALL_PROFILE_PLAYERS || []).filter(function(pp){ return pp.profile_id === pid && pp.league_id !== CURRENT_LEAGUE_ID; }).map(function(pp){ const l = (LEAGUES || []).find(function(x){ return x.id === pp.league_id; }); return l ? (l.schedule_label || l.name) : null; }).filter(Boolean))); };
+  const rows = list.map(function(r, k){
+    const st = waitlistOfferState(r), ol = otherLeagues(r.profile_id);
+    const tags = [];
+    if(st) tags.push(`<span class="pf-chip ${st.expired ? 'warn' : 'on'}">${st.label}</span>`);
+    if(r.sub_id) tags.push(`<span class="pf-chip acc">Déjà remplaçant(e) dans cette ligue</span>`);
+    if(ol.length) tags.push(`<span class="pf-chip acc">Déjà dans : ${escapeHTML(ol.join(', '))}</span>`);
+    const offerBtn = (st && !st.expired) ? '' : `<button type="button" class="btn btn-primary" onclick="waitlistOffer('${r.id}')">${st && st.expired ? 'Offrir de nouveau' : 'Offrir une place'}</button>`;
+    return `<div class="pf-list wl-row">
+      <span class="wl-rk">${k + 1}</span>
+      <div class="wl-who"><b>${escapeHTML(r.display_name || r.email || '—')}</b><small>${escapeHTML(r.email || '')}${r.email ? ' · ' : ''}inscrit(e) le ${escapeHTML(fdl(String(r.created_at).slice(0,10)))}</small>${tags.length ? `<div class="wl-tags">${tags.join('')}</div>` : ''}</div>
+      <div class="wl-acts">${offerBtn}${r.sub_id ? '' : `<button type="button" class="btn btn-secondary" onclick="waitlistAddAsSub('${r.id}')">Remplaçant en attendant</button>`}<button type="button" class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Retirer</button></div>
+    </div>`;
+  }).join('');
+  return `<div class="card"><h3 style="margin:0;">Liste d'attente <span class="small">(${list.length})</span></h3>
+    <p class="small" style="margin:6px 0 12px;">Par ordre d'arrivée. « Offrir une place » prévient la personne : elle a 48 h pour l'accepter dans l'app, puis elle arrive dans les joueurs en attente d'un groupe.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">${rows}</div></div>`;
+}
+function waitlistOffer(reqId){
+  const r = (ALL_JOIN_REQUESTS || []).find(function(x){ return x.id === reqId; }); if(!r) return;
+  const lg = (LEAGUES || []).find(function(l){ return l.id === r.league_id; }) || {};
+  showConfirm('Offrir une place dans ' + (lg.name || 'la ligue') + ' à ' + (r.display_name || r.email) + ' ? La personne est prévenue et a 48 h pour accepter.', async function(){
+    const { error } = await sb.rpc('waitlist_offer', { p_request_id: reqId });
+    if(error){ showAlert("L'offre n'a pas pu être envoyée : " + error.message); return; }
+    invokeSendNotification({ profile_id: r.profile_id, url: goUrl('accueil'), title: 'Une place s\'est libérée !',
+      body: 'Une place est disponible dans ' + (lg.name || 'la ligue') + '. Ouvre Dinkeo pour l\'accepter d\'ici 48 h.' });
+    await loadAllProfiles(); render();
+    showToast('Place offerte à ' + (r.display_name || r.email));
+  });
+}
+function waitlistAddAsSub(reqId){
+  const r = (ALL_JOIN_REQUESTS || []).find(function(x){ return x.id === reqId; }); if(!r) return;
+  const lg = (LEAGUES || []).find(function(l){ return l.id === r.league_id; }) || {};
+  showConfirm('Ajouter ' + (r.display_name || r.email) + ' comme remplaçant(e) en attendant une place ? La personne garde son rang dans la liste d\'attente.', async function(){
+    const sid = await addNamedEntryToLeague(r.league_id, r.display_name || r.email, 'remplacant', r.email, null, undefined, r.profile_id);
+    if(!sid) return;
+    const { error } = await sb.rpc('waitlist_add_as_sub', { p_request_id: reqId, p_substitute_id: sid });
+    if(error){ showAlert('Le remplaçant a été créé, mais son compte n\'a pas pu être relié : ' + error.message); return; }
+    invokeSendNotification({ profile_id: r.profile_id, url: goUrl('accueil'), title: 'Tu es remplaçant(e) dans ' + (lg.name || 'la ligue'),
+      body: 'En attendant une place, tu peux indiquer ta disponibilité à chaque session. Tu gardes ton rang dans la liste d\'attente.' });
+    await refreshAfterAccountChange(r.profile_id, r.league_id);
+    showToast((r.display_name || r.email) + ' ajouté(e) comme remplaçant(e)');
+  });
+}
+// ---- Côté personne : offre de place à accepter ----
+let MY_OFFERS = [], MY_OFFERS_AT = 0, MY_OFFERS_LOADING = false;
+function ensureMyOffers(){
+  if(!SESSION_USER || !CURRENT_PROFILE || MY_OFFERS_LOADING || Date.now() - MY_OFFERS_AT < 60000) return;
+  MY_OFFERS_LOADING = true; MY_OFFERS_AT = Date.now();
+  sb.rpc('my_waitlist_offers').then(function(res){
+    MY_OFFERS_LOADING = false;
+    const list = (res && !res.error && res.data) ? res.data : [];
+    const changed = JSON.stringify(list) !== JSON.stringify(MY_OFFERS);
+    MY_OFFERS = list;
+    if(changed && !appBusyEditing()) render();
+  }, function(){ MY_OFFERS_LOADING = false; });
+}
+function myOffersHTML(){
+  return (MY_OFFERS || []).map(function(o){
+    const when = new Date(o.offer_expires_at).toLocaleString('fr-CA', { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
+    return `<div class="card wo-card"><h3>Une place s'est libérée !</h3>
+      <p class="small" style="margin:0;"><b>${escapeHTML(o.league_name || '')}</b> a une place pour toi. Réponds avant ${escapeHTML(when)}.</p>
+      <div class="wo-acts"><button type="button" class="btn btn-secondary" onclick="respondOffer('${o.id}', false)">Refuser</button><button type="button" class="btn btn-primary" onclick="respondOffer('${o.id}', true)">Accepter la place</button></div></div>`;
+  }).join('');
+}
+function respondOffer(id, accept){
+  const o = (MY_OFFERS || []).find(function(x){ return x.id === id; }); if(!o) return;
+  showConfirm(accept ? 'Accepter ta place dans ' + o.league_name + ' ? Tu deviens joueur(se) régulier(ère) de la ligue.' : 'Refuser cette place ? Tu seras retiré(e) de la liste d\'attente de ' + o.league_name + '.', async function(){
+    const { data, error } = await sb.rpc('waitlist_respond', { p_request_id: id, p_accept: !!accept });
+    if(error || !data || !data.ok){ showAlert((data && data.error) || ('Réponse impossible : ' + (error ? error.message : 'erreur inconnue'))); return; }
+    const who = joinerName();
+    invokeSendNotification({ league_id: o.league_id, audience: 'admins', category: 'admin_alerts',
+      title: (accept ? 'Place acceptée : ' : 'Place refusée : ') + who,
+      body: accept ? who + ' a accepté sa place dans ' + o.league_name + '. Il ou elle attend un groupe (Joueurs).' : who + ' a refusé la place dans ' + o.league_name + '. Tu peux l\'offrir à la personne suivante de la liste d\'attente.' });
+    MY_OFFERS = MY_OFFERS.filter(function(x){ return x.id !== id; });
+    if(accept){ showAlert('Bienvenue dans ' + o.league_name + ' ! L\'organisateur va te placer dans un groupe.'); setTimeout(function(){ location.reload(); }, 1800); }
+    else { render(); showToast('Place refusée'); }
+  });
+}
+// L'offre s'affiche en haut de l'écran, quel que soit l'espace (joueur, remplaçant, compte en attente).
+function injectMyOffers(){
+  try{
+    if(!MY_OFFERS || !MY_OFFERS.length || !SESSION_USER || (SESSION_USER.role === 'admin' && !ADMIN_VIEWING_AS)) return;
+    if(document.getElementById('myOffers')) return;
+    const html = '<div id="myOffers">' + myOffersHTML() + '</div>';
+    const sp = document.querySelector('#app .shell-top-spacer');
+    if(sp) sp.insertAdjacentHTML('afterend', html); else { const a = document.getElementById('app'); if(a) a.insertAdjacentHTML('afterbegin', html); }
+  }catch(e){}
+}
 // ==================== Poste de travail (ordinateur) ====================
 // Organisateurs et administrateurs sur un écran de 1100 px et plus : menu fixe à gauche,
 // la ligue et les panneaux de l'organisation s'ouvrent en pleine page à droite.
@@ -8612,7 +8735,7 @@ async function mergeOrgMembers(keep, drop){
 
 
 // ==================== Accueil du poste de travail ====================
-function dkLeagueTab(id, t){ dkClose(); openAdminLeague(id, t); }
+async function dkLeagueTab(id, t, sub){ dkClose(); await openAdminLeague(id, t); if(sub){ VIEW.playersSubTab = sub; render(); } }
 function deskLeagueCardHTML(lg){
   const sum = adminSummaryFor(lg), st = adminLeagueState(sum), o = sum && sum.open;
   const when = o ? ('Prochaine : ' + fdl(o.date) + (sum.playTime ? ' · ' + fmtHM(sum.playTime) : ''))
@@ -8652,7 +8775,12 @@ function deskTodoHTML(){
   try{ if((ORG_ROSTER_ENTRIES_CACHE || []).length) dups = isOrganizerOnly() ? 0 : dupPairs().length; }catch(e){}
   const tiles = [];
   if(pend) tiles.push(`<button type="button" onclick="dkOrg('comptes')"><b>${pend}</b>Comptes et demandes à traiter<small>Organisation › Comptes</small></button>`);
-  if(interest) tiles.push(`<button type="button" onclick="dkOrg('comptes')"><b>${interest}</b>Personne${interest>1?'s':''} intéressée${interest>1?'s':''} par une ligue complète<small>liste d'intérêt</small></button>`);
+  myOrgLeagues().forEach(function(l){
+    if(isOrganizerOnly() && ORGANIZER_LEAGUES.indexOf(l.id) === -1) return;
+    const w = waitlistFor(l.id); if(!w.length) return;
+    const exp = w.filter(function(r){ const st = waitlistOfferState(r); return st && st.expired; }).length;
+    tiles.push(`<button type="button" onclick="dkLeagueTab('${l.id}','joueurs','attente')"><b>${w.length}</b>En liste d'attente · ${escapeHTML(l.name)}<small>${exp ? exp + ' offre' + (exp>1?'s':'') + ' expirée' + (exp>1?'s':'') : 'par ordre d\'arrivée'}</small></button>`);
+  });
   if(dups) tiles.push(`<button type="button" onclick="dkOrg('membres')"><b>${dups}</b>Doublon${dups>1?'s':''} possible${dups>1?'s':''}<small>fiches au même nom</small></button>`);
   myOrgLeagues().forEach(function(l){
     if(isOrganizerOnly() && ORGANIZER_LEAGUES.indexOf(l.id) === -1) return;
@@ -8951,11 +9079,12 @@ function setSessionSubTab(t){ VIEW.sessionSubTab = t; render(); }
 function adminPlayersSectionHTML(){
   const isMlp = DATA.leagueFormat === 'mlp';
   const sub = (isMlp && VIEW.playersSubTab==='reguliers') ? 'tous' : (VIEW.playersSubTab || 'tous');
-  const subTabs = isMlp ? [['tous','Joueurs'],['remplacants','Remplaçants'],['prospects','Prospects']] : [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants'],['prospects','Prospects']];
+  const nWait = isMlp ? 0 : waitlistFor(CURRENT_LEAGUE_ID).length;
+  const subTabs = isMlp ? [['tous','Joueurs'],['remplacants','Remplaçants'],['prospects','Prospects']] : [['tous','Tous'],['reguliers','Réguliers'],['remplacants','Remplaçants']].concat(nWait || sub === 'attente' ? [['attente',"Liste d'attente"]] : []).concat([['prospects','Prospects']]);
   const nPlayers = (DATA.players||[]).length, nSubs = (DATA.substitutePool||[]).length, nProspects = (DATA.prospects||[]).length;
-  const counts = { tous: isMlp ? nPlayers : nPlayers + nSubs, reguliers: nPlayers, remplacants: nSubs, prospects: nProspects };
+  const counts = { tous: isMlp ? nPlayers : nPlayers + nSubs, reguliers: nPlayers, remplacants: nSubs, prospects: nProspects, attente: nWait };
   let html = `<div class="subtabs" style="margin-bottom:14px;">${subTabs.map(([k,l])=>`<div class="tab ${sub===k?'active':''}" onclick="setPlayersSubTab('${k}')">${l}<span class="tab-count"> ${counts[k]}</span></div>`).join('')}</div>`;
-  if(sub !== 'prospects'){
+  if(sub !== 'prospects' && sub !== 'attente'){
     html += isMlp ? `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;"><div style="font-weight:600;">Ajouter ou retirer des joueurs</div><div class="small">Tout se gère dans Organisation › Membres.</div></div>
       <button class="btn btn-secondary" onclick="openOrganizationPage('membres')">Membres de l'organisation</button>
@@ -8967,7 +9096,7 @@ function adminPlayersSectionHTML(){
       </div>
     </div>`;
   }
-  html += sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
+  html += (sub === 'attente' && !isMlp) ? adminWaitlistHTML() : sub === 'remplacants' ? adminSubstitutePoolHTML() : (sub === 'reguliers' ? adminPlayersHTML() : (sub === 'prospects' ? adminProspectsHTML() : (isMlp ? mlpPlayersHTML() : adminAllPeopleHTML())));
   return html;
 }
 
@@ -11704,7 +11833,7 @@ function organizationAccountsHTML(){
   </div>`;
   const interestHTML = !interest.length ? '' : `<div class="card">
     <div class="section-heading"><span class="icon-badge"></span><h3 style="margin:0;">Liste d'intérêt <span class="small">(${interest.length})</span></h3></div>
-    <p class="small" style="margin:8px 0 4px;">Ces personnes ont trouvé une ligue complète dans la recherche et aimeraient y jouer. Quand une place se libère, ajoute-les ; sinon, retire-les.</p>
+    <p class="small" style="margin:8px 0 4px;">Ces personnes ont trouvé une ligue complète dans la recherche et aimeraient y jouer. La liste d'attente complète (ordre d'arrivée, offrir une place, remplaçant en attendant) est dans la ligue › Joueurs › Liste d'attente.</p>
     ${itemsHTML(interest.map(reqItem), '')}
   </div>`;
   // Une carte par personne : qui, d'où, le joueur proposé, puis Approuver / Refuser côte à côte.
