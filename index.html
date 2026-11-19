@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 462">
+<meta name="app-build" content="Version 463">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1806,6 +1806,31 @@ body.sd-dragging .sub-slot.empty,body.sd-picking .sub-slot.empty{outline:2px das
 .dk-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-12px);z-index:9999;max-width:min(92vw,440px);padding:12px 18px;border-radius:999px;background:var(--ball);color:var(--court);font-weight:700;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center;}
 .dk-toast.show{opacity:1;transform:translate(-50%,0);}
 .dk-toast.err{background:#e5484d;color:#fff;}
+
+/* ===== Poste de travail (ordinateur, 1100 px et plus, organisateurs) ===== */
+.dk-side{display:none;}
+body.desk #app{max-width:none;margin:0;padding:0 0 0 248px;}
+body.desk .dk-side{display:flex;flex-direction:column;gap:2px;position:fixed;left:0;top:0;bottom:0;width:248px;box-sizing:border-box;padding:18px 12px;background:#0A2420;border-right:1px solid var(--line-soft-strong);overflow-y:auto;z-index:960;}
+body.desk .dk-brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;font:600 21px var(--font-display);letter-spacing:.03em;color:var(--text);}
+body.desk .dk-brand .pbi{width:30px;height:30px;}
+body.desk .dk-sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:14px 10px 4px;}
+body.desk .dk-it{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:9px 10px;color:var(--text);font:500 14px var(--font-body);cursor:pointer;}
+body.desk .dk-it:hover{background:rgba(255,255,255,.06);}
+body.desk .dk-it.on{background:var(--ball);color:var(--court);font-weight:700;}
+body.desk .dk-it .dk-n{margin-left:auto;font-size:12px;font-weight:700;border-radius:999px;padding:0 8px;background:var(--paddle);color:#0A2420;}
+body.desk .dk-it.on .dk-n{background:#0A2420;color:var(--ball);}
+body.desk .dk-sub{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px 14px;}
+body.desk .dk-sub .dk-it{padding:6px 10px;font-size:13px;color:var(--muted);}
+body.desk .dk-sub .dk-it.on{background:none;color:var(--ball);font-weight:700;}
+body.desk .dk-foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--line-soft);font-size:12px;color:var(--muted);}
+body.desk #app > .tabs, body.desk .bottom-nav, body.desk .bottom-nav-spacer{display:none !important;}
+body.desk.modern-nav .topbar.shell-top{left:272px;right:24px;--tb-x:24px;}
+body.desk #tabContent{max-width:1240px;margin:0 auto;padding:0 24px 40px;}
+body.desk.modern-nav .shell-top-spacer{height:calc(var(--tb-gap) + 66px);}
+/* Ligue et panneaux de l'organisation : une vraie page à droite du menu, plus une fenêtre par-dessus. */
+body.desk .lg-ov, body.desk .chat-overlay.dk-page{left:248px;padding:0;background:var(--court);align-items:stretch;justify-content:stretch;z-index:900;}
+body.desk .lg-ov > .chat-sheet, body.desk .chat-overlay.dk-page > .chat-sheet{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none;animation:none;}
+body.desk .lg-ov .sheet-body, body.desk .dk-page .sheet-body, body.desk .lg-ov .chat-head, body.desk .dk-page .chat-head{padding-left:max(24px, calc((100% - 1240px) / 2));padding-right:max(24px, calc((100% - 1240px) / 2));}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -2949,7 +2974,7 @@ function sheetModalHTML(){
   const title = og ? og[1] : k==='partenaire' ? 'Partenaire' : k==='calendrier' ? 'Calendrier' : 'Événements';
   const sub = og ? og[2] : k==='partenaire' ? 'Trouver un partenaire ou un match amical' : k==='calendrier' ? 'Sessions, partenaires et événements' : "Rencontres de l'organisation";
   const body = k==='org-membres' ? organizationMembersCardHTML() : k==='org-comptes' ? organizationAccountsHTML() : k==='org-rapport' ? organizationReportHTML() : k==='org-general' ? organizationGeneralHTML() : k==='partenaire' ? partnerBoardHTML() : k==='calendrier' ? calendarSheetHTML() : socialEventsHTML();
-  return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
+  return `<div class="chat-overlay${og ? ' dk-page' : ''}" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet${og?' chat-sheet-lg':''}">
       <div class="chat-head">
         <div class="chat-head-ico">${ico}</div>
@@ -6461,6 +6486,7 @@ function render(){
 let LAST_RENDERED_MODAL = null;
 function renderInner(){
   applyModernNavClass();
+  document.body.classList.remove('desk');
   if(PENDING_GO && !GO_RUNNING && SESSION_USER && SESSION_USER.role !== 'pending' && CURRENT_PROFILE) setTimeout(applyPendingGo, 250);
   if(!NEWS_POPUP_DONE) setTimeout(maybeShowNewsPopup,600);
   ensureInboxLoaded();
@@ -8257,6 +8283,47 @@ function adminLeagueCardHTML(lg){
     </div>
   </div>`;
 }
+
+// ==================== Poste de travail (ordinateur) ====================
+// Organisateurs et administrateurs sur un écran de 1100 px et plus : menu fixe à gauche,
+// la ligue et les panneaux de l'organisation s'ouvrent en pleine page à droite.
+function isDesk(){ try{ return window.matchMedia('(min-width:1100px)').matches; }catch(e){ return false; } }
+let DESK_LAST = null;
+window.addEventListener('resize', function(){ const d = isDesk(); if(DESK_LAST !== null && d !== DESK_LAST && SESSION_USER && SESSION_USER.role === 'admin') render(); DESK_LAST = d; });
+function dkClose(){ if(MODAL){ MODAL_UNDER = null; dropModal(); } }
+function dkHome(t){ dkClose(); VIEW.adet = false; setAAcc(t); }
+function dkOrg(tab){ dkClose(); VIEW.adet = false; openOrgSheet(tab); }
+function dkLeague(id){ dkClose(); openAdminLeague(id, 'session'); }
+function dkTab(t){ dkClose(); VIEW.adet = true; setAdminTab(t); }
+function deskSideHTML(){
+  const org = (MY_ORGANIZATIONS||[]).find(function(o){ return o.id === CURRENT_ORGANIZATION_ID; });
+  const orgSheet = MODAL && MODAL.sheet && MODAL.sheet.indexOf('org-') === 0 ? MODAL.sheet.slice(4) : null;
+  const inLeague = !!VIEW.adet && !orgSheet;
+  const home = !inLeague && !orgSheet;
+  let pend = 0;
+  try{ if(ALL_PROFILES && ALL_PROFILES.length) pend = approvalsCountForOrg(CURRENT_ORGANIZATION_ID); }catch(e){}
+  const it = function(on, label, fn, n){ return `<button type="button" class="dk-it${on ? ' on' : ''}" onclick="${fn}">${escapeHTML(label)}${n ? `<span class="dk-n">${n}</span>` : ''}</button>`; };
+  const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
+  const secs = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
+  let h = `<div class="dk-brand">${pbIcon()}<span>DINKEO</span></div>`;
+  h += `<div class="dk-sec">${escapeHTML(org ? org.name : 'Organisation')}</div>`;
+  h += it(home && VIEW.atab !== 'cal' && VIEW.atab !== 'comm' && VIEW.atab !== 'moi' && VIEW.atab !== 'orgs', 'Accueil', "dkHome('accueil')");
+  h += it(orgSheet === 'membres', 'Membres', "dkOrg('membres')");
+  h += it(orgSheet === 'comptes', 'Comptes et demandes', "dkOrg('comptes')", pend);
+  h += it(orgSheet === 'rapport', 'Rapport de l\'organisation', "dkOrg('rapport')");
+  if(!isOrganizerOnly()) h += it(orgSheet === 'general', 'Paramètres', "dkOrg('general')");
+  h += it(home && VIEW.atab === 'comm', 'Communauté', "dkHome('comm')");
+  h += it(home && VIEW.atab === 'cal', 'Calendrier', "dkHome('cal')");
+  h += `<div class="dk-sec">Ligues</div>`;
+  leagues.forEach(function(l){
+    const on = inLeague && l.id === CURRENT_LEAGUE_ID;
+    h += it(on, l.name, `dkLeague('${l.id}')`);
+    if(on) h += `<div class="dk-sub">${secs.map(function(x){ return it((VIEW.tab || 'session') === x[0], x[1], `dkTab('${x[0]}')`); }).join('')}</div>`;
+  });
+  if((MY_ORGANIZATIONS||[]).length > 1) h += it(home && VIEW.atab === 'orgs', 'Changer d\'organisation', "dkHome('orgs')");
+  h += `<div class="dk-foot">${it(home && VIEW.atab === 'moi', 'Moi', "dkHome('moi')")}</div>`;
+  return `<aside class="dk-side" aria-label="Menu principal">${h}</aside>`;
+}
 function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub){
   const tabs = [['accueil','Accueil',''],['orgs','Organisations',''],['cal','Calendrier',''],['comm','Communauté','']];
   const active = (tabs.some(t=>t[0]===VIEW.atab) || VIEW.atab==='moi') ? VIEW.atab : 'accueil';
@@ -8278,6 +8345,7 @@ function renderAdminAccount(drawerHTML, viewSlide, canViewAsPlayer, canViewAsSub
   else if(active==='cal') c.innerHTML = calendarSheetHTML();
   else c.innerHTML = adminMeHTML(canViewAsPlayer, canViewAsSub);
   if(VIEW.adet) app.insertAdjacentHTML('beforeend', adminLeagueSheetHTML());
+  if(isDesk()){ document.body.classList.add('desk'); app.insertAdjacentHTML('afterbegin', deskSideHTML()); }
 }
 // ---- Accueil admin ----
 let ADMIN_HOME_PRELOADED = false;
