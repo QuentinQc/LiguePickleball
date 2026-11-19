@@ -1861,6 +1861,13 @@ body.desk .m-ov.dk-panel .m-box{max-width:460px !important;width:460px !importan
 body.desk .dk-page.dk-has-panel .sheet-body{padding-right:484px;}
 @keyframes dkPanelIn{from{transform:translateX(30px);opacity:.6;}to{transform:none;opacity:1;}}
 body.desk .dk-hint{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;}
+
+/* Session sur ordinateur : groupes côte à côte, scores en grille */
+body.desk .grp-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;align-items:start;}
+body.desk .grp-board > .card{margin:0;}
+body.desk .rs-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;align-items:start;}
+body.desk .rs-board > .card{margin:0;}
+.dk-toast .dk-undo{margin-left:14px;font:700 13px var(--font-body);color:var(--ball);background:var(--court);border:0;border-radius:8px;padding:5px 12px;cursor:pointer;pointer-events:auto;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -4912,10 +4919,40 @@ function onRowDrop(ev, gid, targetPid){
 }
 // Déplacement d'un joueur (souris ou doigt) : vers un groupe, avant un joueur donné, ou en attente (gid vide).
 // Le joueur reste ensuite dans ce groupe : il y est classé et monte ou descend à partir de là.
+document.addEventListener('keydown', function(ev){
+  if(ev.key !== 'Enter' || !ev.target || !ev.target.classList || !ev.target.classList.contains('rs-in')) return;
+  const all = Array.prototype.slice.call(document.querySelectorAll('.rs-in'));
+  const i = all.indexOf(ev.target); if(i < 0) return;
+  ev.preventDefault();
+  try{ ev.target.dispatchEvent(new Event('change', { bubbles: true })); }catch(e){}
+  setTimeout(function(){ const nx = Array.prototype.slice.call(document.querySelectorAll('.rs-in'))[i + 1]; if(nx){ nx.focus(); try{ nx.select(); }catch(e){} } }, 80);
+});
+// Après un déplacement : un message avec « Annuler » remet les groupes comme avant.
+function undoSnapPlayers(){ return (DATA.players||[]).map(function(p){ return [p.id, p.groupId || null, p.order]; }); }
+function showUndoToast(msg, snap){
+  try{
+    let t = document.getElementById('dkToast');
+    if(!t){ t = document.createElement('div'); t.id = 'dkToast'; t.className = 'dk-toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+    t.innerHTML = escapeHTML(msg) + '<button type="button" class="dk-undo">Annuler</button>';
+    t.classList.remove('err');
+    t.querySelector('.dk-undo').onclick = function(){
+      snap.forEach(function(x){ const p = DATA.players.find(function(y){ return y.id === x[0]; }); if(p){ p.groupId = x[1]; p.order = x[2]; } });
+      t.classList.remove('show'); saveAndRender(); showToast('Déplacement annulé');
+    };
+    void t.offsetWidth; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 6000);
+  }catch(e){}
+}
 function movePlayerTo(draggedPid, gid, targetPid){
   if(!draggedPid || draggedPid === targetPid) return;
   const dragged = DATA.players.find(x=>x.id===draggedPid);
   if(!dragged) return;
+  const snap = undoSnapPlayers(), fromG = dragged.groupId;
+  setTimeout(function(){
+    if(dragged.groupId === fromG && !snap.some(function(x){ const p = DATA.players.find(function(y){ return y.id === x[0]; }); return p && (p.order !== x[2] || (p.groupId || null) !== x[1]); })) return;
+    const g = groupById(dragged.groupId);
+    showUndoToast(dragged.groupId !== fromG ? (dragged.name + (g ? ' déplacé(e) dans le ' + g.name : ' retiré(e) de son groupe')) : (dragged.name + ' : position changée'), snap);
+  }, 60);
   if(!gid){ if(dragged.groupId){ dragged.groupId = null; dragged.order = 0; saveAndRender(); } return; }
   if(!targetPid){
     if(dragged.groupId === gid) return;
@@ -11693,6 +11730,7 @@ function adminGroupsHTML(){
       ${(unassigned.length + absentNow.length)===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">${rec ? 'Tout le monde a un terrain' : 'Aucun joueur en attente'}</span></div>` : ''}
     </div>
   </div>`;
+  html += '<div class="grp-board">';
   groupsSorted().forEach(g=>{
     const ps = playersInGroup(g.id).filter(p=>!(open && isAbsent(open, p.id))).sort((a,b)=>(typeof a.order==='number'?a.order:0)-(typeof b.order==='number'?b.order:0));
     const gdSubs = open ? ((open.groupsData.find(x=>x.groupId===g.id) || {}).substitutes || {}) : {};
@@ -11755,6 +11793,7 @@ function adminGroupsHTML(){
       ${open ? reinforcementHTML(open, g) : ''}
     </div>`;
   });
+  html += '</div>';
   if(!rec) html += `
     <div class="card">
       <div class="row" style="justify-content:space-between;">
@@ -12088,6 +12127,7 @@ function adminSessionHTML(){
   }
   const manual = DATA.matchupMode === 'manual';
   let html = '';
+  html += '<div class="rs-board">';
   groupsSorted().forEach(g=>{
     const gd = open.groupsData.find(x=>x.groupId===g.id);
     if(!gd) return;
@@ -12132,6 +12172,7 @@ function adminSessionHTML(){
     html += `</div>`;
     html += `</div>`;
   });
+  html += '</div>';
   return html;
 }
 
