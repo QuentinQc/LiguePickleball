@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 479">
+<meta name="app-build" content="Version 480">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1264,6 +1264,9 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .hs-card[open] .hs-ch{transform:rotate(90deg);}
 .hs-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
 .hs-g{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:8px 2px 0;}
+.hs-g.hs-gm{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.hs-mt{flex:none;font:600 12px var(--font-body);letter-spacing:0;text-transform:none;color:var(--ball);background:rgba(207,234,92,.1);border:1px solid rgba(207,234,92,.4);border-radius:999px;padding:5px 12px;cursor:pointer;}
+.hs-mt:hover{background:rgba(207,234,92,.18);}
 .hs-rk{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:14px;flex:0 0 auto;}
 
 .hs-mv{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto;}
@@ -14902,7 +14905,8 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
     if(!rows || rows.length===0) return;
     const gd = s.groupsData ? s.groupsData.find(x=>x.groupId===g.id) : null;
     const subValues = new Set((gd && gd.substitutes ? Object.values(gd.substitutes) : []).concat((gd && gd.extras) || []));
-    body += `<div class="hs-g">${escapeHTML(g.name)}</div><div class="pf-list">`;
+    const hasM = gd && gd.matches && gd.matches.length;
+    body += `<div class="hs-g hs-gm"><span>${escapeHTML(g.name)}</span>${hasM ? `<button type="button" class="hs-mt" onclick="event.stopPropagation();showMatchHistoryModal('${s.id}','${g.id}')">Voir les matchs ›</button>` : ''}</div><div class="pf-list">`;
     const ladder = DATA.leagueFormat !== 'pools' && DATA.leagueFormat !== 'single' && DATA.leagueFormat !== 'social' && DATA.leagueFormat !== 'mlp';
     const swapN = Math.max(0, DATA.swapCount || 0);
     rows.forEach((r,i)=>{
@@ -14949,10 +14953,10 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
     });
     body += `</div>`;
   }
-  body += `<div class="pf-list hs-acts"><button class="pf-row" onclick="showMatchHistoryModal('${s.id}'${restrictGroupId ? `,'${restrictGroupId}'` : ''})"><span class="ic">${pbIcon()}</span><span class="t">${viewerPlayerId ? 'Matchs de mon groupe' : 'Voir les matchs'}</span><span class="ch">›</span></button>`;
-  if(withDelete && !viewerPlayerId && isLatestClosedSession(s)) body += `<button class="pf-row" onclick="reopenLadderSession('${s.id}')"><span class="t">Rouvrir pour corriger les scores</span><span class="ch">›</span></button>`;
-  if(withDelete) body += `<button class="pf-row hs-del" onclick="deleteSession('${s.id}')"><span class="t">Supprimer cette session</span><span class="ch">›</span></button>`;
-  body += `</div>`;
+  let acts = '';
+  if(withDelete && !viewerPlayerId && isLatestClosedSession(s)) acts += `<button class="pf-row" onclick="reopenLadderSession('${s.id}')"><span class="t">Rouvrir pour corriger les scores</span><span class="ch">›</span></button>`;
+  if(withDelete) acts += `<button class="pf-row hs-del" onclick="deleteSession('${s.id}')"><span class="t">Supprimer cette session</span><span class="ch">›</span></button>`;
+  if(acts) body += `<div class="pf-list hs-acts">${acts}</div>`;
   return `<details class="card hs-card"${isOpen?' open':''}>
     <summary class="hs-sum"><span class="hs-t"><b>${escapeHTML(frDateLong(s.date))}</b>${chips.length ? `<span class="hs-chips">${chips.join('')}</span>` : ''}</span><span class="hs-ch">›</span></summary>
     <div class="hs-body">${body}</div>
