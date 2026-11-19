@@ -1906,6 +1906,12 @@ body.desk .lg-ov .lg-sheet .sd-dock{top:0;}
 .live-peers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px;font-size:13px;color:var(--muted);}
 .live-peers span.pp{display:inline-flex;align-items:center;gap:6px;color:var(--text);background:rgba(207,234,92,.1);border:1px solid rgba(207,234,92,.35);border-radius:999px;padding:3px 10px;font-weight:600;}
 .live-peers span.pp::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ball);}
+
+/* Rapports sur ordinateur : cartes en deux colonnes, tableau par joueur triable */
+body.desk .rp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
+body.desk .rp-grid > .card{margin:0;}
+.rp-acts{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px;}
+.dk-tbl td.num, .dk-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;}
 </style>
 <script>
 // Démarrage robuste (ES5) : mini-compatibilité pour vieux navigateurs, journal des erreurs, et message clair si l'app ne démarre pas.
@@ -13226,7 +13232,10 @@ function reportsHealthHTML(){
     const linksKnown = (ALL_PROFILE_PLAYERS||[]).length > 0;
     const withAccount = new Set(links.filter(l=>l.player_id).map(l=>l.player_id));
     const noAccount = linksKnown ? (DATA.players||[]).filter(p=>!withAccount.has(p.id)) : [];
-    const rel = h.absentStreak.map(p=>`<button class="pf-row" onclick="openPlayerDetailModal('${p.id}')"><span class="t">${escapeHTML(p.name)}<small>Absent(e) aux 3 dernières sessions</small></span><span class="ch">›</span></button>`);
+    const rel = h.absentStreak.map(p=>{
+      const lk = links.find(l=>l.player_id===p.id);
+      return `<div class="pf-row" role="button" tabindex="0" onclick="openPlayerDetailModal('${p.id}')"><span class="t">${escapeHTML(p.name)}<small>Absent(e) aux 3 dernières sessions</small></span>${lk ? `<button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:13px;" onclick="event.stopPropagation();writeToProfiles(['${lk.profile_id}'], '${escapeHTML(p.name).replace(/'/g, '&#39;')}')">Écrire</button>` : '<span class="ch">›</span>'}</div>`;
+    });
     html += `<div class="card"><div class="pf-sec" style="margin-top:0;">Joueurs à relancer</div>
       ${rel.length ? `<div class="pf-list">${rel.join('')}</div>` : `<div class="ah-meta">Personne n'a manqué les 3 dernières sessions.</div>`}
       ${noAccount.length ? `<details class="bh-more"><summary>${noAccount.length} joueur${noAccount.length>1?'s':''} sans compte dans l'app</summary><div class="pf-list" style="margin-top:8px;">${noAccount.map(p=>`<button class="pf-row" onclick="openPlayerDetailModal('${p.id}')"><span class="t">${escapeHTML(p.name)}<small>Pas de compte lié : ne reçoit ni notification ni rappel</small></span><span class="ch">›</span></button>`).join('')}</div></details>` : ''}
@@ -13282,7 +13291,7 @@ function adminReportsSectionHTML(){
     : [['bilan','Bilan'],['groupes', grpWord(true, true)],['liste','Liste'],['session','Rapport de session'],['reglement','Règlement']];
   if(!subTabs.some(function(t){ return t[0] === sub; })){ VIEW.reportsSubTab = 'bilan'; return adminReportsSectionHTML(); }
   let html = `<div class="ah-switch">${subTabs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="setReportsSubTab('${k}')">${l}</button>`).join('')}</div>`;
-  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : (sub === 'reglement' ? reportsRulesHTML() : reportsHealthHTML())));
+  html += sub === 'session' ? reportsSessionHTML() : (sub === 'liste' ? reportsListHTML() : (sub === 'groupes' ? reportsGroupsHTML() : (sub === 'reglement' ? reportsRulesHTML() : (isDesk() ? '<div class="rp-grid">' + reportsHealthHTML() + '</div>' : reportsHealthHTML()))));
   return html;
 }
 function setReportsSubTab(t){ VIEW.reportsSubTab = t; render(); }
@@ -13954,8 +13963,13 @@ function reportsSessionHTML(){
   </div>
   <div class="card">
     <div class="pf-sec" style="margin-top:0;">Par joueur</div>
-    ${rpSortHTML([['winRate','% victoires'],['wins','Victoires'],['losses','Défaites'],['ratingChange','Δ cote'],['absenceRate','Absences'],['promotions','Montées'],['relegations','Descentes'],['subCount','Remplacements'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
-    ${sorted.length ? `<div class="pf-list">${sorted.map(r=>{
+    ${isDesk() ? '' : rpSortHTML([['winRate','% victoires'],['wins','Victoires'],['losses','Défaites'],['ratingChange','Δ cote'],['absenceRate','Absences'],['promotions','Montées'],['relegations','Descentes'],['subCount','Remplacements'],['name','Nom']], sortBy, sortDir, 'setReportsSort')}
+    ${(sorted.length && isDesk()) ? (function(){
+      const th = function(k, l, num){ const on = sortBy === k; return `<th class="srt${on ? ' on' : ''}${num ? ' num' : ''}" onclick="setReportsSort('${k}')">${l}${on ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`; };
+      return `<div class="rp-acts"><button type="button" class="btn btn-secondary" onclick="exportPlayerReportsCSV()">Exporter (Excel)</button></div><div class="dk-tbl-wrap"><table class="dk-tbl"><thead><tr>${th('name','Joueur')}<th>${escapeHTML(grpWord(false, true))}</th>${th('wins','V',1)}${th('losses','D',1)}${th('winRate','% vict.',1)}${th('absenceRate','Absences',1)}${th('promotions','Montées',1)}${th('relegations','Descentes',1)}${th('subCount','Rempl.',1)}${th('ratingChange','Δ cote',1)}</tr></thead><tbody>${sorted.map(function(r){
+        const g = groupById(r.player.groupId);
+        return `<tr onclick="openPlayerDetailModal('${r.player.id}')"><td><b>${escapeHTML(r.player.name)}</b></td><td>${escapeHTML(g ? g.name : '—')}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td><td class="num">${pct(r.winRate)}</td><td class="num">${r.absenceRate === null ? '—' : pct(r.absenceRate) + ' (' + r.sessionsAbsent + ')'}</td><td class="num">${r.promotions || '—'}</td><td class="num">${r.relegations || '—'}</td><td class="num">${r.subCount || '—'}</td><td class="num">${delta(r.ratingChange)}</td></tr>`;
+      }).join('')}</tbody></table></div>`; })() : sorted.length ? `<div class="pf-list">${sorted.map(r=>{
       const bits = [`${r.wins}-${r.losses} · ${pct(r.winRate)}`];
       if(r.absenceRate!==null) bits.push(`abs. ${pct(r.absenceRate)} (${r.sessionsAbsent}/${r.sessionsAbsent+r.sessionsAppeared})`);
       if(r.promotions) bits.push(`▲${r.promotions}`);
@@ -14187,6 +14201,31 @@ function setReportsListSort(col){
   if((VIEW.reportsListSortBy||'rating') === col){ VIEW.reportsListSortDir = (VIEW.reportsListSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
   else { VIEW.reportsListSortBy = col; VIEW.reportsListSortDir = col==='rating' ? 'desc' : 'asc'; }
   render();
+}
+// Message (notification) à une ou plusieurs personnes précises.
+function writeToProfiles(ids, label){
+  ids = (ids || []).filter(Boolean); if(!ids.length) return;
+  showFormModal('Écrire à ' + (label || (ids.length + ' personnes')), `<div class="field"><label>Titre</label><input id="wpTitle" maxlength="80" placeholder="ex. : On s'ennuie de toi !"></div>
+    <div class="field"><label>Message</label><textarea id="wpBody" rows="4" maxlength="500"></textarea></div>`, function(){
+    const t = String(document.getElementById('wpTitle').value || '').trim(), b = String(document.getElementById('wpBody').value || '').trim();
+    if(!t || !b){ showAlert('Écris un titre et un message.'); return false; }
+    invokeSendNotification({ organization_id: currentLeagueOrgId(), profile_ids: ids, category: 'league_announce', title: t, body: b });
+    setTimeout(function(){ showToast('Message envoyé'); }, 50);
+  });
+}
+// Tableau par joueur exporté pour Excel (CSV).
+function exportPlayerReportsCSV(){
+  const rows = computePlayerReports();
+  const pct = function(x){ return x === null ? '' : Math.round(x * 100) + ' %'; };
+  const esc = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  const head = ['Joueur', grpWord(false, true) + ' actuel', 'Victoires', 'Défaites', '% victoires', 'Absences', 'Taux d\'absence', 'Montées', 'Descentes', 'Remplacements'].concat(isRecLeague() ? [] : ['Variation de cote']);
+  const lines = [head.map(esc).join(',')];
+  rows.forEach(function(r){
+    const g = groupById(r.player.groupId);
+    lines.push([r.player.name, g ? g.name : '', r.wins, r.losses, pct(r.winRate), r.sessionsAbsent, pct(r.absenceRate), r.promotions, r.relegations, r.subCount].concat(isRecLeague() ? [] : [r.ratingChange.toFixed(3)]).map(esc).join(','));
+  });
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rapport-joueurs.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
 function setReportsSort(col){
   if((VIEW.reportsSortBy||'winRate') === col){ VIEW.reportsSortDir = (VIEW.reportsSortDir||'desc')==='asc' ? 'desc' : 'asc'; }
