@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 484">
+<meta name="app-build" content="Version 485">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -7419,8 +7419,8 @@ async function applyPendingGo(){
       openOrgSheet('comptes');
     } else if(k === 'tournoi' && id){
       MODAL = null; MODAL_UNDER = null;
-      if(asAdmin){ await loadTournaments(); }
-      if(asAdmin && tournById(id)) openTourn(id, 'inscrits');
+      if(asAdmin && tournCanManage()){ await loadTournaments(); }
+      if(asAdmin && tournCanManage() && tournById(id)) openTourn(id, 'inscrits');
       else { MY_TOURNS_AT = 0; ensureMyTourns(); openTournRegister(id); }
     } else if(k === 'accueil'){
       MODAL = null; MODAL_UNDER = null;
@@ -8906,7 +8906,8 @@ function tournCopyLink(id){
   showAlert('Lien d\'inscription :\n' + link);
 }
 function tournNotify(teamId, kind){ if(teamId) invokeSendNotification({ tournament_team_id: teamId, kind: kind }); }
-function tournCanManage(){ return !isOrganizerOnly() || (TOURNS || []).length > 0; }
+// Pour l'instant, le module tournoi n'est visible que des super admins (essais avant l'ouverture aux organisateurs).
+function tournCanManage(){ return !!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin); }
 
 // ---- Navigation organisateur ----
 function openTourn(id, tab){
