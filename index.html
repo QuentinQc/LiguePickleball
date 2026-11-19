@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 481">
+<meta name="app-build" content="Version 482">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5143,7 +5143,7 @@ function onRowDrop(ev, gid, targetPid){
   ev.preventDefault();
   ev.stopPropagation();
   ev.currentTarget.classList.remove('row-drop-hover');
-  movePlayerTo(ev.dataTransfer.getData('text/plain'), gid, targetPid);
+  confirmMovePlayer(ev.dataTransfer.getData('text/plain'), gid, targetPid);
 }
 // Déplacement d'un joueur (souris ou doigt) : vers un groupe, avant un joueur donné, ou en attente (gid vide).
 // Le joueur reste ensuite dans ce groupe : il y est classé et monte ou descend à partir de là.
@@ -5170,6 +5170,22 @@ function showUndoToast(msg, snap){
     void t.offsetWidth; t.classList.add('show');
     clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 6000);
   }catch(e){}
+}
+// Déplacement à la main (glisser-déposer) : on demande d'abord une confirmation.
+function confirmMovePlayer(pid, gid, targetPid){
+  const p = (DATA.players||[]).find(function(x){ return x.id === pid; });
+  if(!p || pid === targetPid) return;
+  const from = groupById(p.groupId), to = gid ? groupById(gid) : null;
+  let msg;
+  if(!gid){ if(!p.groupId) return; msg = 'Retirer ' + p.name + ' du ' + (from ? from.name : grpWord()) + ' ?'; }
+  else if(p.groupId === gid){
+    if(!targetPid) return;
+    const members = playersInGroup(gid).sort(function(a,b){ return (a.order||0) - (b.order||0); }).filter(function(x){ return x.id !== pid; });
+    const pos = members.findIndex(function(x){ return x.id === targetPid; }) + 1;
+    msg = 'Placer ' + p.name + ' en ' + (pos === 1 ? '1re' : pos + 'e') + ' position dans le ' + (to ? to.name : grpWord()) + ' ?';
+  }
+  else msg = 'Déplacer ' + p.name + (from ? ' du ' + from.name : '') + ' au ' + (to ? to.name : grpWord()) + ' ?';
+  showConfirm(msg, function(){ movePlayerTo(pid, gid, targetPid); });
 }
 function movePlayerTo(draggedPid, gid, targetPid){
   if(!draggedPid || draggedPid === targetPid) return;
@@ -12794,9 +12810,9 @@ function subDragEnd(e){
   if(d.moved && e.type === 'pointerup' && d.pid){
     const t = d.over;
     if(t){
-      if(t.id === 'waitCard') movePlayerTo(d.pid, null, null);
-      else if(t.hasAttribute('data-prow')) movePlayerTo(d.pid, t.getAttribute('data-g'), t.getAttribute('data-prow'));
-      else movePlayerTo(d.pid, t.getAttribute('data-sg'), null);
+      if(t.id === 'waitCard') confirmMovePlayer(d.pid, null, null);
+      else if(t.hasAttribute('data-prow')) confirmMovePlayer(d.pid, t.getAttribute('data-g'), t.getAttribute('data-prow'));
+      else confirmMovePlayer(d.pid, t.getAttribute('data-sg'), null);
     }
   } else if(d.moved && e.type === 'pointerup'){
     const t = d.over;
@@ -12846,7 +12862,7 @@ function onGroupDragLeave(ev){
 function onGroupDrop(ev, gid){
   ev.preventDefault();
   ev.currentTarget.classList.remove('drop-target-hover');
-  movePlayerTo(ev.dataTransfer.getData('text/plain'), gid || null, null);
+  confirmMovePlayer(ev.dataTransfer.getData('text/plain'), gid || null, null);
 }
 function deleteGroup(gid){
   const g = groupById(gid);
