@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 467">
+<meta name="app-build" content="Version 468">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8540,15 +8540,19 @@ function adminWaitlistHTML(){
   const otherLeagues = function(pid){ return Array.from(new Set((ALL_PROFILE_PLAYERS || []).filter(function(pp){ return pp.profile_id === pid && pp.league_id !== CURRENT_LEAGUE_ID; }).map(function(pp){ const l = (LEAGUES || []).find(function(x){ return x.id === pp.league_id; }); return l ? (l.schedule_label || l.name) : null; }).filter(Boolean))); };
   const rows = list.map(function(r, k){
     const st = waitlistOfferState(r), ol = otherLeagues(r.profile_id);
+    // Ajoutée à la main entre-temps ? Le compte relié dans cette ligue fait foi.
+    const here = (ALL_PROFILE_PLAYERS || []).find(function(pp){ return pp.profile_id === r.profile_id && pp.league_id === CURRENT_LEAGUE_ID; });
+    const isSub = !!(r.sub_id || (here && here.substitute_id)), isPlayer = !!(here && here.player_id);
     const tags = [];
     if(st) tags.push(`<span class="pf-chip ${st.expired ? 'warn' : 'on'}">${st.label}</span>`);
-    if(r.sub_id) tags.push(`<span class="pf-chip acc">Déjà remplaçant(e) dans cette ligue</span>`);
+    if(isPlayer) tags.push(`<span class="pf-chip on">Déjà joueur(se) régulier(ère) ici · tu peux la retirer de la liste</span>`);
+    else if(isSub) tags.push(`<span class="pf-chip acc">Déjà remplaçant(e) dans cette ligue</span>`);
     if(ol.length) tags.push(`<span class="pf-chip acc">Déjà dans : ${escapeHTML(ol.join(', '))}</span>`);
-    const offerBtn = (st && !st.expired) ? '' : `<button type="button" class="btn btn-primary" onclick="waitlistOffer('${r.id}')">${st && st.expired ? 'Offrir de nouveau' : 'Offrir une place'}</button>`;
+    const offerBtn = (isPlayer || (st && !st.expired)) ? '' : `<button type="button" class="btn btn-primary" onclick="waitlistOffer('${r.id}')">${st && st.expired ? 'Offrir de nouveau' : 'Offrir une place'}</button>`;
     return `<div class="pf-list wl-row">
       <span class="wl-rk">${k + 1}</span>
       <div class="wl-who"><b>${escapeHTML(r.display_name || r.email || '—')}</b><small>${escapeHTML(r.email || '')}${r.email ? ' · ' : ''}inscrit(e) le ${escapeHTML(fdl(String(r.created_at).slice(0,10)))}</small>${tags.length ? `<div class="wl-tags">${tags.join('')}</div>` : ''}</div>
-      <div class="wl-acts">${offerBtn}${r.sub_id ? '' : `<button type="button" class="btn btn-secondary" onclick="waitlistAddAsSub('${r.id}')">Remplaçant en attendant</button>`}<button type="button" class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Retirer</button></div>
+      <div class="wl-acts">${offerBtn}${(isSub || isPlayer) ? '' : `<button type="button" class="btn btn-secondary" onclick="waitlistAddAsSub('${r.id}')">Remplaçant en attendant</button>`}<button type="button" class="btn-ghost-danger" onclick="rejectJoinRequest('${r.id}')">Retirer</button></div>
     </div>`;
   }).join('');
   return `<div class="card"><h3 style="margin:0;">Liste d'attente <span class="small">(${list.length})</span></h3>
