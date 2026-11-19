@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 468">
+<meta name="app-build" content="Version 469">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8559,6 +8559,14 @@ function adminWaitlistHTML(){
     <p class="small" style="margin:6px 0 12px;">Par ordre d'arrivée. « Offrir une place » prévient la personne : elle a 48 h pour l'accepter dans l'app, puis elle arrive dans les joueurs en attente d'un groupe.</p>
     <div style="display:flex;flex-direction:column;gap:10px;">${rows}</div></div>`;
 }
+// Ouvre la liste d'attente : directement si une seule ligue en a une, sinon on choisit la ligue.
+async function openWaitlistsFor(orgId){
+  const ls = LEAGUES.filter(function(l){ return l.organization_id === orgId && waitlistFor(l.id).length && (!isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1); });
+  const go = async function(l){ await openAdminLeague(l.id, 'joueurs'); VIEW.playersSubTab = 'attente'; render(); };
+  if(ls.length === 1) return go(ls[0]);
+  if(!ls.length) return;
+  showChoice('Quelle liste d\'attente ouvrir ?', ls.map(function(l){ return l.name + ' (' + waitlistFor(l.id).length + ')'; }), function(i){ if(ls[i]) go(ls[i]); });
+}
 function waitlistOffer(reqId){
   const r = (ALL_JOIN_REQUESTS || []).find(function(x){ return x.id === reqId; }); if(!r) return;
   const lg = (LEAGUES || []).find(function(l){ return l.id === r.league_id; }) || {};
@@ -8881,9 +8889,11 @@ function adminHomeHTML(){
     // Personnes à approuver et intéressées par une ligue complète : signalées dans l'en-tête de l'organisation.
     const parts = [];
     if(pending > 0) parts.push(pending + ' à approuver');
-    if(interested > 0) parts.push(interested + ' intéressé' + (interested>1?'s':''));
-    const right = parts.length
-      ? `<button type="button" class="ah-pend" onclick="openOrgSheetFor('${o.id}','comptes')">${parts.join(' · ')} ›</button>`
+    const btns = [];
+    if(pending > 0) btns.push(`<button type="button" class="ah-pend" onclick="openOrgSheetFor('${o.id}','comptes')">${pending} à approuver ›</button>`);
+    if(interested > 0) btns.push(`<button type="button" class="ah-pend" onclick="openWaitlistsFor('${o.id}')">${interested} en liste d'attente ›</button>`);
+    const right = btns.length
+      ? `<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${btns.join('').replace(/class="ah-pend"/g, 'class="ah-pend" style="margin-left:0;"')}</span>`
       : `<span class="ah-org-r">${ls.length} ligue${ls.length>1?'s':''}</span>`;
     html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
     <div class="ah-grid">${ls.map(adminLeagueCardHTML).join('') || '<p class="empty">Aucune ligue pour l\'instant.</p>'}</div>`;
@@ -11875,7 +11885,7 @@ function organizationAccountsHTML(){
       </div>`;
     }).join('')}
   </div>`;
-  let html = reqHTML + interestHTML + codeHTML;
+  let html = reqHTML + codeHTML;
   if(orphaned.length){
     html += `<div class="card">
       <div class="section-heading"><span class="icon-badge" style="background:rgba(233,85,107,0.14);color:var(--danger);"></span><h3 style="margin:0;color:var(--danger);">Comptes orphelins <span class="small" style="color:var(--muted);">(${orphaned.length})</span></h3></div>
@@ -12019,7 +12029,10 @@ async function linkSamePersonElsewhere(profileId, leagueId, key){
   }catch(e){ console.error('autres ligues', e); }
 }
 function rejectJoinRequest(reqId){
-  showConfirm("Refuser cette demande ?", async ()=>{
+  const rq = (ALL_JOIN_REQUESTS||[]).find(x=>x.id===reqId);
+  const lgq = rq ? (LEAGUES||[]).find(l=>l.id===rq.league_id) : null;
+  const msg = (rq && rq.kind === 'interest') ? ('Retirer ' + (rq.display_name || rq.email || 'cette personne') + " de la liste d'attente" + (lgq ? ' de ' + lgq.name : '') + ' ? Son compte et ses autres inscriptions ne changent pas.') : 'Refuser cette demande ?';
+  showConfirm(msg, async ()=>{
     const { error } = await sb.rpc('reject_join_request', { p_request_id: reqId });
     if(error){ showAlert("Erreur : " + error.message); return; }
     await loadAllProfiles();
