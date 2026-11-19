@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 474">
+<meta name="app-build" content="Version 475">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8911,7 +8911,7 @@ function jpRows(){
     let wk = '—', wc = '';
     if(open){ if(p.injured){ wk = gw(p,'Blessé','Blessée','Blessé(e)'); wc = 'w'; } else if(isAbsent(open, p.id)){ wk = gw(p,'Absent','Absente','Absent(e)'); wc = 'w'; } else { wk = 'Présent' + (p.gender === 'F' ? 'e' : ''); } }
     const ra = accOf(lk && lk.profile_id);
-    out.push({ key: 'p:' + p.id, kind: 'p', id: p.id, name: p.name, type: 'Régulier', group: rec ? '—' : (g ? g.name : 'Sans groupe'), grpOrder: g ? g.order : 999, nogrp: !rec && !g && !p.injured,
+    out.push({ key: 'p:' + p.id, kind: 'p', id: p.id, name: p.name, type: 'Régulier', group: rec ? '—' : (g ? g.name : '—'), grpOrder: g ? g.order : 999, nogrp: !rec && !g && !p.injured,
       rating: typeof p.rating === 'number' ? p.rating : RATING_DEFAULT, profile: lk ? lk.profile_id : null, wk: wk, wc: wc,
       rules: !DATA.rulesText ? '' : (!lk ? '—' : (ra === null ? '…' : (ra ? 'Accepté' : 'En attente'))) });
   });
@@ -8998,7 +8998,7 @@ function jpDeskHTML(){
   const nG = rec ? 0 : (DATA.players||[]).filter(function(p){ return !p.groupId && !p.injured; }).length;
   const f = VIEW.jpF || 'all';
   const chip = function(k, l, n, cls){ return `<button type="button" class="${f === k ? 'on' : ''}${cls ? ' ' + cls : ''}" onclick="jpSetF('${k}')">${l} ${n}</button>`; };
-  const chips = chip('all', 'Tous', nP + nS) + chip('reg', 'Réguliers', nP) + chip('sub', 'Remplaçants', nS) + (rec ? '' : chip('nogrp', 'Sans ' + grpWord(false, false), nG)) + (nW || f === 'attente' ? chip('attente', "Liste d'attente", nW, 'w') : '');
+  const chips = chip('all', 'Tous', nP + nS) + chip('reg', 'Réguliers', nP) + chip('sub', 'Remplaçants', nS) + (nW || f === 'attente' ? chip('attente', "Liste d'attente", nW, 'w') : '');
   return `<div class="jp-head"><h2>Joueurs <small>· ${nP} régulier${nP > 1 ? 's' : ''}, ${nS} remplaçant${nS > 1 ? 's' : ''}</small></h2>
       <div class="row"><button class="btn btn-secondary" onclick="openOrgSheet('membres')">Membres de l'organisation</button><button class="btn btn-primary" onclick="openAddToLeagueModal()">+ Ajouter</button></div></div>
     ${f === 'attente' ? '' : `<input type="search" class="jp-search" placeholder="Rechercher un nom…" value="${escapeHTML(VIEW.jpQ || '')}" oninput="VIEW.jpQ=this.value;jpRefresh()">`}
@@ -9419,7 +9419,7 @@ function adminAllPeopleHTML(){
     const waiting = !g && !p.injured && !isRecLeague(); // récréatif : pas de groupe fixe, personne n'est « en attente »
     rows.push({ name:p.name, f:['reg'].concat(waiting?['wait']:[]), click:`openPlayerDetailModal('${p.id}')`, avatarUrl: pr && pr.avatar_url,
       rating: typeof p.rating==='number' ? p.rating : RATING_DEFAULT,
-      tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}${waiting?' <span class="tag tag-stay">Sans groupe</span>':''}`,
+      tags:`${p.injured?' <span class="tag tag-down">Blessé(e)</span>':''}${(openSessionForBadge && isTrulyAbsent(openSessionForBadge,p.id))?' <span class="tag tag-orange">Absent(e)</span>':''}`,
       sub:`Régulier${isRecLeague() ? '' : ' · ' + escapeHTML(g ? g.name : 'En attente')}${link?' · Compte':''}`, role: pr ? staffRoleSubHTML(pr.id, CURRENT_LEAGUE_ID) : '' });
   });
   (DATA.substitutePool||[]).forEach(sb_=>{
