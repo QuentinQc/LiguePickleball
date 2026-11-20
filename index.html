@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 509">
+<meta name="app-build" content="Version 510">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -11391,7 +11391,7 @@ function openTournDivForm(tid, divId){
       ${tournCourts(t || {}).length ? tournField('Jouer sur', tournMulti('tdCourts', tournCourts(t), (d && Array.isArray(d.courts)) ? d.courts : []), 'Choisis des terrains précis seulement pour réserver cette catégorie à ces terrains : ses matchs n\'iront nulle part ailleurs.') : ''}
     </div>
     <div class="tn-form-acts">
-      ${d ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDivDelete('${d.id}')" ${n ? 'disabled title="Des équipes sont inscrites dans cette catégorie"' : ''}>Supprimer</button>` : ''}
+      ${d ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDivDelete('${d.id}')">Supprimer</button>` : ''}
       <span style="flex:1"></span>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
       <button type="button" class="btn btn-primary" onclick="tournDivSave('${tid}', ${d ? `'${d.id}'` : 'null'})">${d ? 'Enregistrer' : 'Ajouter'}</button>
@@ -11442,7 +11442,16 @@ async function tournDivSave(tid, divId){
   showToast(divId ? 'Catégorie enregistrée' : 'Catégorie ajoutée');
 }
 function tournDivDelete(divId){
-  showConfirm('Supprimer cette catégorie ?', async function(){
+  const d = (TDIVS || []).find(function(x){ return x.id === divId; });
+  const teams = d ? tournTeams(d.tournament_id, d.id) : [];
+  const real = teams.filter(function(x){ return !x.is_test; }).length, test = teams.length - real;
+  const nM = (TMATCHES || []).filter(function(m){ return m.division_id === divId; }).length;
+  const parts = [];
+  if(real) parts.push(real + ' équipe' + (real > 1 ? 's inscrites seront retirées' : ' inscrite sera retirée') + ' (sans avis aux joueurs)');
+  if(test) parts.push(test + ' équipe' + (test > 1 ? 's' : '') + ' de test');
+  if(nM) parts.push(nM + ' match' + (nM > 1 ? 's' : '') + ' et leurs scores');
+  const msg = 'Supprimer la catégorie « ' + (d ? d.name : '') + ' » ?' + (parts.length ? ' Seront aussi effacés : ' + parts.join(', ') + '. Cette action est définitive.' : '');
+  showConfirm(msg, async function(){
     const r = await sb.from('tournament_divisions').delete().eq('id', divId);
     if(r && r.error){ showAlert('Suppression impossible : ' + r.error.message); return; }
     await loadTournaments(true); tournBackToSheet(); render();
