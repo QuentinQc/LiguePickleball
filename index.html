@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 489">
+<meta name="app-build" content="Version 490">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -17031,7 +17031,7 @@ async function subAvailFromHome(leagueId){
   if(!link) return;
   if(leagueId !== CURRENT_LEAGUE_ID){ await switchMyLeague(leagueId); VIEW.ptab = 'accueil'; VIEW.pdet = null; }
   MY_SUMMARY_AT = 0;
-  toggleSubAvailability(link.substitute_id);
+  toggleSubAvailability(link.substitute_id, true);
 }
 function setSubstituteTab(t){ VIEW.tab=t; render(); }
 function substituteAvailabilityHTML(sub){
@@ -17075,14 +17075,31 @@ function substituteAvailabilityHTML(sub){
   html += lastSessionResultHTML('sub::' + sub.id);
   return html;
 }
-function toggleSubAvailability(subId){
+var SUB_AVAIL_BUSY = false;
+function toggleSubAvailability(subId, onlyOn){
   const open = currentOpenSession();
   if(!open) return;
   open.availableSubs = open.availableSubs || [];
   const idx = open.availableSubs.indexOf(subId);
+  // Bouton de l'accueil : il sert seulement à s'indiquer disponible, jamais à se retirer.
+  if(onlyOn && idx !== -1){ showToast('Tu es déjà indiqué(e) disponible pour le ' + fdl(open.date)); render(); return; }
   if(isPlayerActor()){
+    // Un seul envoi à la fois : un deuxième toucher pendant l'enregistrement annulait le premier.
+    if(SUB_AVAIL_BUSY) return;
     const sub0 = (DATA.substitutePool||[]).find(s=>s.id===subId), dt = open.date, becoming = idx===-1;
-    selfAction('sub_available', { subId, available: becoming }).then(ok=>{ if(ok && becoming) notifyAdminsSubAvailable(sub0 && sub0.name, dt); });
+    const send = function(){
+      SUB_AVAIL_BUSY = true;
+      // L'écran change tout de suite ; le serveur confirme ensuite.
+      if(becoming) open.availableSubs.push(subId); else open.availableSubs.splice(open.availableSubs.indexOf(subId), 1);
+      render();
+      selfAction('sub_available', { subId, available: becoming }).then(ok=>{
+        SUB_AVAIL_BUSY = false;
+        if(ok){ if(becoming) notifyAdminsSubAvailable(sub0 && sub0.name, dt); showToast(becoming ? 'Tu es indiqué(e) disponible pour le ' + fdl(dt) : 'Disponibilité retirée'); }
+        render();
+      }, function(){ SUB_AVAIL_BUSY = false; render(); });
+    };
+    if(becoming) send();
+    else showConfirm('Retirer ta disponibilité pour le ' + fdl(dt) + ' ? L\'organisateur ne te comptera plus comme remplaçant ce soir-là.', send);
     return;
   }
   if(idx===-1){
