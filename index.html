@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 492">
+<meta name="app-build" content="Version 493">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2071,6 +2071,42 @@ body.desk .dk-add{color:var(--muted);}
 .tn-ci.on .tn-ci-b{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .tn-ci.on em{color:var(--ball);}
 .tn-multi button{flex:0 1 auto;}
+.tn-std{width:100%;border-collapse:collapse;font-size:13px;}
+.tn-std th{text-align:left;font:600 10px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 4px;}
+.tn-std th:nth-child(3), .tn-std th:nth-child(4), .tn-std td:nth-child(3), .tn-std td:nth-child(4){text-align:right;}
+.tn-std td{padding:6px 4px;border-top:1px solid var(--line-soft);}
+.tn-std td:first-child{font-family:var(--font-display);color:var(--muted);width:18px;}
+.tn-std tr.q td{color:var(--text);font-weight:600;}
+.tn-std tr.q td:first-child{color:var(--ball);box-shadow:inset 3px 0 0 var(--ball);padding-left:7px;}
+.tn-mlist li button{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;width:100%;background:none;border:0;padding:0;color:var(--muted);font:inherit;text-align:left;cursor:pointer;}
+.tn-mlist li button span:last-child{text-align:right;}
+.tn-mlist li button i{font-style:normal;color:var(--muted);}
+.tn-mlist li.done button i{color:var(--ball);font-family:var(--font-display);}
+.tn-mlist li button .w{color:var(--text);font-weight:600;}
+.tn-bracket{display:flex;gap:16px;overflow-x:auto;padding-bottom:6px;align-items:stretch;}
+.tn-br-col{flex:0 0 220px;display:flex;flex-direction:column;gap:8px;}
+.tn-br-body{flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:12px;}
+.tn-br-m{display:block;width:100%;padding:0;text-align:left;background:#12332D;border:1px solid var(--line-soft-strong);border-radius:12px;overflow:hidden;color:var(--text);font:inherit;font-size:13px;cursor:pointer;}
+.tn-br-m:disabled{cursor:default;}
+.tn-br-m.live{border-color:var(--ball);}
+.tn-br-t{display:flex;justify-content:space-between;gap:8px;padding:8px 11px;color:var(--muted);}
+.tn-br-t + .tn-br-t{border-top:1px solid var(--line-soft);}
+.tn-br-t.w{color:var(--ball);font-weight:600;}
+.tn-br-t.tbd span{font-style:italic;opacity:.7;}
+.tn-br-t b{font-family:var(--font-display);white-space:nowrap;}
+.tn-br-live{font-size:11px;color:var(--court);background:var(--ball);padding:3px 11px;font-weight:600;}
+.tn-podium{background:rgba(207,234,92,.06);border:1px solid rgba(207,234,92,.35);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.tn-bracket .tn-podium{margin-top:0;}
+.tn-bracket .tn-podium .tn-k{display:none;}
+.tn-pod-top{display:none;}
+.tn-pod-top .tn-podium{margin:0 0 12px;}
+.tn-pod-r{display:flex;gap:10px;align-items:baseline;font-size:14px;}
+.tn-pod-r b{min-width:58px;font-family:var(--font-display);text-transform:uppercase;font-weight:600;}
+.tn-pod-r.gold b{color:var(--ball);}
+.tn-pod-r.silver b{color:#D7E3DC;}
+.tn-pod-r.bronze b{color:#E0A86A;}
+.tn-sc3 .tn-sc-r input{width:62px !important;}
+.tn-sc-h em{width:62px;text-align:center;font-style:normal;font-size:11px;color:var(--muted);}
 @media (max-width:980px){ .tn-live{grid-template-columns:1fr;} }
 .tn-prep-h{margin-top:14px;}
 .tn-prep-h > div{display:flex;flex-direction:column;gap:2px;}
@@ -2201,6 +2237,8 @@ body.desk .dk-add{color:var(--muted);}
   .tn-fmt-m{display:block;color:var(--muted);font-size:12px;}
   .tn-fmts{grid-template-columns:1fr;}
   .tn-live{grid-template-columns:1fr;}
+  .tn-pod-top{display:block;}
+  .tn-pod-col{display:none;}
   .tn-courts{grid-template-columns:1fr;}
   .tn-court-a .btn{white-space:nowrap;}
   .tn-fmtc{flex-direction:row;align-items:center;gap:12px;}
@@ -9144,7 +9182,7 @@ function tournSheetHTML(){
   let body = '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(t){
     const nav = `<div class="tn-tabs" role="tablist">${tabs.map(function(x){ return `<button type="button" role="tab" class="${tab === x[0] ? 'on' : ''}" onclick="tournTab('${x[0]}')">${x[1]}</button>`; }).join('')}</div>`;
-    body = nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'tableau' ? tournNextStepHTML(t, tab) : tournSettingsHTML(t));
+    body = nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
   }
   return `<div class="chat-overlay dk-page" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet chat-sheet-lg">
@@ -9351,12 +9389,12 @@ function tournPoolsLockedHTML(t, d){
       const teams = (TTEAMS || []).filter(function(x){ return x.division_id === d.id && x.pool === lb && x.status === 'registered'; }).sort(function(a, b){ return (a.pool_order || 0) - (b.pool_order || 0); });
       const pm = ms.filter(function(m){ return m.pool === lb; }).sort(function(a, b){ return a.seq - b.seq; });
       return `<section class="tn-pool"><div class="tn-pool-h"><b>${lb === 'U' ? 'Poule unique' : 'Poule ' + lb}</b><span>${teams.length} équipes</span></div>
-        ${teams.map(function(x){ return `<div class="tn-pool-t static"><span class="tn-seedb">${x.seed || ''}</span><span>${escapeHTML(tournTeamFull(x.id))}</span></div>`; }).join('')}
-        <div class="tn-k" style="margin:10px 0 4px;">Ordre des matchs</div>
-        <ol class="tn-mlist">${pm.map(function(m){ return `<li><span>${escapeHTML(tournTeamName(m.team_a))}</span><i>c.</i><span>${escapeHTML(tournTeamName(m.team_b))}</span></li>`; }).join('')}</ol>
+        ${tournStandingsHTML(t, d, lb)}
+        <div class="tn-k" style="margin:10px 0 4px;">Matchs</div>
+        <ol class="tn-mlist">${pm.map(function(m){ return `<li class="${m.status === 'done' ? 'done' : ''}"><button type="button" onclick="openTournScore('${m.id}')"><span class="${m.status === 'done' && m.winner === m.team_a ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_a))}</span><i>${m.status === 'done' ? m.score_a + '-' + m.score_b : (m.status === 'playing' ? 'en cours' : 'c.')}</i><span class="${m.status === 'done' && m.winner === m.team_b ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_b))}</span></button></li>`; }).join('')}</ol>
       </section>`;
     }).join('')}</div>
-    <p class="small" style="color:var(--muted);margin:12px 0 0;">Prochaine étape : la file d'attente des terrains, qui appellera ces matchs au fur et à mesure.</p>`;
+    <p class="small" style="color:var(--muted);margin:12px 0 0;">Les matchs se jouent depuis l'onglet « En direct ». Touche un match ici pour entrer ou corriger un score. Le tableau final se crée dans l'onglet « Tableau ».</p>`;
 }
 function tournPrepUnlock(divId){
   showConfirm('Déverrouiller les poules ? Les matchs créés seront effacés et tu pourras refaire la répartition.', async function(){
@@ -9379,6 +9417,7 @@ function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter
 function tournMatchMinutes(t, m){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
   const r = tournDivRules(t, d), pts = m.phase === 'pool' ? r.pool_points : r.bracket_points;
+  if(m.phase === 'ko' && r.final_best_of === 3 && tournIsFinal(m)) return 50;
   return pts >= 21 ? 35 : pts >= 15 ? 25 : 20;
 }
 function tournLiveMatches(t){
@@ -9455,6 +9494,7 @@ function tournEstimates(t, queue){
 function tournHour(ms){ const d = new Date(ms); return d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0'); }
 function tournDivLabel(m){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
+  if(m.phase === 'ko') return (d ? d.name : '') + ' · ' + tournRoundName(m.round, tournKoRounds(m.division_id)).toLowerCase().replace(/s$/, '');
   return (d ? d.name : '') + (m.phase === 'pool' && m.pool ? (m.pool === 'U' ? '' : ' · poule ' + m.pool) : '');
 }
 function tournLiveHTML(t){
@@ -9535,13 +9575,29 @@ async function tournCall(id, ci){
 function tournUncall(id){
   showConfirm('Libérer le terrain ? Le match retourne dans la file d\'attente.', function(){ tournMatchPatch(id, { status: 'pending', court: null, called_at: null, started_at: null }); });
 }
+function tournScorePts(m){
+  const t = tournById(m.tournament_id), r = tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; }));
+  return m.phase === 'pool' ? r.pool_points : (tournIsFinal(m) && r.final_best_of === 3 ? 11 : r.bracket_points);
+}
+function tournBestOf3(m){
+  const t = tournById(m.tournament_id), r = tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; }));
+  return m.phase === 'ko' && tournIsFinal(m) && r.final_best_of === 3;
+}
 function openTournScore(id){
-  const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
-  const t = tournById(m.tournament_id), pts = m.phase === 'pool' ? tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; })).pool_points : 15;
-  const row = function(id2, val){ return `<div class="tn-sc-r"><span>${escapeHTML(tournTeamFull(id2))}</span><input id="tsc_${id2 === m.team_a ? 'a' : 'b'}" type="number" inputmode="numeric" min="0" max="99" value="${val == null ? '' : val}" aria-label="Points de ${escapeHTML(tournTeamFull(id2))}"></div>`; };
+  const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m || !m.team_a || !m.team_b) return;
+  const pts = tournScorePts(m), bo3 = tournBestOf3(m), games = Array.isArray(m.games) ? m.games : [];
+  const inp = function(key, val, who){ return `<input id="${key}" type="number" inputmode="numeric" min="0" max="99" value="${val == null ? '' : val}" aria-label="${escapeHTML(who)}">`; };
+  let grid;
+  if(bo3){
+    grid = `<div class="tn-sc tn-sc3"><div class="tn-sc-r tn-sc-h"><span></span><em>1</em><em>2</em><em>3</em></div>
+      ${[m.team_a, m.team_b].map(function(tid, k){ return `<div class="tn-sc-r"><span>${escapeHTML(tournTeamFull(tid))}</span>${[0, 1, 2].map(function(g){ return inp('tsg_' + k + g, games[g] ? games[g][k] : null, tournTeamFull(tid) + ', manche ' + (g + 1)); }).join('')}</div>`; }).join('')}
+      <p class="small" style="color:var(--muted);margin:2px 0 0;">Laisse la 3e manche vide si elle n'a pas été jouée.</p></div>`;
+  } else {
+    grid = `<div class="tn-sc">${[m.team_a, m.team_b].map(function(tid, k){ return `<div class="tn-sc-r"><span>${escapeHTML(tournTeamFull(tid))}</span>${inp(k ? 'tsc_b' : 'tsc_a', k ? m.score_b : m.score_a, 'Points de ' + tournTeamFull(tid))}</div>`; }).join('')}</div>`;
+  }
   const html = `<div class="tn-form">
-    <p class="small" style="color:var(--muted);margin:0 0 10px;">${escapeHTML(tournDivLabel(m))}${m.court ? ' · ' + escapeHTML(m.court) : ''} · match à ${pts}, gagné par 2</p>
-    <div class="tn-sc">${row(m.team_a, m.score_a)}${row(m.team_b, m.score_b)}</div>
+    <p class="small" style="color:var(--muted);margin:0 0 10px;">${escapeHTML(tournDivLabel(m))}${m.court ? ' · ' + escapeHTML(m.court) : ''} · ${bo3 ? '2 manches gagnantes à 11' : 'match à ' + pts}, gagné par 2</p>
+    ${grid}
     <div class="tn-form-acts">
       <button type="button" class="btn btn-secondary" onclick="tournForfeit('${m.id}')">Forfait…</button>
       <span style="flex:1"></span>
@@ -9550,25 +9606,43 @@ function openTournScore(id){
     </div></div>`;
   setModal({ kind:'content', title: m.status === 'done' ? 'Corriger le score' : 'Score du match', htmlContent: html });
   render();
-  setTimeout(function(){ const el = document.getElementById('tsc_a'); if(el && m.score_a == null) el.focus(); }, 60);
+  setTimeout(function(){ const el = document.getElementById(bo3 ? 'tsg_00' : 'tsc_a'); if(el && m.status !== 'done') el.focus(); }, 60);
 }
 async function tournScoreSave(id){
   const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
-  const a = parseInt(tfVal('tsc_a'), 10), b = parseInt(tfVal('tsc_b'), 10);
-  if(isNaN(a) || isNaN(b)){ showToast('Entre les deux scores', true); return; }
-  if(a === b){ showToast('Il faut un gagnant : les scores ne peuvent pas être égaux', true); return; }
-  const ok = await tournMatchPatch(id, { score_a: a, score_b: b, winner: a > b ? m.team_a : m.team_b, status: 'done', ended_at: m.ended_at || new Date().toISOString() }, true);
+  let a, b, games = null;
+  if(tournBestOf3(m)){
+    games = []; let wa = 0, wb = 0;
+    for(let g = 0; g < 3; g++){
+      const x = parseInt(tfVal('tsg_0' + g), 10), y = parseInt(tfVal('tsg_1' + g), 10);
+      if(isNaN(x) && isNaN(y)) continue;
+      if(isNaN(x) || isNaN(y) || x === y){ showToast('Manche ' + (g + 1) + ' : entre deux scores différents', true); return; }
+      games.push([x, y]); if(x > y) wa++; else wb++;
+    }
+    if(Math.max(wa, wb) < 2){ showToast('Il faut 2 manches gagnées pour terminer la finale', true); return; }
+    a = wa; b = wb;
+  } else {
+    a = parseInt(tfVal('tsc_a'), 10); b = parseInt(tfVal('tsc_b'), 10);
+    if(isNaN(a) || isNaN(b)){ showToast('Entre les deux scores', true); return; }
+    if(a === b){ showToast('Il faut un gagnant : les scores ne peuvent pas être égaux', true); return; }
+  }
+  const winner = a > b ? m.team_a : m.team_b;
+  if(m.winner && m.winner !== winner && tournKoBlocked(m)){ showAlert('Le gagnant a déjà joué le match suivant du tableau : corrige d\'abord ce match-là.'); return; }
+  const ok = await tournMatchPatch(id, { score_a: a, score_b: b, games: games, winner: winner, status: 'done', ended_at: m.ended_at || new Date().toISOString() }, true);
   if(!ok) return;
-  tournBackToSheet(); render();
+  await tournAdvance(m);
+  tournLiveNotify(); tournBackToSheet(); render();
   showToast('Score enregistré' + (m.court ? ' : ' + m.court + ' est libre' : ''));
 }
 function tournForfeit(id){
   const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
-  const t = tournById(m.tournament_id), pts = tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; })).pool_points;
+  const pts = tournScorePts(m);
   showChoice('Quelle équipe déclare forfait ? L\'autre gagne ' + pts + '-0.', [tournTeamFull(m.team_a), tournTeamFull(m.team_b)], function(i){
     if(i !== 0 && i !== 1) return;
-    const aLoses = i === 0;
-    tournMatchPatch(id, { score_a: aLoses ? 0 : pts, score_b: aLoses ? pts : 0, winner: aLoses ? m.team_b : m.team_a, status: 'done', ended_at: new Date().toISOString() });
+    const aLoses = i === 0, w = aLoses ? m.team_b : m.team_a;
+    if(m.winner && m.winner !== w && tournKoBlocked(m)){ showAlert('Le gagnant a déjà joué le match suivant du tableau : corrige d\'abord ce match-là.'); return; }
+    tournMatchPatch(id, { score_a: aLoses ? 0 : pts, score_b: aLoses ? pts : 0, games: null, winner: w, status: 'done', ended_at: new Date().toISOString() }, true)
+      .then(function(ok){ return ok && tournAdvance(m); }).then(function(){ tournLiveNotify(); tournBackToSheet(); render(); });
   });
 }
 // Présences du matin.
@@ -9632,6 +9706,209 @@ function ensureTournLive(tid){
   }, 30000);
 }
 function tournLiveNotify(){ try{ if(TLIVE_CH) TLIVE_CH.send({ type: 'broadcast', event: 'saved', payload: {} }); }catch(e){} }
+// ---- Classements des poules ----
+// Départage : victoires, puis résultat entre les équipes à égalité, puis différentiel, puis points marqués.
+function tournStandings(divId, pool){
+  const teams = (TTEAMS || []).filter(function(x){ return x.division_id === divId && x.pool === pool && x.status === 'registered'; });
+  const ms = (TMATCHES || []).filter(function(m){ return m.division_id === divId && m.phase === 'pool' && m.pool === pool; });
+  const row = {};
+  teams.forEach(function(x){ row[x.id] = { id: x.id, w: 0, l: 0, pf: 0, pa: 0, played: 0, left: 0 }; });
+  ms.forEach(function(m){
+    const a = row[m.team_a], b = row[m.team_b]; if(!a || !b) return;
+    if(m.status !== 'done'){ a.left++; b.left++; return; }
+    const sa = Number(m.score_a) || 0, sb = Number(m.score_b) || 0;
+    a.pf += sa; a.pa += sb; b.pf += sb; b.pa += sa; a.played++; b.played++;
+    if(m.winner === m.team_a){ a.w++; b.l++; } else { b.w++; a.l++; }
+  });
+  const list = Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; return r; });
+  const h2h = function(group){
+    const ids = {}; group.forEach(function(r){ ids[r.id] = 0; });
+    ms.forEach(function(m){ if(m.status === 'done' && m.team_a in ids && m.team_b in ids && m.winner in ids) ids[m.winner]++; });
+    return ids;
+  };
+  list.sort(function(x, y){ return y.w - x.w; });
+  const out = [];
+  for(let i = 0; i < list.length;){
+    let j = i; while(j < list.length && list[j].w === list[i].w) j++;
+    const grp = list.slice(i, j), hh = grp.length > 1 ? h2h(grp) : {};
+    grp.sort(function(x, y){ return ((hh[y.id] || 0) - (hh[x.id] || 0)) || (y.diff - x.diff) || (y.pf - x.pf) || tournTeamName(x.id).localeCompare(tournTeamName(y.id)); });
+    grp.forEach(function(r){ out.push(r); });
+    i = j;
+  }
+  return out;
+}
+function tournPoolLabels(divId){
+  const out = []; (TTEAMS || []).forEach(function(x){ if(x.division_id === divId && x.pool && x.status === 'registered' && out.indexOf(x.pool) === -1) out.push(x.pool); });
+  return out.sort();
+}
+function tournStandingsHTML(t, d, pool){
+  const r = tournDivRules(t, d), st = tournStandings(d.id, pool);
+  const q = r.format === 'pools_ko' ? r.qualifiers : 0;
+  return `<table class="tn-std"><thead><tr><th>#</th><th>Équipe</th><th>V-D</th><th>+/-</th></tr></thead><tbody>${st.map(function(x, i){
+    return `<tr class="${i < q ? 'q' : ''}"><td>${i + 1}</td><td>${escapeHTML(tournTeamName(x.id))}</td><td>${x.w}-${x.l}</td><td>${x.diff > 0 ? '+' : ''}${x.diff}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+// ---- Tableau final (élimination directe) ----
+function tournBracketOrder(size){
+  let order = [1];
+  while(order.length < size){ const n = order.length * 2 + 1, next = []; order.forEach(function(s){ next.push(s, n - s); }); order = next; }
+  return order;
+}
+function tournRoundName(round, rounds){
+  const left = rounds - round;
+  return left === 0 ? 'Finale' : left === 1 ? 'Demi-finales' : left === 2 ? 'Quarts de finale' : left === 3 ? 'Huitièmes de finale' : 'Ronde ' + round;
+}
+function tournKoRounds(divId){ return tournMatches(divId, 'ko').reduce(function(mx, m){ return Math.max(mx, m.round); }, 0); }
+function tournIsFinal(m){ return m.phase === 'ko' && m.round === tournKoRounds(m.division_id); }
+// Qualifiés, dans l'ordre : tous les 1ers (meilleur bilan d'abord), puis tous les 2es.
+function tournQualifiers(t, d){
+  const r = tournDivRules(t, d), labels = tournPoolLabels(d.id), out = [];
+  for(let place = 0; place < r.qualifiers; place++){
+    const tier = [];
+    labels.forEach(function(lb){ const st = tournStandings(d.id, lb); if(st[place]) tier.push({ row: st[place], pool: lb }); });
+    tier.sort(function(x, y){
+      const px = x.row.played || 1, py = y.row.played || 1;
+      return (y.row.w / py - x.row.w / px) || (y.row.diff / py - x.row.diff / px) || (y.row.pf / py - x.row.pf / px);
+    });
+    tier.forEach(function(x){ out.push({ id: x.row.id, pool: x.pool, place: place + 1 }); });
+  }
+  return out;
+}
+async function tournCreateBracket(tid, divId){
+  const t = tournById(tid), d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!t || !d) return;
+  const left = tournMatches(divId, 'pool').filter(function(m){ return m.status !== 'done'; }).length;
+  const go = async function(){
+    const q = tournQualifiers(t, d);
+    if(q.length < 2){ showAlert('Il faut au moins 2 équipes qualifiées.'); return; }
+    let size = 2; while(size < q.length) size *= 2;
+    const rounds = Math.round(Math.log(size) / Math.LN2);
+    const order = tournBracketOrder(size);
+    const slots = []; // [teamA, teamB] pour chaque match de la 1re ronde
+    for(let i = 0; i < size; i += 2){ const a = q[order[i] - 1] || null, b = q[order[i + 1] - 1] || null; slots.push([a, b]); }
+    // Éviter que deux équipes d'une même poule se croisent dès la 1re ronde : on échange les seconds au besoin.
+    slots.forEach(function(s, i){
+      if(!s[0] || !s[1] || s[0].pool !== s[1].pool) return;
+      for(let j = 0; j < slots.length; j++){
+        const o = slots[j]; if(j === i || !o[1] || !o[0]) continue;
+        if(o[1].pool !== s[0].pool && s[1].pool !== o[0].pool && o[1].place === s[1].place){ const tmp = s[1]; s[1] = o[1]; o[1] = tmp; return; }
+      }
+    });
+    const rows = [];
+    slots.forEach(function(s, i){
+      const a = s[0] ? s[0].id : null, b = s[1] ? s[1].id : null;
+      const bye = !a || !b;
+      rows.push({ tournament_id: tid, division_id: divId, phase: 'ko', round: 1, seq: i, team_a: a || b, team_b: bye ? null : b, status: bye ? 'bye' : 'pending', winner: bye ? (a || b) : null });
+    });
+    for(let r = 2; r <= rounds; r++){
+      for(let i = 0; i < size / Math.pow(2, r); i++) rows.push({ tournament_id: tid, division_id: divId, phase: 'ko', round: r, seq: i, team_a: null, team_b: null, status: 'pending' });
+    }
+    // Les exemptés passent directement à la 2e ronde.
+    rows.filter(function(m){ return m.round === 1 && m.status === 'bye'; }).forEach(function(m){
+      const nx = rows.find(function(x){ return x.round === 2 && x.seq === Math.floor(m.seq / 2); });
+      if(nx){ if(m.seq % 2 === 0) nx.team_a = m.winner; else nx.team_b = m.winner; }
+    });
+    const ins = await sb.from('tournament_matches').insert(rows);
+    if(ins && ins.error){ showAlert('Impossible de créer le tableau : ' + ins.error.message); return; }
+    await sb.from('tournament_divisions').update({ stage: 'bracket' }).eq('id', divId);
+    await loadTournaments(true); tournLiveNotify(); tournBackToSheet(); render();
+    showToast('Tableau créé : ' + q.length + ' équipes qualifiées');
+  };
+  if(left) showConfirm('Il reste ' + left + ' match' + (left > 1 ? 's' : '') + ' de poule à jouer. Créer le tableau quand même avec le classement actuel ?', go);
+  else go();
+}
+function tournCancelBracket(divId){
+  showConfirm('Annuler le tableau ? Les matchs du tableau seront effacés ; les résultats des poules sont conservés.', async function(){
+    const del = await sb.from('tournament_matches').delete().eq('division_id', divId).eq('phase', 'ko');
+    if(del && del.error){ showAlert(del.error.message); return; }
+    await sb.from('tournament_divisions').update({ stage: 'pools' }).eq('id', divId);
+    await loadTournaments(true); tournLiveNotify(); tournBackToSheet(); render();
+  });
+}
+// Après un score du tableau : le gagnant avance au match suivant.
+async function tournAdvance(m){
+  if(m.phase !== 'ko') return true;
+  const nx = (TMATCHES || []).find(function(x){ return x.division_id === m.division_id && x.phase === 'ko' && x.round === m.round + 1 && x.seq === Math.floor(m.seq / 2); });
+  if(!nx){
+    await sb.from('tournament_divisions').update({ stage: 'done' }).eq('id', m.division_id);
+    const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; }); if(d) d.stage = 'done';
+    return true;
+  }
+  const field = m.seq % 2 === 0 ? 'team_a' : 'team_b';
+  if(nx[field] === m.winner) return true;
+  const patch = {}; patch[field] = m.winner;
+  const r = await sb.from('tournament_matches').update(patch).eq('id', nx.id);
+  if(r && r.error){ showAlert(r.error.message); return false; }
+  nx[field] = m.winner;
+  return true;
+}
+function tournKoBlocked(m){
+  if(m.phase !== 'ko' || m.status !== 'done') return false;
+  const nx = (TMATCHES || []).find(function(x){ return x.division_id === m.division_id && x.phase === 'ko' && x.round === m.round + 1 && x.seq === Math.floor(m.seq / 2); });
+  return !!(nx && (nx.status === 'done' || nx.status === 'playing'));
+}
+function tournPodium(t, d){
+  const r = tournDivRules(t, d);
+  if(r.format === 'round_robin'){
+    const lb = tournPoolLabels(d.id)[0], st = lb ? tournStandings(d.id, lb) : [];
+    if(!st.length || tournMatches(d.id, 'pool').some(function(m){ return m.status !== 'done'; })) return null;
+    return { gold: st[0] && st[0].id, silver: st[1] && st[1].id, bronze: st[2] ? [st[2].id] : [] };
+  }
+  const rounds = tournKoRounds(d.id); if(!rounds) return null;
+  const fin = tournMatches(d.id, 'ko').find(function(m){ return m.round === rounds; });
+  if(!fin || fin.status !== 'done') return null;
+  const semis = rounds > 1 ? tournMatches(d.id, 'ko').filter(function(m){ return m.round === rounds - 1 && m.status === 'done' && m.team_b; }) : [];
+  return { gold: fin.winner, silver: fin.winner === fin.team_a ? fin.team_b : fin.team_a, bronze: semis.map(function(m){ return m.winner === m.team_a ? m.team_b : m.team_a; }) };
+}
+function tournBracketPageHTML(t){
+  const divs = tournDivs(t.id);
+  if(!divs.length) return `<div class="tn-note" style="margin-top:14px;">Ajoute d'abord une catégorie dans <b>Réglages</b>.</div>`;
+  if(!VIEW.tbr || !divs.some(function(x){ return x.id === VIEW.tbr; })) VIEW.tbr = divs[0].id;
+  const d = divs.find(function(x){ return x.id === VIEW.tbr; }), r = tournDivRules(t, d), stage = d.stage || 'setup';
+  const chips = `<div class="tn-chips">${divs.map(function(x){ return `<button type="button" class="${x.id === d.id ? 'on' : ''}" onclick="VIEW.tbr='${x.id}';render()">${escapeHTML(x.name)}${(x.stage || '') === 'done' ? ' ✓' : ''}</button>`; }).join('')}</div>`;
+  const head = `<div class="tn-prep-h"><div><b class="tn-h1">${escapeHTML(d.name)}</b><span class="small" style="color:var(--muted);">${escapeHTML(TOURN_FMT[r.format])}</span></div></div>`;
+  const pod = tournPodium(t, d);
+  const podium = pod ? `<section class="tn-podium"><div class="tn-k">Podium</div>
+      <div class="tn-pod-r gold"><b>Or</b><span>${escapeHTML(tournTeamFull(pod.gold))}</span></div>
+      <div class="tn-pod-r silver"><b>Argent</b><span>${escapeHTML(tournTeamFull(pod.silver))}</span></div>
+      ${pod.bronze.map(function(id){ return `<div class="tn-pod-r bronze"><b>Bronze</b><span>${escapeHTML(tournTeamFull(id))}</span></div>`; }).join('')}
+    </section>` : '';
+  if(r.format === 'double_elim') return chips + head + `<div class="tn-note">La double élimination arrive à la prochaine étape.</div>`;
+  if(stage === 'setup') return chips + head + `<div class="tn-note">Verrouille d'abord ${r.format === 'round_robin' ? 'la poule' : 'les poules'} dans <b>Préparer</b>.</div>`;
+  if(r.format === 'round_robin'){
+    const lb = tournPoolLabels(d.id)[0];
+    return chips + head + podium + `<section class="tn-pool" style="margin-top:12px;max-width:520px;"><div class="tn-pool-h"><b>Classement</b><span>${tournMatches(d.id, 'pool').filter(function(m){ return m.status === 'done'; }).length} / ${tournMatches(d.id, 'pool').length} matchs</span></div>${lb ? tournStandingsHTML(t, d, lb) : ''}</section>`;
+  }
+  if(stage === 'pools'){
+    const pm = tournMatches(d.id, 'pool'), left = pm.filter(function(m){ return m.status !== 'done'; }).length;
+    const q = tournQualifiers(t, d);
+    return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>${left ? 'Poules en cours · ' + left + ' match' + (left > 1 ? 's' : '') + ' à jouer' : 'Poules terminées'}</span><span class="tn-head-r"><button type="button" class="btn ${left ? 'btn-secondary' : 'btn-primary'}" onclick="tournCreateBracket('${t.id}','${d.id}')">Créer le tableau (${q.length} équipes)</button></span></div>
+      <div class="tn-pools">${tournPoolLabels(d.id).map(function(lb){ return `<section class="tn-pool"><div class="tn-pool-h"><b>${lb === 'U' ? 'Poule unique' : 'Poule ' + lb}</b><span>${r.qualifiers === 1 ? 'le 1er passe' : 'les 2 premiers passent'}</span></div>${tournStandingsHTML(t, d, lb)}</section>`; }).join('')}</div>`;
+  }
+  const ko = tournMatches(d.id, 'ko'), rounds = tournKoRounds(d.id);
+  const anyScore = ko.some(function(m){ return m.status === 'done' && m.round >= 1 && m.status !== 'bye'; });
+  const cols = [];
+  for(let rd = 1; rd <= rounds; rd++){
+    const ms = ko.filter(function(m){ return m.round === rd; }).sort(function(a, b){ return a.seq - b.seq; });
+    cols.push(`<div class="tn-br-col"><div class="tn-k">${tournRoundName(rd, rounds)}${rd === rounds && r.final_best_of === 3 ? ' · 2 de 3' : ''}</div><div class="tn-br-body">${ms.map(function(m){ return tournBracketCardHTML(m); }).join('')}</div></div>`);
+  }
+  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Tableau · ${tournQualifiers(t, d).length} équipes</span><span class="tn-head-r">${anyScore ? '' : `<button type="button" class="btn btn-secondary" onclick="tournCancelBracket('${d.id}')">Annuler le tableau</button>`}</span></div>
+    ${podium ? `<div class="tn-pod-top">${podium}</div>` : ''}
+    <div class="tn-bracket">${cols.join('')}${podium ? `<div class="tn-br-col tn-pod-col"><div class="tn-k">&nbsp;</div><div class="tn-br-body">${podium}</div></div>` : ''}</div>
+    <p class="small" style="color:var(--muted);margin:10px 0 0;">Les matchs du tableau entrent dans la file d'attente de l'onglet « En direct » dès que les deux équipes sont connues. Touche un match pour entrer ou corriger son score.</p>`;
+}
+function tournBracketCardHTML(m){
+  const games = Array.isArray(m.games) ? m.games : null;
+  const side = function(id, mine, other, gi){
+    if(!id) return `<div class="tn-br-t tbd"><span>${m.status === 'bye' ? 'Exempté' : 'À venir'}</span></div>`;
+    const win = m.status === 'done' && m.winner === id;
+    const sc = m.status === 'done' ? (games ? games.map(function(g){ return g[gi]; }).join(' · ') : (mine == null ? '' : mine)) : '';
+    return `<div class="tn-br-t${win ? ' w' : ''}"><span>${escapeHTML(tournTeamName(id))}</span><b>${sc}</b></div>`;
+  };
+  const can = m.team_a && m.team_b && m.status !== 'bye';
+  const live = m.status === 'playing' ? `<div class="tn-br-live">En cours${m.court ? ' · ' + escapeHTML(m.court) : ''}</div>` : '';
+  return `<button type="button" class="tn-br-m${m.status === 'playing' ? ' live' : ''}" ${can ? `onclick="openTournScore('${m.id}')"` : 'disabled'}>${side(m.team_a, m.score_a, m.score_b, 0)}${side(m.team_b, m.score_b, m.score_a, 1)}${live}</button>`;
+}
 function tournNextStepHTML(t, tab){
   const n = tournTeams(t.id, null, 'registered').length;
   return `<div class="tn-note" style="margin-top:14px;"><b>${tab === 'poules' ? 'Poules et horaire' : 'Tableau final'}</b> : prochaine étape du module tournoi. ${tab === 'poules'
