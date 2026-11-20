@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 501">
+<meta name="app-build" content="Version 502">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2103,6 +2103,9 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
 .tn-test-btn{border-style:dashed !important;}
+.tn-sim-btn{align-self:flex-start;background:rgba(242,153,74,.08);border:1px dashed rgba(242,153,74,.6);border-radius:999px;color:var(--paddle);font:600 12px var(--font-body);padding:6px 12px;cursor:pointer;}
+.tn-sim-list{display:flex;flex-direction:column;gap:8px;}
+.tn-sim-r{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:10px;}
 .tn-testbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:8px 12px;border:1px dashed rgba(242,153,74,.6);border-radius:12px;background:rgba(242,153,74,.07);font-size:13px;}
 .tn-testbar b{color:var(--paddle);}
 .tn-testbar span{color:var(--muted);flex:1;min-width:0;}
@@ -9646,6 +9649,7 @@ function tournDivStripHTML(t){
       <div class="tn-dv-bar"><span style="width:${Math.round(p.pct * 100)}%"></span></div>
       <div class="tn-dv-s">${escapeHTML(p.detail)}${tournCourtsLabel(d) ? ` · <span class="tn-courts-only">${escapeHTML(tournCourtsLabel(d))}</span>` : ''}</div>
       <button type="button" class="${p.act[2] ? 'btn btn-primary tn-org-only' : 'tn-dv-a'}" onclick="${p.act[1]}">${escapeHTML(p.act[0])}${p.act[2] ? '' : ' ›'}</button>
+      ${tournSimBtnHTML(t, d)}
     </section>`;
   }).join('')}</div>`;
 }
@@ -10361,6 +10365,10 @@ function openTournTestMode(tid){
       </div>
       <button type="button" class="btn btn-primary" style="width:auto;margin:0;" onclick="tournTestAdd('${tid}')">Ajouter les équipes</button>` : `<p class="small" style="color:var(--muted);">Ajoute d'abord une catégorie dans Réglages.</p>`}
     </div>
+    ${divs.length ? `<div class="tn-grp"><div class="tn-grp-t">Simuler par étape</div>
+      <p class="small tn-grp-s">Joue au hasard tous les matchs de l'étape en cours (poules, puis chaque ronde du tableau). Tu gardes la main pour créer le tableau et passer à l'étape suivante.</p>
+      <div class="tn-sim-list">${divs.map(function(d){ const b = on ? tournSimBtnHTML(t, d) : ''; return `<div class="tn-sim-r"><b>${escapeHTML(d.name)}</b>${b || `<span class="small" style="color:var(--muted);">${!on ? 'Active le mode test' : (d.stage || 'setup') === 'setup' ? 'Poules ou tableau à créer d\'abord' : (d.stage === 'done' ? 'Terminée' : 'Rien à simuler (crée le tableau ?)')}</span>`}</div>`; }).join('')}</div>
+    </div>` : ''}
     ${divs.length ? `<div class="tn-grp"><div class="tn-grp-t">Recommencer une catégorie</div>
       ${tournField('Catégorie', tournSel('ttRCat', divs.map(function(d){ return [d.id, escapeHTML(d.name) + ' · ' + ({ setup:'à préparer', pools:'poules', bracket:'tableau', done:'terminée' }[d.stage || 'setup'] || '')]; }), cur))}
       ${tournField('Revenir à', tournSeg('ttRLvl', [['bracket','<b>Avant le tableau</b><small>Tableau effacé, poules et scores gardés</small>'],['scores','<b>Avant les scores</b><small>Poules gardées, tous les scores effacés</small>'],['all','<b>Tout recommencer</b><small>Poules défaites, aucun match</small>']], 'bracket', null, 'tn-seg-st tn-seg-3'))}
@@ -10442,6 +10450,64 @@ function tournTestFill(id){
 }
 // Sur une carte de terrain : score au hasard enregistré tout de suite.
 function tournTestScore(id){ openTournScore(id); tournTestFill(id); tournScoreSave(id); }
+// Étape en cours d'une catégorie : les poules, puis une ronde du tableau à la fois.
+function tournSimStage(t, d){
+  const stage = d.stage || 'setup', r = tournDivRules(t, d);
+  const open = function(m){ return m.status !== 'done' && m.status !== 'bye' && m.team_a && m.team_b; };
+  if(stage === 'pools'){
+    const list = tournMatches(d.id, 'pool').filter(open);
+    return list.length ? { label: r.format === 'round_robin' ? 'Tous contre tous' : 'Poules', list: list } : null;
+  }
+  if(stage !== 'bracket') return null;
+  if(r.format === 'double_elim'){
+    const list = tournMatches(d.id).filter(function(m){ return tournIsDe(m) && open(m); });
+    if(!list.length) return null;
+    const gf = list.length === 1 && list[0].phase === 'gf';
+    return { label: gf ? 'Grande finale' : 'Tableau : ' + list.length + ' match' + (list.length > 1 ? 's' : '') + ' prêt' + (list.length > 1 ? 's' : ''), list: list };
+  }
+  const ko = tournMatches(d.id, 'ko'), rounds = tournKoRounds(d.id);
+  const cur = ko.filter(function(m){ return m.status !== 'done' && m.status !== 'bye'; }).reduce(function(mn, m){ return Math.min(mn, m.round); }, 99);
+  if(cur === 99) return null;
+  const list = ko.filter(function(m){ return m.round === cur && open(m); });
+  return list.length ? { label: tournRoundName(cur, rounds), list: list } : null;
+}
+function tournRandomPatch(m){
+  const aWins = Math.random() < 0.5, lose = function(p){ return Math.floor(Math.random() * (p - 1)); };
+  const patch = { status: 'done', ended_at: new Date().toISOString() };
+  if(tournBestOf3(m)){
+    const three = Math.random() < 0.5, g = [];
+    g.push(aWins ? [11, lose(11)] : [lose(11), 11]);
+    if(three){ g.push(aWins ? [lose(11), 11] : [11, lose(11)]); }
+    g.push(aWins ? [11, lose(11)] : [lose(11), 11]);
+    Object.assign(patch, { games: g, score_a: aWins ? 2 : (three ? 1 : 0), score_b: aWins ? (three ? 1 : 0) : 2 });
+  } else {
+    const pts = tournScorePts(m), l = lose(pts);
+    Object.assign(patch, { games: null, score_a: aWins ? pts : l, score_b: aWins ? l : pts });
+  }
+  patch.winner = aWins ? m.team_a : m.team_b;
+  return patch;
+}
+// Joue au hasard tous les matchs de l'étape en cours (mode test). Les appels de terrains et la création du tableau restent à toi.
+async function tournTestSimStage(tid, divId){
+  const t = tournById(tid), d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!t || !d) return;
+  const st = tournSimStage(t, d); if(!st){ showToast('Rien à simuler pour l\'instant dans ' + d.name, true); return; }
+  let last = null;
+  for(let i = 0; i < st.list.length; i++){
+    const m = st.list[i];
+    if(m.status === 'done' || !m.team_a || !m.team_b) continue;
+    if(!(await tournMatchPatch(m.id, tournRandomPatch(m), true))) break;
+    if(tournIsDe(m)) await tournDeAdvance(m); else await tournAdvance(m);
+    last = m;
+  }
+  tournLiveNotify(); tournBackToSheet(); render();
+  showToast(d.name + ' · ' + st.label + ' : ' + st.list.length + ' match' + (st.list.length > 1 ? 's' : '') + ' simulé' + (st.list.length > 1 ? 's' : ''));
+  if(last) tournAfterResult(last);
+}
+function tournSimBtnHTML(t, d){
+  if(!tournTestOn(t) || tournRole(t.id) === 'scorer') return '';
+  const st = tournSimStage(t, d); if(!st) return '';
+  return `<button type="button" class="tn-sim-btn" onclick="tournTestSimStage('${t.id}','${d.id}')">Simuler : ${escapeHTML(st.label)} (${st.list.length})</button>`;
+}
 function tournTestClear(tid){
   const teams = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.is_test; });
   if(!teams.length) return;
