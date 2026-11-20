@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 496">
+<meta name="app-build" content="Version 497">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2099,6 +2099,20 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium{margin-top:0;}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
+.tn-role-scorer .tn-org-only{display:none !important;}
+.tn-staff{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+.tn-staff-r{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line-soft-strong);border-radius:12px;background:rgba(255,255,255,.03);}
+.tn-staff-n{flex:1;min-width:0;display:flex;flex-direction:column;}
+.tn-staff-n small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;}
+.tn-staff-role{cursor:pointer;font:inherit;font-size:12px;background:none;}
+.tn-staff-role.ok{background:var(--ball);}
+.tn-staff-x{background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px;}
+.tn-sug{display:flex;flex-direction:column;gap:6px;margin:-4px 0 12px;}
+.tn-sug-r{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:8px 12px;border-radius:10px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.04);color:var(--text);font:inherit;cursor:pointer;}
+.tn-sug-r small{color:var(--muted);font-size:12px;}
+.tn-sug-r.on{border-color:var(--ball);background:rgba(207,234,92,.1);}
+.tn-seg-2{grid-template-columns:1fr 1fr !important;}
+
 .tn-dvs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
 .tn-dv{background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;}
 .tn-dv-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
@@ -7654,8 +7668,9 @@ async function applyPendingGo(){
       openOrgSheet('comptes');
     } else if(k === 'tournoi' && id){
       MODAL = null; MODAL_UNDER = null;
-      if(asAdmin && tournCanManage()){ await loadTournaments(); }
-      if(asAdmin && tournCanManage() && tournById(id)) openTourn(id, 'inscrits');
+      if(MY_TSTAFF === null){ try{ const rs = await sb.rpc('claim_tournament_invites'); MY_TSTAFF = (rs && !rs.error && Array.isArray(rs.data)) ? rs.data : []; }catch(e){ MY_TSTAFF = []; } }
+      if(tournRole(id)){ await loadTournaments(true); }
+      if(tournRole(id) && tournById(id)) openTourn(id, tournRole(id) === 'scorer' ? 'direct' : 'inscrits');
       else { MY_TOURNS_AT = 0; ensureMyTourns(); openTournRegister(id); }
     } else if(k === 'accueil'){
       MODAL = null; MODAL_UNDER = null;
@@ -9115,29 +9130,59 @@ function tournFmtDetail(t, d){
   if(r.format === 'double_elim') return 'Matchs à ' + r.bracket_points + ' · ' + fin;
   return 'Poules de ' + r.pool_size + ' · ' + (r.qualifiers === 1 ? 'le 1er passe' : 'les 2 premiers passent') + ' · poules à ' + r.pool_points + ', tableau à ' + r.bracket_points + ' · ' + fin;
 }
+var MY_TSTAFF = null, MY_TSTAFF_LOADING = false, TSTAFF = [];
+// Tournois où je suis organisateur ou à la table des scores (les invitations par courriel sont reliées ici).
+function ensureMyTStaff(){
+  if(MY_TSTAFF !== null || MY_TSTAFF_LOADING || !CURRENT_PROFILE || !SESSION_USER || SESSION_USER.role === 'pending') return;
+  MY_TSTAFF_LOADING = true;
+  sb.rpc('claim_tournament_invites').then(function(r){
+    MY_TSTAFF_LOADING = false;
+    MY_TSTAFF = (r && !r.error && Array.isArray(r.data)) ? r.data : [];
+    if(MY_TSTAFF.length){ TOURNS_FOR = null; if(!appBusyEditing()) render(); }
+  }, function(){ MY_TSTAFF_LOADING = false; MY_TSTAFF = []; });
+}
+function tournIsSuper(){ return !!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin); }
+// Rôle dans un tournoi : 'admin' (organisation), 'organizer', 'scorer' (table des scores) ou null.
+function tournRole(tid){
+  if(tournIsSuper()) return 'admin';
+  const x = (MY_TSTAFF || []).find(function(y){ return y.tournament_id === tid; });
+  return x ? (x.role === 'scorer' ? 'scorer' : 'organizer') : null;
+}
+function tournCurRole(){ const ms = TOURN_SHEET; return ms ? tournRole(ms.tid) : null; }
+function tournLoadKey(){ return (tournIsSuper() ? CURRENT_ORGANIZATION_ID : '') + '|' + (MY_TSTAFF || []).map(function(x){ return x.tournament_id; }).join(','); }
 async function loadTournaments(force){
-  const org = CURRENT_ORGANIZATION_ID;
-  if(!org || TOURNS_LOADING || (!force && TOURNS_FOR === org)) return;
+  const key = tournLoadKey();
+  if(TOURNS_LOADING || (!force && TOURNS_FOR === key)) return;
   TOURNS_LOADING = true;
   try{
-    const r = await sb.from('tournaments').select('*').eq('organization_id', org).order('event_date', { ascending: true });
-    const list = (r && !r.error && r.data) ? r.data : [];
+    let list = [];
+    if(tournIsSuper() && CURRENT_ORGANIZATION_ID){
+      const r = await sb.from('tournaments').select('*').eq('organization_id', CURRENT_ORGANIZATION_ID).order('event_date', { ascending: true });
+      list = (r && !r.error && r.data) ? r.data : [];
+    }
+    const extra = (MY_TSTAFF || []).map(function(x){ return x.tournament_id; }).filter(function(id){ return !list.some(function(t){ return t.id === id; }); });
+    if(extra.length){
+      const r1 = await sb.from('tournaments').select('*').in('id', extra);
+      if(r1 && !r1.error && r1.data) list = list.concat(r1.data);
+    }
     let divs = [], teams = [];
     if(list.length){
       const ids = list.map(function(t){ return t.id; });
       const r2 = await sb.from('tournament_divisions').select('*').in('tournament_id', ids);
       const r3 = await sb.from('tournament_teams').select('*').in('tournament_id', ids).order('created_at', { ascending: true });
       const r4 = await sb.from('tournament_matches').select('*').in('tournament_id', ids).order('seq', { ascending: true });
+      const r5 = await sb.from('tournament_organizers').select('*').in('tournament_id', ids).order('created_at', { ascending: true });
       divs = (r2 && !r2.error && r2.data) ? r2.data : [];
       teams = (r3 && !r3.error && r3.data) ? r3.data : [];
       TMATCHES = (r4 && !r4.error && r4.data) ? r4.data : [];
+      TSTAFF = (r5 && !r5.error && r5.data) ? r5.data : [];
     }
     TOURNS = list; TDIVS = divs; TTEAMS = teams;
   }catch(e){ console.error('Tournois', e); }
-  TOURNS_FOR = org; TOURNS_LOADING = false;
+  TOURNS_FOR = key; TOURNS_LOADING = false;
 }
 function ensureTournaments(){
-  if(TOURNS_FOR === CURRENT_ORGANIZATION_ID || TOURNS_LOADING || !CURRENT_ORGANIZATION_ID) return;
+  if(TOURNS_FOR === tournLoadKey() || TOURNS_LOADING) return;
   loadTournaments().then(function(){ if(!appBusyEditing()) render(); });
 }
 function tournById(id){ return (TOURNS || []).find(function(t){ return t.id === id; }) || null; }
@@ -9160,12 +9205,15 @@ function tournCopyLink(id){
 }
 function tournNotify(teamId, kind){ if(teamId) invokeSendNotification({ tournament_team_id: teamId, kind: kind }); }
 // Pour l'instant, le module tournoi n'est visible que des super admins (essais avant l'ouverture aux organisateurs).
-function tournCanManage(){ return !!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin); }
+// Module tournoi : super admins pour l'instant, plus les personnes ajoutées à l'équipe d'un tournoi.
+function tournCanManage(){ return tournIsSuper() || !!(MY_TSTAFF && MY_TSTAFF.length); }
+function tournTabsFor(tid){ return tournRole(tid) === 'scorer' ? ['direct', 'tableau'] : ['reglages', 'inscrits', 'poules', 'direct', 'tableau']; }
 
 // ---- Navigation organisateur ----
 function openTourn(id, tab){
   dkClose(); VIEW.adet = false;
-  VIEW.ttab = tab || 'reglages'; VIEW.tq = '';
+  VIEW.ttab = tab || (tournRole(id) === 'scorer' ? 'direct' : 'reglages'); VIEW.tq = '';
+  if(tournTabsFor(id).indexOf(VIEW.ttab) === -1) VIEW.ttab = tournTabsFor(id)[0];
   if(VIEW.tdivFor !== id){ VIEW.tdiv = null; VIEW.tdivFor = id; }
   MODAL_UNDER = null;
   MODAL = { kind:'content', sheet:'org-tournoi', tid:id, title:'Tournoi' };
@@ -9188,9 +9236,9 @@ function tournSideHTML(it, ms){
   (TOURNS || []).forEach(function(t){
     const on = t.id === cur;
     h += it(on, t.name, `openTourn('${t.id}')`);
-    if(on) h += `<div class="dk-sub">${tabs.map(function(x){ return it((VIEW.ttab || 'reglages') === x[0], x[1], `tournTab('${x[0]}')`); }).join('')}</div>`;
+    if(on) h += `<div class="dk-sub">${tabs.filter(function(x){ return tournTabsFor(t.id).indexOf(x[0]) !== -1; }).map(function(x){ return it((VIEW.ttab || 'reglages') === x[0], x[1], `tournTab('${x[0]}')`); }).join('')}</div>`;
   });
-  if(!isOrganizerOnly()) h += `<button type="button" class="dk-it dk-add" onclick="openTournForm()">+ Nouveau tournoi</button>`;
+  if(tournIsSuper()) h += `<button type="button" class="dk-it dk-add" onclick="openTournForm()">+ Nouveau tournoi</button>`;
   return h;
 }
 function tournOrgsSectionHTML(){
@@ -9200,13 +9248,15 @@ function tournOrgsSectionHTML(){
     const st = TOURN_ST[t.status] || TOURN_ST.draft;
     return `<button type="button" class="lg-tile" onclick="openTourn('${t.id}')"><span class="lg-tile-ico">${pbIcon()}</span><b>${escapeHTML(t.name)}</b><small>${escapeHTML(tournDateLabel(t, true) + ' · ' + st[0])}</small></button>`;
   }).join('');
-  return `<div class="pc-sec">Tournois</div><div class="lg-tiles">${tiles}${isOrganizerOnly() ? '' : `<button type="button" class="lg-tile lg-tile-add" onclick="openTournForm()"><span class="lg-tile-ico">＋</span><b>Nouveau tournoi</b></button>`}</div>`;
+  return `<div class="pc-sec">Tournois</div><div class="lg-tiles">${tiles}${!tournIsSuper() ? '' : `<button type="button" class="lg-tile lg-tile-add" onclick="openTournForm()"><span class="lg-tile-ico">＋</span><b>Nouveau tournoi</b></button>`}</div>`;
 }
 
 // ---- Page d'un tournoi ----
 function tournSheetHTML(){
-  const t = tournById(MODAL.tid), tab = VIEW.ttab || 'reglages';
-  const tabs = [['reglages','Réglages'],['inscrits','Inscrits'],['poules','Préparer'],['direct','En direct'],['tableau','Tableau']];
+  const t = tournById(MODAL.tid), allowed = tournTabsFor(MODAL.tid);
+  if(allowed.indexOf(VIEW.ttab || 'reglages') === -1) VIEW.ttab = allowed[0];
+  const tab = VIEW.ttab || 'reglages';
+  const tabs = [['reglages','Réglages'],['inscrits','Inscrits'],['poules','Préparer'],['direct','En direct'],['tableau','Tableau']].filter(function(x){ return allowed.indexOf(x[0]) !== -1; });
   let body = '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(t){
     const nav = `<div class="tn-tabs" role="tablist">${tabs.map(function(x){ return `<button type="button" role="tab" class="${tab === x[0] ? 'on' : ''}" onclick="tournTab('${x[0]}')">${x[1]}</button>`; }).join('')}</div>`;
@@ -9219,7 +9269,7 @@ function tournSheetHTML(){
         <div class="chat-head-txt"><div class="chat-head-title">${escapeHTML(t ? t.name : 'Tournoi')}</div><div class="chat-head-sub">${escapeHTML(t ? 'Tournoi · ' + tournDateLabel(t) : '')}</div></div>
         <button type="button" class="chat-head-btn" onclick="closeModal()" aria-label="Fermer">✕</button>
       </div>
-      <div class="sheet-body" data-key="${escapeHTML('org-tournoi|' + MODAL.tid + '|' + tab)}">${body}</div>
+      <div class="sheet-body${tournRole(MODAL.tid) === 'scorer' ? ' tn-role-scorer' : ''}" data-key="${escapeHTML('org-tournoi|' + MODAL.tid + '|' + tab)}">${body}</div>
     </div>
   </div>`;
 }
@@ -9255,6 +9305,7 @@ function tournSettingsHTML(t){
         : `<button type="button" class="tn-empty" onclick="openTournDivForm('${t.id}')"><b>+ Ajoute ta première catégorie</b><span>Choisis sa formule (poules, tous contre tous ou double élimination), puis son nom et son nombre d'équipes.</span></button>`}
     </section>
     ${t.notes ? `<section class="tn-sec"><div class="tn-k">Notes pour les joueurs</div><p class="small" style="margin:6px 0 0;white-space:pre-line;">${escapeHTML(t.notes)}</p></section>` : ''}
+    ${tournStaffSectionHTML(t)}
     <p class="small" style="color:var(--muted);margin:14px 0 0;">Une catégorie pleine passe automatiquement en liste d'attente. Les poules et l'horaire se génèrent à la fermeture des inscriptions.</p>`;
 }
 // ---- Préparer : poules et ordre des matchs ----
@@ -9582,7 +9633,7 @@ function tournDivStripHTML(t){
       <div class="tn-dv-h"><b>${escapeHTML(d.name)}</b><span class="tn-dv-l">${escapeHTML(p.label)}</span></div>
       <div class="tn-dv-bar"><span style="width:${Math.round(p.pct * 100)}%"></span></div>
       <div class="tn-dv-s">${escapeHTML(p.detail)}</div>
-      <button type="button" class="${p.act[2] ? 'btn btn-primary' : 'tn-dv-a'}" onclick="${p.act[1]}">${escapeHTML(p.act[0])}${p.act[2] ? '' : ' ›'}</button>
+      <button type="button" class="${p.act[2] ? 'btn btn-primary tn-org-only' : 'tn-dv-a'}" onclick="${p.act[1]}">${escapeHTML(p.act[0])}${p.act[2] ? '' : ' ›'}</button>
     </section>`;
   }).join('')}</div>`;
 }
@@ -9628,7 +9679,7 @@ function tournLiveHTML(t){
   const recent = done.slice().sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 6);
   return tournDivStripHTML(t) + `<div class="tn-live-bar">
       <div class="tn-live-stats"><span><b>${done.length}</b> / ${all.length} matchs joués</span><span><b>${playing.length}</b> en cours</span><span><b>${ready.length}</b> prêts</span></div>
-      <div class="tn-head-r">${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
+      <div class="tn-head-r">${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary tn-org-only" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
     </div>
     ${cfg.checkin && teamsIn.length && !arrived ? `<div class="tn-note tn-live-hint"><b>Aucune équipe n'est pointée comme arrivée</b> : les matchs ne peuvent pas encore être appelés.<span class="tn-head-r"><button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Pointer les arrivées</button><button type="button" class="btn btn-primary" onclick="tournAllPresent('${t.id}')">Toutes présentes</button></span></div>` : ''}
     <div class="tn-live">
@@ -9705,7 +9756,7 @@ function tournAfterResult(m){
   if(m.phase === 'pool'){
     const left = tournMatches(d.id, 'pool').filter(function(x){ return x.status !== 'done'; }).length;
     if(left) return;
-    if(r.format === 'pools_ko' && (d.stage || '') === 'pools'){
+    if(r.format === 'pools_ko' && (d.stage || '') === 'pools' && tournRole(t.id) !== 'scorer'){
       setTimeout(function(){ showConfirm('Les poules de « ' + d.name + ' » sont terminées ! Créer le tableau final maintenant avec les ' + tournQualifiers(t, d).length + ' équipes qualifiées ?', function(){ VIEW.tbr = d.id; tournCreateBracket(t.id, d.id).then(function(){ VIEW.ttab = 'tableau'; render(); }); }); }, 300);
     } else if(r.format === 'round_robin'){
       setTimeout(function(){ showToast('« ' + d.name + ' » est terminée : classement final et podium dans Tableau'); }, 300);
@@ -9778,8 +9829,8 @@ function tournCheckinRefresh(){ if(MODAL && MODAL.tcheck){ const box = document.
 async function tournCheckin(teamId){
   const x = tournTeamById(teamId); if(!x) return;
   const v = !x.checked_in;
-  const r = await sb.from('tournament_teams').update({ checked_in: v }).eq('id', teamId);
-  if(r && r.error){ showAlert(r.error.message); return; }
+  const r = await sb.rpc('tournament_checkin', { p_team: teamId, p_value: v });
+  if(r && (r.error || (r.data && r.data.ok === false))){ showAlert((r.error && r.error.message) || r.data.error); return; }
   x.checked_in = v; tournLiveNotify();
   tournCheckinRefresh();
 }
@@ -10002,7 +10053,7 @@ function tournBracketPageHTML(t){
   if(stage === 'pools'){
     const pm = tournMatches(d.id, 'pool'), left = pm.filter(function(m){ return m.status !== 'done'; }).length;
     const q = tournQualifiers(t, d);
-    return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>${left ? 'Poules en cours · ' + left + ' match' + (left > 1 ? 's' : '') + ' à jouer' : 'Poules terminées'}</span><span class="tn-head-r"><button type="button" class="btn ${left ? 'btn-secondary' : 'btn-primary'}" onclick="tournCreateBracket('${t.id}','${d.id}')">Créer le tableau (${q.length} équipes)</button></span></div>
+    return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>${left ? 'Poules en cours · ' + left + ' match' + (left > 1 ? 's' : '') + ' à jouer' : 'Poules terminées'}</span><span class="tn-head-r"><button type="button" class="btn ${left ? 'btn-secondary' : 'btn-primary'} tn-org-only" onclick="tournCreateBracket('${t.id}','${d.id}')">Créer le tableau (${q.length} équipes)</button></span></div>
       <div class="tn-pools">${tournPoolLabels(d.id).map(function(lb){ return `<section class="tn-pool"><div class="tn-pool-h"><b>${lb === 'U' ? 'Poule unique' : 'Poule ' + lb}</b><span>${r.qualifiers === 1 ? 'le 1er passe' : 'les 2 premiers passent'}</span></div>${tournStandingsHTML(t, d, lb)}</section>`; }).join('')}</div>`;
   }
   const ko = tournMatches(d.id, 'ko'), rounds = tournKoRounds(d.id);
@@ -10012,7 +10063,7 @@ function tournBracketPageHTML(t){
     const ms = ko.filter(function(m){ return m.round === rd; }).sort(function(a, b){ return a.seq - b.seq; });
     cols.push(`<div class="tn-br-col"><div class="tn-k">${tournRoundName(rd, rounds)}${rd === rounds && r.final_best_of === 3 ? ' · 2 de 3' : ''}</div><div class="tn-br-body">${ms.map(function(m){ return tournBracketCardHTML(m); }).join('')}</div></div>`);
   }
-  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Tableau · ${tournQualifiers(t, d).length} équipes</span><span class="tn-head-r">${anyScore ? '' : `<button type="button" class="btn btn-secondary" onclick="tournCancelBracket('${d.id}')">Annuler le tableau</button>`}</span></div>
+  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Tableau · ${tournQualifiers(t, d).length} équipes</span><span class="tn-head-r">${anyScore ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelBracket('${d.id}')">Annuler le tableau</button>`}</span></div>
     ${podium ? `<div class="tn-pod-top">${podium}</div>` : ''}
     <div class="tn-bracket">${cols.join('')}${podium ? `<div class="tn-br-col tn-pod-col"><div class="tn-k">&nbsp;</div><div class="tn-br-body">${podium}</div></div>` : ''}</div>
     <p class="small" style="color:var(--muted);margin:10px 0 0;">Les matchs du tableau entrent dans la file d'attente de l'onglet « En direct » dès que les deux équipes sont connues. Touche un match pour entrer ou corriger son score.</p>`;
@@ -10146,7 +10197,7 @@ function tournDePageHTML(t, d, chips, head){
   const r = tournDivRules(t, d), stage = d.stage || 'setup';
   if(stage === 'setup'){
     const teams = tournSeededTeams(t, d.id);
-    return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${teams.length} équipes</span><span class="tn-head-r"><button type="button" class="btn btn-primary" onclick="tournCreateDE('${t.id}','${d.id}')" ${teams.length < 4 ? 'disabled' : ''}>Créer le tableau</button></span></div>
+    return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${teams.length} équipes</span><span class="tn-head-r"><button type="button" class="btn btn-primary tn-org-only" onclick="tournCreateDE('${t.id}','${d.id}')" ${teams.length < 4 ? 'disabled' : ''}>Créer le tableau</button></span></div>
       <p class="small" style="color:var(--muted);margin:6px 0 10px;">Ordre du tableau selon les têtes de série (à régler dans Inscrits). Une équipe est éliminée après sa deuxième défaite. Grande finale en un seul match${r.final_best_of === 3 ? ' (2 de 3)' : ''}.</p>
       <ol class="tn-seedlist">${teams.map(function(x){ return `<li><span>${x.seed ? 'Tête ' + x.seed : '—'}</span>${escapeHTML(tournTeamFull(x.id))}</li>`; }).join('')}</ol>`;
   }
@@ -10168,13 +10219,104 @@ function tournDePageHTML(t, d, chips, head){
     return `<div class="tn-k tn-de-t">${title}</div><div class="tn-bracket">${cols.join('')}</div>`;
   };
   const gf = all.find(function(m){ return m.phase === 'gf'; });
-  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${tournSeededTeams(t, d.id).length} équipes</span><span class="tn-head-r">${played ? '' : `<button type="button" class="btn btn-secondary" onclick="tournCancelDE('${d.id}')">Annuler le tableau</button>`}</span></div>
+  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${tournSeededTeams(t, d.id).length} équipes</span><span class="tn-head-r">${played ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelDE('${d.id}')">Annuler le tableau</button>`}</span></div>
     ${podium ? `<div class="tn-pod-top" style="display:block;">${podium}</div>` : ''}
     ${section('wb', 'Tableau des gagnants')}
     ${section('lb', 'Tableau des perdants')}
     <div class="tn-k tn-de-t">Grande finale${r.final_best_of === 3 ? ' · 2 de 3' : ''}</div>
     <div class="tn-bracket"><div class="tn-br-col"><div class="tn-br-body">${gf ? tournBracketCardHTML(gf) : ''}</div></div></div>
     <p class="small" style="color:var(--muted);margin:10px 0 0;">Les matchs entrent dans la file de l'onglet « En direct » dès que les deux équipes sont connues. Les exemptions de la 1re ronde se règlent toutes seules. Touche un match pour entrer ou corriger son score.</p>`;
+}
+var TOURN_ROLE_TXT = { organizer: ['Organisateur', 'Gère tout le tournoi : réglages, inscrits, poules, tableau et en direct.'], scorer: ['Table des scores', 'Seulement l\'onglet En direct : présences, appel des matchs et scores.'] };
+function tournStaffSectionHTML(t){
+  const admin = tournRole(t.id) === 'admin';
+  const list = (TSTAFF || []).filter(function(x){ return x.tournament_id === t.id; });
+  const rows = list.map(function(x){
+    const rt = TOURN_ROLE_TXT[x.role] || TOURN_ROLE_TXT.organizer;
+    return `<div class="tn-staff-r"><span class="member-avatar">${escapeHTML(partnerInitials(x.name || x.email || '?'))}</span>
+      <span class="tn-staff-n"><b>${escapeHTML(x.name || x.email || '?')}</b><small>${x.profile_id ? escapeHTML(x.email || 'Compte Dinkeo') : 'Invitation en attente : accès dès la création de son compte avec ' + escapeHTML(x.email || '')}</small></span>
+      ${admin ? `<button type="button" class="jp-pill ${x.role === 'scorer' ? '' : 'ok'} tn-staff-role" onclick="tournStaffRole('${x.id}')" title="Changer le rôle">${rt[0]}</button><button type="button" class="tn-staff-x" onclick="tournStaffRemove('${x.id}')" aria-label="Retirer ${escapeHTML(x.name || x.email || '')}">✕</button>` : `<span class="jp-pill">${rt[0]}</span>`}
+    </div>`;
+  }).join('');
+  return `<section class="tn-sec">
+    <div class="tn-sec-h"><span>Équipe du tournoi · ${list.length}</span>${admin ? `<button type="button" class="btn btn-primary" onclick="openTournStaffAdd('${t.id}')">+ Ajouter</button>` : ''}</div>
+    ${rows ? `<div class="tn-staff">${rows}</div>` : `<p class="small" style="color:var(--muted);margin:8px 0 0;">Les administrateurs de l'organisation ont toujours accès. Ajoute ici des organisateurs ou des bénévoles pour la table des scores.</p>`}
+  </section>`;
+}
+function openTournStaffAdd(tid){
+  VIEW.tstq = ''; VIEW.tstPick = null;
+  try{ if(typeof loadAllProfiles === 'function' && (!ALL_PROFILES || !ALL_PROFILES.length)) loadAllProfiles().then(function(){ tournStaffSuggest(); }); }catch(e){}
+  const html = `<div class="tn-form">
+    ${tournField('Personne', `<input id="tstQ" maxlength="120" placeholder="Nom ou courriel" oninput="VIEW.tstq=this.value;VIEW.tstPick=null;tournStaffSuggest()" autocomplete="off">`, 'Choisis un membre de l\'organisation, ou écris le courriel de quelqu\'un qui n\'a pas encore de compte.')}
+    <div id="tstSug" class="tn-sug"></div>
+    ${tournField('Rôle', tournSeg('tstRole', [['organizer', '<b>Organisateur</b><small>Gère tout le tournoi</small>'], ['scorer', '<b>Table des scores</b><small>En direct seulement</small>']], 'organizer', null, 'tn-seg-st tn-seg-2'))}
+    <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" onclick="tournStaffSave('${tid}')">Ajouter</button></div>
+  </div>`;
+  setModal({ kind:'content', title:'Ajouter à l\'équipe du tournoi', htmlContent: html });
+  render();
+  setTimeout(function(){ const el = document.getElementById('tstQ'); if(el) el.focus(); }, 60);
+}
+function tournStaffSuggest(){
+  const box = document.getElementById('tstSug'); if(!box) return;
+  const q = dupNorm(VIEW.tstq || '');
+  if(q.length < 2){ box.innerHTML = ''; return; }
+  const list = (ALL_PROFILES || []).filter(function(p){ return dupNorm((p.display_name || '') + ' ' + (p.email || '')).indexOf(q) !== -1; }).slice(0, 6);
+  box.innerHTML = list.map(function(p){
+    const on = VIEW.tstPick === p.id;
+    return `<button type="button" class="tn-sug-r${on ? ' on' : ''}" onclick="VIEW.tstPick='${p.id}';tournStaffSuggest()"><b>${escapeHTML(p.display_name || p.email)}</b><small>${escapeHTML(p.email || '')}</small></button>`;
+  }).join('') || (/@/.test(VIEW.tstq || '') ? `<p class="small" style="color:var(--muted);margin:0;">Aucun compte avec ce courriel : une invitation sera gardée, et l'accès s'ouvrira dès que la personne créera son compte.</p>` : `<p class="small" style="color:var(--muted);margin:0;">Aucun membre trouvé. Pour quelqu'un sans compte, écris son courriel.</p>`);
+}
+async function tournStaffSave(tid){
+  const role = tfVal('tstRole') === 'scorer' ? 'scorer' : 'organizer';
+  const q = String(VIEW.tstq || '').trim();
+  let p = VIEW.tstPick ? (ALL_PROFILES || []).find(function(x){ return x.id === VIEW.tstPick; }) : null;
+  if(!p && /@/.test(q)) p = (ALL_PROFILES || []).find(function(x){ return String(x.email || '').toLowerCase() === q.toLowerCase(); }) || null;
+  if(!p && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(q)){ showToast('Choisis une personne dans la liste ou écris un courriel valide', true); return; }
+  if(p && (TSTAFF || []).some(function(x){ return x.tournament_id === tid && x.profile_id === p.id; })){ showToast('Cette personne fait déjà partie de l\'équipe', true); return; }
+  const row = p ? { tournament_id: tid, profile_id: p.id, role: role, name: p.display_name || p.email, email: p.email || null }
+                : { tournament_id: tid, profile_id: null, role: role, name: q, email: q.toLowerCase() };
+  const r = await sb.from('tournament_organizers').insert(row);
+  if(r && r.error){ showAlert('Ajout impossible : ' + (/duplicate|unique/i.test(r.error.message) ? 'cette personne fait déjà partie de l\'équipe.' : r.error.message)); return; }
+  const t = tournById(tid);
+  if(p) invokeSendNotification({ profile_id: p.id, url: goUrl('tournoi:' + tid), title: 'Tournoi : tu fais partie de l\'équipe',
+    body: 'Tu es ' + (role === 'scorer' ? 'à la table des scores' : 'organisateur') + ' du tournoi ' + (t ? t.name : '') + '. Ouvre Dinkeo pour y accéder.' });
+  await loadTournaments(true); tournBackToSheet(); render();
+  showToast(p ? (row.name + ' ajouté(e) à l\'équipe') : 'Invitation gardée pour ' + q);
+}
+function tournStaffRole(id){
+  const x = (TSTAFF || []).find(function(y){ return y.id === id; }); if(!x) return;
+  const to = x.role === 'scorer' ? 'organizer' : 'scorer';
+  showConfirm('Passer ' + (x.name || x.email) + ' en « ' + TOURN_ROLE_TXT[to][0] + ' » ? ' + TOURN_ROLE_TXT[to][1], async function(){
+    const r = await sb.from('tournament_organizers').update({ role: to }).eq('id', id);
+    if(r && r.error){ showAlert(r.error.message); return; }
+    await loadTournaments(true); tournBackToSheet(); render();
+  });
+}
+function tournStaffRemove(id){
+  const x = (TSTAFF || []).find(function(y){ return y.id === id; }); if(!x) return;
+  showConfirm('Retirer ' + (x.name || x.email) + ' de l\'équipe du tournoi ? La personne n\'y aura plus accès.', async function(){
+    const r = await sb.from('tournament_organizers').delete().eq('id', id);
+    if(r && r.error){ showAlert(r.error.message); return; }
+    await loadTournaments(true); tournBackToSheet(); render();
+  });
+}
+// Carte d'accueil pour les personnes de l'équipe qui n'ont pas l'écran d'administration.
+function myTStaffHTML(){
+  const list = (MY_TSTAFF || []); if(!list.length) return '';
+  return `<div class="card tn-my"><div class="tn-k">Tournois où tu travailles</div>${list.map(function(x){
+    return `<button type="button" class="tn-my-r" onclick="tournOpenStaff('${x.tournament_id}')"><span><b>${escapeHTML(x.name || 'Tournoi')}</b><small>${x.role === 'scorer' ? 'Table des scores' : 'Organisateur'}</small></span><span class="jp-pill ok">Ouvrir</span></button>`;
+  }).join('')}</div>`;
+}
+function tournOpenStaff(tid){ loadTournaments(true).then(function(){ openTourn(tid); }); }
+function injectMyTStaff(){
+  try{
+    if(!MY_TSTAFF || !MY_TSTAFF.length || !SESSION_USER || SESSION_USER.role === 'pending') return;
+    if(SESSION_USER.role === 'admin' && !ADMIN_VIEWING_AS) return;
+    if(!(VIEW.ptab === undefined || VIEW.ptab === 'accueil') || VIEW.pdet || document.getElementById('myTStaff')) return;
+    const html = '<div id="myTStaff">' + myTStaffHTML() + '</div>';
+    const anchor = document.getElementById('myTourns') || document.getElementById('myOffers') || document.querySelector('#app .shell-top-spacer');
+    if(anchor) anchor.insertAdjacentHTML('afterend', html); else { const a = document.getElementById('app'); if(a) a.insertAdjacentHTML('afterbegin', html); }
+  }catch(e){}
 }
 function tournNextStepHTML(t, tab){
   const n = tournTeams(t.id, null, 'registered').length;
@@ -10205,7 +10347,7 @@ function openTournForm(id){
     ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}`
     : `<p class="small tn-grp-s" style="margin:4px 0 12px;">Ensuite, tu ajoutes les catégories une à une en choisissant leur formule. Terrains, inscriptions et notes se règlent plus tard dans « Modifier ».</p>`}
     <div class="tn-form-acts">
-      ${t && !isOrganizerOnly() ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDelete('${t.id}')">Supprimer</button>` : ''}
+      ${t && tournRole(t.id) === 'admin' ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDelete('${t.id}')">Supprimer</button>` : ''}
       <span style="flex:1"></span>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
       <button type="button" class="btn btn-primary" onclick="tournSave(${t ? `'${t.id}'` : 'null'})">${t ? 'Enregistrer' : 'Créer le tournoi'}</button>
@@ -10674,6 +10816,8 @@ function tournAfterRender(){
   if(!SESSION_USER) return;
   ensureMyTourns();
   injectMyTourns();
+  ensureMyTStaff();
+  injectMyTStaff();
   if(TOURN_LINK && !MODAL){
     const id = TOURN_LINK; TOURN_LINK = null;
     try{ localStorage.removeItem('dinkeo_tourn'); }catch(e){}
