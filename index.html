@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 499">
+<meta name="app-build" content="Version 500">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2118,6 +2118,8 @@ body.desk .dk-add{color:var(--muted);}
 .tn-sug-r small{color:var(--muted);font-size:12px;}
 .tn-sug-r.on{border-color:var(--ball);background:rgba(207,234,92,.1);}
 .tn-seg-2{grid-template-columns:1fr 1fr !important;}
+.tn-seg-3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+@media (max-width:640px){ .tn-seg-3{grid-template-columns:1fr !important;} }
 
 .tn-dvs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
 .tn-dv{background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;}
@@ -10071,7 +10073,7 @@ function tournBracketPageHTML(t){
     const ms = ko.filter(function(m){ return m.round === rd; }).sort(function(a, b){ return a.seq - b.seq; });
     cols.push(`<div class="tn-br-col"><div class="tn-k">${tournRoundName(rd, rounds)}${rd === rounds && r.final_best_of === 3 ? ' · 2 de 3' : ''}</div><div class="tn-br-body">${ms.map(function(m){ return tournBracketCardHTML(m); }).join('')}</div></div>`);
   }
-  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Tableau · ${tournQualifiers(t, d).length} équipes</span><span class="tn-head-r">${anyScore ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelBracket('${d.id}')">Annuler le tableau</button>`}</span></div>
+  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Tableau · ${tournQualifiers(t, d).length} équipes</span><span class="tn-head-r">${anyScore && !tournTestOn(t) ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelBracket('${d.id}')">Annuler le tableau</button>`}</span></div>
     ${podium ? `<div class="tn-pod-top">${podium}</div>` : ''}
     <div class="tn-bracket">${cols.join('')}${podium ? `<div class="tn-br-col tn-pod-col"><div class="tn-k">&nbsp;</div><div class="tn-br-body">${podium}</div></div>` : ''}</div>
     <p class="small" style="color:var(--muted);margin:10px 0 0;">Les matchs du tableau entrent dans la file d'attente de l'onglet « En direct » dès que les deux équipes sont connues. Touche un match pour entrer ou corriger son score.</p>`;
@@ -10227,7 +10229,7 @@ function tournDePageHTML(t, d, chips, head){
     return `<div class="tn-k tn-de-t">${title}</div><div class="tn-bracket">${cols.join('')}</div>`;
   };
   const gf = all.find(function(m){ return m.phase === 'gf'; });
-  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${tournSeededTeams(t, d.id).length} équipes</span><span class="tn-head-r">${played ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelDE('${d.id}')">Annuler le tableau</button>`}</span></div>
+  return chips + head + `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · ${tournSeededTeams(t, d.id).length} équipes</span><span class="tn-head-r">${played && !tournTestOn(t) ? '' : `<button type="button" class="btn btn-secondary tn-org-only" onclick="tournCancelDE('${d.id}')">Annuler le tableau</button>`}</span></div>
     ${podium ? `<div class="tn-pod-top" style="display:block;">${podium}</div>` : ''}
     ${section('wb', 'Tableau des gagnants')}
     ${section('lb', 'Tableau des perdants')}
@@ -10356,6 +10358,11 @@ function openTournTestMode(tid){
       </div>
       <button type="button" class="btn btn-primary" style="width:auto;margin:0;" onclick="tournTestAdd('${tid}')">Ajouter les équipes</button>` : `<p class="small" style="color:var(--muted);">Ajoute d'abord une catégorie dans Réglages.</p>`}
     </div>
+    ${divs.length ? `<div class="tn-grp"><div class="tn-grp-t">Recommencer une catégorie</div>
+      ${tournField('Catégorie', tournSel('ttRCat', divs.map(function(d){ return [d.id, escapeHTML(d.name) + ' · ' + ({ setup:'à préparer', pools:'poules', bracket:'tableau', done:'terminée' }[d.stage || 'setup'] || '')]; }), cur))}
+      ${tournField('Revenir à', tournSeg('ttRLvl', [['bracket','<b>Avant le tableau</b><small>Tableau effacé, poules et scores gardés</small>'],['scores','<b>Avant les scores</b><small>Poules gardées, tous les scores effacés</small>'],['all','<b>Tout recommencer</b><small>Poules défaites, aucun match</small>']], 'bracket', null, 'tn-seg-st tn-seg-3'))}
+      <button type="button" class="btn btn-secondary" style="width:auto;margin:0;" onclick="tournTestReset('${tid}')">Recommencer</button>
+    </div>` : ''}
     <div class="tn-grp"><div class="tn-grp-t">Nettoyer</div>
       <p class="small tn-grp-s">${nTest} équipe${nTest > 1 ? 's' : ''} de test. Les poules et tableaux des catégories touchées seront remis à zéro.</p>
       <button type="button" class="btn btn-secondary tn-danger" style="width:auto;margin:0;" onclick="tournTestClear('${tid}')" ${nTest ? '' : 'disabled'}>Retirer les équipes de test</button>
@@ -10364,6 +10371,32 @@ function openTournTestMode(tid){
   </div>`;
   setModal({ kind:'content', title:'Mode test', htmlContent: html, ttest: tid });
   render();
+}
+// Remet une catégorie à une étape précédente pour rejouer la simulation.
+function tournTestReset(tid){
+  const divId = tfVal('ttRCat'), lvl = tfVal('ttRLvl') || 'bracket';
+  const d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!d) return;
+  const t = tournById(tid), r = tournDivRules(t, d);
+  const de = r.format === 'double_elim';
+  const what = lvl === 'all' || de ? 'tout recommencer (poules ou tableau défaits, tous les matchs effacés)'
+    : lvl === 'scores' ? 'effacer tous les scores (les poules restent formées, le tableau est effacé)'
+    : 'effacer le tableau (les poules et leurs scores sont gardés)';
+  showConfirm('« ' + d.name + ' » : ' + what + ' ?', async function(){
+    let stage = 'setup';
+    if(lvl === 'all' || de){
+      await sb.from('tournament_matches').delete().eq('division_id', divId);
+      await sb.from('tournament_teams').update({ pool: null, pool_order: null }).eq('division_id', divId);
+    } else {
+      await sb.from('tournament_matches').delete().eq('division_id', divId).neq('phase', 'pool');
+      if(lvl === 'scores') await sb.from('tournament_matches').update({ status: 'pending', score_a: null, score_b: null, games: null, winner: null, court: null, called_at: null, started_at: null, ended_at: null }).eq('division_id', divId).eq('phase', 'pool');
+      stage = tournMatches(divId, 'pool').length ? 'pools' : 'setup';
+    }
+    const u = await sb.from('tournament_divisions').update({ stage: stage }).eq('id', divId);
+    if(u && u.error){ showAlert(u.error.message); return; }
+    delete TPREP[divId];
+    await loadTournaments(true); tournLiveNotify(); tournBackToSheet(); render();
+    showToast('« ' + d.name + ' » est revenue ' + (stage === 'setup' ? 'au départ' : lvl === 'scores' ? 'aux poules, sans score' : 'à la fin des poules'));
+  });
 }
 function tournTestToggle(v){ if(MODAL && MODAL.ttest) tournTestSet(MODAL.ttest, v === '1', true).then(function(){ showToast(v === '1' ? 'Mode test activé' : 'Mode test désactivé'); }); }
 async function tournTestAdd(tid){
