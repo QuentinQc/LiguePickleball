@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 488">
+<meta name="app-build" content="Version 489">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -6625,22 +6625,61 @@ function finalizeSession(session){
     if(pl && groupById(mm.groupId)){ pl.groupId = mm.groupId; if(typeof mm.order === 'number') pl.order = mm.order; }
   });
   delete session.manualMoves;
-  // Positions dans les groupes : reprises telles qu'avant la correction pour chaque groupe
-  // qui a gardé exactement les mêmes joueurs (sinon, l'ordre automatique s'applique).
-  if(session.manualOrder){
-    const before = {};
-    session.manualOrder.forEach(function(x){ if(x[1]) (before[x[1]] = before[x[1]] || {})[x[0]] = x[2]; });
-    groupsSorted().forEach(function(g){
-      const prev = before[g.id]; if(!prev) return;
-      const now = playersInGroup(g.id);
-      if(now.length !== Object.keys(prev).length || now.some(function(p){ return !(p.id in prev); })) return;
-      now.forEach(function(p){ if(typeof prev[p.id] === 'number') p.order = prev[p.id]; });
-    });
-    delete session.manualOrder;
-  }
+  // Positions placées à la main avant la correction : reprises joueur par joueur, même si le
+  // groupe a changé (un joueur monté ou descendu autrement après la correction).
+  if(session.manualOrder){ restoreManualPositions(session); delete session.manualOrder; }
+  delete session.closeOrder;
 
   session.movements = movements;
   session.status = 'closed';
+  // Ordre donné par cette clôture : à la prochaine correction, on saura quelles places
+  // l'organisateur a changées à la main (et seulement celles-là seront reprises).
+  session.closeOrder = (DATA.players||[]).filter(function(p){ return p.groupId; }).map(function(p){ return [p.id, p.groupId, p.order]; });
+}
+// Rang (0, 1, 2…) de chaque joueur dans son groupe, à partir d'une liste [id, groupe, ordre].
+function rankByGroup(list){
+  const by = {}, rank = {};
+  (list || []).forEach(function(x){ if(x[1]) (by[x[1]] = by[x[1]] || []).push(x); });
+  Object.keys(by).forEach(function(g){
+    by[g].sort(function(a, b){ return (Number(a[2]) || 0) - (Number(b[2]) || 0); });
+    by[g].forEach(function(x, i){ rank[x[0]] = { g: g, r: i }; });
+  });
+  return rank;
+}
+// Après une correction : chaque joueur dont la place avait été changée à la main reprend sa
+// place dans le groupe (s'il y est encore) ; les autres suivent l'ordre automatique.
+// Sans l'ordre de la clôture précédente (session terminée avant cette version), on garde
+// l'ordre d'avant pour les groupes dont les scores n'ont pas été corrigés.
+function restoreManualPositions(session){
+  const before = rankByGroup(session.manualOrder);
+  const auto = session.closeOrder ? rankByGroup(session.closeOrder) : null;
+  const scores = session.reopenScores || null;
+  const groupChanged = function(gid){
+    if(!scores) return true;
+    const gd = (session.groupsData || []).find(function(x){ return x.groupId === gid; });
+    return scores[gid] !== groupScoreSignature(gd);
+  };
+  groupsSorted().forEach(function(g){
+    const now = playersInGroup(g.id).slice().sort(function(a, b){ return (a.order || 0) - (b.order || 0); });
+    if(!now.length) return;
+    const pinned = now.filter(function(p){
+      const b = before[p.id];
+      if(!b || b.g !== g.id) return false;
+      if(auto){ const a = auto[p.id]; return !a || a.g !== b.g || a.r !== b.r; }
+      return !groupChanged(g.id);
+    });
+    if(!pinned.length) return;
+    const slots = new Array(now.length);
+    pinned.sort(function(a, b){ return before[a.id].r - before[b.id].r; }).forEach(function(p){
+      let i = Math.min(before[p.id].r, now.length - 1);
+      while(slots[i] && i < now.length - 1) i++;
+      while(slots[i] && i > 0) i--;
+      slots[i] = p;
+    });
+    const rest = now.filter(function(p){ return pinned.indexOf(p) === -1; });
+    for(let i = 0; i < slots.length; i++){ if(!slots[i]) slots[i] = rest.shift(); }
+    slots.forEach(function(p, i){ if(p) p.order = i + 1; });
+  });
 }
 
 // Réordonne automatiquement chaque groupe après une session, selon la
