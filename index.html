@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 495">
+<meta name="app-build" content="Version 496">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2099,6 +2099,29 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium{margin-top:0;}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
+.tn-dvs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
+.tn-dv{background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;}
+.tn-dv-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.tn-dv-h b{font-family:var(--font-display);font-size:17px;text-transform:uppercase;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tn-dv-l{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.tn-dv-bar{height:6px;border-radius:3px;background:var(--line-soft-strong);overflow:hidden;}
+.tn-dv-bar span{display:block;height:100%;background:var(--ball);}
+.tn-dv-s{font-size:12px;color:var(--muted);}
+.tn-dv .btn{width:auto;margin:2px 0 0;padding:8px 12px;font-size:13px;}
+.tn-dv-a{align-self:flex-start;background:none;border:0;padding:2px 0;color:var(--ball);font:600 13px var(--font-body);cursor:pointer;}
+.tn-dv.st-pools .tn-dv-l, .tn-dv.st-bracket .tn-dv-l{color:var(--ball);}
+.tn-dv.st-next{border-color:var(--ball);background:linear-gradient(135deg, rgba(207,234,92,.16), rgba(207,234,92,.04));}
+.tn-dv.st-next .tn-dv-l{color:var(--court);background:var(--ball);padding:2px 8px;border-radius:999px;}
+.tn-dv.st-done .tn-dv-l{color:var(--ball);}
+.tn-dv.st-done .tn-dv-bar span{background:#9fb64a;}
+.tn-dv.st-setup .tn-dv-l{color:var(--paddle);}
+.tn-ph{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--text);vertical-align:1px;white-space:nowrap;}
+.tn-ph.ph-ko{background:rgba(207,234,92,.16);color:var(--ball);}
+.tn-ph.ph-lb{background:rgba(242,153,74,.16);color:var(--paddle);}
+.tn-ph.ph-final{background:var(--ball);color:var(--court);}
+.tn-court-cat{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:600;}
+.tn-court-h .tn-live-dot{font-size:11px;font-weight:700;color:var(--court);background:var(--ball);border-radius:999px;padding:1px 8px;margin-left:auto;margin-right:6px;}
+
 .tn-live-hint{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;}
 .tn-live-hint .tn-head-r{margin-left:auto;}
 .tn-de-t{margin:16px 0 8px;font-size:12px;color:var(--ball);}
@@ -2241,6 +2264,8 @@ body.desk .dk-add{color:var(--muted);}
   .tn-fmts{grid-template-columns:1fr;}
   .tn-live{grid-template-columns:1fr;}
   .tn-pod-top{display:block;}
+  .tn-dvs{display:flex;overflow-x:auto;gap:8px;margin:0 -16px 14px;padding:0 16px 4px;scroll-snap-type:x mandatory;}
+  .tn-dv{flex:0 0 78%;scroll-snap-align:start;}
   .tn-pod-col{display:none;}
   .tn-courts{grid-template-columns:1fr;}
   .tn-court-a .btn{white-space:nowrap;}
@@ -9497,17 +9522,75 @@ function tournEstimates(t, queue){
   return est;
 }
 function tournHour(ms){ const d = new Date(ms); return d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0'); }
+function tournRoundSingular(round, rounds){
+  const left = rounds - round;
+  return left === 0 ? 'Finale' : left === 1 ? 'Demi-finale' : left === 2 ? 'Quart de finale' : left === 3 ? 'Huitième de finale' : 'Ronde ' + round;
+}
+// Pastille de l'étape d'un match : poule, tableau, perdants, finale.
+function tournPhaseBadge(m){
+  if(m.phase === 'pool') return { txt: m.pool === 'U' || !m.pool ? 'Tous contre tous' : 'Poule ' + m.pool, cls: 'ph-pool' };
+  if(m.phase === 'ko'){ const r = tournKoRounds(m.division_id); return { txt: tournRoundSingular(m.round, r), cls: m.round === r ? 'ph-final' : 'ph-ko' }; }
+  if(m.phase === 'gf') return { txt: 'Grande finale', cls: 'ph-final' };
+  if(m.phase === 'wb') return { txt: 'Gagnants · ' + tournRoundSingular(m.round, tournDeRounds(m.division_id, 'wb')).toLowerCase(), cls: 'ph-ko' };
+  const last = tournDeRounds(m.division_id, 'lb');
+  return { txt: 'Perdants · ' + (m.round === last ? 'finale' : 'ronde ' + m.round), cls: 'ph-lb' };
+}
+function tournBadgeHTML(m){ const b = tournPhaseBadge(m); return `<span class="tn-ph ${b.cls}">${escapeHTML(b.txt)}</span>`; }
+function tournDivName(id){ const d = (TDIVS || []).find(function(x){ return x.id === id; }); return d ? d.name : ''; }
 function tournDivLabel(m){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
   if(tournIsDe(m)) return (d ? d.name : '') + ' · ' + tournDeLabel(m);
-  if(m.phase === 'ko') return (d ? d.name : '') + ' · ' + tournRoundName(m.round, tournKoRounds(m.division_id)).toLowerCase().replace(/s$/, '');
+  if(m.phase === 'ko') return (d ? d.name : '') + ' · ' + tournRoundSingular(m.round, tournKoRounds(m.division_id)).toLowerCase();
   return (d ? d.name : '') + (m.phase === 'pool' && m.pool ? (m.pool === 'U' ? '' : ' · poule ' + m.pool) : '');
+}
+// Où en est chaque catégorie, et quelle est la prochaine action.
+function tournDivProgress(t, d){
+  const r = tournDivRules(t, d), stage = d.stage || 'setup';
+  const pool = tournMatches(d.id, 'pool');
+  const br = tournMatches(d.id).filter(function(m){ return m.phase !== 'pool' && m.status !== 'bye' && (m.team_a || m.team_b || m.src); });
+  const cnt = function(list){ return { done: list.filter(function(m){ return m.status === 'done'; }).length, total: list.length, live: list.filter(function(m){ return m.status === 'playing'; }).length }; };
+  const goPrep = `VIEW.tprep='${d.id}';tournTab('poules')`, goBr = `VIEW.tbr='${d.id}';tournTab('tableau')`;
+  if(stage === 'setup') return { step: 'setup', label: 'À préparer', detail: r.format === 'double_elim' ? 'Le tableau n\'est pas encore créé' : 'Les poules ne sont pas encore formées', pct: 0, act: [r.format === 'double_elim' ? 'Créer le tableau' : 'Former les poules', goPrep, true] };
+  if(stage === 'pools'){
+    const c = cnt(pool);
+    if(c.done < c.total) return { step: 'pools', label: r.format === 'round_robin' ? 'Tous contre tous en cours' : 'Poules en cours', detail: c.done + ' / ' + c.total + ' matchs joués' + (c.live ? ' · ' + c.live + ' en cours' : ''), pct: c.total ? c.done / c.total : 0, act: ['Classements', r.format === 'round_robin' ? goBr : goPrep, false] };
+    if(r.format === 'round_robin') return { step: 'done', label: 'Terminé', detail: 'Classement final et podium prêts', pct: 1, act: ['Voir le podium', goBr, false] };
+    return { step: 'next', label: 'Poules terminées', detail: 'Les qualifiés attendent le tableau final', pct: 1, act: ['Créer le tableau final', `tournCreateBracket('${t.id}','${d.id}')`, true] };
+  }
+  const real = br.filter(function(m){ return m.team_a && m.team_b || m.status === 'done'; });
+  const c = cnt(real);
+  if(stage === 'done'){
+    const pod = r.format === 'double_elim' ? tournDePodium(d) : tournPodium(t, d);
+    return { step: 'done', label: 'Terminé', detail: pod && pod.gold ? 'Or : ' + tournTeamName(pod.gold) : 'Catégorie terminée', pct: 1, act: ['Voir le podium', goBr, false] };
+  }
+  let label = 'Tableau en cours';
+  if(r.format !== 'double_elim'){
+    const rounds = tournKoRounds(d.id);
+    const cur = tournMatches(d.id, 'ko').filter(function(m){ return m.status !== 'done' && m.status !== 'bye'; }).reduce(function(mn, m){ return Math.min(mn, m.round); }, 99);
+    if(cur < 99){ const nm = tournRoundName(cur, rounds); label = nm + (cur === rounds ? ' en cours' : ' en cours'); }
+  } else {
+    const gf = tournMatches(d.id, 'gf')[0];
+    if(gf && gf.team_a && gf.team_b) label = 'Grande finale';
+  }
+  return { step: 'bracket', label: label, detail: c.done + ' match' + (c.done > 1 ? 's' : '') + ' du tableau joué' + (c.done > 1 ? 's' : '') + (c.live ? ' · ' + c.live + ' en cours' : ''), pct: br.length ? c.done / br.length : 0, act: ['Voir le tableau', goBr, false] };
+}
+function tournDivStripHTML(t){
+  const divs = tournDivs(t.id); if(!divs.length) return '';
+  return `<div class="tn-dvs">${divs.map(function(d){
+    const p = tournDivProgress(t, d);
+    return `<section class="tn-dv st-${p.step}">
+      <div class="tn-dv-h"><b>${escapeHTML(d.name)}</b><span class="tn-dv-l">${escapeHTML(p.label)}</span></div>
+      <div class="tn-dv-bar"><span style="width:${Math.round(p.pct * 100)}%"></span></div>
+      <div class="tn-dv-s">${escapeHTML(p.detail)}</div>
+      <button type="button" class="${p.act[2] ? 'btn btn-primary' : 'tn-dv-a'}" onclick="${p.act[1]}">${escapeHTML(p.act[0])}${p.act[2] ? '' : ' ›'}</button>
+    </section>`;
+  }).join('')}</div>`;
 }
 function tournLiveHTML(t){
   ensureTournLive(t.id);
   const all = tournLiveMatches(t), courts = tournCourts(t), cfg = tournSettings(t);
-  if(!all.length) return `<div class="tn-note" style="margin-top:14px;">Aucun match pour l'instant. Verrouille d'abord les poules dans <b>Préparer</b>.</div>`;
-  if(!courts.length) return `<div class="tn-note" style="margin-top:14px;">Ajoute les noms des terrains dans <b>Réglages › Modifier</b> pour que la file d'attente puisse les remplir.</div>`;
+  if(!all.length) return tournDivStripHTML(t) + `<div class="tn-note" style="margin-top:14px;">Aucun match pour l'instant. Forme les poules ou crée le tableau d'une catégorie (bouton ci-dessus).</div>`;
+  if(!courts.length) return tournDivStripHTML(t) + `<div class="tn-note" style="margin-top:14px;">Ajoute les noms des terrains dans <b>Réglages › Modifier</b> pour que la file d'attente puisse les remplir.</div>`;
   const queue = tournQueue(t), est = tournEstimates(t, queue);
   const playing = all.filter(function(m){ return m.status === 'playing'; });
   const done = all.filter(function(m){ return m.status === 'done'; });
@@ -9521,9 +9604,9 @@ function tournLiveHTML(t){
       const mins = Math.floor((now - Date.parse(m.called_at || m.started_at || new Date().toISOString())) / 60000);
       const late = mins >= tournMatchMinutes(t, m) + 10;
       return `<section class="tn-court busy">
-        <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="${late ? 'late' : ''}">${mins < 1 ? 'appelé à l\'instant' : 'depuis ' + mins + ' min'}</span></div>
-        <div class="tn-court-m"><span>${escapeHTML(tournTeamName(m.team_a))}</span><i>c.</i><span>${escapeHTML(tournTeamName(m.team_b))}</span></div>
-        <div class="tn-court-s">${escapeHTML(tournDivLabel(m))}</div>
+        <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="tn-live-dot">En cours</span><span class="${late ? 'late' : ''}">${mins < 1 ? 'à l\'instant' : mins + ' min'}</span></div>
+        <div class="tn-court-cat"><span>${escapeHTML(tournDivName(m.division_id))}</span>${tournBadgeHTML(m)}</div>
+        <div class="tn-court-m"><span>${escapeHTML(tournTeamName(m.team_a))}</span><i>contre</i><span>${escapeHTML(tournTeamName(m.team_b))}</span></div>
         <div class="tn-court-a"><button type="button" class="btn btn-primary" onclick="openTournScore('${m.id}')">Entrer le score</button><button type="button" class="btn btn-secondary" onclick="tournUncall('${m.id}')">Libérer</button></div>
       </section>`;
     }
@@ -9532,17 +9615,18 @@ function tournLiveHTML(t){
     if(sug){ used[sug.team_a] = 1; used[sug.team_b] = 1; }
     return `<section class="tn-court">
       <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="free">Libre</span></div>
-      ${sug ? `<div class="tn-court-m sug"><span>${escapeHTML(tournTeamName(sug.team_a))}</span><i>c.</i><span>${escapeHTML(tournTeamName(sug.team_b))}</span></div>
-        <div class="tn-court-s">${escapeHTML(tournDivLabel(sug))}</div>
+      ${sug ? `<div class="tn-court-s">Prochain match proposé :</div>
+        <div class="tn-court-cat"><span>${escapeHTML(tournDivName(sug.division_id))}</span>${tournBadgeHTML(sug)}</div>
+        <div class="tn-court-m sug"><span>${escapeHTML(tournTeamName(sug.team_a))}</span><i>contre</i><span>${escapeHTML(tournTeamName(sug.team_b))}</span></div>
         <div class="tn-court-a"><button type="button" class="btn btn-primary" onclick="tournCall('${sug.id}',${courts.indexOf(c)})">Appeler ce match</button></div>`
       : `<div class="tn-court-empty">Aucun match prêt pour ce terrain</div>`}
     </section>`;
   }).join('');
   const qRow = function(m, i){
-    return `<li class="${m._why ? 'blk' : ''}"><span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivLabel(m))}${m._why ? ' · ' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
+    return `<li class="${m._why ? 'blk' : ''}"><span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}${m._why ? '<br>' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
   };
   const recent = done.slice().sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 6);
-  return `<div class="tn-live-bar">
+  return tournDivStripHTML(t) + `<div class="tn-live-bar">
       <div class="tn-live-stats"><span><b>${done.length}</b> / ${all.length} matchs joués</span><span><b>${playing.length}</b> en cours</span><span><b>${ready.length}</b> prêts</span></div>
       <div class="tn-head-r">${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
     </div>
@@ -9551,7 +9635,7 @@ function tournLiveHTML(t){
       <div class="tn-courts">${cards}</div>
       <aside class="tn-queue">
         <div class="tn-sec-h"><span>File d'attente</span><small>${queue.length} à jouer</small></div>
-        ${queue.length ? `<ol>${ready.map(qRow).join('')}${blocked.map(qRow).join('')}</ol>` : `<p class="small" style="color:var(--muted);">Tous les matchs de poule sont joués ou en cours.</p>`}
+        ${queue.length ? `<ol>${ready.map(qRow).join('')}${blocked.map(qRow).join('')}</ol>` : `<p class="small" style="color:var(--muted);">Aucun match en attente : tout est joué ou en cours. Regarde l'avancement des catégories en haut.</p>`}
         ${recent.length ? `<div class="tn-k" style="margin:14px 0 6px;">Derniers résultats</div><ul class="tn-res">${recent.map(function(m){
           const aw = m.winner === m.team_a;
           return `<li><button type="button" onclick="openTournScore('${m.id}')"><span class="${aw ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_a))}</span><b>${m.score_a} - ${m.score_b}</b><span class="${aw ? '' : 'w'}">${escapeHTML(tournTeamName(m.team_b))}</span></button></li>`;
@@ -9615,6 +9699,21 @@ function openTournScore(id){
   render();
   setTimeout(function(){ const el = document.getElementById(bo3 ? 'tsg_00' : 'tsc_a'); if(el && m.status !== 'done') el.focus(); }, 60);
 }
+function tournAfterResult(m){
+  const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; }); if(!d) return;
+  const t = tournById(m.tournament_id), r = tournDivRules(t, d);
+  if(m.phase === 'pool'){
+    const left = tournMatches(d.id, 'pool').filter(function(x){ return x.status !== 'done'; }).length;
+    if(left) return;
+    if(r.format === 'pools_ko' && (d.stage || '') === 'pools'){
+      setTimeout(function(){ showConfirm('Les poules de « ' + d.name + ' » sont terminées ! Créer le tableau final maintenant avec les ' + tournQualifiers(t, d).length + ' équipes qualifiées ?', function(){ VIEW.tbr = d.id; tournCreateBracket(t.id, d.id).then(function(){ VIEW.ttab = 'tableau'; render(); }); }); }, 300);
+    } else if(r.format === 'round_robin'){
+      setTimeout(function(){ showToast('« ' + d.name + ' » est terminée : classement final et podium dans Tableau'); }, 300);
+    }
+  } else if((d.stage || '') === 'done'){
+    setTimeout(function(){ showToast('« ' + d.name + ' » est terminée : le podium est dans Tableau'); }, 300);
+  }
+}
 async function tournScoreSave(id){
   const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
   let a, b, games = null;
@@ -9640,6 +9739,7 @@ async function tournScoreSave(id){
   if(tournIsDe(m)) await tournDeAdvance(m); else await tournAdvance(m);
   tournLiveNotify(); tournBackToSheet(); render();
   showToast('Score enregistré' + (m.court ? ' : ' + m.court + ' est libre' : ''));
+  tournAfterResult(m);
 }
 function tournForfeit(id){
   const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
@@ -9649,7 +9749,7 @@ function tournForfeit(id){
     const aLoses = i === 0, w = aLoses ? m.team_b : m.team_a;
     if(m.winner && m.winner !== w && (tournKoBlocked(m) || tournDeBlocked(m))){ showAlert('Le gagnant a déjà joué le match suivant du tableau : corrige d\'abord ce match-là.'); return; }
     tournMatchPatch(id, { score_a: aLoses ? 0 : pts, score_b: aLoses ? pts : 0, games: null, winner: w, status: 'done', ended_at: new Date().toISOString() }, true)
-      .then(function(ok){ return ok && (tournIsDe(m) ? tournDeAdvance(m) : tournAdvance(m)); }).then(function(){ tournLiveNotify(); tournBackToSheet(); render(); });
+      .then(function(ok){ return ok && (tournIsDe(m) ? tournDeAdvance(m) : tournAdvance(m)); }).then(function(){ tournLiveNotify(); tournBackToSheet(); render(); tournAfterResult(m); });
   });
 }
 // Équipes qui jouent : inscrites dans une catégorie dont les poules ou le tableau sont créés.
@@ -9835,7 +9935,7 @@ async function tournCreateBracket(tid, divId){
     showToast('Tableau créé : ' + q.length + ' équipes qualifiées');
   };
   if(left) showConfirm('Il reste ' + left + ' match' + (left > 1 ? 's' : '') + ' de poule à jouer. Créer le tableau quand même avec le classement actuel ?', go);
-  else go();
+  else return go();
 }
 function tournCancelBracket(divId){
   showConfirm('Annuler le tableau ? Les matchs du tableau seront effacés ; les résultats des poules sont conservés.', async function(){
@@ -9987,7 +10087,7 @@ function tournIsDe(m){ return m.phase === 'wb' || m.phase === 'lb' || m.phase ==
 function tournDeRounds(divId, phase){ return tournMatches(divId, phase).reduce(function(mx, m){ return Math.max(mx, m.round); }, 0); }
 function tournDeLabel(m){
   if(m.phase === 'gf') return 'Grande finale';
-  if(m.phase === 'wb') return 'Gagnants · ' + tournRoundName(m.round, tournDeRounds(m.division_id, 'wb')).toLowerCase().replace(/s$/, '');
+  if(m.phase === 'wb') return 'Gagnants · ' + tournRoundSingular(m.round, tournDeRounds(m.division_id, 'wb')).toLowerCase();
   const last = tournDeRounds(m.division_id, 'lb');
   return 'Perdants · ' + (m.round === last ? 'finale' : 'ronde ' + m.round);
 }
