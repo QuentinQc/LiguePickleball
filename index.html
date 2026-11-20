@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 508">
+<meta name="app-build" content="Version 509">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2102,6 +2102,41 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium{margin-top:0;}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
+.tn-card-btn{text-align:left;font:inherit;color:var(--text);cursor:pointer;transition:border-color .15s, background .15s;}
+.tn-card-btn:hover{border-color:rgba(207,234,92,.5);background:rgba(207,234,92,.06);}
+.tn-card-btn .tn-k{display:flex;justify-content:space-between;gap:6px;}
+.tn-card-btn .tn-k em{font-style:normal;color:var(--ball);text-transform:none;letter-spacing:0;font-weight:600;}
+.tn-card-btn.warn{border-color:rgba(242,153,74,.55);}
+.tn-warn-t{color:var(--paddle);font-weight:700;}
+.tn-ok-t{color:var(--ball);font-weight:700;}
+.tn-info{display:flex;flex-direction:column;gap:10px;}
+.tn-info-big{font-family:var(--font-display);font-size:26px;text-transform:uppercase;line-height:1.1;}
+.tn-info-big.warn{color:var(--paddle);}
+.tn-info .small{margin:0;}
+.tn-note-warn{background:rgba(242,153,74,.08);border-color:rgba(242,153,74,.45);margin-top:0;}
+.tn-info-tbl{width:100%;}
+.tn-reg-list{display:flex;flex-direction:column;border-top:1px solid var(--line-soft-strong);}
+.tn-reg-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,120px) 92px;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line-soft);}
+.tn-reg-row b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tn-reg-bar{display:block;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;}
+.tn-reg-bar > span{display:block;height:100%;background:var(--ball);border-radius:3px;}
+.tn-reg-n{text-align:right;font-size:13px;white-space:nowrap;}
+.tn-reg-n em{display:block;font-style:normal;font-size:11px;color:var(--paddle);}
+.tn-info-tbl td small{display:block;color:var(--muted);font-size:12px;}
+.tn-info-tbl td.num, .tn-info-tbl th.num{text-align:right;}
+.tn-info-k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:4px;}
+.tn-info-list{display:flex;flex-direction:column;gap:6px;}
+.tn-info-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.04);color:var(--text);font:inherit;cursor:pointer;}
+.tn-info-row:hover{border-color:rgba(207,234,92,.5);}
+.tn-info-row > span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.tn-info-row small{color:var(--muted);font-size:12px;}
+.tn-info-r{display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;}
+.tn-info-r b{font-family:var(--font-display);font-size:22px;color:var(--ball);}
+.tn-info-r em{font-style:normal;font-size:11px;color:var(--muted);}
+.tn-info-todo{padding:10px 12px;border-radius:12px;border:1px solid rgba(242,153,74,.45);background:rgba(242,153,74,.06);display:flex;flex-direction:column;gap:4px;}
+.tn-info-todo b{color:var(--paddle);}
+.tn-info-todo small{color:var(--muted);font-size:12px;line-height:1.5;}
+
 .tn-fmts{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
 .tn-fmt-main{margin-top:12px;}
 .tn-fmt-main:empty{display:none;}
@@ -9440,9 +9475,7 @@ function tournSettingsHTML(t){
     </div>
     ${t.status === 'draft' ? `<div class="tn-note">Le tournoi est en brouillon : ajoute les catégories, puis touche <b>Modifier › Inscriptions ouvertes</b> pour obtenir le lien à partager.</div>` : ''}
     <div class="tn-cards">
-      <section class="tn-card"><div class="tn-k">Lieu et horaire</div><b>${escapeHTML(t.venue || 'Lieu à préciser')}</b><span>${escapeHTML(tournDateLabel(t))}${hours ? ' · ' + escapeHTML(hours) : ''}${courts.length ? '<br>' + courts.length + ' terrain' + (courts.length > 1 ? 's' : '') + ' (' + escapeHTML(courts.slice(0, 3).join(', ')) + (courts.length > 3 ? '…' : '') + ')' : ''}</span></section>
-      <section class="tn-card"><div class="tn-k">Formules</div><b>${(function(){ const f = {}; divs.forEach(function(d){ f[tournDivRules(t, d).format] = 1; }); const k = Object.keys(f); return k.length ? escapeHTML(k.map(function(x){ return TOURN_FMT_SHORT[x]; }).join(' · ')) : 'Poules puis élimination'; })()}</b><span>Chaque catégorie a sa propre formule et son nombre d'équipes.</span></section>
-      <section class="tn-card"><div class="tn-k">Inscriptions</div><b>${escapeHTML(regTxt)}</b><span>Membres et public · confirmation du partenaire</span></section>
+      ${tournCardsHTML(t, divs, hours, courts, regTxt)}
     </div>
     <section class="tn-sec">
       <div class="tn-sec-h"><span>Catégories · ${divs.length}</span><button type="button" class="btn btn-primary" onclick="openTournDivForm('${t.id}')">+ Ajouter une catégorie</button></div>
@@ -11067,6 +11100,128 @@ function tournHistoryCSV(tid){
   });
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'matchs-' + dupNorm(t.name).replace(/[^a-z0-9]+/g, '-') + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+// ---- Cartes de la page Réglages : un résumé utile, le détail au toucher ----
+// Nombre de matchs prévus pour une catégorie de n équipes, selon sa formule.
+function tournPlanFor(t, d, n){
+  const r = tournDivRules(t, d), out = { pool: 0, bracket: 0, q: 0, pools: [] };
+  if(n < 2) return out;
+  if(r.format === 'round_robin'){ out.pool = n * (n - 1) / 2; out.pools = [n]; return out; }
+  if(r.format === 'pools_ko' || r.format === 'pools_de'){
+    const k = tournPoolCount(n, r.pool_size, r.format), base = Math.floor(n / k), extra = n % k;
+    for(let i = 0; i < k; i++){ const sz = base + (i < extra ? 1 : 0); out.pools.push(sz); out.pool += sz * (sz - 1) / 2; }
+    out.q = Math.min(n, k * r.qualifiers);
+  } else out.q = n;
+  const q = out.q;
+  if(q >= 2){
+    if(tournFullDe(r) && q >= 4) out.bracket = 2 * q - 2;
+    else {
+      out.bracket = q - 1;
+      if(tournBronzeAllowed(r) && r.bronze_match && q >= 4) out.bracket += 1;
+      if(r.de_mode === 'consolation' && (r.format === 'pools_de' || r.format === 'double_elim')) out.bracket += Math.max(0, Math.floor(q / 2) - 1);
+    }
+  }
+  return out;
+}
+function tournMinutesFor(t, d, plan){
+  const r = tournDivRules(t, d), mn = function(p){ return p >= 21 ? 35 : p >= 15 ? 25 : 20; };
+  return plan.pool * mn(r.pool_points) + plan.bracket * mn(r.bracket_points) + (r.final_best_of === 3 && plan.bracket ? 30 : 0);
+}
+function tournFmtMin(m){ const h = Math.floor(m / 60), x = Math.round(m % 60); return (h ? h + ' h ' : '') + (h ? String(x).padStart(2, '0') : x + ' min'); }
+function tournParseTime(v){ const m = /^(\d{1,2}):(\d{2})/.exec(v || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null; }
+function tournHm(min){ min = Math.round(min); return Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0'); }
+// Estimation de la journée : matchs prévus, minutes de jeu, heure de fin selon le nombre de terrains.
+function tournDayEstimate(t){
+  const divs = tournDivs(t.id), courts = Math.max(1, tournCourts(t).length || 1);
+  let matches = 0, minutes = 0;
+  const rows = divs.map(function(d){
+    const reg = tournTeams(t.id, d.id, 'registered').length, n = reg || d.max_teams || 0;
+    const plan = tournPlanFor(t, d, n), m = tournMinutesFor(t, d, plan);
+    matches += plan.pool + plan.bracket; minutes += m;
+    return { d: d, reg: reg, n: n, plan: plan, minutes: m, guess: !reg };
+  });
+  // Rotation des terrains et pauses : on ajoute 15 %.
+  const span = Math.ceil(minutes * 1.15 / courts);
+  const start = tournParseTime(t.start_time), end = tournParseTime(t.end_time);
+  return { rows: rows, matches: matches, minutes: minutes, courts: tournCourts(t).length, span: span, start: start, end: end, finish: start != null ? start + span : null };
+}
+function tournCardsHTML(t, divs, hours, courts, regTxt){
+  const est = tournDayEstimate(t);
+  const late = est.finish != null && est.end != null && est.finish > est.end;
+  const reg = tournTeams(t.id, null, 'registered'), wait = tournTeams(t.id, null, 'waitlist').length;
+  const unconf = reg.filter(function(x){ return !x.partner_confirmed; }).length, unpaid = reg.filter(function(x){ return !x.paid; }).length;
+  const cap = divs.reduce(function(s2, d){ return s2 + (d.max_teams || 0); }, 0);
+  const todo = [unconf ? unconf + ' partenaire' + (unconf > 1 ? 's' : '') + ' à confirmer' : '', unpaid ? unpaid + ' à payer' : ''].filter(Boolean).join(' · ');
+  const card = function(fn, k, main, sub, warn){ return `<button type="button" class="tn-card tn-card-btn${warn ? ' warn' : ''}" onclick="${fn}"><div class="tn-k">${k}<em>Détails ›</em></div><b>${main}</b><span>${sub}</span></button>`; };
+  return card(`openTournDayInfo('${t.id}')`, 'Lieu et horaire',
+      escapeHTML(t.venue || 'Lieu à préciser'),
+      escapeHTML(tournDateLabel(t)) + (hours ? ' · ' + escapeHTML(hours) : '') + '<br>' + (est.courts ? est.courts + ' terrain' + (est.courts > 1 ? 's' : '') : '<b class="tn-warn-t">Aucun terrain</b>')
+        + (est.matches && est.finish != null ? ' · fin estimée <b class="' + (late ? 'tn-warn-t' : 'tn-ok-t') + '">' + tournHm(est.finish) + '</b>' : ''), late || !est.courts)
+    + card(`openTournFormatsInfo('${t.id}')`, 'Formules',
+      est.matches ? est.matches + ' matchs prévus' : 'Aucune catégorie',
+      divs.length ? divs.length + ' catégorie' + (divs.length > 1 ? 's' : '') + (est.minutes ? ' · ≈ ' + tournFmtMin(est.minutes) + ' de jeu' : '') : 'Ajoute une catégorie pour commencer', false)
+    + card(`openTournRegInfo('${t.id}')`, 'Inscriptions',
+      escapeHTML(regTxt),
+      reg.length + (cap ? ' / ' + cap : '') + ' équipe' + (reg.length > 1 ? 's' : '') + (wait ? ' · ' + wait + ' en attente' : '') + (todo ? '<br><span class="tn-warn-t">' + escapeHTML(todo) + '</span>' : '<br>Tout est en ordre'), !!todo);
+}
+function openTournDayInfo(tid){
+  const t = tournById(tid); if(!t) return;
+  const est = tournDayEstimate(t), late = est.finish != null && est.end != null && est.finish > est.end;
+  const rows = est.rows.map(function(x){ return `<tr><td><b>${escapeHTML(x.d.name)}</b><small>${x.guess ? 'si complète (' + x.n + ' équipes)' : x.reg + (x.reg > 1 ? ' équipes inscrites' : ' équipe inscrite')}</small></td><td class="num">${x.plan.pool + x.plan.bracket}</td><td class="num">${tournFmtMin(x.minutes)}</td></tr>`; }).join('');
+  const html = `<div class="tn-info">
+    <div class="tn-info-big ${late ? 'warn' : ''}">${est.finish != null && est.matches ? 'Fin estimée vers ' + tournHm(est.finish) : est.matches ? '≈ ' + tournFmtMin(est.span) + ' de tournoi' : 'Pas encore de matchs prévus'}</div>
+    <p class="small">${est.start != null ? 'Début à ' + tournHm(est.start) + (est.end != null ? ', fin prévue à ' + tournHm(est.end) : '') + '. ' : ''}${est.matches} matchs, ≈ ${tournFmtMin(est.minutes)} de jeu au total, répartis sur ${est.courts || 1} terrain${(est.courts || 1) > 1 ? 's' : ''}, plus 15 % pour la rotation et les pauses.</p>
+    ${late ? `<div class="tn-note tn-note-warn">Le tournoi risque de dépasser l'heure de fin d'environ <b>${tournFmtMin(est.finish - est.end)}</b>. Pistes : ajouter des terrains, passer des matchs à 11 points, réduire la taille des poules ou finir en 1 match au lieu de 2 de 3.</div>` : ''}
+    ${!est.courts ? `<div class="tn-note tn-note-warn">Aucun terrain n'est configuré : la file d'attente ne pourra appeler aucun match.</div>` : ''}
+    ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Durée de jeu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    <div class="tn-info-k">Terrains</div><p class="small">${est.courts ? escapeHTML(tournCourts(t).join(', ')) : 'Aucun'}</p>
+    <p class="small" style="color:var(--muted);">Durées utilisées : 20 min pour un match à 11, 25 min à 15, 35 min à 21.</p>
+    ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournForm('${tid}')">Modifier lieu, heures et terrains</button></div>` : ''}
+  </div>`;
+  showPanelModal('Lieu et horaire', html);
+}
+function openTournFormatsInfo(tid){
+  const t = tournById(tid); if(!t) return;
+  const est = tournDayEstimate(t);
+  const rows = est.rows.map(function(x){
+    const r = tournDivRules(t, x.d), stage = { setup: 'À préparer', pools: 'Poules en cours', bracket: 'Tableau en cours', done: 'Terminée' }[x.d.stage || 'setup'];
+    const detail = [x.plan.pools.length > 1 ? x.plan.pools.length + ' poules (' + x.plan.pools.join(', ') + ' équipes)' : x.plan.pool ? 'une poule de ' + x.n : '', x.plan.pool ? x.plan.pool + (x.plan.pool > 1 ? ' matchs de poule' : ' match de poule') : '', x.plan.bracket ? x.plan.bracket + (x.plan.bracket > 1 ? ' matchs de tableau' : ' match de tableau') + (x.plan.q && r.format !== 'double_elim' ? ' (' + x.plan.q + ' qualifiés)' : '') : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="tn-info-row" onclick="closeModal();openTournDivForm('${tid}','${x.d.id}')"><span><b>${escapeHTML(x.d.name)}</b><small>${escapeHTML(TOURN_FMT[r.format])}${x.guess ? ' · si complète (' + x.n + ' équipes)' : ' · ' + x.reg + (x.reg > 1 ? ' équipes' : ' équipe')}</small><small>${escapeHTML(detail)}</small></span><span class="tn-info-r"><b>${x.plan.pool + x.plan.bracket}</b><em>${escapeHTML(stage)}</em></span></button>`;
+  }).join('');
+  const html = `<div class="tn-info">
+    <div class="tn-info-big">${est.matches} matchs prévus</div>
+    <p class="small">≈ ${tournFmtMin(est.minutes)} de jeu au total. Touche une catégorie pour changer sa formule.</p>
+    <div class="tn-info-list">${rows || '<p class="small">Aucune catégorie.</p>'}</div>
+    ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournDivForm('${tid}')">+ Ajouter une catégorie</button></div>` : ''}
+  </div>`;
+  showPanelModal('Formules', html);
+}
+function openTournRegInfo(tid){
+  const t = tournById(tid); if(!t) return;
+  const divs = tournDivs(tid), reg = tournTeams(tid, null, 'registered');
+  const unconf = reg.filter(function(x){ return !x.partner_confirmed; }), unpaid = reg.filter(function(x){ return !x.paid; });
+  const rows = divs.map(function(d){
+    const n = tournTeams(tid, d.id, 'registered').length, w = tournTeams(tid, d.id, 'waitlist').length, max = d.max_teams || 0, pct = max ? Math.min(100, Math.round(100 * n / max)) : 0;
+    return `<div class="tn-reg-row"><b>${escapeHTML(d.name)}</b><span class="tn-reg-bar"><span style="width:${pct}%;${n >= max ? 'background:var(--paddle);' : ''}"></span></span><span class="tn-reg-n">${n} / ${max}${w ? '<em>+' + w + ' en attente</em>' : ''}</span></div>`;
+  }).join('');
+  const names = function(list){ return list.slice(0, 6).map(function(x){ return escapeHTML(x.p1_name + ' et ' + x.p2_name); }).join('<br>') + (list.length > 6 ? '<br>… et ' + (list.length - 6) + ' autre' + (list.length - 6 > 1 ? 's' : '') : ''); };
+  const st = TOURN_ST[t.status] || TOURN_ST.draft;
+  const dl = t.reg_deadline ? new Date(t.reg_deadline + 'T12:00:00').toLocaleDateString('fr-CA', { day:'numeric', month:'long' }) : null;
+  const html = `<div class="tn-info">
+    <div class="tn-info-big">${reg.length} équipe${reg.length > 1 ? 's' : ''} inscrite${reg.length > 1 ? 's' : ''}</div>
+    <p class="small"><span class="jp-pill ${st[1]}">${st[0]}</span> ${dl ? ' · date limite : ' + escapeHTML(dl) : ''}</p>
+    ${rows ? `<div class="tn-reg-list">${rows}</div>` : ''}
+    <div class="tn-info-k">À régler</div>
+    ${unconf.length ? `<div class="tn-info-todo"><b>${unconf.length} partenaire${unconf.length > 1 ? 's' : ''} à confirmer</b><small>${names(unconf)}</small></div>` : ''}
+    ${unpaid.length ? `<div class="tn-info-todo"><b>${unpaid.length} équipe${unpaid.length > 1 ? 's' : ''} à payer</b><small>${names(unpaid)}</small></div>` : ''}
+    ${!unconf.length && !unpaid.length ? '<p class="small">Rien à régler : partenaires confirmés et paiements reçus.</p>' : ''}
+    <div class="tn-form-acts">
+      ${t.status !== 'draft' ? `<button type="button" class="btn btn-secondary" onclick="tournCopyLink('${tid}')">Copier le lien d'inscription</button>` : ''}
+      <span style="flex:1"></span>
+      <button type="button" class="btn btn-primary" onclick="closeModal();tournTab('inscrits')">Voir les inscrits</button>
+    </div>
+  </div>`;
+  showPanelModal('Inscriptions', html);
 }
 function tournNextStepHTML(t, tab){
   const n = tournTeams(t.id, null, 'registered').length;
