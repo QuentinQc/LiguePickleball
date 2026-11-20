@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 507">
+<meta name="app-build" content="Version 508">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9404,7 +9404,7 @@ function tournSheetHTML(){
   let body = '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(t){
     const nav = `<div class="tn-tabs" role="tablist">${tabs.map(function(x){ return `<button type="button" role="tab" class="${tab === x[0] ? 'on' : ''}" onclick="tournTab('${x[0]}')">${x[1]}</button>`; }).join('')}</div>`;
-    const testBar = tournTestOn(t) ? `<div class="tn-testbar"><b>Mode test actif</b><span>Les scores peuvent être générés.</span>${tournRole(t.id) === 'admin' ? `<button type="button" onclick="openTournTestMode('${t.id}')">Gérer</button><button type="button" onclick="tournTestSet('${t.id}', false)">Désactiver</button>` : ''}</div>` : '';
+    const testBar = tournTestOn(t) ? `<div class="tn-testbar"><b>Mode test actif</b><span>Simulation disponible : équipes de test, scores générés, étapes simulées.</span>${tournRole(t.id) === 'admin' ? `<button type="button" onclick="openTournTestMode('${t.id}')">Outils de test</button><button type="button" onclick="tournTestSet('${t.id}', false)">Désactiver</button>` : ''}</div>` : '';
     body = testBar + nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'matchs' ? tournHistoryHTML(t, false) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
   }
   return `<div class="chat-overlay dk-page" onclick="if(event.target===this && ovDown(this)) closeModal()">
@@ -10559,11 +10559,8 @@ function openTournTestMode(tid){
   const nTest = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.is_test && x.status !== 'withdrawn'; }).length;
   const cur = VIEW.tdiv && VIEW.tdiv !== 'all' ? VIEW.tdiv : (divs[0] ? divs[0].id : '');
   const html = `<div class="tn-form">
-    <p class="small" style="color:var(--muted);margin:0 0 12px;">Pour essayer le tournoi sans tout entrer. Tu gardes la main sur tout (poules, appels, tableau) ; seuls les scores peuvent être générés. Les équipes de test n'ont ni courriel ni compte Dinkeo : personne ne reçoit de notification.</p>
-    <div class="tn-grp tn-grp-first"><div class="tn-grp-t">Mode test du tournoi</div>
-      ${tournSeg('ttOn', [['1','<b>Activé</b><small>Bouton « Générer » dans les scores</small>'],['0','<b>Désactivé</b><small>Scores entrés à la main</small>']], on ? '1' : '0', 'tournTestToggle', 'tn-seg-st tn-seg-2')}
-    </div>
-    <div class="tn-grp"><div class="tn-grp-t">Ajouter des équipes de test</div>
+    <p class="small" style="color:var(--muted);margin:0 0 12px;">Pour essayer le tournoi sans tout entrer. Tu gardes la main sur tout (poules, appels, tableau) ; seuls les scores peuvent être générés. Les équipes de test n'ont ni courriel ni compte Dinkeo : personne ne reçoit de notification. Le mode test s'active ou se désactive dans <b>Réglages › Modifier</b>.</p>
+    <div class="tn-grp tn-grp-first"><div class="tn-grp-t">Ajouter des équipes de test</div>
       ${divs.length ? `${tournField('Catégorie', tournSel('ttCat', divs.map(function(d){ return [d.id, escapeHTML(d.name) + ' · ' + tournTeams(tid, d.id, 'registered').length + ' / ' + d.max_teams]; }), cur))}
       <div class="tn-row2">
         ${tournField('Nombre d\'équipes', tournStepper('ttNb', 8, 1, 32))}
@@ -10586,7 +10583,7 @@ function openTournTestMode(tid){
     </div>
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Fermer</button></div>
   </div>`;
-  setModal({ kind:'content', title:'Mode test', htmlContent: html, ttest: tid });
+  setModal({ kind:'content', title:'Outils de test', htmlContent: html, ttest: tid });
   render();
 }
 // Remet une catégorie à une étape précédente pour rejouer la simulation.
@@ -10630,7 +10627,6 @@ async function tournTestAdd(tid){
   }
   const r = await sb.from('tournament_teams').insert(rows);
   if(r && r.error){ showAlert('Ajout impossible : ' + r.error.message); return; }
-  if(!tournTestOn(tournById(tid))) await tournTestSet(tid, true, true);
   const wait = rows.filter(function(x){ return x.status === 'waitlist'; }).length;
   await loadTournaments(true); tournBackToSheet(); render();
   showToast(nb + ' équipes de test ajoutées dans ' + d.name + (wait ? ' (' + wait + ' en liste d\'attente : catégorie pleine)' : '') + ' · mode test activé');
@@ -11098,7 +11094,11 @@ function openTournForm(id){
       ${tournSeg('tfStatus', [['draft','<b>Brouillon</b><small>Invisible au public</small>'],['open','<b>Ouvertes</b><small>Le lien fonctionne</small>'],['closed','<b>Fermées</b><small>Plus d\'inscriptions</small>'],['done','<b>Terminé</b><small>Tournoi joué</small>']], v.status, null, 'tn-seg-st')}
       <div style="margin-top:12px;">${tournField('Date limite d\'inscription', `<input id="tfDeadline" type="date" value="${escapeHTML(v.reg_deadline || '')}">`, 'Facultatif. Après cette date, le lien n\'accepte plus d\'inscriptions.')}</div>
     </div>
-    ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}`
+    ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}
+    ${tournRole(t.id) === 'admin' ? `<div class="tn-grp"><div class="tn-grp-t">Mode test</div>
+      ${tournSeg('tfTest', [['0','<b>Désactivé</b><small>Tournoi réel</small>'],['1','<b>Activé</b><small>Fonctions de simulation</small>']], tournTestOn(t) ? '1' : '0', null, 'tn-seg-st tn-seg-2')}
+      <p class="small tn-grp-s" style="margin:8px 0 0;">Activé : équipes de test en un clic, scores générés, simulation par étape et remise à zéro. Les équipes de test n'ont ni courriel ni compte : personne n'est notifié.</p>
+    </div>` : ''}`
     : `<p class="small tn-grp-s" style="margin:4px 0 12px;">Ensuite, tu ajoutes les catégories une à une en choisissant leur formule. Terrains, inscriptions et notes se règlent plus tard dans « Modifier ».</p>`}
     <div class="tn-form-acts">
       ${t && tournRole(t.id) === 'admin' ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDelete('${t.id}')">Supprimer</button>` : ''}
@@ -11171,6 +11171,7 @@ async function tournSave(id){
   };
   // Champs absents (création simplifiée) : on ne les écrit pas.
   [['tfCourts','courts'],['tfPool','pool_points'],['tfBracket','bracket_points'],['tfFinal','final_best_of'],['tfStatus','status'],['tfDeadline','reg_deadline'],['tfNotes','notes']].forEach(function(f){ if(!document.getElementById(f[0])) delete row[f[1]]; });
+  if(document.getElementById('tfTest')){ const t0 = tournById(id); row.settings = Object.assign({}, (t0 && t0.settings) || {}, { test: tfVal('tfTest') === '1' }); }
   if(!document.getElementById('tfStatus')){ delete row.reg_open; if(!id){ row.status = 'draft'; row.reg_open = false; } }
   let res, newId = id;
   if(id) res = await sb.from('tournaments').update(row).eq('id', id);
@@ -11302,7 +11303,7 @@ function tournTeamsPageHTML(t){
   const chip = function(k, label, n){ return `<button type="button" class="${cur === k ? 'on' : ''}" onclick="VIEW.tdiv='${k}';render()">${escapeHTML(label)} · ${n}</button>`; };
   return `<div class="tn-head">
       <div class="tn-head-l"><b class="tn-h1">Inscrits</b><span class="small" style="color:var(--muted);">${nReg} équipe${nReg > 1 ? 's' : ''}${nWait ? ', ' + nWait + ' en attente' : ''}</span></div>
-      <div class="tn-head-r">${tournRole(t.id) === 'admin' ? `<button type="button" class="btn btn-secondary tn-test-btn" onclick="openTournTestMode('${t.id}')">Mode test</button>` : ''}<button type="button" class="btn btn-secondary" onclick="tournExportCSV('${t.id}')">Exporter (Excel)</button>${divs.length ? `<button type="button" class="btn btn-primary" onclick="openTournTeamForm('${t.id}')">+ Inscrire une équipe</button>` : ''}</div>
+      <div class="tn-head-r">${tournRole(t.id) === 'admin' && tournTestOn(t) ? `<button type="button" class="btn btn-secondary tn-test-btn" onclick="openTournTestMode('${t.id}')">Mode test</button>` : ''}<button type="button" class="btn btn-secondary" onclick="tournExportCSV('${t.id}')">Exporter (Excel)</button>${divs.length ? `<button type="button" class="btn btn-primary" onclick="openTournTeamForm('${t.id}')">+ Inscrire une équipe</button>` : ''}</div>
     </div>
     ${divs.length ? `<div class="tn-chips">${chip('all', 'Toutes', nReg)}${divs.map(function(d){ return chip(d.id, d.name, tournTeams(t.id, d.id, 'registered').length); }).join('')}</div>
     <div class="tn-search"><input type="search" placeholder="Rechercher un joueur…" value="${escapeHTML(VIEW.tq || '')}" oninput="VIEW.tq=this.value;tournTeamsRefresh()" aria-label="Rechercher un joueur"></div>
