@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 503">
+<meta name="app-build" content="Version 504">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2102,6 +2102,74 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium{margin-top:0;}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
+html.tv-html, body.tv-mode{background:var(--court);overflow:hidden;}
+body.tv-mode #app{max-width:none !important;width:100vw;height:100vh;margin:0;padding:0 !important;}
+body.tv-mode .shell-top, body.tv-mode .bnav, body.tv-mode .install-banner{display:none !important;}
+.tv{height:100vh;box-sizing:border-box;padding:1.6vh 1.6vw;display:flex;flex-direction:column;gap:1.4vh;font-size:clamp(13px,1.05vw,30px);color:var(--text);}
+.tv-h{display:flex;align-items:center;justify-content:space-between;gap:2vw;}
+.tv-title{display:flex;align-items:center;gap:1vw;min-width:0;}
+.tv-title .pbi{width:3.2vw;height:3.2vw;min-width:34px;min-height:34px;}
+.tv-title b{display:block;font-family:var(--font-display);font-size:2.2em;text-transform:uppercase;line-height:1;font-weight:600;}
+.tv-title span{color:var(--muted);font-size:.95em;}
+.tv-right{display:flex;align-items:center;gap:1.2vw;}
+.tv-live{background:var(--ball);color:var(--court);font-weight:700;border-radius:999px;padding:.3em .9em;font-size:.9em;text-transform:uppercase;letter-spacing:.06em;}
+.tv-clock{font-family:var(--font-display);font-size:2.2em;}
+.tv-fs{background:none;border:1px solid var(--line-soft-strong);color:var(--muted);border-radius:10px;font-size:1em;padding:.2em .6em;cursor:pointer;}
+.tv-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 28%;gap:1.4vw;}
+.tv-left{display:flex;flex-direction:column;gap:1.4vh;min-height:0;}
+.tv-courts{display:grid;grid-template-columns:repeat(auto-fill,minmax(15vw,1fr));gap:.8vw;}
+.tv-court{background:linear-gradient(135deg, rgba(207,234,92,.14), rgba(207,234,92,.03));border:1px solid rgba(207,234,92,.5);border-radius:1vw;padding:.9vw 1vw;min-width:0;}
+.tv-court.free{background:rgba(255,255,255,.03);border:1px dashed var(--line-soft-strong);}
+.tv-court-h{display:flex;justify-content:space-between;align-items:baseline;gap:.5vw;}
+.tv-court-h b{font-family:var(--font-display);font-size:1.6em;text-transform:uppercase;font-weight:600;}
+.tv-court-h span{color:var(--muted);font-size:.85em;}
+.tv-court.free .tv-court-h span{color:var(--ball);}
+.tv-court-c{font-size:.8em;color:var(--muted);margin:.3em 0;display:flex;gap:.4em;align-items:center;flex-wrap:wrap;}
+.tv-court-t{font-weight:700;font-size:1.15em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-court-v{font-size:.75em;color:var(--muted);}
+.tv-panel{flex:1;min-height:0;background:rgba(0,0,0,.14);border:1px solid var(--line-soft-strong);border-radius:1vw;padding:1vw;overflow:hidden;position:relative;display:flex;flex-direction:column;}
+.tv-panel-h{display:flex;align-items:baseline;gap:1vw;margin-bottom:.8vh;}
+.tv-panel-h b{font-family:var(--font-display);font-size:1.7em;text-transform:uppercase;font-weight:600;}
+.tv-panel-h span{color:var(--ball);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.85em;}
+.tv-panel-b{flex:1;min-height:0;overflow:hidden;}
+.tv-pools{display:grid;grid-template-columns:repeat(auto-fill,minmax(19vw,1fr));gap:.8vw;}
+.tv .tn-std{font-size:.95em;}
+.tv .tn-bracket{overflow:hidden;}
+.tv .tn-br-col{flex:0 0 15vw;}
+.tv .tn-br-m{font-size:.85em;}
+.tv .tn-pod-col, .tv .tn-pod-top{display:none !important;}
+.tv-fit{transform-origin:top left;}
+.tv .tv-fit .tn-bracket{overflow:visible;}
+.tv-podium{display:flex;gap:1vw;flex-wrap:wrap;margin-bottom:1vh;}
+.tv-podium div{flex:1;min-width:14vw;border-radius:.8vw;padding:.8vw;background:rgba(255,255,255,.05);border:1px solid var(--line-soft-strong);display:flex;flex-direction:column;}
+.tv-podium em{font-style:normal;font-family:var(--font-display);text-transform:uppercase;font-size:1.2em;}
+.tv-podium .g{border-color:var(--ball);} .tv-podium .g em{color:var(--ball);}
+.tv-podium .s em{color:#D7E3DC;} .tv-podium .b em{color:#E0A86A;}
+.tv-dots{position:absolute;right:1vw;top:1.1vw;display:flex;gap:.4vw;}
+.tv-dots span{width:.6vw;height:.6vw;min-width:7px;min-height:7px;border-radius:50%;background:var(--line-soft-strong);}
+.tv-dots span.on{background:var(--ball);}
+.tv-side{display:flex;flex-direction:column;gap:1.4vh;min-height:0;}
+.tv-box{background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:1vw;padding:1vw;min-height:0;overflow:hidden;}
+.tv-box h3{margin:0 0 .6em;font-family:var(--font-display);text-transform:uppercase;font-size:1.3em;font-weight:600;}
+.tv-next{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5em;}
+.tv-next li{display:flex;gap:.8em;align-items:flex-start;padding-top:.5em;border-top:1px solid var(--line-soft);}
+.tv-next li:first-child{border-top:0;padding-top:0;}
+.tv-q-t{font-family:var(--font-display);color:var(--ball);min-width:3.6em;}
+.tv-q-m{display:flex;flex-direction:column;min-width:0;}
+.tv-q-m b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-q-m small{color:var(--muted);font-size:.8em;}
+.tv-res{list-style:none;margin:0;padding:0;}
+.tv-res li{display:grid;grid-template-columns:1fr auto 1fr;gap:.6em;padding:.4em 0;border-top:1px solid var(--line-soft);color:var(--muted);}
+.tv-res li:first-child{border-top:0;}
+.tv-res li span:last-child{text-align:right;}
+.tv-res li b{font-family:var(--font-display);color:var(--ball);}
+.tv-res li .w{color:var(--text);font-weight:700;}
+.tv-foot{margin-top:auto;color:var(--muted);font-size:.85em;text-align:center;}
+.tv-empty{color:var(--muted);padding:1em 0;}
+.tv-msg{margin:auto;text-align:center;font-size:1.5em;display:flex;flex-direction:column;gap:.6em;max-width:60vw;}
+.tv-msg small{font-size:.6em;color:var(--muted);}
+@media (max-width:900px){ .tv-main{grid-template-columns:1fr;} body.tv-mode, html.tv-html{overflow:auto;} .tv{height:auto;min-height:100vh;} .tv-courts{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));} }
+
 .tn-readonly .tn-org-only, .tn-readonly .tn-head-r{display:none !important;}
 .tn-readonly .tn-br-m{cursor:default;}
 .tn-next{background:linear-gradient(135deg, rgba(207,234,92,.16), rgba(207,234,92,.04)), rgba(255,255,255,.03);border:1px solid rgba(207,234,92,.45);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:4px;}
@@ -7188,6 +7256,7 @@ function storageBannerHTML(){
 }
 
 function render(){
+  if(TV_ID){ renderTV(); return; } // écran téléviseur d'un tournoi : rien d'autre à afficher
   // Les panneaux (ligue, Membres…) sont recréés à chaque rendu : on garde leur position de défilement
   // tant qu'on reste sur le même contenu (même ligue et même onglet).
   const sheetScroll = {};
@@ -9718,7 +9787,7 @@ function tournLiveHTML(t){
   const recent = done.slice().sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 6);
   return tournDivStripHTML(t) + `<div class="tn-live-bar">
       <div class="tn-live-stats"><span><b>${done.length}</b> / ${all.length} matchs joués</span><span><b>${playing.length}</b> en cours</span><span><b>${ready.length}</b> prêts</span></div>
-      <div class="tn-head-r">${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary tn-org-only" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
+      <div class="tn-head-r"><button type="button" class="btn btn-secondary tn-org-only" onclick="tournOpenTV('${t.id}')">Écran téléviseur</button>${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary tn-org-only" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
     </div>
     ${cfg.checkin && teamsIn.length && !arrived ? `<div class="tn-note tn-live-hint"><b>Aucune équipe n'est pointée comme arrivée</b> : les matchs ne peuvent pas encore être appelés.<span class="tn-head-r"><button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Pointer les arrivées</button><button type="button" class="btn btn-primary" onclick="tournAllPresent('${t.id}')">Toutes présentes</button></span></div>` : ''}
     <div class="tn-live">
@@ -9909,6 +9978,7 @@ function ensureTournLive(tid){
       TLIVE_FOR = tid;
       TLIVE_CH = sb.channel('tournament-' + tid, { config: { broadcast: { self: false } } });
       TLIVE_CH.on('broadcast', { event: 'saved' }, function(){
+        if(TV_ID){ tvLoad().then(renderTV); return; }
         if(MODAL && MODAL.sheet === 'tplayer'){ loadTournBoard(MODAL.tid).then(function(){ if(!appBusyEditing() && MODAL && MODAL.sheet === 'tplayer') render(); }); return; }
         loadTournaments(true).then(function(){ if(!appBusyEditing() && TOURN_SHEET && MODAL === TOURN_SHEET) render(); });
       }).subscribe();
@@ -10654,6 +10724,152 @@ function tournPlayerMineHTML(t, d, me){
     return `<div class="tn-mm ${res}${m.status === 'playing' ? ' live' : ''}"><span class="tn-mm-l">${tournBadgeHTML(m)}<span>c. <b>${escapeHTML(op ? tournTeamName(op) : '…')}</b></span></span><span class="tn-mm-r">${res ? `<b>${sc}</b><em>${res === 'w' ? 'Victoire' : 'Défaite'}</em>` : `<em>${when}</em>`}</span></div>`;
   }).join('');
   return card + pool + `<section class="tn-sec"><div class="tn-sec-h"><span>Mes matchs</span><small style="font-family:var(--font-body);font-size:12px;color:var(--muted);text-transform:none;">${w} V · ${l} D</small></div><div class="tn-mms">${rows || '<p class="small" style="color:var(--muted);">Aucun match pour l\'instant.</p>'}</div></section>`;
+}
+// ---- Écran téléviseur : dinkeo.ca/?tv=<tournoi> (sans connexion, tournoi publié) ----
+var TV_ID = null, TV_TIMER = null, TV_PANEL = 0, TV_LOADED = false, TV_ERR = null, TV_TICK = 0;
+(function(){
+  try{
+    const v = new URLSearchParams(location.search).get('tv');
+    if(v && /^[0-9a-f-]{36}$/i.test(v)){
+      TV_ID = v;
+      document.documentElement.classList.add('tv-html');
+      setTimeout(function(){ tvLoad().then(renderTV); }, 0);
+    }
+  }catch(e){}
+})();
+async function tvLoad(){
+  try{
+    const r = await sb.rpc('tournament_board', { p_id: TV_ID });
+    const b = r && !r.error ? r.data : null;
+    if(!b || !b.ok){ TV_ERR = (b && b.error) || 'Tournoi introuvable ou pas encore publié.'; return; }
+    TV_ERR = null;
+    TOURNS = (TOURNS || []).filter(function(x){ return x.id !== TV_ID; }).concat([b.tournament]);
+    TDIVS = (TDIVS || []).filter(function(x){ return x.tournament_id !== TV_ID; }).concat(b.divisions || []);
+    TTEAMS = (TTEAMS || []).filter(function(x){ return x.tournament_id !== TV_ID; }).concat(b.teams || []);
+    TMATCHES = (TMATCHES || []).filter(function(x){ return x.tournament_id !== TV_ID; }).concat(b.matches || []);
+    TV_LOADED = true;
+  }catch(e){ TV_ERR = 'Connexion impossible pour l\'instant.'; }
+}
+function tvStart(){
+  if(TV_TIMER) return;
+  ensureTournLive(TV_ID);
+  // Toutes les 5 s : horloge et minutes ; toutes les 15 s : rechargement et panneau suivant.
+  TV_TIMER = setInterval(function(){
+    TV_TICK++;
+    if(TV_TICK % 3 === 0){ TV_PANEL++; tvLoad().then(renderTV); } else renderTV();
+  }, 5000);
+}
+function tvPanels(t){
+  const out = [];
+  tournDivs(t.id).forEach(function(d){
+    const st = d.stage || 'setup', r = tournDivRules(t, d);
+    if(st === 'setup') return;
+    if(st === 'pools' || r.format === 'round_robin') out.push({ d: d, kind: 'pools' });
+    else out.push({ d: d, kind: 'bracket' });
+  });
+  return out;
+}
+function tvPanelHTML(t, pn){
+  if(!pn) return `<div class="tv-empty">Les classements et tableaux s'afficheront ici dès le début des matchs.</div>`;
+  const d = pn.d, r = tournDivRules(t, d);
+  const pod = r.format === 'double_elim' ? tournDePodium(d) : tournPodium(t, d);
+  let body;
+  if(pn.kind === 'pools'){
+    body = `<div class="tv-pools">${tournPoolLabels(d.id).map(function(lb){ return `<section class="tn-pool"><div class="tn-pool-h"><b>${lb === 'U' ? 'Classement' : 'Poule ' + lb}</b><span>${r.format === 'pools_ko' ? (r.qualifiers === 1 ? 'le 1er passe' : 'les 2 premiers passent') : ''}</span></div>${tournStandingsHTML(t, d, lb)}</section>`; }).join('')}</div>`;
+  } else if(r.format === 'double_elim'){
+    body = tournDePageHTML(t, d, '', '').replace(/^[\s\S]*?(<div class="tn-k tn-de-t">)/, '$1');
+  } else {
+    VIEW.tbr = d.id;
+    body = tournBracketPageHTML(t).replace(/^[\s\S]*?(<div class="tn-bracket">)/, '$1');
+  }
+  const phase = pod && pod.gold ? 'Podium' : pn.kind === 'pools' ? (r.format === 'round_robin' ? 'Classement' : 'Poules') : 'Tableau';
+  return `<div class="tv-panel-h"><b>${escapeHTML(d.name)}</b><span>${phase}</span></div>
+    ${pod && pod.gold ? `<div class="tv-podium"><div class="g"><em>Or</em><b>${escapeHTML(tournTeamFull(pod.gold))}</b></div><div class="s"><em>Argent</em><b>${escapeHTML(tournTeamFull(pod.silver))}</b></div>${(pod.bronze || []).map(function(id){ return `<div class="b"><em>Bronze</em><b>${escapeHTML(tournTeamFull(id))}</b></div>`; }).join('')}</div>` : ''}
+    <div class="tv-panel-b tn-readonly">${body}</div>`;
+}
+function renderTV(){
+  if(!TV_ID) return;
+  document.body.classList.add('tv-mode');
+  const t = tournById(TV_ID);
+  const clock = (function(){ const d = new Date(); return d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0'); })();
+  if(!t){
+    app.innerHTML = `<div class="tv"><div class="tv-msg">${TV_ERR ? escapeHTML(TV_ERR) + '<small>Le tournoi doit être en « Inscriptions ouvertes » ou plus. Un organisateur connecté peut aussi ouvrir cet écran.</small>' : 'Chargement du tournoi…'}</div></div>`;
+    if(!TV_TIMER && TV_ERR) setTimeout(function(){ tvLoad().then(renderTV); }, 15000);
+    return;
+  }
+  tvStart();
+  const courts = tournCourts(t), all = tournLiveMatches(t);
+  const playing = all.filter(function(m){ return m.status === 'playing'; });
+  let queue = [], est = {};
+  try{ queue = tournQueue(t); est = tournEstimates(t, queue); }catch(e){}
+  const now = Date.now();
+  const cards = courts.map(function(c){
+    const m = playing.find(function(x){ return x.court === c; });
+    if(!m) return `<section class="tv-court free"><div class="tv-court-h"><b>${escapeHTML(c)}</b><span>Libre</span></div></section>`;
+    const mins = Math.max(0, Math.floor((now - Date.parse(m.called_at || m.started_at || new Date().toISOString())) / 60000));
+    return `<section class="tv-court"><div class="tv-court-h"><b>${escapeHTML(c)}</b><span>${mins} min</span></div>
+      <div class="tv-court-c">${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}</div>
+      <div class="tv-court-t">${escapeHTML(tournTeamName(m.team_a))}</div><div class="tv-court-v">contre</div><div class="tv-court-t">${escapeHTML(tournTeamName(m.team_b))}</div></section>`;
+  }).join('');
+  const next = queue.slice(0, 7).map(function(m){
+    return `<li><span class="tv-q-t">${est[m.id] ? tournHour(est[m.id]) : ''}</span><span class="tv-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}</small></span></li>`;
+  }).join('');
+  const done = all.filter(function(m){ return m.status === 'done'; }).sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 5);
+  const res = done.map(function(m){
+    const sc = Array.isArray(m.games) ? m.games.map(function(g){ return g[0] + '-' + g[1]; }).join(' ') : m.score_a + '-' + m.score_b;
+    return `<li><span class="${m.winner === m.team_a ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_a))}</span><b>${sc}</b><span class="${m.winner === m.team_b ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_b))}</span></li>`;
+  }).join('');
+  const panels = tvPanels(t), pn = panels.length ? panels[TV_PANEL % panels.length] : null;
+  app.innerHTML = `<div class="tv">
+    <header class="tv-h"><div class="tv-title">${pbIcon()}<div><b>${escapeHTML(t.name)}</b><span>${escapeHTML([t.venue, tournDateLabel(t)].filter(Boolean).join(' · '))}</span></div></div>
+      <div class="tv-right"><span class="tv-live">En direct</span><span class="tv-clock">${clock}</span><button type="button" class="tv-fs" onclick="tvFullscreen()" title="Plein écran">⛶</button></div></header>
+    <div class="tv-main">
+      <div class="tv-left">
+        <div class="tv-courts">${cards || '<div class="tv-empty">Aucun terrain configuré.</div>'}</div>
+        <section class="tv-panel">${tvPanelHTML(t, pn)}${panels.length > 1 ? `<div class="tv-dots">${panels.map(function(x, i){ return `<span class="${i === TV_PANEL % panels.length ? 'on' : ''}"></span>`; }).join('')}</div>` : ''}</section>
+      </div>
+      <aside class="tv-side">
+        <section class="tv-box"><h3>Prochains matchs</h3>${next ? `<ol class="tv-next">${next}</ol>` : '<div class="tv-empty">Aucun match en attente.</div>'}</section>
+        <section class="tv-box"><h3>Derniers résultats</h3>${res ? `<ul class="tv-res">${res}</ul>` : '<div class="tv-empty">Pas encore de résultat.</div>'}</section>
+        <div class="tv-foot">Résultats en direct dans l'app Dinkeo</div>
+      </aside>
+    </div>
+  </div>`;
+  // Le panneau (classements, tableaux) rétrécit au besoin pour tenir en entier à l'écran.
+  try{
+    const box = app.querySelector('.tv-panel-b'), inner = box && box.firstElementChild;
+    if(box && inner){
+      const wrap = document.createElement('div'); wrap.className = 'tv-fit';
+      while(box.firstChild) wrap.appendChild(box.firstChild);
+      box.appendChild(wrap);
+      // 1) largeur : on élargit la zone pour que tout tienne, 2) hauteur mesurée ensuite.
+      const kw = Math.min(1, box.clientWidth / Math.max(1, wrap.scrollWidth));
+      if(kw < 1) wrap.style.width = (100 / kw) + '%';
+      const k = Math.min(kw, box.clientHeight / Math.max(1, wrap.scrollHeight));
+      let kk = k < 1 ? k * 0.98 : 1;
+      if(k < 1){ wrap.style.width = (100 / k) + '%'; wrap.style.transform = 'scale(' + kk.toFixed(3) + ')'; }
+      // Vérification après coup : si le bas dépasse encore, on réduit un peu plus.
+      for(let n = 0; n < 3; n++){
+        const bb = box.getBoundingClientRect(), last = wrap.lastElementChild ? wrap.lastElementChild.getBoundingClientRect() : null;
+        let bottom = bb.top; wrap.querySelectorAll('*').forEach(function(el){ const r = el.getBoundingClientRect(); if(r.height && r.bottom > bottom) bottom = r.bottom; });
+        if(bottom <= bb.bottom - 2 || !last) break;
+        kk = kk * (bb.height - 4) / Math.max(1, bottom - bb.top);
+        wrap.style.width = (100 / kk) + '%'; wrap.style.transform = 'scale(' + kk.toFixed(3) + ')';
+      }
+    }
+  }catch(e){}
+}
+function tvFullscreen(){ try{ const el = document.documentElement; if(!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen(); else if(document.exitFullscreen) document.exitFullscreen(); }catch(e){} }
+function tournTvLink(tid){ const o = (location.origin && location.origin.indexOf('http') === 0) ? location.origin : 'https://dinkeo.ca'; return o + '/?tv=' + tid; }
+function tournOpenTV(tid){
+  const t = tournById(tid), link = tournTvLink(tid);
+  showChoice('Écran téléviseur : ouvre ce lien sur l\'ordinateur branché à la télé, puis touche le bouton plein écran.' + (t && t.status === 'draft' ? ' Le tournoi est encore en brouillon : l\'écran ne s\'affichera que pour un organisateur connecté.' : ''), ['Ouvrir l\'écran ici', 'Copier le lien'], function(i){
+    if(i === 0){ try{ window.open(link, '_blank'); }catch(e){ location.href = link; } }
+    else if(i === 1){
+      try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(function(){ showToast('Lien de l\'écran copié'); }, function(){ showAlert(link); }); return; } }catch(e){}
+      showAlert(link);
+    }
+  });
 }
 function tournNextStepHTML(t, tab){
   const n = tournTeams(t.id, null, 'registered').length;
