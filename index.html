@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 487">
+<meta name="app-build" content="Version 488">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2026,6 +2026,19 @@ body.desk .dk-add{color:var(--muted);}
 .tn-grp{border-top:1px solid var(--line-soft);padding-top:12px;margin:4px 0 12px;}
 .tn-grp-t{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
 .tn-grp-s{color:var(--muted);margin:-4px 0 10px;}
+.tn-grp-first{border-top:0;padding-top:0;}
+.tn-fmt-opts{margin-top:12px;}
+.tn-adv{margin-top:10px;border:1px solid var(--line-soft);border-radius:12px;padding:0 12px;background:rgba(0,0,0,.12);}
+.tn-adv summary{list-style:none;display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;font-size:13px;color:var(--muted);}
+.tn-adv summary::-webkit-details-marker{display:none;}
+.tn-adv summary span{flex:1;min-width:0;}
+.tn-adv summary em{font-style:normal;font-weight:600;color:var(--ball);white-space:nowrap;}
+.tn-adv[open] summary em{opacity:.6;}
+.tn-adv .tn-fmt-opts{margin-top:0;padding-bottom:4px;}
+.tn-empty{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:10px;padding:18px;border:1px dashed rgba(207,234,92,.5);border-radius:14px;background:rgba(207,234,92,.05);color:var(--text);text-align:left;font:inherit;cursor:pointer;}
+.tn-empty b{color:var(--ball);font-size:15px;}
+.tn-empty span{color:var(--muted);font-size:13px;}
+.tn-empty:hover{background:rgba(207,234,92,.1);}
 .tn-seg{display:flex;flex-wrap:wrap;gap:6px;}
 .tn-seg button{flex:1 1 0;min-width:0;font:600 14px var(--font-body);color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line-soft-strong);border-radius:10px;padding:10px 8px;cursor:pointer;white-space:nowrap;transition:background .15s, border-color .15s;}
 .tn-seg button:hover{border-color:rgba(207,234,92,.5);}
@@ -9042,13 +9055,13 @@ function tournSettingsHTML(t){
     ${t.status === 'draft' ? `<div class="tn-note">Le tournoi est en brouillon : ajoute les catégories, puis touche <b>Modifier › Inscriptions ouvertes</b> pour obtenir le lien à partager.</div>` : ''}
     <div class="tn-cards">
       <section class="tn-card"><div class="tn-k">Lieu et horaire</div><b>${escapeHTML(t.venue || 'Lieu à préciser')}</b><span>${escapeHTML(tournDateLabel(t))}${hours ? ' · ' + escapeHTML(hours) : ''}${courts.length ? '<br>' + courts.length + ' terrain' + (courts.length > 1 ? 's' : '') + ' (' + escapeHTML(courts.slice(0, 3).join(', ')) + (courts.length > 3 ? '…' : '') + ')' : ''}</span></section>
-      <section class="tn-card"><div class="tn-k">Formules</div><b>${(function(){ const f = {}; divs.forEach(function(d){ f[tournDivRules(t, d).format] = 1; }); const k = Object.keys(f); return k.length ? escapeHTML(k.map(function(x){ return TOURN_FMT_SHORT[x]; }).join(' · ')) : 'Poules puis élimination'; })()}</b><span>Chaque catégorie a sa propre formule et son nombre d'équipes. Par défaut : poules à ${t.pool_points || 11}, tableau à ${t.bracket_points || 15}.</span></section>
+      <section class="tn-card"><div class="tn-k">Formules</div><b>${(function(){ const f = {}; divs.forEach(function(d){ f[tournDivRules(t, d).format] = 1; }); const k = Object.keys(f); return k.length ? escapeHTML(k.map(function(x){ return TOURN_FMT_SHORT[x]; }).join(' · ')) : 'Poules puis élimination'; })()}</b><span>Chaque catégorie a sa propre formule et son nombre d'équipes.</span></section>
       <section class="tn-card"><div class="tn-k">Inscriptions</div><b>${escapeHTML(regTxt)}</b><span>Membres et public · confirmation du partenaire</span></section>
     </div>
     <section class="tn-sec">
       <div class="tn-sec-h"><span>Catégories · ${divs.length}</span><button type="button" class="btn btn-primary" onclick="openTournDivForm('${t.id}')">+ Ajouter une catégorie</button></div>
       ${divs.length ? `<div class="dk-tbl-wrap"><table class="dk-tbl tn-divs"><thead><tr><th>Catégorie</th><th>Genre</th><th>Niveau</th><th>Âge</th><th>Équipes</th><th>Formule</th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : `<p class="small" style="color:var(--muted);margin:10px 0 0;">Aucune catégorie pour l'instant. Exemple : « Mixte 3.5 », « Hommes 50 ans + ».</p>`}
+        : `<button type="button" class="tn-empty" onclick="openTournDivForm('${t.id}')"><b>+ Ajoute ta première catégorie</b><span>Choisis sa formule (poules, tous contre tous ou double élimination), puis son nom et son nombre d'équipes.</span></button>`}
     </section>
     ${t.notes ? `<section class="tn-sec"><div class="tn-k">Notes pour les joueurs</div><p class="small" style="margin:6px 0 0;white-space:pre-line;">${escapeHTML(t.notes)}</p></section>` : ''}
     <p class="small" style="color:var(--muted);margin:14px 0 0;">Une catégorie pleine passe automatiquement en liste d'attente. Les poules et l'horaire se génèrent à la fermeture des inscriptions.</p>`;
@@ -9074,20 +9087,13 @@ function openTournForm(id){
       ${tournField('Fin', `<input id="tfEnd" type="time" value="${escapeHTML(v.end_time || '')}">`)}
     </div>
     ${tournField('Lieu', `<input id="tfVenue" maxlength="120" value="${escapeHTML(v.venue || '')}" placeholder="Centre Pickleball Saguenay">`)}
-    ${tournField('Terrains', `<input id="tfCourts" maxlength="400" value="${escapeHTML((Array.isArray(v.courts) ? v.courts : []).join(', '))}" placeholder="Pulsar, P3B, Optique Santé">`, 'Noms séparés par des virgules. Ils serviront à l\'horaire.')}
-    <div class="tn-grp"><div class="tn-grp-t">Points par défaut</div>
-      <p class="small tn-grp-s">Proposés à chaque nouvelle catégorie, qui peut ensuite avoir sa propre formule.</p>
-      <div class="tn-row3">
-        ${tournField('Poules', tournSeg('tfPool', [[11,'11'],[15,'15'],[21,'21']], v.pool_points))}
-        ${tournField('Tableau', tournSeg('tfBracket', [[11,'11'],[15,'15'],[21,'21']], v.bracket_points))}
-        ${tournField('Finale', tournSeg('tfFinal', [[1,'1 match'],[3,'2 de 3']], v.final_best_of))}
-      </div>
-    </div>
+    ${t ? `${tournField('Terrains', `<input id="tfCourts" maxlength="400" value="${escapeHTML((Array.isArray(v.courts) ? v.courts : []).join(', '))}" placeholder="Pulsar, P3B, Optique Santé">`, 'Noms séparés par des virgules. Ils serviront à l\'horaire.')}
     <div class="tn-grp"><div class="tn-grp-t">Inscriptions</div>
       ${tournSeg('tfStatus', [['draft','<b>Brouillon</b><small>Invisible au public</small>'],['open','<b>Ouvertes</b><small>Le lien fonctionne</small>'],['closed','<b>Fermées</b><small>Plus d\'inscriptions</small>'],['done','<b>Terminé</b><small>Tournoi joué</small>']], v.status, null, 'tn-seg-st')}
       <div style="margin-top:12px;">${tournField('Date limite d\'inscription', `<input id="tfDeadline" type="date" value="${escapeHTML(v.reg_deadline || '')}">`, 'Facultatif. Après cette date, le lien n\'accepte plus d\'inscriptions.')}</div>
     </div>
-    ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}
+    ${tournField('Notes pour les joueurs', `<textarea id="tfNotes" rows="3" maxlength="1500" placeholder="Frais, stationnement, dîner…">${escapeHTML(v.notes || '')}</textarea>`)}`
+    : `<p class="small tn-grp-s" style="margin:4px 0 12px;">Ensuite, tu ajoutes les catégories une à une en choisissant leur formule. Terrains, inscriptions et notes se règlent plus tard dans « Modifier ».</p>`}
     <div class="tn-form-acts">
       ${t && !isOrganizerOnly() ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDelete('${t.id}')">Supprimer</button>` : ''}
       <span style="flex:1"></span>
@@ -9139,6 +9145,9 @@ async function tournSave(id){
     pool_points: parseInt(tfVal('tfPool'), 10) || 11, bracket_points: parseInt(tfVal('tfBracket'), 10) || 15, final_best_of: parseInt(tfVal('tfFinal'), 10) || 3,
     status: status, reg_open: status === 'open', reg_deadline: tfVal('tfDeadline') || null, notes: tfVal('tfNotes') || null, updated_at: new Date().toISOString()
   };
+  // Champs absents (création simplifiée) : on ne les écrit pas.
+  [['tfCourts','courts'],['tfPool','pool_points'],['tfBracket','bracket_points'],['tfFinal','final_best_of'],['tfStatus','status'],['tfDeadline','reg_deadline'],['tfNotes','notes']].forEach(function(f){ if(!document.getElementById(f[0])) delete row[f[1]]; });
+  if(!document.getElementById('tfStatus')){ delete row.reg_open; if(!id){ row.status = 'draft'; row.reg_open = false; } }
   let res, newId = id;
   if(id) res = await sb.from('tournaments').update(row).eq('id', id);
   else {
@@ -9148,8 +9157,8 @@ async function tournSave(id){
   }
   if(res && res.error){ showAlert("Le tournoi n'a pas pu être enregistré : " + res.error.message); return; }
   await loadTournaments(true);
-  if(!id && newId) openTourn(newId, 'reglages'); else { tournBackToSheet(); render(); }
-  showToast(id ? 'Tournoi enregistré' : 'Tournoi créé : ajoute maintenant les catégories');
+  if(!id && newId){ openTourn(newId, 'reglages'); openTournDivForm(newId); } else { tournBackToSheet(); render(); }
+  showToast(id ? 'Tournoi enregistré' : 'Tournoi créé : ajoute ta première catégorie');
 }
 function tournDelete(id){
   const t = tournById(id); if(!t) return;
@@ -9175,21 +9184,25 @@ function openTournDivForm(tid, divId){
   const pts = [[11,'Match à 11'],[15,'Match à 15'],[21,'Match à 21']];
   const show = function(list){ return list.indexOf(r.format) !== -1 ? '' : ' style="display:none"'; };
   const html = `<div class="tn-form">
-    ${tournField('Nom de la catégorie', `<input id="tdName" maxlength="60" value="${escapeHTML(v.name || '')}" placeholder="Mixte 3.5">`)}
-    ${tournField('Genre', tournSeg('tdGender', [['mixte','Mixte'],['hommes','Hommes'],['femmes','Femmes'],['ouvert','Ouvert']], v.gender || 'mixte'))}
-    <div class="tn-row2">
-      ${tournField('Niveau', `<input id="tdLevel" maxlength="20" value="${escapeHTML(v.level || '')}" placeholder="3.5 (vide = tous)">`)}
-      ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="50 ans + (vide = tous)">`)}
-    </div>
-    ${tournField('Nombre maximum d\'équipes', tournStepper('tdMax', v.max_teams || 12, 2, 64), 'Au-delà, les équipes vont en liste d\'attente.')}
-    <div class="tn-grp"><div class="tn-grp-t">Formule</div>
+    <div class="tn-grp tn-grp-first"><div class="tn-grp-t">${d ? 'Formule' : '1. Choisis la formule'}</div>
       ${tournFmtCards(r.format)}
-      <div class="tn-row2" style="margin-top:12px;">
-        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6']], r.pool_size))}</div>
-        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'Le 1er'],[2,'Les 2 premiers']], r.qualifiers))}</div>
-        <div data-f="pools_ko round_robin"${show(['pools_ko','round_robin'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points))}</div>
-        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points))}</div>
-        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of))}</div>
+      <details class="tn-adv"><summary><span id="tdFmtSum">${escapeHTML(tournFmtDetail(t, d))}</span><em>Ajuster</em></summary>
+      <div class="tn-row2 tn-fmt-opts">
+        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6']], r.pool_size, 'tournDivSum'))}</div>
+        <div data-f="pools_ko"${show(['pools_ko'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'Le 1er'],[2,'Les 2 premiers']], r.qualifiers, 'tournDivSum'))}</div>
+        <div data-f="pools_ko round_robin"${show(['pools_ko','round_robin'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points, 'tournDivSum'))}</div>
+        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points, 'tournDivSum'))}</div>
+        <div data-f="pools_ko double_elim"${show(['pools_ko','double_elim'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of, 'tournDivSum'))}</div>
+      </div>
+      </details>
+    </div>
+    <div class="tn-grp"><div class="tn-grp-t">${d ? 'Catégorie' : '2. Décris la catégorie'}</div>
+      ${tournField('Nom', `<input id="tdName" maxlength="60" value="${escapeHTML(v.name || '')}" placeholder="Mixte 3.5">`)}
+      ${tournField('Genre', tournSeg('tdGender', [['mixte','Mixte'],['hommes','Hommes'],['femmes','Femmes'],['ouvert','Ouvert']], v.gender || 'mixte'))}
+      <div class="tn-row3">
+        ${tournField('Niveau', `<input id="tdLevel" maxlength="20" value="${escapeHTML(v.level || '')}" placeholder="Tous">`)}
+        ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="Tous">`)}
+        ${tournField('Équipes max.', tournStepper('tdMax', v.max_teams || 12, 2, 64))}
       </div>
     </div>
     <div class="tn-form-acts">
@@ -9198,7 +9211,7 @@ function openTournDivForm(tid, divId){
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
       <button type="button" class="btn btn-primary" onclick="tournDivSave('${tid}', ${d ? `'${d.id}'` : 'null'})">${d ? 'Enregistrer' : 'Ajouter'}</button>
     </div></div>`;
-  setModal({ kind:'content', title: d ? 'Modifier la catégorie' : 'Nouvelle catégorie', htmlContent: html });
+  setModal({ kind:'content', title: d ? 'Modifier la catégorie' : 'Ajouter une catégorie', htmlContent: html });
   render();
 }
 function tournFmtHelp(f){
@@ -9206,10 +9219,17 @@ function tournFmtHelp(f){
     round_robin:'Une seule poule : tout le monde se rencontre. Classement par victoires, puis par différentiel. Idéal jusqu\'à 6 ou 7 équipes.',
     double_elim:'Tableau dès le départ : une équipe est éliminée après sa deuxième défaite (tableau des gagnants et tableau des perdants).' }[f] || '';
 }
+// Résumé des réglages fins de la formule, mis à jour à chaque choix.
+function tournDivSum(){
+  const el = document.getElementById('tdFmtSum'); if(!el) return;
+  const n = function(id){ return parseInt(tfVal(id), 10) || null; };
+  el.textContent = tournFmtDetail(null, { format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal') });
+}
 function tournDivFmt(f){
   document.querySelectorAll('.tn-form [data-f]').forEach(function(el){ el.style.display = (' ' + el.getAttribute('data-f') + ' ').indexOf(' ' + f + ' ') !== -1 ? '' : 'none'; });
   const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' ? 'Points des matchs' : 'Points des poules';
   const h = document.getElementById('tdFmtHelp'); if(h) h.textContent = tournFmtHelp(f);
+  tournDivSum();
 }
 async function tournDivSave(tid, divId){
   const name = tfVal('tdName');
