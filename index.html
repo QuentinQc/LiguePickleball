@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 511">
+<meta name="app-build" content="Version 512">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2128,6 +2128,9 @@ body.desk .dk-add{color:var(--muted);}
 .tn-info .small{margin:0;}
 .tn-note-warn{background:rgba(242,153,74,.08);border-color:rgba(242,153,74,.45);margin-top:0;}
 .tn-info-tbl{width:100%;}
+.tn-seg.abs-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+.tn-seg.abs-grid.abs-4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.tn-seg.abs-grid button{min-width:0;white-space:normal;}
 .tn-reg-list{display:flex;flex-direction:column;border-top:1px solid var(--line-soft-strong);}
 .tn-reg-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(50px,120px) 84px;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line-soft);}
 .tn-reg-row b{min-width:0;overflow-wrap:anywhere;}
@@ -18076,6 +18079,7 @@ function adminSettingsSectionHTML(){
   let html = stGroup('Ligue', [
     isOrganizerOnly() ? '' : settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
     mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
+    mlp ? '' : settingsRow('', 'Rappel d\'absence', absenceReminderSummary(), 'openAbsenceReminderModal()'),
     isOrganizerOnly() ? '' : settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
     settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
     isOrganizerOnly() ? '' : settingsRow('', 'Organisateurs', organizersSettingsSummary(), 'openOrganizersModal()'),
@@ -19105,6 +19109,64 @@ function saveSeasonCalendarForm(){
   DATA.autoStartSessions = st.autoStart;
   DATA.autoPublishSessions = st.autoStart ? st.autoPublish : false;
   SEASON_CAL_STATE = null;
+}
+// ---- Rappel d'absence automatique (envoyé par le serveur, fonction absence-reminders) ----
+const ABS_REM_DAYS = [[0,'Désactivé'],[1,'La veille'],[2,'2 jours avant'],[3,'3 jours avant'],[5,'5 jours avant'],[7,'7 jours avant']];
+const ABS_REM_HOURS = [[9,'9 h'],[12,'12 h'],[17,'17 h'],[19,'19 h']];
+let ABS_REM_STATE = null, ABS_REM_LAST = {};
+function absenceReminderSummary(){
+  const n = parseInt(DATA.absenceReminderDays, 10) || 0;
+  if(!n) return 'Désactivé · les joueurs ne reçoivent pas de rappel automatique';
+  const h = parseInt(DATA.absenceReminderHour, 10); const hh = isNaN(h) ? 17 : h;
+  return (n === 1 ? 'La veille' : n + ' jours avant') + ' de chaque session, vers ' + hh + ' h · aux joueurs qui n\'ont pas indiqué d\'absence';
+}
+// Prochaine session visée et jour d'envoi, calculés comme sur le serveur.
+function absenceReminderNext(days, hour){
+  if(!days) return null;
+  const now = new Date(), today = fmtDate(now);
+  let start = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + days));
+  for(let i = 0; i < 10; i++){
+    const r = nextValidSessionDate(playDayOnOrAfter(start));
+    if(!r || !r.date) return null;
+    const d = new Date(r.date + 'T00:00:00');
+    const send = fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - days));
+    if(send > today || (send === today)) return { session: r.date, send: send, today: send === today, passed: send === today && now.getHours() >= hour };
+    start = fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+  }
+  return null;
+}
+function openAbsenceReminderModal(){
+  const h = parseInt(DATA.absenceReminderHour, 10);
+  ABS_REM_STATE = { days: parseInt(DATA.absenceReminderDays, 10) || 0, hour: isNaN(h) ? 17 : h };
+  showFormModal('Rappel d\'absence', absenceReminderFormHTML, function(){
+    DATA.absenceReminderDays = ABS_REM_STATE.days || 0;
+    DATA.absenceReminderHour = ABS_REM_STATE.hour;
+    ABS_REM_STATE = null;
+    showToast(DATA.absenceReminderDays ? 'Rappel automatique activé' : 'Rappel automatique désactivé');
+  });
+  const lid = CURRENT_LEAGUE_ID;
+  sb.from('league_reminders_sent').select('session_date, sent_at, recipients').eq('league_id', lid).eq('kind', 'absence').order('session_date', { ascending: false }).limit(1).then(function(r){
+    ABS_REM_LAST[lid] = (r && r.data && r.data[0]) || null;
+    if(ABS_REM_STATE) render();
+  });
+}
+function absRemPick(k, v){ if(!ABS_REM_STATE) return; ABS_REM_STATE[k] = v; render(); }
+function absFd(d){ return d ? frDateLong(d).toLowerCase() : ''; }
+function absenceReminderFormHTML(){
+  const st = ABS_REM_STATE || { days: 0, hour: 17 };
+  const seg = function(k, opts, cur){ return `<div class="tn-seg abs-grid${k === 'hour' ? ' abs-4' : ''}">${opts.map(function(o){ return `<button type="button" class="${o[0] === cur ? 'on' : ''}" aria-pressed="${o[0] === cur}" onclick="absRemPick('${k}',${o[0]})">${o[1]}</button>`; }).join('')}</div>`; };
+  const nx = absenceReminderNext(st.days, st.hour);
+  const time = DATA.playTime ? ' à ' + String(DATA.playTime).replace(/^0?(\d{1,2}):(\d{2}).*$/, '$1 h $2') : '';
+  const sd = nx ? absFd(nx.session) : '';
+  const msg = st.days ? `<div style="border:1px solid var(--line-soft-strong);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.04);font-size:14px;line-height:1.45;"><div class="small" style="color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:11px;margin-bottom:4px;">Message reçu par les joueurs</div><b>Rappel : session ${st.days === 1 ? 'de demain' : (sd ? 'du ' + escapeHTML(sd) : 'à venir')}</b><br><span style="color:var(--muted)">${escapeHTML(DATA.leagueName || '')}${DATA.leagueName ? ' · ' : ''}Ta session est ${st.days === 1 ? 'demain' : escapeHTML(sd || 'bientôt')}${escapeHTML(time)}. Tu ne pourras pas être là ? Indique ton absence dans Dinkeo dès maintenant.</span></div>` : '';
+  const next = st.days ? (nx ? `<p class="small" style="margin:10px 0 0;"><b>Prochain envoi :</b> ${nx.today ? (nx.passed ? 'aujourd\'hui, d\'ici une heure' : 'aujourd\'hui vers ' + st.hour + ' h') : escapeHTML(absFd(nx.send)) + ' vers ' + st.hour + ' h'}, pour la session du ${escapeHTML(absFd(nx.session))}.</p>` : `<p class="small" style="margin:10px 0 0;color:var(--paddle);">Aucune session à venir dans le calendrier de saison : rien ne sera envoyé pour l'instant.</p>`) : '';
+  const last = ABS_REM_LAST[CURRENT_LEAGUE_ID];
+  const lastTxt = last ? `<p class="small" style="margin:6px 0 0;color:var(--muted);">Dernier rappel : session du ${escapeHTML(absFd(last.session_date))}, envoyé à ${last.recipients} joueur${last.recipients > 1 ? 's' : ''}.</p>` : '';
+  return `<p class="small" style="margin:0 0 12px;">Dinkeo envoie une notification aux joueurs de la ligue qui n'ont pas encore indiqué d'absence, pour qu'ils pensent à le faire à temps. Les remplaçants et les joueurs déjà absents ne la reçoivent pas.</p>
+    <div class="pf-sec" style="margin-top:0;">Quand</div>${seg('days', ABS_REM_DAYS, st.days)}
+    ${st.days ? `<div class="pf-sec">Vers quelle heure</div>${seg('hour', ABS_REM_HOURS, st.hour)}` : ''}
+    ${next}${lastTxt}${msg ? '<div style="margin-top:12px;">' + msg + '</div>' : ''}
+    <p class="small" style="margin:12px 0 0;color:var(--muted);">Un seul rappel par session. Les dates bloquées et la fin de saison sont respectées, tout comme les préférences de notification de chaque joueur.</p>`;
 }
 function showAdminGuideModal(){
   showContentModal('Guide de l\'administrateur', settingsGuideHTML());
