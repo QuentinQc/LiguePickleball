@@ -1825,6 +1825,37 @@ body.desk .dk-it.on .dk-n{background:#0A2420;color:var(--ball);}
 body.desk .dk-sub{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px 14px;}
 body.desk .dk-sub .dk-it{padding:6px 10px;font-size:13px;color:var(--muted);}
 body.desk .dk-sub .dk-it.on{background:none;color:var(--ball);font-weight:700;}
+/* Menu de gauche : groupes (variantes de démonstration dk-v1 / dk-v2 / dk-v3) */
+body.desk .dk-grp{display:flex;flex-direction:column;gap:2px;}
+body.desk .dk-sec{display:flex;align-items:center;gap:8px;}
+body.desk .dk-sec-ico{display:none;width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+body.desk .dk-ico{display:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.8;}
+body.desk .dk-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* V1 : blocs */
+body.desk.dk-v1 .dk-grp{background:rgba(255,255,255,.035);border:1px solid var(--line-soft);border-radius:14px;padding:4px 6px 8px;margin-top:10px;}
+body.desk.dk-v1 .dk-sec{padding:10px 8px 8px;margin-bottom:2px;border-bottom:1px solid var(--line-soft);font:600 13px var(--font-display);letter-spacing:.08em;color:var(--text);}
+body.desk.dk-v1 .dk-sec-ico{display:block;color:var(--ball);}
+body.desk.dk-v1 .dk-ico{display:block;}
+/* V2 : couleur par section */
+body.desk.dk-v2 .dk-grp{--g:var(--ball);position:relative;margin-top:14px;padding-left:10px;}
+body.desk.dk-v2 .dk-grp::before{content:"";position:absolute;left:0;top:6px;bottom:4px;width:3px;border-radius:3px;background:var(--g);opacity:.85;}
+body.desk.dk-v2 .dk-grp-lg{--g:#5CC8E8;}
+body.desk.dk-v2 .dk-grp-tn{--g:var(--paddle);}
+body.desk.dk-v2 .dk-sec{padding:4px 10px 6px;color:var(--g);font:600 13px var(--font-display);letter-spacing:.08em;}
+body.desk.dk-v2 .dk-sec-ico{display:block;}
+body.desk.dk-v2 .dk-it.on{background:var(--g);color:#0A2420;}
+body.desk.dk-v2 .dk-sub .dk-it.on{background:none;color:var(--g);}
+body.desk.dk-v2 .dk-ico{display:block;}
+/* V3 : blocs + couleur (recommandée) */
+body.desk.dk-v3 .dk-grp{--g:var(--ball);--gb:rgba(207,234,92,.07);--gl:rgba(207,234,92,.22);background:var(--gb);border:1px solid var(--gl);border-radius:14px;padding:4px 6px 8px;margin-top:10px;}
+body.desk.dk-v3 .dk-grp-lg{--g:#5CC8E8;--gb:rgba(92,200,232,.07);--gl:rgba(92,200,232,.24);}
+body.desk.dk-v3 .dk-grp-tn{--g:var(--paddle);--gb:rgba(233,106,60,.08);--gl:rgba(233,106,60,.3);}
+body.desk.dk-v3 .dk-sec{padding:10px 8px 8px;color:var(--g);font:600 13px var(--font-display);letter-spacing:.08em;}
+body.desk.dk-v3 .dk-sec-ico{display:block;}
+body.desk.dk-v3 .dk-it.on{background:var(--g);color:#0A2420;}
+body.desk.dk-v3 .dk-sub .dk-it.on{background:none;color:var(--g);}
+body.desk.dk-v3 .dk-sub{border-left:2px solid var(--gl);margin-left:18px;padding-left:6px;}
+body.desk.dk-v3 .dk-ico{display:block;}
 body.desk .dk-foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--line-soft);font-size:12px;color:var(--muted);}
 body.desk #app > .tabs, body.desk .bottom-nav, body.desk .bottom-nav-spacer{display:none !important;}
 body.desk.modern-nav .topbar.shell-top{left:272px;right:24px;--tb-x:24px;}
@@ -2707,6 +2738,7 @@ const NAV_SVG = {
   reglages:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   equipes:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
   org:'<path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/>',
+  ball:'<circle cx="12" cy="12" r="8"/><circle cx="9" cy="9" r=".9"/><circle cx="14.5" cy="8.5" r=".9"/><circle cx="12" cy="13" r=".9"/><circle cx="8" cy="14" r=".9"/><circle cx="16" cy="14" r=".9"/>',
   accueil:'<path d="M3.5 11 12 4l8.5 7M6 9.5V20h12V9.5"/>',
   orgs:'<path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/>',
   comm:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.6 3-5.5 6-5.5s5.5 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.3c2.2.2 3.7 1.8 4 4.7"/>',
@@ -9411,10 +9443,10 @@ function tournSideHTML(it, ms){
   ensureTournaments();
   const cur = ms && ms.sheet === 'org-tournoi' ? ms.tid : null;
   const tabs = [['reglages','Réglages et catégories'],['inscrits','Inscrits'],['poules','Préparer (poules)'],['direct','En direct'],['matchs','Historique des matchs'],['tableau','Tableau final']];
-  let h = `<div class="dk-sec">Tournois</div>`;
+  let h = '';
   (TOURNS || []).forEach(function(t){
     const on = t.id === cur;
-    h += it(on, t.name, `openTourn('${t.id}')`);
+    h += it(on, t.name, `openTourn('${t.id}')`, 0, 'gamification');
     if(on) h += `<div class="dk-sub">${tabs.filter(function(x){ return tournTabsFor(t.id).indexOf(x[0]) !== -1; }).map(function(x){ return it((VIEW.ttab || 'reglages') === x[0], x[1], `tournTab('${x[0]}')`); }).join('')}</div>`;
   });
   if(tournIsSuper()) h += `<button type="button" class="dk-it dk-add" onclick="openTournForm()">+ Nouveau tournoi</button>`;
@@ -11780,7 +11812,8 @@ function deskSideHTML(){
   const home = !inLeague && !orgSheet;
   let pend = 0;
   try{ if(ALL_PROFILES && ALL_PROFILES.length) pend = approvalsCountForOrg(CURRENT_ORGANIZATION_ID); }catch(e){}
-  const it = function(on, label, fn, n){ return `<button type="button" class="dk-it${on ? ' on' : ''}" onclick="${fn}">${escapeHTML(label)}${n ? `<span class="dk-n">${n}</span>` : ''}</button>`; };
+  const it = function(on, label, fn, n, ico){ return `<button type="button" class="dk-it${on ? ' on' : ''}" onclick="${fn}">${ico ? `<svg class="dk-ico" viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[ico] || ''}</svg>` : ''}<span class="dk-lbl">${escapeHTML(label)}</span>${n ? `<span class="dk-n">${n}</span>` : ''}</button>`; };
+  const sec = function(g, ico, title){ return `<div class="dk-grp dk-grp-${g}"><div class="dk-sec"><svg class="dk-sec-ico" viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[ico] || ''}</svg><span>${escapeHTML(title)}</span></div>`; };
   const leagues = myOrgLeagues().filter(function(l){ return !isOrganizerOnly() || ORGANIZER_LEAGUES.indexOf(l.id) !== -1; });
   const secs = [['session','Session'],['joueurs','Joueurs'],['historique','Historique'],['rapports','Rapports'],['reglages','Réglages']];
   let h = `<div class="dk-brand">${pbIcon()}<span>DINKEO</span></div>`;
@@ -11793,21 +11826,23 @@ function deskSideHTML(){
     ${asP ? `<button type="button" class="dk-it" onclick="toggleAdminPlayerView()"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG.joueurs}</svg>Passer en vue joueur</button>` : ''}
     ${asS ? `<button type="button" class="dk-it" onclick="toggleAdminSubView()"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG.joueurs}</svg>Passer en vue remplaçant</button>` : ''}
   </div>`;
-  h += `<div class="dk-sec">${escapeHTML(org ? org.name : 'Organisation')}</div>`;
-  h += it(home && VIEW.atab !== 'cal' && VIEW.atab !== 'comm' && VIEW.atab !== 'moi' && VIEW.atab !== 'orgs', 'Accueil', "dkHome('accueil')");
-  h += it(orgSheet === 'membres', 'Membres', "dkOrg('membres')");
-  h += it(orgSheet === 'comptes', 'Comptes et demandes', "dkOrg('comptes')", pend);
-  h += it(orgSheet === 'rapport', 'Rapport de l\'organisation', "dkOrg('rapport')");
-  if(!isOrganizerOnly()) h += it(orgSheet === 'general', 'Paramètres', "dkOrg('general')");
-  h += it(home && VIEW.atab === 'comm', 'Communauté', "dkHome('comm')");
-  h += it(home && VIEW.atab === 'cal', 'Calendrier', "dkHome('cal')");
-  h += `<div class="dk-sec">Ligues</div>`;
+  h += sec('org', 'org', org ? org.name : 'Organisation');
+  h += it(home && VIEW.atab !== 'cal' && VIEW.atab !== 'comm' && VIEW.atab !== 'moi' && VIEW.atab !== 'orgs', 'Accueil', "dkHome('accueil')", 0, 'accueil');
+  h += it(orgSheet === 'membres', 'Membres', "dkOrg('membres')", 0, 'joueurs');
+  h += it(orgSheet === 'comptes', 'Comptes et demandes', "dkOrg('comptes')", pend, 'moi');
+  h += it(orgSheet === 'rapport', 'Rapport de l\'organisation', "dkOrg('rapport')", 0, 'rapports');
+  if(!isOrganizerOnly()) h += it(orgSheet === 'general', 'Paramètres', "dkOrg('general')", 0, 'reglages');
+  h += it(home && VIEW.atab === 'comm', 'Communauté', "dkHome('comm')", 0, 'comm');
+  h += it(home && VIEW.atab === 'cal', 'Calendrier', "dkHome('cal')", 0, 'session');
+  h += `</div>` + sec('lg', 'ball', 'Ligues');
   leagues.forEach(function(l){
     const on = inLeague && l.id === CURRENT_LEAGUE_ID;
-    h += it(on, l.name, `dkLeague('${l.id}')`);
+    h += it(on, l.name, `dkLeague('${l.id}')`, 0, 'ball');
     if(on) h += `<div class="dk-sub">${secs.map(function(x){ return it((VIEW.tab || 'session') === x[0], x[1], `dkTab('${x[0]}')`); }).join('')}</div>`;
   });
-  h += tournSideHTML(it, ms);
+  h += `</div>`;
+  const th = tournSideHTML(it, ms);
+  if(th) h += sec('tn', 'gamification', 'Tournois') + th + `</div>`;
   if((MY_ORGANIZATIONS||[]).length > 1) h += it(home && VIEW.atab === 'orgs', 'Changer d\'organisation', "dkHome('orgs')");
   const meName = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || (CURRENT_PROFILE.email||'').split('@')[0])) || 'Moi';
   h += `<div class="dk-foot"><button type="button" class="dk-it dk-me${home && VIEW.atab === 'moi' ? ' on' : ''}" onclick="dkHome('moi')">${avatarHTML('shell-me-av', partnerInitials(meName), (CURRENT_PROFILE && CURRENT_PROFILE.avatar_url) || null, '')}${escapeHTML(meName)}</button><button type="button" class="dk-k" onclick="openDeskSearch()">Rechercher · Ctrl + K</button></div>`;
