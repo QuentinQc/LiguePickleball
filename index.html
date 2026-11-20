@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 500">
+<meta name="app-build" content="Version 501">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2070,7 +2070,10 @@ body.desk .dk-add{color:var(--muted);}
 .tn-ci.on{border-color:rgba(207,234,92,.55);}
 .tn-ci.on .tn-ci-b{background:var(--ball);border-color:var(--ball);color:var(--court);}
 .tn-ci.on em{color:var(--ball);}
-.tn-multi button{flex:0 1 auto;}
+.tn-seg.tn-multi button{flex:0 0 auto;min-width:44px;padding-left:12px;padding-right:12px;}
+.tn-seg.tn-multi .tn-all{flex:1 1 100%;}
+.tn-multi .tn-all{flex-basis:100%;}
+.tn-courts-only{color:var(--paddle) !important;font-weight:600;}
 .tn-std{width:100%;border-collapse:collapse;font-size:13px;}
 .tn-std th{text-align:left;font:600 10px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 4px;}
 .tn-std th:nth-child(3), .tn-std th:nth-child(4), .tn-std td:nth-child(3), .tn-std td:nth-child(4){text-align:right;}
@@ -9296,7 +9299,7 @@ function tournSettingsHTML(t){
     return `<tr onclick="openTournDivForm('${t.id}','${d.id}')">
       <td><b>${escapeHTML(d.name)}</b><small class="tn-fmt-m">${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</small></td><td>${escapeHTML(TOURN_GENDER[d.gender] || d.gender || '—')}</td><td>${escapeHTML(d.level || 'Tous')}</td><td>${escapeHTML(d.age || 'Tous')}</td>
       <td><div class="tn-fill"><span class="tn-bar"><span style="width:${pct}%;${full ? 'background:var(--paddle);' : ''}"></span></span><span class="${full ? 'tn-full' : ''}">${n} / ${max}${full ? ' · complet' : ''}${w ? ' · ' + w + ' en attente' : ''}</span></div></td>
-      <td class="tn-fmt"><b>${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</b><small>${escapeHTML(tournFmtDetail(t, d))}</small></td></tr>`;
+      <td class="tn-fmt"><b>${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</b><small>${escapeHTML(tournFmtDetail(t, d))}</small>${tournCourtsLabel(d) ? `<small class="tn-courts-only">${escapeHTML(tournCourtsLabel(d))}</small>` : ''}</td></tr>`;
   }).join('');
   return `<div class="tn-head">
       <div class="tn-head-l"><span class="jp-pill ${st[1]}">${st[0]}</span><span class="small" style="color:var(--muted);">${nReg} équipe${nReg > 1 ? 's' : ''}${nWait ? ' · ' + nWait + ' en attente' : ''}</span></div>
@@ -9641,7 +9644,7 @@ function tournDivStripHTML(t){
     return `<section class="tn-dv st-${p.step}">
       <div class="tn-dv-h"><b>${escapeHTML(d.name)}</b><span class="tn-dv-l">${escapeHTML(p.label)}</span></div>
       <div class="tn-dv-bar"><span style="width:${Math.round(p.pct * 100)}%"></span></div>
-      <div class="tn-dv-s">${escapeHTML(p.detail)}</div>
+      <div class="tn-dv-s">${escapeHTML(p.detail)}${tournCourtsLabel(d) ? ` · <span class="tn-courts-only">${escapeHTML(tournCourtsLabel(d))}</span>` : ''}</div>
       <button type="button" class="${p.act[2] ? 'btn btn-primary tn-org-only' : 'tn-dv-a'}" onclick="${p.act[1]}">${escapeHTML(p.act[0])}${p.act[2] ? '' : ' ›'}</button>
     </section>`;
   }).join('')}</div>`;
@@ -9683,7 +9686,7 @@ function tournLiveHTML(t){
     </section>`;
   }).join('');
   const qRow = function(m, i){
-    return `<li class="${m._why ? 'blk' : ''}"><span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}${m._why ? '<br>' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
+    return `<li class="${m._why ? 'blk' : ''}"><span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}${(function(){ const lb = tournCourtsLabel((TDIVS || []).find(function(x){ return x.id === m.division_id; })); return lb ? ' <span class="tn-courts-only">' + escapeHTML(lb) + '</span>' : ''; })()}${m._why ? '<br>' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
   };
   const recent = done.slice().sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 6);
   return tournDivStripHTML(t) + `<div class="tn-live-bar">
@@ -10501,17 +10504,21 @@ function tournSeg(id, opts, cur, onpick, cls){
 }
 // Choix multiples (terrains) : liste gardée en JSON dans un champ caché.
 function tournMulti(id, opts, cur){
-  return `<div class="tn-seg tn-multi"><input type="hidden" id="${id}" value="${escapeHTML(JSON.stringify(cur || []))}">${opts.map(function(o, i){
+  const none = !(cur || []).length;
+  return `<div class="tn-seg tn-multi"><input type="hidden" id="${id}" value="${escapeHTML(JSON.stringify(cur || []))}"><button type="button" aria-pressed="${none}" class="tn-all${none ? ' on' : ''}" onclick="tournMultiPick(this,'${id}',-1)">Tous les terrains</button>${opts.map(function(o, i){
     const on = (cur || []).indexOf(o) !== -1;
-    return `<button type="button" aria-pressed="${on}" class="${on ? 'on' : ''}" onclick="tournMultiPick(this,'${id}',${i})">${escapeHTML(o)}</button>`;
+    return `<button type="button" aria-pressed="${on}" class="${on ? 'on' : ''}" data-v="${escapeHTML(o)}" onclick="tournMultiPick(this,'${id}',${i})">${escapeHTML(o)}</button>`;
   }).join('')}</div>`;
 }
 function tournMultiPick(btn, id, i){
-  btn.classList.toggle('on'); btn.setAttribute('aria-pressed', btn.classList.contains('on'));
-  const box = btn.parentNode, el = document.getElementById(id), out = [];
-  box.querySelectorAll('button').forEach(function(b){ if(b.classList.contains('on')) out.push(b.textContent); });
+  const box = btn.parentNode, el = document.getElementById(id), all = box.querySelector('.tn-all');
+  if(i === -1) box.querySelectorAll('button[data-v]').forEach(function(b){ b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); });
+  else btn.classList.toggle('on');
+  const out = []; box.querySelectorAll('button[data-v]').forEach(function(b){ b.setAttribute('aria-pressed', b.classList.contains('on')); if(b.classList.contains('on')) out.push(b.getAttribute('data-v')); });
+  if(all){ all.classList.toggle('on', !out.length); all.setAttribute('aria-pressed', !out.length); }
   if(el) el.value = JSON.stringify(out);
 }
+function tournCourtsLabel(d){ const c = d && Array.isArray(d.courts) ? d.courts : []; return c.length ? (c.length === 1 ? 'Terrain ' + c[0] + ' seulement' : 'Terrains ' + c.join(', ') + ' seulement') : ''; }
 function tournSegPick(btn, id, v, fn){
   const box = btn.parentNode;
   box.querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); });
@@ -10606,7 +10613,7 @@ function openTournDivForm(tid, divId){
         ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="Tous">`)}
         ${tournField('Équipes max.', tournStepper('tdMax', v.max_teams || 12, 2, 64))}
       </div>
-      ${tournCourts(t || {}).length ? tournField('Terrains', tournMulti('tdCourts', tournCourts(t), (d && Array.isArray(d.courts)) ? d.courts : []), 'Facultatif. Sans choix, la catégorie joue sur tous les terrains.') : ''}
+      ${tournCourts(t || {}).length ? tournField('Jouer sur', tournMulti('tdCourts', tournCourts(t), (d && Array.isArray(d.courts)) ? d.courts : []), 'Choisis des terrains précis seulement pour réserver cette catégorie à ces terrains : ses matchs n\'iront nulle part ailleurs.') : ''}
     </div>
     <div class="tn-form-acts">
       ${d ? `<button type="button" class="btn btn-secondary tn-danger" onclick="tournDivDelete('${d.id}')" ${n ? 'disabled title="Des équipes sont inscrites dans cette catégorie"' : ''}>Supprimer</button>` : ''}
