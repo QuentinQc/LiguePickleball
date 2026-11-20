@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 498">
+<meta name="app-build" content="Version 499">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2100,6 +2100,10 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
 .tn-test-btn{border-style:dashed !important;}
+.tn-testbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:8px 12px;border:1px dashed rgba(242,153,74,.6);border-radius:12px;background:rgba(242,153,74,.07);font-size:13px;}
+.tn-testbar b{color:var(--paddle);}
+.tn-testbar span{color:var(--muted);flex:1;min-width:0;}
+.tn-testbar button{background:none;border:0;color:var(--paddle);font:600 13px var(--font-body);cursor:pointer;padding:2px 4px;}
 .tn-test-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--paddle);border:1px dashed rgba(242,153,74,.6);border-radius:999px;padding:0 6px;}
 .tn-role-scorer .tn-org-only{display:none !important;}
 .tn-staff{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
@@ -9262,7 +9266,8 @@ function tournSheetHTML(){
   let body = '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(t){
     const nav = `<div class="tn-tabs" role="tablist">${tabs.map(function(x){ return `<button type="button" role="tab" class="${tab === x[0] ? 'on' : ''}" onclick="tournTab('${x[0]}')">${x[1]}</button>`; }).join('')}</div>`;
-    body = nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
+    const testBar = tournTestOn(t) ? `<div class="tn-testbar"><b>Mode test actif</b><span>Les scores peuvent être générés.</span>${tournRole(t.id) === 'admin' ? `<button type="button" onclick="openTournTestMode('${t.id}')">Gérer</button><button type="button" onclick="tournTestSet('${t.id}', false)">Désactiver</button>` : ''}</div>` : '';
+    body = testBar + nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
   }
   return `<div class="chat-overlay dk-page" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet chat-sheet-lg">
@@ -9660,7 +9665,7 @@ function tournLiveHTML(t){
         <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="tn-live-dot">En cours</span><span class="${late ? 'late' : ''}">${mins < 1 ? 'à l\'instant' : mins + ' min'}</span></div>
         <div class="tn-court-cat"><span>${escapeHTML(tournDivName(m.division_id))}</span>${tournBadgeHTML(m)}</div>
         <div class="tn-court-m"><span>${escapeHTML(tournTeamName(m.team_a))}</span><i>contre</i><span>${escapeHTML(tournTeamName(m.team_b))}</span></div>
-        <div class="tn-court-a"><button type="button" class="btn btn-primary" onclick="openTournScore('${m.id}')">Entrer le score</button><button type="button" class="btn btn-secondary" onclick="tournUncall('${m.id}')">Libérer</button></div>
+        <div class="tn-court-a"><button type="button" class="btn btn-primary" onclick="openTournScore('${m.id}')">Entrer le score</button>${tournTestOn(t) ? `<button type="button" class="btn btn-secondary tn-test-btn" onclick="tournTestScore('${m.id}')">Score au hasard</button>` : ''}<button type="button" class="btn btn-secondary" onclick="tournUncall('${m.id}')">Libérer</button></div>
       </section>`;
     }
     // Une équipe n'est proposée que sur un seul terrain à la fois.
@@ -9744,6 +9749,7 @@ function openTournScore(id){
     ${grid}
     <div class="tn-form-acts">
       <button type="button" class="btn btn-secondary" onclick="tournForfeit('${m.id}')">Forfait…</button>
+      ${tournTestOn(tournById(m.tournament_id)) ? `<button type="button" class="btn btn-secondary tn-test-btn" onclick="tournTestFill('${m.id}')">Générer</button>` : ''}
       <span style="flex:1"></span>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
       <button type="button" class="btn btn-primary" onclick="tournScoreSave('${m.id}')">Enregistrer</button>
@@ -10324,13 +10330,25 @@ function injectMyTStaff(){
 var TEST_FIRST = ['Julie','Marc','Sophie','Éric','Isabelle','Patrick','Nathalie','Martin','Mélanie','Simon','Karine','Luc','Annie','Pierre','Josée','Hugo','Valérie','Denis','Chantal','Yves','Caroline','Sébastien','Manon','Guy','Catherine','Steve','Geneviève','Alain','Émilie','François'];
 var TEST_LAST = ['Tremblay','Gagnon','Roy','Côté','Bouchard','Gauthier','Morin','Lavoie','Fortin','Gagné','Ouellet','Pelletier','Bélanger','Lévesque','Bergeron','Leblanc','Paquette','Girard','Simard','Boucher','Caron','Beaulieu','Cloutier','Dubé','Poirier','Fournier','Lapointe','Leclerc','Lefebvre','Poulin'];
 function tournTestName(i){ return TEST_FIRST[(i * 7) % TEST_FIRST.length] + ' ' + TEST_LAST[(i * 11 + Math.floor(i / TEST_FIRST.length)) % TEST_LAST.length]; }
+function tournTestOn(t){ return !!(t && t.settings && t.settings.test); }
+async function tournTestSet(tid, on, quiet){
+  const t = tournById(tid); if(!t) return;
+  const settings = Object.assign({}, t.settings || {}, { test: !!on });
+  const r = await sb.from('tournaments').update({ settings: settings }).eq('id', tid);
+  if(r && r.error){ showAlert(r.error.message); return; }
+  t.settings = settings; tournLiveNotify();
+  if(!quiet){ render(); showToast(on ? 'Mode test activé : bouton « Générer » dans les scores' : 'Mode test désactivé'); }
+}
 function openTournTestMode(tid){
-  const divs = tournDivs(tid), nTest = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.is_test && x.status !== 'withdrawn'; }).length;
-  const ready = tournLiveMatches(tournById(tid) || { id: tid }).filter(function(m){ return m.status !== 'done' && m.team_a && m.team_b; }).length;
+  const t = tournById(tid), divs = tournDivs(tid), on = tournTestOn(t);
+  const nTest = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.is_test && x.status !== 'withdrawn'; }).length;
   const cur = VIEW.tdiv && VIEW.tdiv !== 'all' ? VIEW.tdiv : (divs[0] ? divs[0].id : '');
   const html = `<div class="tn-form">
-    <p class="small" style="color:var(--muted);margin:0 0 12px;">Pour essayer le tournoi sans tout entrer. Les équipes de test n'ont ni courriel ni compte Dinkeo : personne ne reçoit de notification.</p>
-    <div class="tn-grp tn-grp-first"><div class="tn-grp-t">Ajouter des équipes de test</div>
+    <p class="small" style="color:var(--muted);margin:0 0 12px;">Pour essayer le tournoi sans tout entrer. Tu gardes la main sur tout (poules, appels, tableau) ; seuls les scores peuvent être générés. Les équipes de test n'ont ni courriel ni compte Dinkeo : personne ne reçoit de notification.</p>
+    <div class="tn-grp tn-grp-first"><div class="tn-grp-t">Mode test du tournoi</div>
+      ${tournSeg('ttOn', [['1','<b>Activé</b><small>Bouton « Générer » dans les scores</small>'],['0','<b>Désactivé</b><small>Scores entrés à la main</small>']], on ? '1' : '0', 'tournTestToggle', 'tn-seg-st tn-seg-2')}
+    </div>
+    <div class="tn-grp"><div class="tn-grp-t">Ajouter des équipes de test</div>
       ${divs.length ? `${tournField('Catégorie', tournSel('ttCat', divs.map(function(d){ return [d.id, escapeHTML(d.name) + ' · ' + tournTeams(tid, d.id, 'registered').length + ' / ' + d.max_teams]; }), cur))}
       <div class="tn-row2">
         ${tournField('Nombre d\'équipes', tournStepper('ttNb', 8, 1, 32))}
@@ -10338,19 +10356,16 @@ function openTournTestMode(tid){
       </div>
       <button type="button" class="btn btn-primary" style="width:auto;margin:0;" onclick="tournTestAdd('${tid}')">Ajouter les équipes</button>` : `<p class="small" style="color:var(--muted);">Ajoute d'abord une catégorie dans Réglages.</p>`}
     </div>
-    <div class="tn-grp"><div class="tn-grp-t">Simuler des scores</div>
-      <p class="small tn-grp-s">Joue au hasard les matchs dont les deux équipes sont connues (${ready} en ce moment). Le tableau avance tout seul ; touche de nouveau pour la ronde suivante.</p>
-      <button type="button" class="btn btn-secondary" style="width:auto;margin:0;" onclick="tournTestPlay('${tid}')" ${ready ? '' : 'disabled'}>Jouer les ${ready} matchs prêts</button>
-    </div>
     <div class="tn-grp"><div class="tn-grp-t">Nettoyer</div>
       <p class="small tn-grp-s">${nTest} équipe${nTest > 1 ? 's' : ''} de test. Les poules et tableaux des catégories touchées seront remis à zéro.</p>
       <button type="button" class="btn btn-secondary tn-danger" style="width:auto;margin:0;" onclick="tournTestClear('${tid}')" ${nTest ? '' : 'disabled'}>Retirer les équipes de test</button>
     </div>
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Fermer</button></div>
   </div>`;
-  setModal({ kind:'content', title:'Mode test', htmlContent: html });
+  setModal({ kind:'content', title:'Mode test', htmlContent: html, ttest: tid });
   render();
 }
+function tournTestToggle(v){ if(MODAL && MODAL.ttest) tournTestSet(MODAL.ttest, v === '1', true).then(function(){ showToast(v === '1' ? 'Mode test activé' : 'Mode test désactivé'); }); }
 async function tournTestAdd(tid){
   const div = tfVal('ttCat'), nb = Math.max(1, Math.min(32, parseInt(tfVal('ttNb'), 10) || 8)), seeded = tfVal('ttSeed') !== '0';
   const d = (TDIVS || []).find(function(x){ return x.id === div; }); if(!d) return;
@@ -10365,31 +10380,32 @@ async function tournTestAdd(tid){
   }
   const r = await sb.from('tournament_teams').insert(rows);
   if(r && r.error){ showAlert('Ajout impossible : ' + r.error.message); return; }
+  if(!tournTestOn(tournById(tid))) await tournTestSet(tid, true, true);
   const wait = rows.filter(function(x){ return x.status === 'waitlist'; }).length;
   await loadTournaments(true); tournBackToSheet(); render();
-  showToast(nb + ' équipes de test ajoutées dans ' + d.name + (wait ? ' (' + wait + ' en liste d\'attente : catégorie pleine)' : ''));
+  showToast(nb + ' équipes de test ajoutées dans ' + d.name + (wait ? ' (' + wait + ' en liste d\'attente : catégorie pleine)' : '') + ' · mode test activé');
 }
-async function tournTestPlay(tid){
-  const t = tournById(tid); if(!t) return;
-  const list = tournLiveMatches(t).filter(function(m){ return m.status !== 'done' && m.team_a && m.team_b; });
-  let n = 0;
-  for(let i = 0; i < list.length; i++){
-    const m = list[i]; if(m.status === 'done' || !m.team_a || !m.team_b) continue;
-    const pts = tournScorePts(m), aWins = Math.random() < 0.5, lose = Math.floor(Math.random() * (pts - 1));
-    const patch = { status: 'done', ended_at: new Date().toISOString(), court: m.court || null };
-    if(tournBestOf3(m)){
-      const g = aWins ? [[11, lose], [Math.floor(Math.random() * 10), 11], [11, Math.floor(Math.random() * 10)]] : [[lose, 11], [11, Math.floor(Math.random() * 10)], [Math.floor(Math.random() * 10), 11]];
-      Object.assign(patch, { games: g, score_a: aWins ? 2 : 1, score_b: aWins ? 1 : 2 });
-    } else Object.assign(patch, { games: null, score_a: aWins ? pts : lose, score_b: aWins ? lose : pts });
-    patch.winner = aWins ? m.team_a : m.team_b;
-    if(!(await tournMatchPatch(m.id, patch, true))) break;
-    if(tournIsDe(m)) await tournDeAdvance(m); else await tournAdvance(m);
-    n++;
+// Score réaliste au hasard dans la fenêtre de score (modifiable avant d'enregistrer).
+function tournTestFill(id){
+  const m = (TMATCHES || []).find(function(x){ return x.id === id; }); if(!m) return;
+  const set = function(k, v){ const el = document.getElementById(k); if(el) el.value = v; };
+  const lose = function(pts){ return Math.floor(Math.random() * (pts - 1)); };
+  const aWins = Math.random() < 0.5;
+  if(tournBestOf3(m)){
+    const three = Math.random() < 0.5;
+    const g = [aWins, three ? !aWins : aWins, aWins];
+    for(let i = 0; i < 3; i++){
+      if(i === 2 && !three){ set('tsg_0' + i, ''); set('tsg_1' + i, ''); continue; }
+      const w = g[i], l = lose(11);
+      set('tsg_0' + i, w ? 11 : l); set('tsg_1' + i, w ? l : 11);
+    }
+  } else {
+    const pts = tournScorePts(m), l = lose(pts);
+    set('tsc_a', aWins ? pts : l); set('tsc_b', aWins ? l : pts);
   }
-  tournLiveNotify(); tournBackToSheet(); render();
-  showToast(n + ' match' + (n > 1 ? 's' : '') + ' joué' + (n > 1 ? 's' : '') + ' au hasard');
-  if(list.length) tournAfterResult(list[list.length - 1]);
 }
+// Sur une carte de terrain : score au hasard enregistré tout de suite.
+function tournTestScore(id){ openTournScore(id); tournTestFill(id); tournScoreSave(id); }
 function tournTestClear(tid){
   const teams = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.is_test; });
   if(!teams.length) return;
