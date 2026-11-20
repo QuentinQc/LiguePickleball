@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 510">
+<meta name="app-build" content="Version 511">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1825,37 +1825,19 @@ body.desk .dk-it.on .dk-n{background:#0A2420;color:var(--ball);}
 body.desk .dk-sub{display:flex;flex-direction:column;gap:1px;padding:2px 0 6px 14px;}
 body.desk .dk-sub .dk-it{padding:6px 10px;font-size:13px;color:var(--muted);}
 body.desk .dk-sub .dk-it.on{background:none;color:var(--ball);font-weight:700;}
-/* Menu de gauche : groupes (variantes de démonstration dk-v1 / dk-v2 / dk-v3) */
-body.desk .dk-grp{display:flex;flex-direction:column;gap:2px;}
-body.desk .dk-sec{display:flex;align-items:center;gap:8px;}
-body.desk .dk-sec-ico{display:none;width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;}
-body.desk .dk-ico{display:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.8;}
+/* Menu de gauche : un bloc et une couleur par section (organisation, ligues, tournois) */
+body.desk .dk-side{--g:var(--ball);--gl:rgba(207,234,92,.22);}
+body.desk .dk-grp{display:flex;flex-direction:column;gap:2px;--g:var(--ball);--gb:rgba(207,234,92,.07);--gl:rgba(207,234,92,.22);background:var(--gb);border:1px solid var(--gl);border-radius:14px;padding:4px 6px 8px;margin-top:10px;}
+body.desk .dk-grp-lg{--g:#5CC8E8;--gb:rgba(92,200,232,.07);--gl:rgba(92,200,232,.24);}
+body.desk .dk-grp-tn{--g:var(--paddle);--gb:rgba(233,106,60,.08);--gl:rgba(233,106,60,.3);}
+body.desk .dk-sec{display:flex;align-items:center;gap:8px;padding:10px 8px 8px;color:var(--g);font:600 13px var(--font-display);letter-spacing:.08em;}
+body.desk .dk-sec > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+body.desk .dk-sec-ico{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+body.desk .dk-ico{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.8;}
 body.desk .dk-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-/* V1 : blocs */
-body.desk.dk-v1 .dk-grp{background:rgba(255,255,255,.035);border:1px solid var(--line-soft);border-radius:14px;padding:4px 6px 8px;margin-top:10px;}
-body.desk.dk-v1 .dk-sec{padding:10px 8px 8px;margin-bottom:2px;border-bottom:1px solid var(--line-soft);font:600 13px var(--font-display);letter-spacing:.08em;color:var(--text);}
-body.desk.dk-v1 .dk-sec-ico{display:block;color:var(--ball);}
-body.desk.dk-v1 .dk-ico{display:block;}
-/* V2 : couleur par section */
-body.desk.dk-v2 .dk-grp{--g:var(--ball);position:relative;margin-top:14px;padding-left:10px;}
-body.desk.dk-v2 .dk-grp::before{content:"";position:absolute;left:0;top:6px;bottom:4px;width:3px;border-radius:3px;background:var(--g);opacity:.85;}
-body.desk.dk-v2 .dk-grp-lg{--g:#5CC8E8;}
-body.desk.dk-v2 .dk-grp-tn{--g:var(--paddle);}
-body.desk.dk-v2 .dk-sec{padding:4px 10px 6px;color:var(--g);font:600 13px var(--font-display);letter-spacing:.08em;}
-body.desk.dk-v2 .dk-sec-ico{display:block;}
-body.desk.dk-v2 .dk-it.on{background:var(--g);color:#0A2420;}
-body.desk.dk-v2 .dk-sub .dk-it.on{background:none;color:var(--g);}
-body.desk.dk-v2 .dk-ico{display:block;}
-/* V3 : blocs + couleur (recommandée) */
-body.desk.dk-v3 .dk-grp{--g:var(--ball);--gb:rgba(207,234,92,.07);--gl:rgba(207,234,92,.22);background:var(--gb);border:1px solid var(--gl);border-radius:14px;padding:4px 6px 8px;margin-top:10px;}
-body.desk.dk-v3 .dk-grp-lg{--g:#5CC8E8;--gb:rgba(92,200,232,.07);--gl:rgba(92,200,232,.24);}
-body.desk.dk-v3 .dk-grp-tn{--g:var(--paddle);--gb:rgba(233,106,60,.08);--gl:rgba(233,106,60,.3);}
-body.desk.dk-v3 .dk-sec{padding:10px 8px 8px;color:var(--g);font:600 13px var(--font-display);letter-spacing:.08em;}
-body.desk.dk-v3 .dk-sec-ico{display:block;}
-body.desk.dk-v3 .dk-it.on{background:var(--g);color:#0A2420;}
-body.desk.dk-v3 .dk-sub .dk-it.on{background:none;color:var(--g);}
-body.desk.dk-v3 .dk-sub{border-left:2px solid var(--gl);margin-left:18px;padding-left:6px;}
-body.desk.dk-v3 .dk-ico{display:block;}
+body.desk .dk-it.on{background:var(--g);color:#0A2420;}
+body.desk .dk-sub{border-left:2px solid var(--gl);margin-left:18px;padding-left:6px;}
+body.desk .dk-sub .dk-it.on{background:none;color:var(--g);}
 body.desk .dk-foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--line-soft);font-size:12px;color:var(--muted);}
 body.desk #app > .tabs, body.desk .bottom-nav, body.desk .bottom-nav-spacer{display:none !important;}
 body.desk.modern-nav .topbar.shell-top{left:272px;right:24px;--tb-x:24px;}
@@ -11830,7 +11812,7 @@ function deskSideHTML(){
   h += it(home && VIEW.atab !== 'cal' && VIEW.atab !== 'comm' && VIEW.atab !== 'moi' && VIEW.atab !== 'orgs', 'Accueil', "dkHome('accueil')", 0, 'accueil');
   h += it(orgSheet === 'membres', 'Membres', "dkOrg('membres')", 0, 'joueurs');
   h += it(orgSheet === 'comptes', 'Comptes et demandes', "dkOrg('comptes')", pend, 'moi');
-  h += it(orgSheet === 'rapport', 'Rapport de l\'organisation', "dkOrg('rapport')", 0, 'rapports');
+  h += it(orgSheet === 'rapport', 'Rapport', "dkOrg('rapport')", 0, 'rapports');
   if(!isOrganizerOnly()) h += it(orgSheet === 'general', 'Paramètres', "dkOrg('general')", 0, 'reglages');
   h += it(home && VIEW.atab === 'comm', 'Communauté', "dkHome('comm')", 0, 'comm');
   h += it(home && VIEW.atab === 'cal', 'Calendrier', "dkHome('cal')", 0, 'session');
