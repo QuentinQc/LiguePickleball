@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 494">
+<meta name="app-build" content="Version 495">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2099,6 +2099,8 @@ body.desk .dk-add{color:var(--muted);}
 .tn-bracket .tn-podium{margin-top:0;}
 .tn-bracket .tn-podium .tn-k{display:none;}
 .tn-pod-top{display:none;}
+.tn-live-hint{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;}
+.tn-live-hint .tn-head-r{margin-left:auto;}
 .tn-de-t{margin:16px 0 8px;font-size:12px;color:var(--ball);}
 .tn-pod-top .tn-podium{margin:0 0 12px;}
 .tn-pod-r{display:flex;gap:10px;align-items:baseline;font-size:14px;}
@@ -9510,7 +9512,7 @@ function tournLiveHTML(t){
   const playing = all.filter(function(m){ return m.status === 'playing'; });
   const done = all.filter(function(m){ return m.status === 'done'; });
   const ready = queue.filter(function(m){ return !m._why; }), blocked = queue.filter(function(m){ return m._why; });
-  const teamsIn = (TTEAMS || []).filter(function(x){ return x.tournament_id === t.id && x.status === 'registered' && x.pool; });
+  const teamsIn = tournPlayingTeams(t.id);
   const arrived = teamsIn.filter(function(x){ return x.checked_in; }).length;
   const now = Date.now(), used = {};
   const cards = courts.map(function(c){
@@ -9544,6 +9546,7 @@ function tournLiveHTML(t){
       <div class="tn-live-stats"><span><b>${done.length}</b> / ${all.length} matchs joués</span><span><b>${playing.length}</b> en cours</span><span><b>${ready.length}</b> prêts</span></div>
       <div class="tn-head-r">${cfg.checkin ? `<button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Présences ${arrived} / ${teamsIn.length}</button>` : ''}<button type="button" class="btn btn-secondary" onclick="openTournDaySettings('${t.id}')">Réglages du jour</button></div>
     </div>
+    ${cfg.checkin && teamsIn.length && !arrived ? `<div class="tn-note tn-live-hint"><b>Aucune équipe n'est pointée comme arrivée</b> : les matchs ne peuvent pas encore être appelés.<span class="tn-head-r"><button type="button" class="btn btn-secondary" onclick="openTournCheckin('${t.id}')">Pointer les arrivées</button><button type="button" class="btn btn-primary" onclick="tournAllPresent('${t.id}')">Toutes présentes</button></span></div>` : ''}
     <div class="tn-live">
       <div class="tn-courts">${cards}</div>
       <aside class="tn-queue">
@@ -9649,11 +9652,16 @@ function tournForfeit(id){
       .then(function(ok){ return ok && (tournIsDe(m) ? tournDeAdvance(m) : tournAdvance(m)); }).then(function(){ tournLiveNotify(); tournBackToSheet(); render(); });
   });
 }
+// Équipes qui jouent : inscrites dans une catégorie dont les poules ou le tableau sont créés.
+function tournPlayingTeams(tid){
+  const on = {}; tournDivs(tid).forEach(function(d){ if((d.stage || 'setup') !== 'setup') on[d.id] = 1; });
+  return (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.status === 'registered' && on[x.division_id]; });
+}
 // Présences du matin.
 function openTournCheckin(tid){
   const html = function(){
     const q = dupNorm(VIEW.tcq || '');
-    const teams = (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && x.status === 'registered' && x.pool; });
+    const teams = tournPlayingTeams(tid);
     const by = {}; teams.forEach(function(x){ (by[x.division_id] = by[x.division_id] || []).push(x); });
     return `<div class="tn-search" style="margin:0 0 10px;"><input type="search" placeholder="Rechercher un joueur…" value="${escapeHTML(VIEW.tcq || '')}" oninput="VIEW.tcq=this.value;tournCheckinRefresh()" aria-label="Rechercher"></div>
       <div id="tnCheckList">${tournDivs(tid).filter(function(d){ return by[d.id]; }).map(function(d){
@@ -9674,6 +9682,14 @@ async function tournCheckin(teamId){
   if(r && r.error){ showAlert(r.error.message); return; }
   x.checked_in = v; tournLiveNotify();
   tournCheckinRefresh();
+}
+async function tournAllPresent(tid){
+  const t = tournById(tid); if(!t) return;
+  const settings = Object.assign({}, t.settings || {}, { checkin: false });
+  const r = await sb.from('tournaments').update({ settings: settings }).eq('id', tid);
+  if(r && r.error){ showAlert(r.error.message); return; }
+  t.settings = settings; tournLiveNotify(); render();
+  showToast('Toutes les équipes sont considérées présentes');
 }
 function openTournDaySettings(tid){
   const t = tournById(tid), cfg = tournSettings(t);
