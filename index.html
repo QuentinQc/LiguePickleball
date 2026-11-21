@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 514">
+<meta name="app-build" content="Version 515">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2088,6 +2088,7 @@ body.desk .dk-add{color:var(--muted);}
 .tn-multi .tn-all{flex-basis:100%;}
 .tn-courts-only{color:var(--paddle) !important;font-weight:600;}
 .tn-std{width:100%;border-collapse:collapse;font-size:13px;}
+table.tn-std{display:table;white-space:normal;}
 .tn-std th{text-align:left;font:600 10px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 4px;}
 .tn-std th:nth-child(3), .tn-std th:nth-child(4), .tn-std td:nth-child(3), .tn-std td:nth-child(4){text-align:right;}
 .tn-std td{padding:6px 4px;border-top:1px solid var(--line-soft);}
@@ -9300,13 +9301,13 @@ var TOURNS = [], TDIVS = [], TTEAMS = [], TOURNS_FOR = null, TOURNS_LOADING = fa
 function tournBackToSheet(){ MODAL_UNDER = null; MODAL = (TOURN_SHEET && tournById(TOURN_SHEET.tid)) ? TOURN_SHEET : null; }
 var TOURN_ST = { draft:['Brouillon',''], open:['Inscriptions ouvertes','g'], closed:['Inscriptions fermées','w'], done:['Terminé',''] };
 var TOURN_GENDER = { mixte:'Mixte', hommes:'Hommes', femmes:'Femmes', ouvert:'Ouvert' };
-var TOURN_FMT = { pools_ko:'Poules puis élimination', pools_de:'Poules puis double élimination', round_robin:'Poule unique (tous contre tous)', pools_only:'Poules seulement (sans tableau)', double_elim:'Double élimination' };
-var TOURN_FMT_SHORT = { pools_ko:'Poules + élimination', pools_de:'Poules + double élim.', round_robin:'Tous contre tous', pools_only:'Poules seulement', double_elim:'Double élimination' };
+var TOURN_FMT = { pools_ko:'Poules puis élimination', pools_de:'Poules puis double élimination', round_robin:'Poule unique (tous contre tous)', pools_only:'Poules seulement (sans tableau)', rotation:'Partenaires qui changent', double_elim:'Double élimination' };
+var TOURN_FMT_SHORT = { pools_ko:'Poules + élimination', pools_de:'Poules + double élim.', round_robin:'Tous contre tous', pools_only:'Poules seulement', rotation:'Partenaires changeants', double_elim:'Double élimination' };
 // Formule d'une catégorie : ses propres réglages, sinon ceux du tournoi.
 function tournDivRules(t, d){
   d = d || {};
   const fmt = d.format || 'pools_ko', rrf = (d.rr_final === 2 || d.rr_final === 4) ? d.rr_final : 0;
-  return { format: fmt, pool_size: d.pool_size || 4, qualifiers: fmt === 'round_robin' ? (rrf || 2) : (d.qualifiers || 2), rr_final: fmt === 'round_robin' ? rrf : 0,
+  return { format: fmt, pool_size: d.pool_size || 4, qualifiers: fmt === 'round_robin' ? (rrf || 2) : (d.qualifiers || 2), rr_final: fmt === 'round_robin' ? rrf : 0, rot_rounds: d.rot_rounds || 0,
     pool_points: d.pool_points || (t && t.pool_points) || 11, bracket_points: d.bracket_points || (t && t.bracket_points) || 15,
     final_best_of: d.final_best_of || (t && t.final_best_of) || 3,
     de_mode: d.de_mode === 'consolation' ? 'consolation' : 'full', bronze_match: !!d.bronze_match };
@@ -9314,7 +9315,15 @@ function tournDivRules(t, d){
 // Poules suivies d'un tableau (élimination simple ou double).
 function tournPoolsThenBracket(r){ return r.format === 'pools_ko' || r.format === 'pools_de' || (r.format === 'round_robin' && !!r.rr_final); }
 // Formules sans tableau : le classement des poules est le résultat final.
-function tournNoBracket(r){ return r.format === 'pools_only' || (r.format === 'round_robin' && !r.rr_final); }
+function tournNoBracket(r){ return r.format === 'pools_only' || r.format === 'rotation' || (r.format === 'round_robin' && !r.rr_final); }
+// Partenaires qui changent : inscription individuelle, une paire différente à chaque ronde, classement individuel.
+function tournIsRot(r){ return !!r && r.format === 'rotation'; }
+function tournDivIsRot(divId){ const d = (TDIVS || []).find(function(x){ return x.id === divId; }); return !!d && d.format === 'rotation'; }
+// Nombre de rondes : le réglage, sinon assez pour que chacun change souvent de partenaire.
+function tournRotRounds(n, r){ return (r && r.rot_rounds) || (n <= 8 ? Math.max(3, n - 1) : 7); }
+// Joueurs (inscriptions individuelles) derrière une équipe : une paire de ronde, ou l'équipe elle-même.
+function tournMembers(id){ const x = id ? tournTeamById(id) : null; return x && Array.isArray(x.members) && x.members.length ? x.members : (id ? [id] : []); }
+function tournMP(m){ return tournMembers(m.team_a).concat(tournMembers(m.team_b)); }
 // Texte « qui passe au tableau » selon le nombre de qualifiés par poule.
 function tournQualTxt(q, cap){ const t = q >= 99 ? 'toutes les équipes passent' : q === 1 ? 'le 1er passe' : 'les ' + q + ' premiers passent'; return cap ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 // Double élimination complète (gagnants, perdants, grande finale).
@@ -9327,6 +9336,7 @@ function tournFmtDetail(t, d){
   const extra = (tournBronzeAllowed(r) && r.bronze_match ? ' · match pour le bronze' : '');
   const de = r.de_mode === 'consolation' ? 'tableau simple + consolante' : 'double élimination complète';
   if(r.format === 'round_robin') return 'Matchs à ' + r.pool_points + (r.rr_final === 2 ? ' · puis finale entre les 2 premiers à ' + r.bracket_points + ' · ' + fin : r.rr_final === 4 ? ' · puis demi-finales et finale (4 premiers) à ' + r.bracket_points + ' · ' + fin + extra : '');
+  if(r.format === 'rotation') return 'Inscription individuelle · ' + (r.rot_rounds ? r.rot_rounds + ' rondes' : 'rondes selon le nombre d\'inscrits') + ' · matchs à ' + r.pool_points + ' · classement individuel';
   if(r.format === 'pools_only') return 'Poules de ' + r.pool_size + ' · matchs à ' + r.pool_points + ' · le classement de chaque poule est le résultat final';
   if(r.format === 'double_elim') return de.charAt(0).toUpperCase() + de.slice(1) + ' · matchs à ' + r.bracket_points + ' · ' + fin + extra;
   const pools = 'Poules de ' + r.pool_size + ' · ' + tournQualTxt(r.qualifiers) + ' · poules à ' + r.pool_points + ', tableau à ' + r.bracket_points;
@@ -9391,7 +9401,7 @@ function ensureTournaments(){
 function tournById(id){ return (TOURNS || []).find(function(t){ return t.id === id; }) || null; }
 function tournDivs(tid){ return (TDIVS || []).filter(function(d){ return d.tournament_id === tid; }).sort(function(a, b){ return ((a.sort || 0) - (b.sort || 0)) || String(a.name).localeCompare(String(b.name)); }); }
 function tournTeams(tid, divId, status){
-  return (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && (!divId || x.division_id === divId) && (status ? x.status === status : x.status !== 'withdrawn'); });
+  return (TTEAMS || []).filter(function(x){ return x.tournament_id === tid && (!divId || x.division_id === divId) && (status ? x.status === status : x.status !== 'withdrawn' && x.status !== 'pair'); });
 }
 function tournDateLabel(t, short){
   if(!t || !t.event_date) return 'Date à venir';
@@ -9517,9 +9527,10 @@ function tournTeamName(id){
   const x = (TTEAMS || []).find(function(y){ return y.id === id; });
   if(!x) return '—';
   const last = function(n){ const p = String(n || '?').trim().split(/\s+/); return p.length > 1 ? p.slice(1).join(' ') : p[0]; };
+  if(!x.p2_name && !(Array.isArray(x.members) && x.members.length)) return String(x.p1_name || '?');
   return last(x.p1_name) + ' / ' + last(x.p2_name);
 }
-function tournTeamFull(id){ const x = (TTEAMS || []).find(function(y){ return y.id === id; }); return x ? (x.p1_name || '?') + ' et ' + (x.p2_name || '?') : '—'; }
+function tournTeamFull(id){ const x = (TTEAMS || []).find(function(y){ return y.id === id; }); return x ? (x.p2_name ? (x.p1_name || '?') + ' et ' + x.p2_name : (x.p1_name || '?')) : '—'; }
 // Équipes inscrites dans l'ordre des têtes de série (sans tête de série : par date d'inscription).
 function tournSeededTeams(t, divId){
   return tournTeams(t.id, divId, 'registered').slice().sort(function(a, b){
@@ -9571,9 +9582,15 @@ function tournPrepHTML(t){
   const unconf = teams.filter(function(x){ return !x.partner_confirmed; }).length;
   const unpaid = teams.filter(function(x){ return !x.paid; }).length;
   const wait = tournTeams(t.id, d.id, 'waitlist').length;
-  const minN = r.format === 'double_elim' ? 4 : 3;
+  const minN = r.format === 'double_elim' || tournIsRot(r) ? 4 : 3;
   const chk = function(ok, txt, warn){ return `<li class="${ok ? 'ok' : (warn ? 'warn' : 'bad')}"><span aria-hidden="true">${ok ? '✓' : '!'}</span>${txt}</li>`; };
-  const list = `<ul class="tn-chk">
+  const rot = tournIsRot(r);
+  const list = rot ? `<ul class="tn-chk">
+    ${chk(n >= minN, n + ' joueur' + (n > 1 ? 's' : '') + ' inscrit' + (n > 1 ? 's' : '') + (n >= minN ? '' : ' (minimum ' + minN + ')'))}
+    ${chk(t.status !== 'open', t.status === 'open' ? 'Les inscriptions sont encore ouvertes' : 'Inscriptions fermées', true)}
+    ${chk(!unpaid, unpaid ? unpaid + ' joueur' + (unpaid > 1 ? 's' : '') + ' à payer' : 'Tout le monde a payé', true)}
+    ${wait ? chk(false, wait + ' joueur' + (wait > 1 ? 's' : '') + ' en liste d\'attente (ne jouent pas)', true) : ''}
+  </ul>` : `<ul class="tn-chk">
     ${chk(n >= minN, n + ' équipe' + (n > 1 ? 's' : '') + ' inscrite' + (n > 1 ? 's' : '') + (n >= minN ? '' : ' (minimum ' + minN + ')'))}
     ${chk(t.status !== 'open', t.status === 'open' ? 'Les inscriptions sont encore ouvertes' : 'Inscriptions fermées', true)}
     ${chk(!unconf, unconf ? unconf + ' partenaire' + (unconf > 1 ? 's' : '') + ' n\'' + (unconf > 1 ? 'ont' : 'a') + ' pas confirmé' : 'Tous les partenaires ont confirmé', true)}
@@ -9582,7 +9599,9 @@ function tournPrepHTML(t){
   </ul>`;
   const head = `<div class="tn-prep-h"><div><b class="tn-h1">${escapeHTML(d.name)}</b><span class="small" style="color:var(--muted);">${escapeHTML(TOURN_FMT[r.format])} · ${escapeHTML(tournFmtDetail(t, d))}</span></div></div>`;
   let body = '';
-  if(r.format === 'double_elim'){
+  if(rot){
+    body = (d.stage || 'setup') !== 'setup' ? tournRotLockedHTML(t, d) : n < minN ? `<div class="tn-note">Il faut au moins ${minN} joueurs pour former des matchs de double.</div>` : tournRotDraftHTML(t, d, r, n);
+  } else if(r.format === 'double_elim'){
     const deMade = (d.stage || 'setup') !== 'setup';
     body = `<div class="tn-sec-h tn-prep-bar"><span>Double élimination · pas de poules</span><span class="tn-head-r">${deMade ? `<button type="button" class="btn btn-primary" onclick="VIEW.tbr='${d.id}';tournTab('tableau')">Voir le tableau</button>` : `<button type="button" class="btn btn-primary" onclick="tournCreateDE('${t.id}','${d.id}')" ${n < minN ? 'disabled' : ''}>Créer le tableau</button>`}</span></div>
       <p class="small" style="color:var(--muted);margin:6px 0 10px;">${deMade ? 'Le tableau est créé : les matchs se jouent depuis l\'onglet « En direct ».' : 'Le tableau des gagnants et celui des perdants se forment à partir des têtes de série ci-dessous (à régler dans Inscrits).'}</p>
@@ -9601,6 +9620,114 @@ function tournPrepHTML(t){
     body = tournPoolsDraftHTML(t, d, r);
   }
   return chips + head + list + body;
+}
+// ---- Partenaires qui changent : rondes ----
+function tournShuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function tournUuid(){
+  const b = new Uint8Array(16); (window.crypto || window.msCrypto).getRandomValues(b);
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = Array.prototype.map.call(b, function(x){ return (x < 16 ? '0' : '') + x.toString(16); }).join('');
+  return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+}
+// Rondes de double avec partenaires qui changent : on évite de rejouer avec le même partenaire,
+// on varie les adversaires et le repos tourne (ceux qui se sont le moins reposés sortent).
+function tournRotSchedule(ids, rounds){
+  const per = Math.floor(ids.length / 4), sitN = ids.length - per * 4;
+  const key = function(a, b){ return a < b ? a + '|' + b : b + '|' + a; };
+  const partner = {}, opp = {}, sat = {}, out = [];
+  ids.forEach(function(id){ sat[id] = 0; });
+  const cost = function(sp){
+    const pc = (partner[key(sp[0][0], sp[0][1])] || 0) + (partner[key(sp[1][0], sp[1][1])] || 0);
+    let oc = 0; sp[0].forEach(function(a){ sp[1].forEach(function(b){ oc += opp[key(a, b)] || 0; }); });
+    return pc * 100 + oc * 3;
+  };
+  for(let r = 0; r < rounds; r++){
+    const order = tournShuffle(ids.slice()).sort(function(a, b){ return sat[a] - sat[b]; });
+    const rest = order.slice(0, sitN), play = order.slice(sitN);
+    rest.forEach(function(id){ sat[id]++; });
+    let best = null, bestCost = Infinity;
+    for(let it = 0; it < 400 && bestCost > 0; it++){
+      const sh = tournShuffle(play.slice()), games = []; let c = 0;
+      for(let g = 0; g < per; g++){
+        const q = sh.slice(g * 4, g * 4 + 4);
+        const splits = [[[q[0], q[1]], [q[2], q[3]]], [[q[0], q[2]], [q[1], q[3]]], [[q[0], q[3]], [q[1], q[2]]]];
+        let bs = splits[0], bc = cost(splits[0]);
+        splits.forEach(function(sp){ const k = cost(sp); if(k < bc){ bc = k; bs = sp; } });
+        c += bc; games.push(bs);
+      }
+      if(c < bestCost){ bestCost = c; best = games; }
+    }
+    (best || []).forEach(function(sp){
+      partner[key(sp[0][0], sp[0][1])] = (partner[key(sp[0][0], sp[0][1])] || 0) + 1;
+      partner[key(sp[1][0], sp[1][1])] = (partner[key(sp[1][0], sp[1][1])] || 0) + 1;
+      sp[0].forEach(function(a){ sp[1].forEach(function(b){ opp[key(a, b)] = (opp[key(a, b)] || 0) + 1; }); });
+    });
+    out.push({ games: best || [], rest: rest });
+  }
+  return out;
+}
+function tournRotDraftHTML(t, d, r, n){
+  const rounds = tournRotRounds(n, r), per = Math.floor(n / 4), sit = n - per * 4;
+  const players = tournSeededTeams(t, d.id);
+  return `<div class="tn-sec-h tn-prep-bar"><span>${n} joueurs · ${per} match${per > 1 ? 's' : ''} par ronde${sit ? ' · ' + sit + ' au repos à chaque ronde' : ''}</span>
+      <span class="tn-head-r"><span class="tn-rot-r"><small>Rondes</small>${tournStepper('trRounds', rounds, 1, 20)}</span><button type="button" class="btn btn-primary" onclick="tournRotLock('${t.id}','${d.id}')">Créer les rondes</button></span></div>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">À chaque ronde, chacun joue avec un nouveau partenaire contre de nouveaux adversaires, autant que possible. ${sit ? 'Le repos tourne : personne ne se repose deux fois avant que tout le monde se soit reposé. ' : ''}Classement individuel : victoires, puis différentiel de points.</p>
+    <div class="tn-pools"><section class="tn-pool"><div class="tn-pool-h"><b>Joueurs</b><span>${n}</span></div>
+      ${players.map(function(x){ return `<div class="tn-pool-t" style="cursor:default;"><span class="tn-seedb"></span><span>${escapeHTML(tournTeamFull(x.id))}</span></div>`; }).join('')}
+    </section></div>`;
+}
+async function tournRotLock(tid, divId){
+  const t = tournById(tid), d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!t || !d) return;
+  if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
+  const players = tournSeededTeams(t, divId), ids = players.map(function(x){ return x.id; });
+  if(ids.length < 4){ showAlert('Il faut au moins 4 joueurs.'); return; }
+  const rounds = Math.max(1, Math.min(20, parseInt(tfVal('trRounds'), 10) || tournRotRounds(ids.length, tournDivRules(t, d))));
+  const nM = rounds * Math.floor(ids.length / 4);
+  showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs) pour « ' + d.name + ' » ? Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
+    if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
+    const plan = tournRotSchedule(ids, rounds), byId = {};
+    players.forEach(function(x){ byId[x.id] = x; });
+    const pairs = [], rows = [];
+    let seq = 0;
+    const mkPair = function(two){
+      const a = byId[two[0]], b = byId[two[1]], id = tournUuid();
+      pairs.push({ id: id, tournament_id: tid, division_id: divId, status: 'pair', members: [a.id, b.id], partner_confirmed: true, paid: true, is_test: !!(a.is_test && b.is_test),
+        p1_name: a.p1_name, p1_email: a.p1_email || null, p1_profile: a.p1_profile || null, p2_name: b.p1_name, p2_email: b.p1_email || null, p2_profile: b.p1_profile || null });
+      return id;
+    };
+    plan.forEach(function(rd, ri){ rd.games.forEach(function(sp){ rows.push({ tournament_id: tid, division_id: divId, phase: 'pool', pool: 'R', round: ri + 1, seq: ++seq, team_a: mkPair(sp[0]), team_b: mkPair(sp[1]) }); }); });
+    const insP = await sb.from('tournament_teams').insert(pairs);
+    if(insP && insP.error){ showAlert('Impossible de créer les paires : ' + insP.error.message); return; }
+    const up1 = await sb.from('tournament_teams').update({ pool: 'R' }).in('id', ids);
+    if(up1 && up1.error){ showAlert(up1.error.message); return; }
+    const ins = await sb.from('tournament_matches').insert(rows);
+    if(ins && ins.error){ await tournDropPairs(divId); showAlert('Impossible de créer les matchs : ' + ins.error.message); return; }
+    const up = await sb.from('tournament_divisions').update({ stage: 'pools' }).eq('id', divId);
+    if(up && up.error){ showAlert(up.error.message); return; }
+    d.stage = 'pools';
+    await loadTournaments(true); tournBackToSheet(); render();
+    showToast(rounds + ' rondes créées : ' + rows.length + ' matchs');
+  });
+}
+async function tournDropPairs(divId){ return sb.from('tournament_teams').delete().eq('division_id', divId).eq('status', 'pair'); }
+function tournRotLockedHTML(t, d){
+  const ms = tournMatches(d.id, 'pool').slice().sort(function(a, b){ return (a.round - b.round) || (a.seq - b.seq); });
+  const scored = ms.some(function(m){ return m.score_a != null || m.score_b != null; });
+  const players = (TTEAMS || []).filter(function(x){ return x.division_id === d.id && x.pool === 'R' && x.status === 'registered'; });
+  const rounds = ms.reduce(function(mx, m){ return Math.max(mx, m.round); }, 0);
+  let html = '';
+  for(let rr = 1; rr <= rounds; rr++){
+    const rm = ms.filter(function(m){ return m.round === rr; }), inR = {};
+    rm.forEach(function(m){ tournMP(m).forEach(function(id){ inR[id] = 1; }); });
+    const rest = players.filter(function(x){ return !inR[x.id]; });
+    html += `<section class="tn-pool"><div class="tn-pool-h"><b>Ronde ${rr}</b><span>${rm.filter(function(m){ return m.status === 'done'; }).length} / ${rm.length} joués</span></div>
+      <ol class="tn-mlist">${rm.map(function(m){ return `<li class="${m.status === 'done' ? 'done' : ''}"><button type="button" onclick="openTournScore('${m.id}')"><span class="${m.status === 'done' && m.winner === m.team_a ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_a))}</span><i>${m.status === 'done' ? m.score_a + '-' + m.score_b : 'c.'}</i><span class="${m.status === 'done' && m.winner === m.team_b ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_b))}</span></button></li>`; }).join('')}</ol>
+      ${rest.length ? `<p class="small" style="color:var(--muted);margin:6px 0 0;">Au repos : ${rest.map(function(x){ return escapeHTML(tournTeamName(x.id)); }).join(', ')}</p>` : ''}</section>`;
+  }
+  return `<div class="tn-sec-h tn-prep-bar"><span>${rounds} rondes · ${ms.length} matchs</span>
+      <span class="tn-head-r">${scored ? '' : `<button type="button" class="btn btn-secondary" onclick="tournPrepUnlock('${d.id}')">Refaire les rondes</button>`}</span></div>
+    <div class="tn-pools"><section class="tn-pool"><div class="tn-pool-h"><b>Classement individuel</b><span>${players.length} joueurs</span></div>${tournStandingsHTML(t, d, 'R')}</section>${html}</div>
+    <p class="small" style="color:var(--muted);margin:12px 0 0;">Les matchs se jouent depuis l'onglet « En direct ». Touche un match ici pour entrer ou corriger un score.</p>`;
 }
 function tournPoolsDraftHTML(t, d, r){
   const pools = TPREP[d.id];
@@ -9682,9 +9809,10 @@ function tournPoolsLockedHTML(t, d){
     <p class="small" style="color:var(--muted);margin:12px 0 0;">Les matchs se jouent depuis l'onglet « En direct ». Touche un match ici pour entrer ou corriger un score. Le tableau final se crée dans l'onglet « Tableau ».</p>`;
 }
 function tournPrepUnlock(divId){
-  showConfirm('Déverrouiller les poules ? Les matchs créés seront effacés et tu pourras refaire la répartition.', async function(){
+  showConfirm(tournDivIsRot(divId) ? 'Refaire les rondes ? Les matchs créés seront effacés et tu pourras en générer de nouveaux.' : 'Déverrouiller les poules ? Les matchs créés seront effacés et tu pourras refaire la répartition.', async function(){
     const del = await sb.from('tournament_matches').delete().eq('division_id', divId);
     if(del && del.error){ showAlert(del.error.message); return; }
+    await tournDropPairs(divId);
     await sb.from('tournament_teams').update({ pool: null, pool_order: null }).eq('division_id', divId);
     await sb.from('tournament_divisions').update({ stage: 'setup' }).eq('id', divId);
     delete TPREP[divId];
@@ -9714,7 +9842,7 @@ function tournTeamById(id){ return (TTEAMS || []).find(function(x){ return x.id 
 function tournTeamState(t){
   const st = {};
   tournLiveMatches(t).forEach(function(m){
-    [m.team_a, m.team_b].forEach(function(id){
+    tournMP(m).forEach(function(id){
       const s = st[id] = st[id] || { busy: null, lastEnd: 0, played: 0 };
       if(m.status === 'playing') s.busy = m;
       if(m.status === 'done'){ s.played++; const e = m.ended_at ? Date.parse(m.ended_at) : 0; if(e > s.lastEnd) s.lastEnd = e; }
@@ -9728,10 +9856,10 @@ function tournQueue(t){
   const now = Date.now(), cfg = tournSettings(t), st = tournTeamState(t);
   const pend = tournLiveMatches(t).filter(function(m){ return m.status === 'pending'; });
   pend.forEach(function(m){
-    const a = st[m.team_a] || { lastEnd: 0 }, b = st[m.team_b] || { lastEnd: 0 };
-    m._key = Math.max(a.lastEnd || 0, b.lastEnd || 0);
+    const mp = tournMP(m);
+    m._key = mp.reduce(function(mx, id){ return Math.max(mx, (st[id] || {}).lastEnd || 0); }, 0);
     let why = '';
-    [m.team_a, m.team_b].forEach(function(id){
+    mp.forEach(function(id){
       if(why) return;
       const s = st[id] || {}, tm = tournTeamById(id);
       if(s.busy) why = tournTeamName(id) + ' joue sur ' + (s.busy.court || 'un terrain');
@@ -9757,22 +9885,22 @@ function tournEstimates(t, queue){
     if(m.status === 'playing' && m.court){
       const end = Math.max(now, (m.called_at ? Date.parse(m.called_at) : now) + tournMatchMinutes(t, m) * 60000);
       if(free[m.court] !== undefined) free[m.court] = end;
-      teamAt[m.team_a] = teamAt[m.team_b] = end + cfg.rest * 60000;
+      tournMP(m).forEach(function(id){ teamAt[id] = end + cfg.rest * 60000; });
     }
     if(m.status === 'done' && m.ended_at){
       const e = Date.parse(m.ended_at) + cfg.rest * 60000;
-      [m.team_a, m.team_b].forEach(function(id){ teamAt[id] = Math.max(teamAt[id] || 0, e); });
+      tournMP(m).forEach(function(id){ teamAt[id] = Math.max(teamAt[id] || 0, e); });
     }
   });
   queue.forEach(function(m){
     let best = null;
     courts.forEach(function(c){ if(tournCourtOk(m, c) && (best === null || free[c] < free[best])) best = c; });
     if(best === null) return;
-    const start = Math.max(free[best], teamAt[m.team_a] || now, teamAt[m.team_b] || now, now);
+    const start = Math.max.apply(null, [free[best], now].concat(tournMP(m).map(function(id){ return teamAt[id] || now; })));
     est[m.id] = start;
     const end = start + tournMatchMinutes(t, m) * 60000;
     free[best] = end;
-    teamAt[m.team_a] = teamAt[m.team_b] = end + cfg.rest * 60000;
+    tournMP(m).forEach(function(id){ teamAt[id] = end + cfg.rest * 60000; });
   });
   return est;
 }
@@ -9783,7 +9911,7 @@ function tournRoundSingular(round, rounds){
 }
 // Pastille de l'étape d'un match : poule, tableau, perdants, finale.
 function tournPhaseBadge(m){
-  if(m.phase === 'pool') return { txt: m.pool === 'U' || !m.pool ? 'Tous contre tous' : 'Poule ' + m.pool, cls: 'ph-pool' };
+  if(m.phase === 'pool') return { txt: m.pool === 'R' ? 'Ronde ' + m.round : (m.pool === 'U' || !m.pool ? 'Tous contre tous' : 'Poule ' + m.pool), cls: 'ph-pool' };
   if(m.phase === 'ko'){ const r = tournKoRounds(m.division_id); return { txt: tournRoundSingular(m.round, r), cls: m.round === r ? 'ph-final' : 'ph-ko' }; }
   if(m.phase === 'gf') return { txt: 'Grande finale', cls: 'ph-final' };
   if(m.phase === 'bronze') return { txt: 'Match pour le bronze', cls: 'ph-lb' };
@@ -9808,10 +9936,10 @@ function tournDivProgress(t, d){
   const br = tournMatches(d.id).filter(function(m){ return m.phase !== 'pool' && m.status !== 'bye' && (m.team_a || m.team_b || m.src); });
   const cnt = function(list){ return { done: list.filter(function(m){ return m.status === 'done'; }).length, total: list.length, live: list.filter(function(m){ return m.status === 'playing'; }).length }; };
   const goPrep = `VIEW.tprep='${d.id}';tournTab('poules')`, goBr = `VIEW.tbr='${d.id}';tournTab('tableau')`;
-  if(stage === 'setup') return { step: 'setup', label: 'À préparer', detail: r.format === 'double_elim' ? 'Le tableau n\'est pas encore créé' : 'Les poules ne sont pas encore formées', pct: 0, act: [r.format === 'double_elim' ? 'Créer le tableau' : 'Former les poules', goPrep, true] };
+  if(stage === 'setup') return { step: 'setup', label: 'À préparer', detail: r.format === 'double_elim' ? 'Le tableau n\'est pas encore créé' : tournIsRot(r) ? 'Les rondes ne sont pas encore créées' : 'Les poules ne sont pas encore formées', pct: 0, act: [r.format === 'double_elim' ? 'Créer le tableau' : tournIsRot(r) ? 'Créer les rondes' : 'Former les poules', goPrep, true] };
   if(stage === 'pools'){
     const c = cnt(pool);
-    if(c.done < c.total) return { step: 'pools', label: r.format === 'round_robin' ? 'Tous contre tous en cours' : 'Poules en cours', detail: c.done + ' / ' + c.total + ' matchs joués' + (c.live ? ' · ' + c.live + ' en cours' : ''), pct: c.total ? c.done / c.total : 0, act: ['Classements', r.format === 'round_robin' ? goBr : goPrep, false] };
+    if(c.done < c.total) return { step: 'pools', label: r.format === 'round_robin' ? 'Tous contre tous en cours' : tournIsRot(r) ? 'Rondes en cours' : 'Poules en cours', detail: c.done + ' / ' + c.total + ' matchs joués' + (c.live ? ' · ' + c.live + ' en cours' : ''), pct: c.total ? c.done / c.total : 0, act: ['Classements', r.format === 'round_robin' ? goBr : goPrep, false] };
     if(tournNoBracket(r)) return { step: 'done', label: 'Terminé', detail: tournPoolLabels(d.id).length > 1 ? 'Classement final de chaque poule prêt' : 'Classement final et podium prêts', pct: 1, act: [tournPoolLabels(d.id).length > 1 ? 'Voir les classements' : 'Voir le podium', goBr, false] };
     return { step: 'next', label: 'Poules terminées', detail: 'Les qualifiés attendent le tableau final', pct: 1, act: ['Créer le tableau final', `tournCreateBracket('${t.id}','${d.id}')`, true] };
   }
@@ -9870,8 +9998,8 @@ function tournLiveHTML(t){
       </section>`;
     }
     // Une équipe n'est proposée que sur un seul terrain à la fois.
-    const sug = ready.find(function(x){ return !used[x.team_a] && !used[x.team_b] && tournCourtOk(x, c); });
-    if(sug){ used[sug.team_a] = 1; used[sug.team_b] = 1; }
+    const sug = ready.find(function(x){ return tournMP(x).every(function(id){ return !used[id]; }) && tournCourtOk(x, c); });
+    if(sug) tournMP(sug).forEach(function(id){ used[id] = 1; });
     return `<section class="tn-court">
       <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="free">Libre</span></div>
       ${sug ? `<div class="tn-court-s">Prochain match proposé :</div>
@@ -10029,7 +10157,7 @@ function openTournCheckin(tid){
         const list = by[d.id].filter(function(x){ return !q || dupNorm(x.p1_name + ' ' + x.p2_name).indexOf(q) !== -1; });
         if(!list.length) return '';
         return `<div class="tn-k" style="margin:10px 0 6px;">${escapeHTML(d.name)} · ${by[d.id].filter(function(x){ return x.checked_in; }).length} / ${by[d.id].length}</div>
-          ${list.map(function(x){ return `<button type="button" class="tn-ci${x.checked_in ? ' on' : ''}" onclick="tournCheckin('${x.id}')"><span class="tn-ci-b" aria-hidden="true">${x.checked_in ? '✓' : ''}</span><span>${escapeHTML(x.p1_name)} et ${escapeHTML(x.p2_name)}</span><em>${x.checked_in ? 'Arrivée' : 'Pas arrivée'}</em></button>`; }).join('')}`;
+          ${list.map(function(x){ return `<button type="button" class="tn-ci${x.checked_in ? ' on' : ''}" onclick="tournCheckin('${x.id}')"><span class="tn-ci-b" aria-hidden="true">${x.checked_in ? '✓' : ''}</span><span>${escapeHTML(tournTeamFull(x.id))}</span><em>${x.checked_in ? (x.p2_name ? 'Arrivée' : 'Arrivé(e)') : (x.p2_name ? 'Pas arrivée' : 'Pas arrivé(e)')}</em></button>`; }).join('')}`;
       }).join('')}</div>`;
   };
   setModal({ kind:'content', title:'Présences', htmlContent: html, panel: true, tcheck: tid });
@@ -10093,6 +10221,7 @@ function tournLiveNotify(){ try{ if(TLIVE_CH) TLIVE_CH.send({ type: 'broadcast',
 // ---- Classements des poules ----
 // Départage : victoires, puis résultat entre les équipes à égalité, puis différentiel, puis points marqués.
 function tournStandings(divId, pool){
+  if(tournDivIsRot(divId)) return tournRotStandings(divId, pool);
   const teams = (TTEAMS || []).filter(function(x){ return x.division_id === divId && x.pool === pool && x.status === 'registered'; });
   const ms = (TMATCHES || []).filter(function(m){ return m.division_id === divId && m.phase === 'pool' && m.pool === pool; });
   const row = {};
@@ -10121,6 +10250,24 @@ function tournStandings(divId, pool){
   }
   return out;
 }
+// Classement individuel : victoires (en proportion des matchs joués), puis différentiel moyen.
+function tournRotStandings(divId, pool){
+  const players = (TTEAMS || []).filter(function(x){ return x.division_id === divId && x.pool === pool && x.status === 'registered'; });
+  const row = {};
+  players.forEach(function(x){ row[x.id] = { id: x.id, w: 0, l: 0, pf: 0, pa: 0, played: 0, left: 0 }; });
+  tournMatches(divId, 'pool').forEach(function(m){
+    if(m.pool !== pool) return;
+    const A = tournMembers(m.team_a), B = tournMembers(m.team_b);
+    if(m.status !== 'done'){ A.concat(B).forEach(function(id){ if(row[id]) row[id].left++; }); return; }
+    const sa = Number(m.score_a) || 0, sb = Number(m.score_b) || 0, aWin = m.winner === m.team_a;
+    A.forEach(function(id){ const r = row[id]; if(!r) return; r.pf += sa; r.pa += sb; r.played++; if(aWin) r.w++; else r.l++; });
+    B.forEach(function(id){ const r = row[id]; if(!r) return; r.pf += sb; r.pa += sa; r.played++; if(aWin) r.l++; else r.w++; });
+  });
+  const list = Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; return r; });
+  const pct = function(r, v){ return r.played ? v / r.played : 0; };
+  list.sort(function(x, y){ return (pct(y, y.w) - pct(x, x.w)) || (pct(y, y.diff) - pct(x, x.diff)) || (pct(y, y.pf) - pct(x, x.pf)) || (y.w - x.w) || tournTeamName(x.id).localeCompare(tournTeamName(y.id)); });
+  return list;
+}
 function tournPoolLabels(divId){
   const out = []; (TTEAMS || []).forEach(function(x){ if(x.division_id === divId && x.pool && x.status === 'registered' && out.indexOf(x.pool) === -1) out.push(x.pool); });
   return out.sort();
@@ -10128,7 +10275,7 @@ function tournPoolLabels(divId){
 function tournStandingsHTML(t, d, pool){
   const r = tournDivRules(t, d), st = tournStandings(d.id, pool);
   const q = tournPoolsThenBracket(r) ? r.qualifiers : 0;
-  return `<table class="tn-std"><thead><tr><th>#</th><th>Équipe</th><th>V-D</th><th>+/-</th></tr></thead><tbody>${st.map(function(x, i){
+  return `<table class="tn-std"><thead><tr><th>#</th><th>${tournIsRot(r) ? 'Joueur' : 'Équipe'}</th><th>V-D</th><th>+/-</th></tr></thead><tbody>${st.map(function(x, i){
     return `<tr class="${i < q ? 'q' : ''}"><td>${i + 1}</td><td>${escapeHTML(tournTeamName(x.id))}</td><td>${x.w}-${x.l}</td><td>${x.diff > 0 ? '+' : ''}${x.diff}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
@@ -10661,6 +10808,7 @@ function tournTestReset(tid){
     let stage = 'setup';
     if(lvl === 'all' || de){
       await sb.from('tournament_matches').delete().eq('division_id', divId);
+      await tournDropPairs(divId);
       await sb.from('tournament_teams').update({ pool: null, pool_order: null }).eq('division_id', divId);
     } else {
       await sb.from('tournament_matches').delete().eq('division_id', divId).neq('phase', 'pool');
@@ -10684,7 +10832,7 @@ async function tournTestAdd(tid){
   const rows = [];
   for(let i = 0; i < nb; i++){
     const k = (start + i) * 2;
-    rows.push({ tournament_id: tid, division_id: div, p1_name: tournTestName(k), p2_name: tournTestName(k + 1), partner_confirmed: true, paid: true,
+    rows.push({ tournament_id: tid, division_id: div, p1_name: tournTestName(k), p2_name: d.format === 'rotation' ? null : tournTestName(k + 1), partner_confirmed: true, paid: true,
       status: have + i < (d.max_teams || 0) ? 'registered' : 'waitlist', seed: seeded && have + i < (d.max_teams || 0) ? maxSeed + i + 1 : null, is_test: true });
   }
   const r = await sb.from('tournament_teams').insert(rows);
@@ -10720,7 +10868,7 @@ function tournSimStage(t, d){
   const open = function(m){ return m.status !== 'done' && m.status !== 'bye' && m.team_a && m.team_b; };
   if(stage === 'pools'){
     const list = tournMatches(d.id, 'pool').filter(open);
-    return list.length ? { label: r.format === 'round_robin' ? 'Tous contre tous' : 'Poules', list: list } : null;
+    return list.length ? { label: r.format === 'round_robin' ? 'Tous contre tous' : tournIsRot(r) ? 'Rondes' : 'Poules', list: list } : null;
   }
   if(stage !== 'bracket') return null;
   if(tournFullDe(r)){
@@ -10785,6 +10933,7 @@ function tournTestClear(tid){
   showConfirm('Retirer les ' + teams.length + ' équipes de test ? Les poules, matchs et tableaux de ' + divIds.length + ' catégorie' + (divIds.length > 1 ? 's' : '') + ' seront remis à zéro.', async function(){
     for(let i = 0; i < divIds.length; i++){
       await sb.from('tournament_matches').delete().eq('division_id', divIds[i]);
+      await tournDropPairs(divIds[i]);
       await sb.from('tournament_teams').update({ pool: null, pool_order: null }).eq('division_id', divIds[i]);
       await sb.from('tournament_divisions').update({ stage: 'setup' }).eq('id', divIds[i]);
     }
@@ -10864,24 +11013,28 @@ function tournPlayerBracketHTML(t, d){
   return tournBracketPageHTML(t).replace(/^[\s\S]*?(<div class="tn-prep-h">)/, '$1');
 }
 function tournPlayerMineHTML(t, d, me){
-  const all = (TMATCHES || []).filter(function(m){ return m.division_id === me.division_id && (m.team_a === me.id || m.team_b === me.id) && m.status !== 'bye'; });
-  const other = function(m){ return m.team_a === me.id ? m.team_b : m.team_a; };
+  // Mon équipe dans un match : l'équipe elle-même, ou la paire de ronde qui me contient (partenaires qui changent).
+  const mine = function(m){ return tournMembers(m.team_a).indexOf(me.id) !== -1 ? m.team_a : (tournMembers(m.team_b).indexOf(me.id) !== -1 ? m.team_b : null); };
+  const all = (TMATCHES || []).filter(function(m){ return m.division_id === me.division_id && mine(m) && m.status !== 'bye'; });
+  const other = function(m){ return mine(m) === m.team_a ? m.team_b : m.team_a; };
+  const mate = function(m){ const tm = tournTeamById(mine(m)); if(!tm || !Array.isArray(tm.members)) return ''; const o = tm.members.filter(function(x){ return x !== me.id; })[0]; return o ? tournTeamFull(o) : ''; };
+  const withTxt = function(m){ const x = mate(m); return x ? 'avec <b>' + escapeHTML(x) + '</b> · ' : ''; };
   const order = function(a, b){ const pa = a.phase === 'pool' ? 0 : 1, pb = b.phase === 'pool' ? 0 : 1; return (pa - pb) || (a.round - b.round) || (a.seq - b.seq); };
   all.sort(order);
   const playing = all.find(function(m){ return m.status === 'playing'; });
   const next = playing || all.find(function(m){ return m.status === 'pending' && m.team_a && m.team_b; });
   const waiting = !next && all.some(function(m){ return m.status === 'pending' && !(m.team_a && m.team_b); });
   const done = all.filter(function(m){ return m.status === 'done'; });
-  const w = done.filter(function(m){ return m.winner === me.id; }).length, l = done.length - w;
+  const w = done.filter(function(m){ return m.winner === mine(m); }).length, l = done.length - w;
   let est = null;
   if(next && !playing){ try{ const q = tournQueue(t), e = tournEstimates(t, q); est = e[next.id] || null; }catch(e){} }
   let card;
   if(playing){
     card = `<section class="tn-next live"><div class="tn-k">Ton match est appelé</div><div class="tn-next-big">${escapeHTML(playing.court ? 'Terrain ' + playing.court : 'Présente-toi à la table')}</div>
-      <div class="tn-next-vs">contre <b>${escapeHTML(tournTeamFull(other(playing)))}</b></div><div class="tn-next-s">${escapeHTML(d.name)} · ${tournBadgeHTML(playing)}</div></section>`;
+      <div class="tn-next-vs">${withTxt(playing)}contre <b>${escapeHTML(tournTeamFull(other(playing)))}</b></div><div class="tn-next-s">${escapeHTML(d.name)} · ${tournBadgeHTML(playing)}</div></section>`;
   } else if(next){
     card = `<section class="tn-next"><div class="tn-k">Ton prochain match</div><div class="tn-next-big">${est ? 'Vers ' + tournHour(est) : 'Bientôt'}</div>
-      <div class="tn-next-vs">contre <b>${escapeHTML(tournTeamFull(other(next)))}</b></div><div class="tn-next-s">${escapeHTML(d.name)} · ${tournBadgeHTML(next)} · le terrain te sera annoncé par notification</div></section>`;
+      <div class="tn-next-vs">${withTxt(next)}contre <b>${escapeHTML(tournTeamFull(other(next)))}</b></div><div class="tn-next-s">${escapeHTML(d.name)} · ${tournBadgeHTML(next)} · le terrain te sera annoncé par notification</div></section>`;
   } else if(waiting){
     card = `<section class="tn-next"><div class="tn-k">Ton prochain match</div><div class="tn-next-big">En attente</div><div class="tn-next-s">Ton adversaire sera connu à la fin d'un autre match. Tu recevras une notification quand ton match sera appelé.</div></section>`;
   } else if((d.stage || '') === 'pools' && tournPoolsThenBracket(tournDivRules(t, d))){
@@ -10891,12 +11044,12 @@ function tournPlayerMineHTML(t, d, me){
     const medal = pod.gold === me.id ? 'Médaille d\'or' : pod.silver === me.id ? 'Médaille d\'argent' : (pod.bronze || []).indexOf(me.id) !== -1 ? 'Médaille de bronze' : '';
     card = `<section class="tn-next${medal ? ' medal' : ''}"><div class="tn-k">Ton tournoi est terminé</div><div class="tn-next-big">${medal || (w + ' V · ' + l + ' D')}</div><div class="tn-next-s">${medal ? w + ' victoires · ' + l + ' défaites. Bravo !' : 'Merci d\'avoir joué !'}</div></section>`;
   }
-  const pool = me.pool && d ? `<section class="tn-pool" style="margin-top:12px;"><div class="tn-pool-h"><b>${me.pool === 'U' ? 'Classement' : 'Poule ' + me.pool}</b><span>${tournPoolsThenBracket(tournDivRules(t, d)) ? (tournDivRules(t, d).qualifiers === 1 ? 'le 1er passe' : 'les 2 premiers passent') : ''}</span></div>${tournStandingsHTML(t, d, me.pool).replace('<td>' + escapeHTML(tournTeamName(me.id)) + '</td>', '<td><b class="tn-me">' + escapeHTML(tournTeamName(me.id)) + ' (toi)</b></td>')}</section>` : '';
+  const pool = me.pool && d ? `<section class="tn-pool" style="margin-top:12px;"><div class="tn-pool-h"><b>${me.pool === 'U' || me.pool === 'R' ? 'Classement' : 'Poule ' + me.pool}</b><span>${tournPoolsThenBracket(tournDivRules(t, d)) ? tournQualTxt(tournDivRules(t, d).qualifiers) : ''}</span></div>${tournStandingsHTML(t, d, me.pool).replace('<td>' + escapeHTML(tournTeamName(me.id)) + '</td>', '<td><b class="tn-me">' + escapeHTML(tournTeamName(me.id)) + ' (toi)</b></td>')}</section>` : '';
   const rows = all.map(function(m){
-    const op = other(m), res = m.status === 'done' ? (m.winner === me.id ? 'w' : 'l') : '';
-    const sc = m.status === 'done' ? (Array.isArray(m.games) ? m.games.map(function(g){ return m.team_a === me.id ? g[0] + '-' + g[1] : g[1] + '-' + g[0]; }).join(' · ') : (m.team_a === me.id ? m.score_a + '-' + m.score_b : m.score_b + '-' + m.score_a)) : '';
+    const op = other(m), res = m.status === 'done' ? (m.winner === mine(m) ? 'w' : 'l') : '', ia = mine(m) === m.team_a;
+    const sc = m.status === 'done' ? (Array.isArray(m.games) ? m.games.map(function(g){ return ia ? g[0] + '-' + g[1] : g[1] + '-' + g[0]; }).join(' · ') : (ia ? m.score_a + '-' + m.score_b : m.score_b + '-' + m.score_a)) : '';
     const when = m.status === 'playing' ? 'En cours' + (m.court ? ' · ' + m.court : '') : m.status === 'done' ? '' : (op ? 'À venir' : 'Adversaire à venir');
-    return `<div class="tn-mm ${res}${m.status === 'playing' ? ' live' : ''}"><span class="tn-mm-l">${tournBadgeHTML(m)}<span>c. <b>${escapeHTML(op ? tournTeamName(op) : '…')}</b></span></span><span class="tn-mm-r">${res ? `<b>${sc}</b><em>${res === 'w' ? 'Victoire' : 'Défaite'}</em>` : `<em>${when}</em>`}</span></div>`;
+    return `<div class="tn-mm ${res}${m.status === 'playing' ? ' live' : ''}"><span class="tn-mm-l">${tournBadgeHTML(m)}<span>${withTxt(m)}c. <b>${escapeHTML(op ? tournTeamName(op) : '…')}</b></span></span><span class="tn-mm-r">${res ? `<b>${sc}</b><em>${res === 'w' ? 'Victoire' : 'Défaite'}</em>` : `<em>${when}</em>`}</span></div>`;
   }).join('');
   return card + pool + `<section class="tn-sec"><div class="tn-sec-h"><span>Mes matchs</span><small style="font-family:var(--font-body);font-size:12px;color:var(--muted);text-transform:none;">${w} V · ${l} D</small></div><div class="tn-mms">${rows || '<p class="small" style="color:var(--muted);">Aucun match pour l\'instant.</p>'}</div></section>`;
 }
@@ -11135,6 +11288,7 @@ function tournHistoryCSV(tid){
 function tournPlanFor(t, d, n){
   const r = tournDivRules(t, d), out = { pool: 0, bracket: 0, q: 0, pools: [] };
   if(n < 2) return out;
+  if(tournIsRot(r)){ out.pool = n >= 4 ? tournRotRounds(n, r) * Math.floor(n / 4) : 0; out.pools = [n]; return out; }
   if(r.format === 'round_robin'){ out.pool = n * (n - 1) / 2; out.pools = [n]; if(!r.rr_final) return out; out.q = Math.min(n, r.rr_final); }
   else if(r.format === 'pools_ko' || r.format === 'pools_de' || r.format === 'pools_only'){
     const k = tournPoolCount(n, r.pool_size, r.format), base = Math.floor(n / k), extra = n % k;
@@ -11233,7 +11387,7 @@ function openTournRegInfo(tid){
     const n = tournTeams(tid, d.id, 'registered').length, w = tournTeams(tid, d.id, 'waitlist').length, max = d.max_teams || 0, pct = max ? Math.min(100, Math.round(100 * n / max)) : 0;
     return `<div class="tn-reg-row"><b>${escapeHTML(d.name)}</b><span class="tn-reg-bar"><span style="width:${pct}%;${n >= max ? 'background:var(--paddle);' : ''}"></span></span><span class="tn-reg-n">${n} / ${max}${w ? '<em>+' + w + ' en attente</em>' : ''}</span></div>`;
   }).join('');
-  const names = function(list){ return list.slice(0, 6).map(function(x){ return escapeHTML(x.p1_name + ' et ' + x.p2_name); }).join('<br>') + (list.length > 6 ? '<br>… et ' + (list.length - 6) + ' autre' + (list.length - 6 > 1 ? 's' : '') : ''); };
+  const names = function(list){ return list.slice(0, 6).map(function(x){ return escapeHTML(tournTeamFull(x.id)); }).join('<br>') + (list.length > 6 ? '<br>… et ' + (list.length - 6) + ' autre' + (list.length - 6 > 1 ? 's' : '') : ''); };
   const st = TOURN_ST[t.status] || TOURN_ST.draft;
   const dl = t.reg_deadline ? new Date(t.reg_deadline + 'T12:00:00').toLocaleDateString('fr-CA', { day:'numeric', month:'long' }) : null;
   const html = `<div class="tn-info">
@@ -11333,12 +11487,13 @@ var TOURN_FMT_SVG = {
   pools_ko: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="3" width="16" height="12" rx="3"/><rect x="2" y="21" width="16" height="12" rx="3"/><path d="M18 9h10v18H18M28 18h10"/><path d="M38 10h10v16H38M48 18h12"/><circle cx="60" cy="18" r="2" fill="currentColor"/></svg>',
   round_robin: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M32 4L50 16 43 32H21L14 16Z"/><path d="M32 4L43 32M32 4L21 32M14 16h36M14 16l29 16M50 16L21 32" stroke-width="1.2" opacity=".7"/><g fill="currentColor"><circle cx="32" cy="4" r="3"/><circle cx="50" cy="16" r="3"/><circle cx="43" cy="32" r="3"/><circle cx="21" cy="32" r="3"/><circle cx="14" cy="16" r="3"/></g></svg>',
   pools_only: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="16" height="28" rx="3"/><rect x="24" y="4" width="16" height="28" rx="3"/><rect x="45" y="4" width="16" height="28" rx="3"/><path d="M7 12h8M7 18h8M7 24h8M28 12h8M28 18h8M28 24h8M49 12h8M49 18h8M49 24h8" stroke-width="1.4" opacity=".7"/></svg>',
+  rotation: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><g fill="currentColor"><circle cx="10" cy="9" r="3.5"/><circle cx="10" cy="27" r="3.5"/><circle cx="54" cy="9" r="3.5"/><circle cx="54" cy="27" r="3.5"/></g><path d="M18 9h28M18 27h28" opacity=".45"/><path d="M20 14c8 0 16 8 24 8M44 14c-8 0-16 8-24 8"/><path d="M40 19l4 3-4 3M24 11l-4 3 4 3" stroke-width="1.6"/></svg>',
   double_elim: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 3h10v10H4M14 8h10M24 8h10v10M34 18h12"/><path d="M4 23h10v10H4M14 28h10M24 28h10v-10" opacity=".55"/><path d="M46 18h14"/><circle cx="60" cy="18" r="2" fill="currentColor"/></svg>',
   pools_de: '<svg viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="3"/><rect x="2" y="21" width="14" height="12" rx="3"/><path d="M16 9h8M16 27h8"/><path d="M24 4h10v10H24M34 9h10M44 9v9h14"/><path d="M24 22h10v10H24M34 27h10v-9" opacity=".55"/><circle cx="60" cy="18" r="2" fill="currentColor"/></svg>'
 };
 function tournFmtCards(cur){
-  const desc = { pools_ko:'Poules, puis les meilleures équipes passent au tableau final.', pools_de:'Poules, puis les qualifiés jouent une double élimination.', round_robin:'Une seule poule, tout le monde se rencontre. Finale possible ensuite.', pools_only:'Plusieurs poules, sans tableau : le classement de chaque poule est final.', double_elim:'Tableau dès le départ ; éliminé après la deuxième défaite.' };
-  return `<div class="tn-fmts" role="radiogroup"><input type="hidden" id="tdFormat" value="${cur}">${['pools_ko','pools_de','round_robin','pools_only','double_elim'].map(function(k){
+  const desc = { pools_ko:'Poules, puis les meilleures équipes passent au tableau final.', pools_de:'Poules, puis les qualifiés jouent une double élimination.', round_robin:'Une seule poule, tout le monde se rencontre. Finale possible ensuite.', pools_only:'Plusieurs poules, sans tableau : le classement de chaque poule est final.', rotation:'Inscription individuelle : un nouveau partenaire à chaque ronde, classement individuel.', double_elim:'Tableau dès le départ ; éliminé après la deuxième défaite.' };
+  return `<div class="tn-fmts" role="radiogroup"><input type="hidden" id="tdFormat" value="${cur}">${['pools_ko','pools_de','round_robin','pools_only','rotation','double_elim'].map(function(k){
     const on = k === cur;
     return `<button type="button" role="radio" aria-checked="${on}" class="tn-fmtc${on ? ' on' : ''}" onclick="tournSegPick(this,'tdFormat','${k}','tournDivFmt')">${TOURN_FMT_SVG[k]}<span><b>${TOURN_FMT[k]}</b><small>${desc[k]}</small></span></button>`;
   }).join('')}</div>`;
@@ -11398,6 +11553,7 @@ function openTournDivForm(tid, divId){
       ${tournFmtCards(r.format)}
       <div class="tn-row2 tn-fmt-main">
         <div data-f="pools_de double_elim"${show(['pools_de','double_elim'])}>${tournField('Double élimination', tournSeg('tdDeMode', [['full','<b>Complète</b><small>Gagnants, perdants, grande finale</small>'],['consolation','<b>Consolante seulement</b><small>Tableau simple + consolante</small>']], r.de_mode, 'tournDivOptVis', 'tn-seg-st tn-seg-2'))}</div>
+        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Nombre de rondes', tournSeg('tdRounds', [[0,'Auto'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[10,'10']], r.rot_rounds || 0, 'tournDivSum'), 'Auto : autant de rondes que de joueurs moins un jusqu\'à 8 joueurs, sinon 7. Modifiable au moment de créer les rondes.')}</div>
         <div class="tn-span" data-f="round_robin"${show(['round_robin'])}>${tournField('Après la poule', tournSeg('tdRrFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>Les 2 premiers</small>'],[4,'<b>Demi + finale</b><small>Les 4 premiers</small>']], r.rr_final || 0, 'tournDivOptVis', 'tn-seg-st tn-seg-3'))}</div>
         <div id="tdBronzeWrap" data-f="pools_ko pools_de double_elim round_robin"${tournBronzeAllowed(r) ? '' : ' style="display:none"'}>${tournField('Match pour la médaille de bronze', tournSeg('tdBronze', [['0','Non'],['1','Oui']], r.bronze_match ? '1' : '0', 'tournDivSum'), 'Les deux perdants des demi-finales jouent pour la 3e place.')}</div>
       </div>
@@ -11405,7 +11561,7 @@ function openTournDivForm(tid, divId){
       <div class="tn-row2 tn-fmt-opts">
         <div data-f="pools_ko pools_de pools_only"${show(['pools_ko','pools_de','pools_only'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6']], r.pool_size, 'tournDivSum'))}</div>
         <div data-f="pools_ko pools_de"${show(['pools_ko','pools_de'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'Le 1er'],[2,'Les 2 premiers'],[3,'Les 3 premiers'],[99,'Toutes']], r.qualifiers, 'tournDivSum'), 'Avec « Toutes », chaque équipe joue le tableau, placée selon son classement de poule.')}</div>
-        <div data-f="pools_ko pools_de round_robin pools_only"${show(['pools_ko','pools_de','round_robin','pools_only'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points, 'tournDivSum'))}</div>
+        <div data-f="pools_ko pools_de round_robin pools_only rotation"${show(['pools_ko','pools_de','round_robin','pools_only','rotation'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' || r.format === 'rotation' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points, 'tournDivSum'))}</div>
         <div data-f="pools_ko pools_de double_elim round_robin"${show(['pools_ko','pools_de','double_elim','round_robin'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points, 'tournDivSum'))}</div>
         <div data-f="pools_ko pools_de double_elim round_robin"${show(['pools_ko','pools_de','double_elim','round_robin'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of, 'tournDivSum'))}</div>
       </div>
@@ -11417,7 +11573,7 @@ function openTournDivForm(tid, divId){
       <div class="tn-row3">
         ${tournField('Niveau', `<input id="tdLevel" maxlength="20" value="${escapeHTML(v.level || '')}" placeholder="Tous">`)}
         ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="Tous">`)}
-        ${tournField('Équipes max.', tournStepper('tdMax', v.max_teams || 12, 2, 64))}
+        ${tournField(`<span id="tdMaxLbl">${r.format === 'rotation' ? 'Joueurs max.' : 'Équipes max.'}</span>`, tournStepper('tdMax', v.max_teams || 12, 2, 64))}
       </div>
       ${tournCourts(t || {}).length ? tournField('Jouer sur', tournMulti('tdCourts', tournCourts(t), (d && Array.isArray(d.courts)) ? d.courts : []), 'Choisis des terrains précis seulement pour réserver cette catégorie à ces terrains : ses matchs n\'iront nulle part ailleurs.') : ''}
     </div>
@@ -11435,13 +11591,14 @@ function tournFmtHelp(f){
     pools_de:'Les équipes jouent en poules, puis les qualifiées jouent une double élimination (complète ou avec consolante).',
     round_robin:'Une seule poule : tout le monde se rencontre. Classement par victoires, puis par différentiel. Idéal jusqu\'à 6 ou 7 équipes. Option : finale ou demi-finales après la poule.',
     pools_only:'Plusieurs poules, tous contre tous dans chaque poule. Pas de tableau : le classement de chaque poule est le résultat final.',
+    rotation:'Chaque joueur s\'inscrit seul. À chaque ronde, l\'app forme de nouvelles paires et de nouveaux adversaires ; le repos tourne si le nombre de joueurs ne tombe pas juste. Classement individuel.',
     double_elim:'Tableau dès le départ : une équipe est éliminée après sa deuxième défaite (tableau des gagnants et tableau des perdants).' }[f] || '';
 }
 // Résumé des réglages fins de la formule, mis à jour à chaque choix.
 function tournDivSum(){
   const el = document.getElementById('tdFmtSum'); if(!el) return;
   const n = function(id){ return parseInt(tfVal(id), 10) || null; };
-  el.textContent = tournFmtDetail(null, { format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: n('tdRrFinal') || 0, pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
+  el.textContent = tournFmtDetail(null, { format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: n('tdRrFinal') || 0, rot_rounds: n('tdRounds') || 0, pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
 }
 // Options qui dépendent de la formule et du mode de double élimination.
 function tournDivOptVis(){
@@ -11451,7 +11608,8 @@ function tournDivOptVis(){
 }
 function tournDivFmt(f){
   document.querySelectorAll('.tn-form [data-f]').forEach(function(el){ el.style.display = (' ' + el.getAttribute('data-f') + ' ').indexOf(' ' + f + ' ') !== -1 ? '' : 'none'; });
-  const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' ? 'Points des matchs' : 'Points des poules';
+  const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' || f === 'rotation' ? 'Points des matchs' : 'Points des poules';
+  const ml = document.getElementById('tdMaxLbl'); if(ml) ml.textContent = f === 'rotation' ? 'Joueurs max.' : 'Équipes max.';
   const h = document.getElementById('tdFmtHelp'); if(h) h.textContent = tournFmtHelp(f);
   tournDivOptVis();
 }
@@ -11463,6 +11621,7 @@ async function tournDivSave(tid, divId){
     max_teams: Math.max(2, Math.min(64, parseInt(tfVal('tdMax'), 10) || 12)), format: fmt,
     pool_size: Math.max(3, Math.min(6, parseInt(tfVal('tdPool'), 10) || 4)), qualifiers: [1, 2, 3, 99].indexOf(parseInt(tfVal('tdQual'), 10)) !== -1 ? parseInt(tfVal('tdQual'), 10) : 2,
     rr_final: fmt === 'round_robin' && [2, 4].indexOf(parseInt(tfVal('tdRrFinal'), 10)) !== -1 ? parseInt(tfVal('tdRrFinal'), 10) : 0,
+    rot_rounds: fmt === 'rotation' ? Math.max(0, Math.min(20, parseInt(tfVal('tdRounds'), 10) || 0)) : 0,
     pool_points: parseInt(tfVal('tdPoolPts'), 10) || 11, bracket_points: parseInt(tfVal('tdBrPts'), 10) || 15, final_best_of: parseInt(tfVal('tdFinal'), 10) === 1 ? 1 : 3,
     de_mode: tfVal('tdDeMode') === 'consolation' ? 'consolation' : 'full' };
   row.bronze_match = tournBronzeAllowed(row) && tfVal('tdBronze') === '1';
@@ -11522,7 +11681,7 @@ function tournTeamsTableHTML(t){
   const rows = reg.map(function(x, i){
     return `<tr onclick="openTournTeam('${x.id}')">
       <td class="tn-k2">${i + 1}</td>
-      <td><b>${escapeHTML(x.p1_name || '?')}</b> &amp; <b>${escapeHTML(x.p2_name || '?')}</b><div class="small" style="color:var(--muted);">${x.is_test ? '<span class="tn-test-tag">Test</span> ' : ''}${escapeHTML(cur ? (x.p2_profile ? 'Deux comptes Dinkeo' : 'Partenaire sans compte') : divName(x.division_id))}</div></td>
+      <td><b>${escapeHTML(x.p1_name || '?')}</b>${x.p2_name ? ` &amp; <b>${escapeHTML(x.p2_name)}</b>` : ''}<div class="small" style="color:var(--muted);">${x.is_test ? '<span class="tn-test-tag">Test</span> ' : ''}${escapeHTML(cur ? (!x.p2_name ? (x.p1_profile ? 'Inscription individuelle' : 'Individuelle · sans compte') : x.p2_profile ? 'Deux comptes Dinkeo' : 'Partenaire sans compte') : divName(x.division_id))}</div></td>
       <td onclick="event.stopPropagation()"><input class="tn-seed" type="number" min="1" max="64" value="${x.seed || ''}" placeholder="—" aria-label="Tête de série" onchange="tournTeamPatch('${x.id}', { seed: parseInt(this.value,10) || null })"></td>
       <td>${escapeHTML(fdate(x.created_at))}</td>
       <td><span class="jp-pill ${x.partner_confirmed ? 'ok' : 'w'}">${x.partner_confirmed ? 'Confirmé' : 'En attente de réponse'}</span></td>
@@ -11532,7 +11691,7 @@ function tournTeamsTableHTML(t){
   const table = reg.length ? `<div class="dk-tbl-wrap"><table class="dk-tbl tn-teams"><thead><tr><th>#</th><th>Équipe</th><th>Tête de série</th><th>Inscription</th><th>Partenaire</th><th>Paiement</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : `<p class="small" style="color:var(--muted);margin:12px 0 0;">${q ? 'Aucune équipe ne correspond.' : 'Aucune équipe inscrite pour l\'instant. Partage le lien d\'inscription (Réglages).'}</p>`;
   const wl = wait.length ? `<div class="tn-wait"><b>Liste d'attente · ${wait.length}</b>
-      <div class="tn-wait-l">${wait.map(function(x, i){ return `<div class="tn-wait-r"><span>${i + 1}. ${escapeHTML(x.p1_name || '?')} &amp; ${escapeHTML(x.p2_name || '?')}${cur ? '' : ' <small>· ' + escapeHTML(divName(x.division_id)) + '</small>'}</span><button type="button" class="btn btn-primary" onclick="tournPromote('${x.id}')">Donner la place</button></div>`; }).join('')}</div></div>` : '';
+      <div class="tn-wait-l">${wait.map(function(x, i){ return `<div class="tn-wait-r"><span>${i + 1}. ${escapeHTML(tournTeamFull(x.id))}${cur ? '' : ' <small>· ' + escapeHTML(divName(x.division_id)) + '</small>'}</span><button type="button" class="btn btn-primary" onclick="tournPromote('${x.id}')">Donner la place</button></div>`; }).join('')}</div></div>` : '';
   return table + wl;
 }
 async function tournTeamPatch(id, patch){
@@ -11547,7 +11706,7 @@ function tournPromote(id){
   const x = (TTEAMS || []).find(function(y){ return y.id === id; }); if(!x) return;
   const d = (TDIVS || []).find(function(y){ return y.id === x.division_id; }) || {};
   const n = tournTeams(x.tournament_id, x.division_id, 'registered').length;
-  showConfirm('Inscrire ' + x.p1_name + ' et ' + x.p2_name + ' dans ' + (d.name || 'la catégorie') + ' ?' + (n >= (d.max_teams || 0) ? ' La catégorie a déjà ' + n + ' équipes : elle passera à ' + (n + 1) + '.' : '') + ' Les joueurs sont prévenus.', async function(){
+  showConfirm('Inscrire ' + tournTeamFull(x.id) + ' dans ' + (d.name || 'la catégorie') + ' ?' + (n >= (d.max_teams || 0) ? ' La catégorie a déjà ' + n + ' équipes : elle passera à ' + (n + 1) + '.' : '') + ' Les joueurs sont prévenus.', async function(){
     const r = await sb.from('tournament_teams').update({ status:'registered', offered_at: new Date().toISOString() }).eq('id', id);
     if(r && r.error){ showAlert('Impossible : ' + r.error.message); return; }
     tournNotify(id, 'promoted');
@@ -11564,7 +11723,7 @@ function tournTeamPanelHTML(id){
   const t = tournById(x.tournament_id), divs = tournDivs(x.tournament_id);
   const who = function(n, e, pid){ return `<div class="tn-who"><b>${escapeHTML(n || '?')}</b><span>${escapeHTML(e || 'Pas de courriel')}${pid ? ' · compte Dinkeo' : ''}</span></div>`; };
   return `<div class="tn-team">
-    ${who(x.p1_name, x.p1_email, x.p1_profile)}${who(x.p2_name, x.p2_email, x.p2_profile)}
+    ${who(x.p1_name, x.p1_email, x.p1_profile)}${x.p2_name ? who(x.p2_name, x.p2_email, x.p2_profile) : ''}
     ${tournField('Catégorie', `<select onchange="tournTeamPatch('${x.id}', { division_id: this.value })">${divs.map(function(d){ return `<option value="${d.id}"${d.id === x.division_id ? ' selected' : ''}>${escapeHTML(d.name)}</option>`; }).join('')}</select>`)}
     <div class="tn-toggles">
       <button type="button" class="jp-pill ${x.partner_confirmed ? 'ok' : 'w'}" onclick="tournTeamPatch('${x.id}', { partner_confirmed: ${x.partner_confirmed ? 'false' : 'true'} })">${x.partner_confirmed ? 'Partenaire confirmé' : 'Partenaire : en attente (confirmer)'}</button>
@@ -11578,7 +11737,7 @@ function tournTeamPanelHTML(id){
 }
 function tournTeamWithdraw(id){
   const x = (TTEAMS || []).find(function(y){ return y.id === id; }); if(!x) return;
-  showConfirm('Retirer ' + x.p1_name + ' et ' + x.p2_name + ' du tournoi ?', async function(){
+  showConfirm('Retirer ' + tournTeamFull(x.id) + ' du tournoi ?', async function(){
     const r = await sb.from('tournament_teams').update({ status:'withdrawn' }).eq('id', id);
     if(r && r.error){ showAlert('Impossible : ' + r.error.message); return; }
     await loadTournaments(true); tournBackToSheet(); render();
@@ -11592,7 +11751,7 @@ function openTournTeamForm(tid){
     ${tournField('Catégorie', tournSel('ttDiv', divs.map(function(d){ return [d.id, escapeHTML(d.name) + ' · ' + tournTeams(tid, d.id, 'registered').length + ' / ' + d.max_teams]; }), cur))}
     <div class="tn-row2">${tournField('Joueur 1', `<input id="ttN1" maxlength="60" placeholder="Nom">`)}${tournField('Courriel', `<input id="ttE1" type="email" maxlength="120" placeholder="Facultatif">`)}</div>
     <div class="tn-row2">${tournField('Joueur 2', `<input id="ttN2" maxlength="60" placeholder="Nom">`)}${tournField('Courriel', `<input id="ttE2" type="email" maxlength="120" placeholder="Facultatif">`)}</div>
-    <p class="small" style="color:var(--muted);margin:0 0 10px;">Inscrite par toi : le partenaire est considéré comme confirmé. Avec le courriel, la personne voit l'inscription dans son app.</p>
+    <p class="small" style="color:var(--muted);margin:0 0 10px;">Inscrite par toi : le partenaire est considéré comme confirmé. Avec le courriel, la personne voit l'inscription dans son app. Catégorie « Partenaires qui changent » : chaque nom est une inscription individuelle (le joueur 2 est facultatif).</p>
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" onclick="tournTeamAdd('${tid}')">Inscrire</button></div></div>`;
   setModal({ kind:'content', title:'Inscrire une équipe', htmlContent: html });
   render();
@@ -11600,6 +11759,18 @@ function openTournTeamForm(tid){
 async function tournTeamAdd(tid){
   const div = tfVal('ttDiv'), n1 = tfVal('ttN1'), n2 = tfVal('ttN2');
   const e1 = tfVal('ttE1').toLowerCase() || null, e2 = tfVal('ttE2').toLowerCase() || null;
+  const dv0 = (TDIVS || []).find(function(x){ return x.id === div; }) || {};
+  if(dv0.format === 'rotation'){
+    // Inscription individuelle : chaque nom devient une inscription (le joueur 2 est facultatif).
+    if(!div || !n1){ showToast('Indique au moins un joueur', true); return; }
+    const prof1 = function(e){ if(!e) return null; const p = (ALL_PROFILES || []).find(function(x){ return String(x.email || '').toLowerCase() === e; }); return p ? p.id : null; };
+    let have = tournTeams(tid, div, 'registered').length; const rows = [];
+    [[n1, e1], [n2, e2]].forEach(function(pe){ if(!pe[0]) return; rows.push({ tournament_id: tid, division_id: div, p1_name: pe[0], p1_email: pe[1], p1_profile: prof1(pe[1]), partner_confirmed: true, status: have < (dv0.max_teams || 0) ? 'registered' : 'waitlist' }); have++; });
+    const rr = await sb.from('tournament_teams').insert(rows);
+    if(rr && rr.error){ showAlert("L'inscription n'a pas pu être faite : " + rr.error.message); return; }
+    await loadTournaments(true); tournBackToSheet(); render();
+    showToast(rows.length > 1 ? '2 joueurs inscrits' : 'Joueur inscrit'); return;
+  }
   if(!div || !n1 || !n2){ showToast('Indique la catégorie et le nom des deux joueurs', true); return; }
   const prof = function(e){ if(!e) return null; const p = (ALL_PROFILES || []).find(function(x){ return String(x.email || '').toLowerCase() === e; }); return p ? p.id : null; };
   const d = (TDIVS || []).find(function(x){ return x.id === div; }) || {};
@@ -11679,6 +11850,8 @@ function tournRegHTML(){
   if(!p) return '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(!p.ok) return `<p>${escapeHTML(p.error || 'Tournoi introuvable.')}</p><div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
   const head = `<div class="tn-reg-h"><div class="tn-k">${escapeHTML(p.organization || 'Tournoi')}</div><b>${escapeHTML(p.name)}</b><span>${escapeHTML(tournDateLabel(p))}${p.start_time ? ' · ' + escapeHTML(p.start_time) : ''}${p.venue ? ' · ' + escapeHTML(p.venue) : ''}</span></div>`;
+  if(R.done && R.done.solo) return head + `<div class="tn-ok"><b>${R.done.status === 'waitlist' ? 'Tu es sur la liste d\'attente' : 'Tu es inscrit(e) !'}</b><p class="small" style="margin:6px 0 0;">${escapeHTML(R.done.division)} · ${R.done.status === 'waitlist' ? 'la catégorie est complète : l\'organisateur te préviendra si une place se libère.' : 'tu changeras de partenaire à chaque ronde. Le jour du tournoi, tes matchs s\'afficheront dans l\'app.'}</p></div>
+    <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal()">Terminé</button></div>`;
   if(R.done) return head + `<div class="tn-ok"><b>${R.done.status === 'waitlist' ? 'Tu es sur la liste d\'attente' : 'Ton équipe est inscrite !'}</b><p class="small" style="margin:6px 0 0;">${escapeHTML(R.done.division)} · ${R.done.status === 'waitlist' ? 'la catégorie est complète : l\'organisateur te préviendra si une place se libère.' : 'ton partenaire doit maintenant confirmer de son côté.'}${R.done.partner_profile ? ' Il ou elle vient de recevoir une notification.' : ' Ton partenaire n\'a pas encore de compte Dinkeo : envoie-lui le lien du tournoi, son inscription l\'attendra.'}</p></div>
     <div class="tn-form-acts"><button type="button" class="btn btn-secondary" onclick="tournCopyLink('${p.id}')">Copier le lien pour mon partenaire</button><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal()">Terminé</button></div>`;
   if(p.mine){
@@ -11686,7 +11859,7 @@ function tournRegHTML(){
     const inv = (MY_TOURNS || []).find(function(x){ return x.team_id === m.id && !x.i_am_p1; });
     if(inv && !m.partner_confirmed) return head + `<div class="tn-ok"><b>${escapeHTML(m.p1_name || '')} t'a inscrit(e) comme partenaire</b><p class="small" style="margin:6px 0 0;">${escapeHTML(d.name || '')} · confirme pour que votre équipe soit complète.</p></div>
       <div class="tn-form-acts"><button type="button" class="btn btn-secondary" onclick="closeModal();tournPartnerRespond('${m.id}', false)">Je ne peux pas</button><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();tournPartnerRespond('${m.id}', true)">Confirmer</button></div>`;
-    return head + `<div class="tn-ok"><b>${m.status === 'waitlist' ? 'Liste d\'attente' : 'Tu es inscrit(e)'}</b><p class="small" style="margin:6px 0 0;">${escapeHTML(d.name || '')} · ${escapeHTML(m.p1_name || '')} et ${escapeHTML(m.p2_name || '')} · partenaire ${m.partner_confirmed ? 'confirmé' : 'en attente de confirmation'}</p></div>
+    return head + `<div class="tn-ok"><b>${m.status === 'waitlist' ? 'Liste d\'attente' : 'Tu es inscrit(e)'}</b><p class="small" style="margin:6px 0 0;">${escapeHTML(d.name || '')} · ${m.p2_name ? escapeHTML(m.p1_name || '') + ' et ' + escapeHTML(m.p2_name) + ' · partenaire ' + (m.partner_confirmed ? 'confirmé' : 'en attente de confirmation') : 'inscription individuelle · nouveau partenaire à chaque ronde'}</p></div>
       <div class="tn-form-acts"><button type="button" class="btn btn-secondary tn-danger" onclick="tournWithdrawMine('${m.id}')">Retirer mon équipe</button><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal()">Fermer</button></div>`;
   }
   if(!p.reg_open) return head + `<p><b>Les inscriptions sont fermées.</b></p><div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
@@ -11699,17 +11872,18 @@ function tournRegHTML(){
   return head + `<div class="tn-form">
     <div class="tn-k" style="margin:4px 0 8px;">Choisis ta catégorie</div>
     <div class="tn-opts">${divs || '<p class="small">Aucune catégorie ouverte.</p>'}</div>
-    <div class="tn-k" style="margin:14px 0 8px;">Ton partenaire</div>
-    <div class="tn-row2">${tournField('Nom', `<input id="trPn" maxlength="60" value="${escapeHTML(R.f.pn)}" oninput="TREG.f.pn=this.value" placeholder="Prénom et nom">`)}${tournField('Courriel', `<input id="trPe" type="email" maxlength="120" value="${escapeHTML(R.f.pe)}" oninput="TREG.f.pe=this.value" placeholder="Pour qu'il ou elle confirme">`)}</div>
-    <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" ${R.busy ? 'disabled' : ''} onclick="tournRegSubmit()">${R.busy ? 'Inscription…' : 'Inscrire mon équipe'}</button></div>
+    ${((p.divisions || []).find(function(x){ return x.id === R.f.div; }) || {}).format === 'rotation' ? `<p class="small" style="color:var(--muted);margin:14px 0 0;">Inscription individuelle : tu changes de partenaire à chaque ronde. Pas besoin d'inscrire de partenaire.</p>` : `<div class="tn-k" style="margin:14px 0 8px;">Ton partenaire</div>
+    <div class="tn-row2">${tournField('Nom', `<input id="trPn" maxlength="60" value="${escapeHTML(R.f.pn)}" oninput="TREG.f.pn=this.value" placeholder="Prénom et nom">`)}${tournField('Courriel', `<input id="trPe" type="email" maxlength="120" value="${escapeHTML(R.f.pe)}" oninput="TREG.f.pe=this.value" placeholder="Pour qu'il ou elle confirme">`)}</div>`}
+    <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" ${R.busy ? 'disabled' : ''} onclick="tournRegSubmit()">${R.busy ? 'Inscription…' : (((p.divisions || []).find(function(x){ return x.id === R.f.div; }) || {}).format === 'rotation' ? 'M\'inscrire' : 'Inscrire mon équipe')}</button></div>
   </div>`;
 }
 async function tournRegSubmit(){
   const R = TREG; if(!R || R.busy) return;
   if(!R.f.div){ showToast('Choisis une catégorie', true); return; }
-  if(!String(R.f.pn || '').trim()){ showToast('Indique le nom de ton partenaire', true); return; }
+  const solo = (((R.data && R.data.divisions) || []).find(function(x){ return x.id === R.f.div; }) || {}).format === 'rotation';
+  if(!solo && !String(R.f.pn || '').trim()){ showToast('Indique le nom de ton partenaire', true); return; }
   R.busy = true; render();
-  const r = await sb.rpc('tournament_register', { p_id: R.id, p_division: R.f.div, p_partner_name: String(R.f.pn).trim(), p_partner_email: String(R.f.pe || '').trim() || null });
+  const r = await sb.rpc('tournament_register', { p_id: R.id, p_division: R.f.div, p_partner_name: solo ? null : String(R.f.pn || '').trim(), p_partner_email: solo ? null : (String(R.f.pe || '').trim() || null) });
   R.busy = false;
   const d = r && r.data;
   if(r.error || !d || !d.ok){ render(); showAlert((d && d.error) || (r.error && r.error.message) || "L'inscription n'a pas pu être envoyée."); return; }
@@ -11756,7 +11930,7 @@ function myTournsHTML(){
   }).join('');
   if(others.length) h += `<div class="card tn-my"><div class="tn-k">Mes tournois</div>${others.map(function(x){
     const st = x.status === 'waitlist' ? ['Liste d\'attente', 'w'] : !x.partner_confirmed ? ['Partenaire à confirmer', 'w'] : ['Inscrits', 'ok'];
-    return `<button type="button" class="tn-my-r" onclick="tournOpenAsPlayer('${x.tournament_id}')"><span><b>${escapeHTML(x.tournament)}</b><small>${escapeHTML(x.division)} · avec ${escapeHTML(x.i_am_p1 ? (x.p2_name || '') : (x.p1_name || ''))}${when(x) ? ' · ' + escapeHTML(when(x)) : ''}</small></span><span class="jp-pill ${st[1]}">${st[0]}</span></button>`;
+    return `<button type="button" class="tn-my-r" onclick="tournOpenAsPlayer('${x.tournament_id}')"><span><b>${escapeHTML(x.tournament)}</b><small>${escapeHTML(x.division)}${x.format === 'rotation' || !(x.i_am_p1 ? x.p2_name : x.p1_name) ? ' · partenaires qui changent' : ' · avec ' + escapeHTML(x.i_am_p1 ? (x.p2_name || '') : (x.p1_name || ''))}${when(x) ? ' · ' + escapeHTML(when(x)) : ''}</small></span><span class="jp-pill ${st[1]}">${st[0]}</span></button>`;
   }).join('')}</div>`;
   return h;
 }
