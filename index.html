@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 526">
+<meta name="app-build" content="Version 527">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2140,6 +2140,13 @@ table.tn-std{display:table;white-space:normal;}
 .tn-rank li b{font-family:var(--font-display);color:var(--ball);min-width:22px;text-align:right;}
 
 .tn-pk{display:inline-flex;gap:6px;}
+.tn-sel-row{cursor:default;gap:12px;}
+.tn-sel-row.on{border-color:rgba(207,234,92,.6);background:rgba(207,234,92,.07);}
+.tn-ck{flex:none;width:26px;height:26px;border-radius:8px;border:2px solid var(--line-soft-strong);background:transparent;color:#0A2420;font-weight:800;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.tn-ck.on{background:var(--ball);border-color:var(--ball);}
+.tn-ck.off{opacity:.25;cursor:default;}
+.tn-sel-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:left;background:none;border:0;padding:0;color:var(--text);font:inherit;cursor:pointer;}
+.tn-sel-main small{color:var(--muted);font-size:12px;}
 .tn-court-tag{font-size:11px;color:var(--muted);margin:-2px 0 6px;}
 .tn-court .tn-court-as{display:block;margin:10px auto 0;font-size:12px;color:var(--muted);text-decoration:none;}
 .tn-court .tn-court-as:hover{color:var(--ball);text-decoration:underline;}
@@ -9902,17 +9909,29 @@ function tournPrepReady(t, d){
   const what = tournIsRot(r) ? 'rondes' : r.format === 'double_elim' ? 'tableau' : (r.format === 'round_robin' ? 'poule unique' : (TPREP[d.id] ? TPREP[d.id].length : tournPrepK(d.id, n, r)) + ' poule' + ((TPREP[d.id] ? TPREP[d.id].length : tournPrepK(d.id, n, r)) > 1 ? 's' : ''));
   return { ok: true, txt: n + ' ' + unit + 's · ' + what + ' · ' + tournPlanFor(t, d, n).pool + (r.format === 'double_elim' ? '' : ' matchs') };
 }
+var TPREPSEL = {}; // catégories cochées dans « Toutes » : { divId: true }
 function tournPrepAllHTML(t){
   const divs = tournDivs(t.id), rows = divs.map(function(d){ return { d: d, s: tournPrepReady(t, d) }; });
-  const ready = rows.filter(function(x){ return x.s.ok; });
-  return `<div class="tn-sec-h tn-prep-bar" style="margin-top:12px;"><span>Toutes les catégories</span><span class="tn-head-r"><button type="button" class="btn btn-primary" ${ready.length ? '' : 'disabled'} onclick="tournLockAll('${t.id}')">${ready.length ? 'Créer les matchs de ' + (ready.length > 1 ? 'ces ' + ready.length + ' catégories' : 'cette catégorie') : 'Rien à créer'}</button></span></div>
-    <p class="small" style="color:var(--muted);margin:6px 0 10px;">Crée d'un coup les poules, rondes ou tableaux de chaque catégorie prête, avec la répartition affichée dans sa page (têtes de série, tirage au sort ou déplacements faits à la main). Les matchs des catégories entrent ensemble dans la file d'attente : chaque catégorie reçoit des terrains.</p>
-    <div class="tn-info-list">${rows.map(function(x){ return `<button type="button" class="tn-info-row" onclick="VIEW.tprep='${x.d.id}';render()"><span><b>${escapeHTML(x.d.name)}</b><small>${escapeHTML(TOURN_FMT[tournDivRules(t, x.d).format])} · ${escapeHTML(x.s.txt)}</small></span><span class="tn-info-r"><em class="${x.s.ok ? 'tn-ok-t' : x.s.done ? '' : 'tn-warn-t'}">${x.s.ok ? 'Prête' : x.s.done ? '✓ Créée' : 'Pas prête'}</em></span></button>`; }).join('')}</div>`;
+  const sel = rows.filter(function(x){ return x.s.ok && TPREPSEL[x.d.id]; });
+  const anyReady = rows.some(function(x){ return x.s.ok; });
+  return `<div class="tn-sec-h tn-prep-bar" style="margin-top:12px;"><span>Toutes les catégories</span><span class="tn-head-r">${anyReady ? `<button type="button" class="btn btn-secondary" onclick="tournPrepSelAll('${t.id}')">${rows.filter(function(x){ return x.s.ok; }).every(function(x){ return TPREPSEL[x.d.id]; }) ? 'Tout décocher' : 'Tout cocher'}</button>` : ''}<button type="button" class="btn btn-primary" ${sel.length ? '' : 'disabled'} onclick="tournLockAll('${t.id}')">${sel.length ? 'Créer les matchs de ' + (sel.length > 1 ? 'ces ' + sel.length + ' catégories' : 'cette catégorie') : (anyReady ? 'Coche les catégories à démarrer' : 'Rien à créer')}</button></span></div>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">Coche les catégories à démarrer maintenant (par exemple celles du matin) : leurs poules, rondes ou tableaux sont créés d'un coup, avec la répartition affichée dans leur page. Les autres restent à préparer pour plus tard. Les matchs des catégories démarrées entrent ensemble dans la file d'attente : chacune reçoit des terrains.</p>
+    <div class="tn-info-list">${rows.map(function(x){
+      const on = x.s.ok && TPREPSEL[x.d.id];
+      return `<div class="tn-info-row tn-sel-row${on ? ' on' : ''}">${x.s.ok ? `<button type="button" class="tn-ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="Démarrer ${escapeHTML(x.d.name)}" onclick="tournPrepSel('${x.d.id}')">${on ? '✓' : ''}</button>` : '<span class="tn-ck off"></span>'}<button type="button" class="tn-sel-main" onclick="VIEW.tprep='${x.d.id}';render()"><b>${escapeHTML(x.d.name)}</b><small>${escapeHTML(TOURN_FMT[tournDivRules(t, x.d).format])} · ${escapeHTML(x.s.txt)}</small></button><span class="tn-info-r"><em class="${x.s.ok ? 'tn-ok-t' : x.s.done ? '' : 'tn-warn-t'}">${x.s.ok ? 'Prête' : x.s.done ? '✓ Créée' : 'Pas prête'}</em></span></div>`;
+    }).join('')}</div>`;
+}
+function tournPrepSel(divId){ TPREPSEL[divId] = !TPREPSEL[divId]; render(); }
+function tournPrepSelAll(tid){
+  const t = tournById(tid); if(!t) return;
+  const ready = tournDivs(tid).filter(function(d){ return tournPrepReady(t, d).ok; });
+  const all = ready.every(function(d){ return TPREPSEL[d.id]; });
+  ready.forEach(function(d){ TPREPSEL[d.id] = !all; }); render();
 }
 async function tournLockAll(tid){
   const t = tournById(tid); if(!t) return;
-  const list = tournDivs(tid).filter(function(d){ return tournPrepReady(t, d).ok; });
-  if(!list.length) return;
+  const list = tournDivs(tid).filter(function(d){ return tournPrepReady(t, d).ok && TPREPSEL[d.id]; });
+  if(!list.length){ showToast('Coche au moins une catégorie', true); return; }
   showConfirm('Créer les matchs de ' + list.map(function(d){ return '« ' + d.name + ' »'; }).join(', ') + ' ? Tu pourras encore déverrouiller une catégorie tant qu\'aucun score n\'y est entré.', async function(){
     const origConfirm = window.showConfirm, origRender = window.render;
     let made = 0;
@@ -9927,7 +9946,7 @@ async function tournLockAll(tid){
           if(!TPREP[d.id]) TPREP[d.id] = tournPrepSplit(d.id, teams, tournPrepK(d.id, teams.length, r));
           await tournPrepLock(tid, d.id);
         }
-        if(tournMatches(d.id).length) made++;
+        if(tournMatches(d.id).length){ made++; delete TPREPSEL[d.id]; }
       }
     } finally { window.showConfirm = origConfirm; window.render = origRender; }
     VIEW.ttab = 'poules'; VIEW.tprep = 'all';
@@ -9942,10 +9961,10 @@ function tournPoolsDraftHTML(t, d, r){
   const nMatches = pools.reduce(function(s, p){ return s + p.length * (p.length - 1) / 2; }, 0);
   return `<div class="tn-sec-h tn-prep-bar"><span>${pools.length > 1 ? pools.length + ' poules' : 'Poule unique'} · aperçu</span>
       <span class="tn-head-r">${r.format !== 'round_robin' ? `<span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer une poule" ${pools.length <= 1 ? 'disabled' : ''} onclick="tournPrepPools('${d.id}',-1)">− Poule</button><button type="button" class="btn btn-secondary" aria-label="Ajouter une poule" onclick="tournPrepPools('${d.id}',1)">+ Poule</button></span>` : ''}${pools.length > 1 ? (TPREPRND[d.id] ? `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Nouveau tirage</button><button type="button" class="btn btn-secondary" onclick="tournPrepSeeded('${d.id}')">Têtes de série</button>` : `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Au hasard</button><button type="button" class="btn btn-secondary" onclick="tournPrepReset('${d.id}')">Refaire la répartition</button>`) : ''}<button type="button" class="btn btn-primary" onclick="tournPrepLock('${t.id}','${d.id}')">Verrouiller et créer les ${nMatches} matchs</button></span></div>
-    <p class="small" style="color:var(--muted);margin:6px 0 10px;">${pools.length > 1 ? (TPREPRND[d.id] ? 'Répartition au hasard (tirage au sort), sans tenir compte des têtes de série.' : 'Répartition en serpentin selon les têtes de série. « Au hasard » fait plutôt un tirage au sort.') + ' Touche une équipe pour la changer de poule. « + Poule » et « − Poule » changent le nombre de poules.' : (r.format === 'round_robin' ? 'Toutes les équipes se rencontrent.' : 'Une seule poule : toutes les équipes se rencontrent. « + Poule » les sépare en poules.')} ${tournPoolsThenBracket(r) ? (r.format === 'round_robin' ? (r.rr_final === 2 ? 'Les 2 premiers jouent ensuite la finale.' : 'Les 4 premiers jouent ensuite les demi-finales et la finale.') : r.qualifiers >= 99 ? 'Toutes les équipes passent au tableau, placées selon leur classement de poule.' : tournQualTxt(r.qualifiers, true) + ' de chaque poule au tableau.') : r.format === 'pools_only' ? 'Pas de tableau : le classement de chaque poule est le résultat final.' : ''}</p>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">${pools.length > 1 ? (TPREPRND[d.id] ? 'Répartition au hasard (tirage au sort), sans tenir compte des têtes de série.' : 'Répartition en serpentin selon les têtes de série. « Au hasard » fait plutôt un tirage au sort.') + ' Touche une équipe pour la changer de poule ou lui donner un numéro de tête de série. « + Poule » et « − Poule » changent le nombre de poules.' : (r.format === 'round_robin' ? 'Toutes les équipes se rencontrent.' : 'Une seule poule : toutes les équipes se rencontrent. « + Poule » les sépare en poules.')} ${tournPoolsThenBracket(r) ? (r.format === 'round_robin' ? (r.rr_final === 2 ? 'Les 2 premiers jouent ensuite la finale.' : 'Les 4 premiers jouent ensuite les demi-finales et la finale.') : r.qualifiers >= 99 ? 'Toutes les équipes passent au tableau, placées selon leur classement de poule.' : tournQualTxt(r.qualifiers, true) + ' de chaque poule au tableau.') : r.format === 'pools_only' ? 'Pas de tableau : le classement de chaque poule est le résultat final.' : ''}</p>
     <div class="tn-pools">${pools.map(function(p, i){
       return `<section class="tn-pool"><div class="tn-pool-h"><b>${pools.length > 1 ? 'Poule ' + tournPoolLabel(i) : 'Poule unique'}</b><span>${p.length} équipes · ${p.length * (p.length - 1) / 2} matchs</span></div>
-        ${p.map(function(id){ return `<button type="button" class="tn-pool-t" onclick="tournPrepMove('${d.id}','${id}')"><span class="tn-seedb">${seedOf(id) || ''}</span><span>${escapeHTML(tournTeamFull(id))}</span>${pools.length > 1 ? '<em>Déplacer</em>' : ''}</button>`; }).join('')}
+        ${p.map(function(id){ return `<button type="button" class="tn-pool-t" onclick="tournPrepMove('${d.id}','${id}')"><span class="tn-seedb">${seedOf(id) || ''}</span><span>${escapeHTML(tournTeamFull(id))}</span><em>${pools.length > 1 ? 'Déplacer · tête' : 'Tête de série'}</em></button>`; }).join('')}
       </section>`;
     }).join('')}</div>`;
 }
@@ -9957,16 +9976,39 @@ function tournPrepReset(divId){
   render(); showToast('Répartition refaite selon les têtes de série');
 }
 function tournPrepMove(divId, teamId){
-  const pools = TPREP[divId]; if(!pools || pools.length < 2) return;
+  const pools = TPREP[divId]; if(!pools) return;
   const from = pools.findIndex(function(p){ return p.indexOf(teamId) !== -1; });
-  const choices = pools.map(function(p, i){ return (i === from ? '✓ ' : '') + 'Poule ' + tournPoolLabel(i) + ' (' + p.length + ' équipes)'; });
-  showChoice('Mettre ' + tournTeamFull(teamId) + ' dans quelle poule ?', choices, function(i){
+  const tm = tournTeamById(teamId);
+  const choices = (pools.length > 1 ? pools.map(function(p, i){ return (i === from ? '✓ ' : '') + 'Mettre dans la poule ' + tournPoolLabel(i) + ' (' + p.length + ' équipes)'; }) : []).concat([tm && tm.seed ? 'Tête de série : ' + tm.seed + ' (changer)' : 'Donner un numéro de tête de série']);
+  showChoice(tournTeamFull(teamId), choices, function(i){
+    if(i === choices.length - 1){ setTimeout(function(){ tournSeedPrompt(divId, teamId); }, 30); return; }
     if(i === from || i < 0 || i >= pools.length) return;
     pools[from].splice(pools[from].indexOf(teamId), 1);
     pools[i].push(teamId);
     const small = pools.find(function(p){ return p.length < 2; });
     if(small) setTimeout(function(){ showToast('Attention : une poule a moins de 2 équipes', true); }, 50);
   });
+}
+// Numéro de tête de série d'une équipe (vide = aucun). Si une autre équipe de la catégorie avait ce numéro, elle prend l'ancien.
+function tournSeedPrompt(divId, teamId){
+  const tm = tournTeamById(teamId); if(!tm) return;
+  showPrompt('Tête de série de ' + tournTeamFull(teamId) + ' (1 = la meilleure ; laisse vide pour aucune) :', tm.seed ? String(tm.seed) : '', function(v){
+    const raw = String(v == null ? '' : v).trim(), n = raw === '' ? null : parseInt(raw, 10);
+    if(raw !== '' && (!n || n < 1 || n > 99)){ showToast('Entre un nombre de 1 à 99, ou laisse vide', true); return; }
+    tournSeedSave(divId, teamId, n);
+  });
+}
+async function tournSeedSave(divId, teamId, n){
+  const tm = tournTeamById(teamId); if(!tm) return;
+  const old = tm.seed || null;
+  const other = n ? (TTEAMS || []).find(function(x){ return x.division_id === divId && x.id !== teamId && x.seed === n && x.status !== 'pair' && x.status !== 'withdrawn'; }) : null;
+  const ups = [sb.from('tournament_teams').update({ seed: n }).eq('id', teamId)];
+  if(other) ups.push(sb.from('tournament_teams').update({ seed: old }).eq('id', other.id));
+  const res = await Promise.all(ups);
+  if(res.some(function(r){ return r && r.error; })){ showAlert('La tête de série n\'a pas pu être enregistrée.'); return; }
+  tm.seed = n; if(other) other.seed = old;
+  tournLiveNotify(); render();
+  showToast((n ? 'Tête de série ' + n : 'Plus de tête de série') + (other ? ' · ' + tournTeamFull(other.id) + ' prend ' + (old ? 'la ' + old : 'aucun numéro') : '') + (TPREPRND[divId] ? '' : ' · touche « Refaire la répartition » pour en tenir compte'));
 }
 async function tournPrepLock(tid, divId){
   const pools = TPREP[divId]; if(!pools) return;
