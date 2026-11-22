@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 523">
+<meta name="app-build" content="Version 524">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9610,6 +9610,30 @@ function tournSettingsHTML(t){
 // ---- Préparer : poules et ordre des matchs ----
 var TPREP = {}; // brouillon des poules par catégorie : { divId: [[teamId…], …] }
 var TPREPK = {}, TROTK = {}; // nombre de poules (ou de groupes) choisi à la main avant de verrouiller : { divId: k }
+var TPREPRND = {}; // tirage au sort : { divId: [ids dans l'ordre tiré] } (sinon répartition selon les têtes de série)
+// Répartit dans k poules : en serpentin selon les têtes de série, ou dans l'ordre du tirage au sort.
+function tournPrepSplit(divId, teams, k){
+  const order = TPREPRND[divId];
+  if(!order) return tournSnake(teams, k);
+  const ids = teams.map(function(x){ return x.id; });
+  const list = order.filter(function(id){ return ids.indexOf(id) !== -1; }).concat(ids.filter(function(id){ return order.indexOf(id) === -1; }));
+  const pools = []; for(let i = 0; i < k; i++) pools.push([]);
+  list.forEach(function(id, i){ pools[i % k].push(id); });
+  return pools;
+}
+function tournPrepRandom(divId, rot){
+  const d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!d) return;
+  const t = tournById(d.tournament_id), r = tournDivRules(t, d), teams = tournSeededTeams(t, divId);
+  TPREPRND[divId] = tournShuffle(teams.map(function(x){ return x.id; }));
+  if(!rot) TPREP[divId] = tournPrepSplit(divId, teams, (TPREP[divId] || []).length || tournPrepK(divId, teams.length, r));
+  render(); showToast(rot ? 'Groupes tirés au sort' : 'Poules tirées au sort');
+}
+function tournPrepSeeded(divId, rot){
+  const d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!d) return;
+  delete TPREPRND[divId];
+  if(!rot){ const t = tournById(d.tournament_id), r = tournDivRules(t, d), teams = tournSeededTeams(t, divId); TPREP[divId] = tournSnake(teams, (TPREP[divId] || []).length || tournPrepK(divId, teams.length, r)); }
+  render(); showToast('Répartition selon les têtes de série');
+}
 function tournPrepK(divId, n, r){ return TPREPK[divId] || tournPoolCount(n, r.pool_size, r.format); }
 // Ajouter ou retirer une poule : nouvelle répartition en serpentin avec ce nombre de poules.
 function tournPrepPools(divId, delta){
@@ -9619,9 +9643,9 @@ function tournPrepPools(divId, delta){
   if(k < 1) return;
   if(delta > 0 && Math.floor(n / k) < 2){ showToast('Pas assez d\'équipes : chaque poule doit en avoir au moins 2', true); return; }
   TPREPK[divId] = k;
-  TPREP[divId] = tournSnake(teams, k);
+  TPREP[divId] = tournPrepSplit(divId, teams, k);
   render();
-  showToast(k > 1 ? k + ' poules : équipes réparties de nouveau selon les têtes de série' : 'Une seule poule : tout le monde se rencontre');
+  showToast(k > 1 ? k + ' poules : équipes réparties de nouveau ' + (TPREPRND[divId] ? 'selon le tirage au sort' : 'selon les têtes de série') : 'Une seule poule : tout le monde se rencontre');
 }
 function tournRotK(divId, n, r){ return TROTK[divId] || tournRotGroupCount(n, r); }
 function tournRotGroups(divId, delta){
@@ -9722,7 +9746,7 @@ function tournPrepHTML(t){
   } else if(n < minN){
     body = `<div class="tn-note">Il faut au moins ${minN} équipes pour former ${r.format === 'round_robin' ? 'la poule' : 'les poules'}.</div>`;
   } else {
-    if(!TPREP[d.id]) TPREP[d.id] = tournSnake(teams, tournPrepK(d.id, n, r));
+    if(!TPREP[d.id]) TPREP[d.id] = tournPrepSplit(d.id, teams, tournPrepK(d.id, n, r));
     // Brouillon à jour si des équipes se sont ajoutées ou retirées entre-temps.
     const ids = teams.map(function(x){ return x.id; });
     TPREP[d.id] = TPREP[d.id].map(function(p){ return p.filter(function(id){ return ids.indexOf(id) !== -1; }); });
@@ -9779,14 +9803,14 @@ function tournRotSchedule(ids, rounds){
 }
 function tournRotDraftHTML(t, d, r, n){
   const players = tournSeededTeams(t, d.id), k = tournRotK(d.id, n, r);
-  const groups = tournSnake(players, k);
+  const groups = tournPrepSplit(d.id, players, k);
   const small = Math.floor(n / k), rounds = tournRotRounds(small, r);
   const sizes = groups.map(function(g){ return g.length; });
   const desc = k > 1 ? k + ' groupes (' + sizes.join(', ') + ' joueurs)' : n + ' joueurs';
   const perTxt = groups.map(function(g){ const per = Math.floor(g.length / 4), sit = g.length - per * 4; return per + ' match' + (per > 1 ? 's' : '') + (sit ? ' + ' + sit + ' au repos' : ''); });
   return `<div class="tn-sec-h tn-prep-bar"><span>${desc} · ${k > 1 ? 'par ronde : ' + perTxt.join(' / ') : perTxt[0] + ' par ronde'}</span>
-      <span class="tn-head-r"><span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer un groupe" ${k <= 1 ? 'disabled' : ''} onclick="tournRotGroups('${d.id}',-1)">− Groupe</button><button type="button" class="btn btn-secondary" aria-label="Ajouter un groupe" onclick="tournRotGroups('${d.id}',1)">+ Groupe</button></span><span class="tn-rot-r"><small>Rondes</small>${tournStepper('trRounds', rounds, 1, 20)}</span><button type="button" class="btn btn-primary" onclick="tournRotLock('${t.id}','${d.id}')">Créer les rondes</button></span></div>
-    <p class="small" style="color:var(--muted);margin:6px 0 10px;">À chaque ronde, chacun joue avec un nouveau partenaire contre de nouveaux adversaires${k > 1 ? ' de son groupe' : ''}, autant que possible. Le repos tourne si le nombre de joueurs ne tombe pas juste. Classement individuel${k > 1 ? ' dans chaque groupe' : ''} : victoires, puis différentiel de points.${k > 1 ? ' Les groupes sont formés en serpentin selon l\'ordre des têtes de série (sinon l\'ordre d\'inscription) ; « + Groupe » et « − Groupe » changent le nombre de groupes.' : ' « + Groupe » sépare les joueurs en groupes.'}</p>
+      <span class="tn-head-r"><span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer un groupe" ${k <= 1 ? 'disabled' : ''} onclick="tournRotGroups('${d.id}',-1)">− Groupe</button><button type="button" class="btn btn-secondary" aria-label="Ajouter un groupe" onclick="tournRotGroups('${d.id}',1)">+ Groupe</button></span>${k > 1 ? (TPREPRND[d.id] ? `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}',1)">Nouveau tirage</button><button type="button" class="btn btn-secondary" onclick="tournPrepSeeded('${d.id}',1)">Têtes de série</button>` : `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}',1)">Au hasard</button>`) : ''}<span class="tn-rot-r"><small>Rondes</small>${tournStepper('trRounds', rounds, 1, 20)}</span><button type="button" class="btn btn-primary" onclick="tournRotLock('${t.id}','${d.id}')">Créer les rondes</button></span></div>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">À chaque ronde, chacun joue avec un nouveau partenaire contre de nouveaux adversaires${k > 1 ? ' de son groupe' : ''}, autant que possible. Le repos tourne si le nombre de joueurs ne tombe pas juste. Classement individuel${k > 1 ? ' dans chaque groupe' : ''} : victoires, puis différentiel de points.${k > 1 ? ' ' + (TPREPRND[d.id] ? 'Groupes tirés au sort.' : 'Les groupes sont formés en serpentin selon l\'ordre des têtes de série (sinon l\'ordre d\'inscription) ; « Au hasard » fait un tirage au sort.') + ' « + Groupe » et « − Groupe » changent le nombre de groupes.' : ' « + Groupe » sépare les joueurs en groupes.'}</p>
     <div class="tn-pools">${groups.map(function(g, i){ return `<section class="tn-pool"><div class="tn-pool-h"><b>${k > 1 ? 'Groupe ' + String.fromCharCode(65 + i) : 'Joueurs'}</b><span>${g.length}</span></div>
       ${g.map(function(id){ return `<div class="tn-pool-t" style="cursor:default;"><span class="tn-seedb"></span><span>${escapeHTML(tournTeamFull(id))}</span></div>`; }).join('')}
     </section>`; }).join('')}</div>`;
@@ -9796,7 +9820,7 @@ async function tournRotLock(tid, divId){
   if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
   const players = tournSeededTeams(t, divId), ids = players.map(function(x){ return x.id; });
   if(ids.length < 4){ showAlert('Il faut au moins 4 joueurs.'); return; }
-  const r = tournDivRules(t, d), k = tournRotK(divId, ids.length, r), groups = tournSnake(players, k);
+  const r = tournDivRules(t, d), k = tournRotK(divId, ids.length, r), groups = tournPrepSplit(divId, players, k);
   const rounds = Math.max(1, Math.min(20, parseInt(tfVal('trRounds'), 10) || tournRotRounds(Math.floor(ids.length / k), r)));
   const nM = groups.reduce(function(sum, g){ return sum + rounds * Math.floor(g.length / 4); }, 0);
   showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs' + (k > 1 ? ', ' + k + ' groupes' : '') + ') pour « ' + d.name + ' » ? Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
@@ -9866,8 +9890,8 @@ function tournPoolsDraftHTML(t, d, r){
   const seedOf = function(id){ const x = (TTEAMS || []).find(function(y){ return y.id === id; }); return x && x.seed ? x.seed : ''; };
   const nMatches = pools.reduce(function(s, p){ return s + p.length * (p.length - 1) / 2; }, 0);
   return `<div class="tn-sec-h tn-prep-bar"><span>${pools.length > 1 ? pools.length + ' poules' : 'Poule unique'} · aperçu</span>
-      <span class="tn-head-r">${r.format !== 'round_robin' ? `<span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer une poule" ${pools.length <= 1 ? 'disabled' : ''} onclick="tournPrepPools('${d.id}',-1)">− Poule</button><button type="button" class="btn btn-secondary" aria-label="Ajouter une poule" onclick="tournPrepPools('${d.id}',1)">+ Poule</button></span>` : ''}${pools.length > 1 ? `<button type="button" class="btn btn-secondary" onclick="tournPrepReset('${d.id}')">Refaire la répartition</button>` : ''}<button type="button" class="btn btn-primary" onclick="tournPrepLock('${t.id}','${d.id}')">Verrouiller et créer les ${nMatches} matchs</button></span></div>
-    <p class="small" style="color:var(--muted);margin:6px 0 10px;">${pools.length > 1 ? 'Répartition en serpentin selon les têtes de série. Touche une équipe pour la changer de poule. « + Poule » et « − Poule » changent le nombre de poules.' : (r.format === 'round_robin' ? 'Toutes les équipes se rencontrent.' : 'Une seule poule : toutes les équipes se rencontrent. « + Poule » les sépare en poules.')} ${tournPoolsThenBracket(r) ? (r.format === 'round_robin' ? (r.rr_final === 2 ? 'Les 2 premiers jouent ensuite la finale.' : 'Les 4 premiers jouent ensuite les demi-finales et la finale.') : r.qualifiers >= 99 ? 'Toutes les équipes passent au tableau, placées selon leur classement de poule.' : tournQualTxt(r.qualifiers, true) + ' de chaque poule au tableau.') : r.format === 'pools_only' ? 'Pas de tableau : le classement de chaque poule est le résultat final.' : ''}</p>
+      <span class="tn-head-r">${r.format !== 'round_robin' ? `<span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer une poule" ${pools.length <= 1 ? 'disabled' : ''} onclick="tournPrepPools('${d.id}',-1)">− Poule</button><button type="button" class="btn btn-secondary" aria-label="Ajouter une poule" onclick="tournPrepPools('${d.id}',1)">+ Poule</button></span>` : ''}${pools.length > 1 ? (TPREPRND[d.id] ? `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Nouveau tirage</button><button type="button" class="btn btn-secondary" onclick="tournPrepSeeded('${d.id}')">Têtes de série</button>` : `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Au hasard</button><button type="button" class="btn btn-secondary" onclick="tournPrepReset('${d.id}')">Refaire la répartition</button>`) : ''}<button type="button" class="btn btn-primary" onclick="tournPrepLock('${t.id}','${d.id}')">Verrouiller et créer les ${nMatches} matchs</button></span></div>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">${pools.length > 1 ? (TPREPRND[d.id] ? 'Répartition au hasard (tirage au sort), sans tenir compte des têtes de série.' : 'Répartition en serpentin selon les têtes de série. « Au hasard » fait plutôt un tirage au sort.') + ' Touche une équipe pour la changer de poule. « + Poule » et « − Poule » changent le nombre de poules.' : (r.format === 'round_robin' ? 'Toutes les équipes se rencontrent.' : 'Une seule poule : toutes les équipes se rencontrent. « + Poule » les sépare en poules.')} ${tournPoolsThenBracket(r) ? (r.format === 'round_robin' ? (r.rr_final === 2 ? 'Les 2 premiers jouent ensuite la finale.' : 'Les 4 premiers jouent ensuite les demi-finales et la finale.') : r.qualifiers >= 99 ? 'Toutes les équipes passent au tableau, placées selon leur classement de poule.' : tournQualTxt(r.qualifiers, true) + ' de chaque poule au tableau.') : r.format === 'pools_only' ? 'Pas de tableau : le classement de chaque poule est le résultat final.' : ''}</p>
     <div class="tn-pools">${pools.map(function(p, i){
       return `<section class="tn-pool"><div class="tn-pool-h"><b>${pools.length > 1 ? 'Poule ' + tournPoolLabel(i) : 'Poule unique'}</b><span>${p.length} équipes · ${p.length * (p.length - 1) / 2} matchs</span></div>
         ${p.map(function(id){ return `<button type="button" class="tn-pool-t" onclick="tournPrepMove('${d.id}','${id}')"><span class="tn-seedb">${seedOf(id) || ''}</span><span>${escapeHTML(tournTeamFull(id))}</span>${pools.length > 1 ? '<em>Déplacer</em>' : ''}</button>`; }).join('')}
@@ -9877,6 +9901,7 @@ function tournPoolsDraftHTML(t, d, r){
 function tournPrepReset(divId){
   const d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!d) return;
   const t = tournById(d.tournament_id), r = tournDivRules(t, d), teams = tournSeededTeams(t, divId);
+  delete TPREPRND[divId];
   TPREP[divId] = tournSnake(teams, tournPrepK(divId, teams.length, r));
   render(); showToast('Répartition refaite selon les têtes de série');
 }
