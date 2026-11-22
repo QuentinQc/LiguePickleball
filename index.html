@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 531">
+<meta name="app-build" content="Version 532">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10226,7 +10226,10 @@ function tournQueue(t){
   const pend = tournLiveMatches(t).filter(function(m){ return m.status === 'pending'; });
   pend.forEach(function(m){
     const mp = tournMP(m);
-    m._key = mp.reduce(function(mx, id){ return Math.max(mx, (st[id] || {}).lastEnd || 0); }, 0);
+    // Prêt depuis : le plus tard entre la création du match et la fin du dernier match de ses joueurs.
+    // Un match qui attend depuis plus longtemps passe d'abord ; un tableau créé à l'instant prend sa place à la suite.
+    const born = m.created_at ? (Date.parse(m.created_at) || 0) : 0;
+    m._key = mp.reduce(function(mx, id){ return Math.max(mx, (st[id] || {}).lastEnd || 0); }, born);
     let why = '';
     mp.forEach(function(id){
       if(why) return;
