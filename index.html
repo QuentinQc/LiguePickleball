@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 525">
+<meta name="app-build" content="Version 526">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9705,17 +9705,20 @@ function tournRoundRobin(ids){
 function tournPoolLabel(i){ return String.fromCharCode(65 + i); }
 function tournPrepDiv(t){
   const divs = tournDivs(t.id);
+  if(VIEW.tprep === 'all') return null;
   if(!VIEW.tprep || !divs.some(function(d){ return d.id === VIEW.tprep; })) VIEW.tprep = divs[0] ? divs[0].id : null;
   return divs.find(function(d){ return d.id === VIEW.tprep; }) || null;
 }
 function tournPrepHTML(t){
   const divs = tournDivs(t.id);
   if(!divs.length) return `<div class="tn-note" style="margin-top:14px;">Ajoute d'abord une catégorie dans <b>Réglages</b>.</div>`;
-  const d = tournPrepDiv(t), r = tournDivRules(t, d);
-  const chips = `<div class="tn-chips">${divs.map(function(x){
+  const d = tournPrepDiv(t);
+  const chips = `<div class="tn-chips">${divs.length > 1 ? `<button type="button" class="${!d ? 'on' : ''}" onclick="VIEW.tprep='all';render()">Toutes</button>` : ''}${divs.map(function(x){
     const st = (x.stage || 'setup') === 'setup' ? '' : ' ✓';
-    return `<button type="button" class="${x.id === d.id ? 'on' : ''}" onclick="VIEW.tprep='${x.id}';render()">${escapeHTML(x.name)}${st}</button>`;
+    return `<button type="button" class="${d && x.id === d.id ? 'on' : ''}" onclick="VIEW.tprep='${x.id}';render()">${escapeHTML(x.name)}${st}</button>`;
   }).join('')}</div>`;
+  if(!d) return chips + tournPrepAllHTML(t);
+  const r = tournDivRules(t, d);
   const teams = tournSeededTeams(t, d.id), n = teams.length;
   const unconf = teams.filter(function(x){ return !x.partner_confirmed; }).length;
   const unpaid = teams.filter(function(x){ return !x.paid; }).length;
@@ -9826,7 +9829,7 @@ async function tournRotLock(tid, divId){
   const r = tournDivRules(t, d), k = tournRotK(divId, ids.length, r), groups = tournPrepSplit(divId, players, k);
   const rounds = Math.max(1, Math.min(20, parseInt(tfVal('trRounds'), 10) || tournRotRounds(Math.floor(ids.length / k), r)));
   const nM = groups.reduce(function(sum, g){ return sum + rounds * Math.floor(g.length / 4); }, 0);
-  showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs' + (k > 1 ? ', ' + k + ' groupes' : '') + ') pour « ' + d.name + ' » ? Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
+  return showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs' + (k > 1 ? ', ' + k + ' groupes' : '') + ') pour « ' + d.name + ' » ? Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
     if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
     const byId = {}; players.forEach(function(x){ byId[x.id] = x; });
     const pairs = [], rows = [];
@@ -9888,6 +9891,51 @@ function tournRotLockedHTML(t, d){
     ${html}
     <p class="small" style="color:var(--muted);margin:12px 0 0;">Les matchs se jouent depuis l'onglet « En direct ». Touche un match ici pour entrer ou corriger un score. <button type="button" class="tn-linkbtn" onclick="openTournSheet('${t.id}')">Feuille de matchs à imprimer ou en Excel</button></p>`;
 }
+// ---- Préparer toutes les catégories d'un coup ----
+// Prête : encore à préparer et assez d'équipes (ou de joueurs) pour sa formule.
+function tournPrepReady(t, d){
+  if((d.stage || 'setup') !== 'setup' || tournMatches(d.id).length) return { ok: false, txt: 'Matchs déjà créés', done: true };
+  const r = tournDivRules(t, d), n = tournSeededTeams(t, d.id).length;
+  const min = tournIsRot(r) ? 4 : r.format === 'double_elim' ? (tournFullDe(r) ? 4 : 2) : 3;
+  const unit = tournIsRot(r) ? 'joueur' : 'équipe';
+  if(n < min) return { ok: false, txt: n + ' ' + unit + (n > 1 ? 's' : '') + ' (minimum ' + min + ')' };
+  const what = tournIsRot(r) ? 'rondes' : r.format === 'double_elim' ? 'tableau' : (r.format === 'round_robin' ? 'poule unique' : (TPREP[d.id] ? TPREP[d.id].length : tournPrepK(d.id, n, r)) + ' poule' + ((TPREP[d.id] ? TPREP[d.id].length : tournPrepK(d.id, n, r)) > 1 ? 's' : ''));
+  return { ok: true, txt: n + ' ' + unit + 's · ' + what + ' · ' + tournPlanFor(t, d, n).pool + (r.format === 'double_elim' ? '' : ' matchs') };
+}
+function tournPrepAllHTML(t){
+  const divs = tournDivs(t.id), rows = divs.map(function(d){ return { d: d, s: tournPrepReady(t, d) }; });
+  const ready = rows.filter(function(x){ return x.s.ok; });
+  return `<div class="tn-sec-h tn-prep-bar" style="margin-top:12px;"><span>Toutes les catégories</span><span class="tn-head-r"><button type="button" class="btn btn-primary" ${ready.length ? '' : 'disabled'} onclick="tournLockAll('${t.id}')">${ready.length ? 'Créer les matchs de ' + (ready.length > 1 ? 'ces ' + ready.length + ' catégories' : 'cette catégorie') : 'Rien à créer'}</button></span></div>
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">Crée d'un coup les poules, rondes ou tableaux de chaque catégorie prête, avec la répartition affichée dans sa page (têtes de série, tirage au sort ou déplacements faits à la main). Les matchs des catégories entrent ensemble dans la file d'attente : chaque catégorie reçoit des terrains.</p>
+    <div class="tn-info-list">${rows.map(function(x){ return `<button type="button" class="tn-info-row" onclick="VIEW.tprep='${x.d.id}';render()"><span><b>${escapeHTML(x.d.name)}</b><small>${escapeHTML(TOURN_FMT[tournDivRules(t, x.d).format])} · ${escapeHTML(x.s.txt)}</small></span><span class="tn-info-r"><em class="${x.s.ok ? 'tn-ok-t' : x.s.done ? '' : 'tn-warn-t'}">${x.s.ok ? 'Prête' : x.s.done ? '✓ Créée' : 'Pas prête'}</em></span></button>`; }).join('')}</div>`;
+}
+async function tournLockAll(tid){
+  const t = tournById(tid); if(!t) return;
+  const list = tournDivs(tid).filter(function(d){ return tournPrepReady(t, d).ok; });
+  if(!list.length) return;
+  showConfirm('Créer les matchs de ' + list.map(function(d){ return '« ' + d.name + ' »'; }).join(', ') + ' ? Tu pourras encore déverrouiller une catégorie tant qu\'aucun score n\'y est entré.', async function(){
+    const origConfirm = window.showConfirm, origRender = window.render;
+    let made = 0;
+    window.showConfirm = function(m, f){ return f ? f() : null; };
+    try{
+      for(let i = 0; i < list.length; i++){
+        const d = list[i], r = tournDivRules(t, d), teams = tournSeededTeams(t, d.id);
+        if(!tournPrepReady(t, d).ok) continue;
+        if(tournIsRot(r)) await tournRotLock(tid, d.id);
+        else if(r.format === 'double_elim') await tournCreateDE(tid, d.id);
+        else {
+          if(!TPREP[d.id]) TPREP[d.id] = tournPrepSplit(d.id, teams, tournPrepK(d.id, teams.length, r));
+          await tournPrepLock(tid, d.id);
+        }
+        if(tournMatches(d.id).length) made++;
+      }
+    } finally { window.showConfirm = origConfirm; window.render = origRender; }
+    VIEW.ttab = 'poules'; VIEW.tprep = 'all';
+    await loadTournaments(true); tournLiveNotify(); tournBackToSheet(); render();
+    showToast(made + ' catégorie' + (made > 1 ? 's' : '') + ' prête' + (made > 1 ? 's' : '') + ' : les matchs sont dans la file d\'attente');
+    tournAutoKick(tid);
+  });
+}
 function tournPoolsDraftHTML(t, d, r){
   const pools = TPREP[d.id];
   const seedOf = function(id){ const x = (TTEAMS || []).find(function(y){ return y.id === id; }); return x && x.seed ? x.seed : ''; };
@@ -9926,7 +9974,7 @@ async function tournPrepLock(tid, divId){
   if(pools.some(function(p){ return p.length < 2; })){ showAlert('Chaque poule doit avoir au moins 2 équipes.'); return; }
   const d = (TDIVS || []).find(function(x){ return x.id === divId; }) || {};
   const nM = pools.reduce(function(s, p){ return s + p.length * (p.length - 1) / 2; }, 0);
-  showConfirm('Verrouiller les poules de « ' + d.name + ' » et créer les ' + nM + ' matchs ? Tu pourras encore déverrouiller tant qu\'aucun score n\'est entré.', async function(){
+  return showConfirm('Verrouiller les poules de « ' + d.name + ' » et créer les ' + nM + ' matchs ? Tu pourras encore déverrouiller tant qu\'aucun score n\'est entré.', async function(){
     if(tournMatches(divId).length){ showToast('Les poules sont déjà verrouillées', true); return; }
     const rows = [];
     let seq = 0;
@@ -10062,6 +10110,14 @@ function tournPickFor(list, court, used){
 // puis les terrains qui restent (ouverts, prêtés ou sans réservation). Renvoie { terrain: match }.
 function tournPlanCourts(freeCourts, list, used){
   const out = {};
+  // Sans ordre choisi à la main : à tour de rôle entre les catégories, pour que chacune reçoive au moins un terrain.
+  if(!list.some(function(m){ return typeof m.prio === 'number'; })){
+    const by = {}, order = [];
+    list.forEach(function(m){ if(!by[m.division_id]){ by[m.division_id] = []; order.push(m.division_id); } by[m.division_id].push(m); });
+    const mixed = []; let more = true;
+    for(let k = 0; more; k++){ more = false; order.forEach(function(dv){ if(by[dv][k]){ mixed.push(by[dv][k]); more = true; } }); }
+    list = mixed;
+  }
   const ok = function(x){ return tournMP(x).every(function(id){ return !used[id]; }); };
   const take = function(c, x){ out[c] = x; tournMP(x).forEach(function(id){ used[id] = 1; }); };
   freeCourts.forEach(function(c){ const x = list.find(function(m){ return ok(m) && tournCourtOwn(m, c); }); if(x) take(c, x); });
@@ -10992,7 +11048,7 @@ async function tournCreateDE(tid, divId){
   const d = (TDIVS || []).find(function(x){ return x.id === divId; }) || {};
   const full = tournFullDe(tournDivRules(t, d));
   if(teams.length < (full ? 4 : 2)){ showAlert('Il faut au moins ' + (full ? 4 : 2) + ' équipes pour ce tableau.'); return; }
-  showConfirm('Créer le tableau ' + (full ? 'à double élimination' : 'avec consolante') + ' de « ' + d.name + ' » avec ' + teams.length + ' équipes ? L\'ordre suit les têtes de série (Inscrits). Tu pourras l\'annuler tant qu\'aucun match n\'est joué.', async function(){
+  return showConfirm('Créer le tableau ' + (full ? 'à double élimination' : 'avec consolante') + ' de « ' + d.name + ' » avec ' + teams.length + ' équipes ? L\'ordre suit les têtes de série (Inscrits). Tu pourras l\'annuler tant qu\'aucun match n\'est joué.', async function(){
     if(tournMatches(divId).length){ showToast('Le tableau existe déjà', true); return; }
     const rows = tournBuildBracketRows(t, d, teams.map(function(x){ return { id: x.id, pool: null, place: 1 }; }));
     const ins = await sb.from('tournament_matches').insert(rows);
