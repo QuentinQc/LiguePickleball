@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 528">
+<meta name="app-build" content="Version 529">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9524,7 +9524,7 @@ function tournDaysOf(t){
   for(let i = 0; i < 6; i++){ d.setUTCDate(d.getUTCDate() + 1); const k = d.toISOString().slice(0, 10); if(k > t.end_date) break; out.push(k); }
   return out;
 }
-// Périodes de jeu d'après les dates : matin et après-midi de chaque jour. Clé : « AAAA-MM-JJ|am » ou « |pm ».
+// Périodes de jeu d'après les dates : matin, après-midi et soirée de chaque jour. Clé : « AAAA-MM-JJ|am », « |pm » ou « |ev ».
 function tournPeriods(t){
   const days = tournDaysOf(t), out = [];
   days.forEach(function(day){
@@ -9532,12 +9532,14 @@ function tournPeriods(t){
     const lab = days.length > 1 ? wd.charAt(0).toUpperCase() + wd.slice(1) + ' ' + d.getDate() + ' ' + d.toLocaleDateString('fr-CA', { month:'long' }) + ' · ' : '';
     out.push({ key: day + '|am', label: lab + (lab ? 'matin' : 'Matin'), day: day, part: 'am' });
     out.push({ key: day + '|pm', label: lab + (lab ? 'après-midi' : 'Après-midi'), day: day, part: 'pm' });
+    out.push({ key: day + '|ev', label: lab + (lab ? 'soirée' : 'Soirée'), day: day, part: 'ev' });
   });
   return out;
 }
 function tournPeriodLabel(t, key){ const p = tournPeriods(t).find(function(x){ return x.key === key; }); return p ? p.label : ''; }
 function tournPmStart(t){ const s = (t && t.settings && t.settings.pm_start) || '13:00'; return /^\d{1,2}:\d{2}$/.test(s) ? s : '13:00'; }
-function tournPeriodStart(t, key){ return String(key || '').slice(-2) === 'pm' ? tournPmStart(t) : ((t && t.start_time) || '08:00'); }
+function tournEvStart(t){ const s = (t && t.settings && t.settings.ev_start) || '18:00'; return /^\d{1,2}:\d{2}$/.test(s) ? s : '18:00'; }
+function tournPeriodStart(t, key){ const k = String(key || '').slice(-2); return k === 'pm' ? tournPmStart(t) : k === 'ev' ? tournEvStart(t) : ((t && t.start_time) || '08:00'); }
 // Période d'une catégorie, seulement si elle existe encore dans les dates du tournoi.
 function tournDivPeriod(t, d){ return d && d.period && tournPeriods(t).some(function(x){ return x.key === d.period; }) ? d.period : null; }
 function tournLink(id){ const o = (location.origin && location.origin.indexOf('http') === 0) ? location.origin : 'https://dinkeo.ca'; return o + '/?t=' + id; }
@@ -11907,6 +11909,8 @@ function tournDayEstimate(t){
 }
 function tournCardsHTML(t, divs, hours, courts, regTxt){
   const est = tournDayEstimate(t);
+  const pl0 = tournPeriodLast(t, est);
+  if(pl0){ est.finish = pl0.fin; if(est.end != null && pl0.st >= est.end) est.end = null; }
   const late = est.finish != null && est.end != null && est.finish > est.end;
   const reg = tournTeams(t.id, null, 'registered'), wait = tournTeams(t.id, null, 'waitlist').length;
   const unconf = reg.filter(function(x){ return !x.partner_confirmed; }).length, unpaid = reg.filter(function(x){ return !x.paid; }).length;
@@ -11928,7 +11932,7 @@ function openTournDayInfo(tid){
   const t = tournById(tid); if(!t) return;
   const est = tournDayEstimate(t);
   const pl = tournPeriodLast(t, est);
-  if(pl) est.finish = pl.fin;
+  if(pl){ est.finish = pl.fin; if(est.end != null && pl.st >= est.end) est.end = null; }
   const late = est.finish != null && est.end != null && est.finish > est.end;
   const rows = est.rows.map(function(x){ return `<tr><td><b>${escapeHTML(x.d.name)}</b><small>${x.guess ? 'si complète (' + x.n + ' équipes)' : x.reg + (x.reg > 1 ? ' équipes inscrites' : ' équipe inscrite')}</small></td><td class="num">${x.plan.pool + x.plan.bracket}</td><td class="num">${tournFmtMin(x.minutes)}</td></tr>`; }).join('');
   const html = `<div class="tn-info">
@@ -11962,7 +11966,8 @@ function tournPeriodEstimateHTML(t, est){
   return `<div class="tn-info-k">Par période</div><div class="tn-info-list">${used.map(function(p){
     const mins = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).reduce(function(s2, x){ return s2 + x.minutes; }, 0);
     const st = tournParseTime(tournPeriodStart(t, p.key)), fin = st != null ? st + Math.ceil(mins * 1.15 / courts) : null;
-    const nextStart = p.part === 'am' ? tournParseTime(tournPmStart(t)) : tournParseTime(t.end_time);
+    const evS = tournParseTime(tournEvStart(t)), endS = tournParseTime(t.end_time);
+    const nextStart = p.part === 'am' ? tournParseTime(tournPmStart(t)) : p.part === 'pm' ? (used.some(function(u){ return u.day === p.day && u.part === 'ev'; }) ? evS : endS) : (endS != null && evS != null && endS > evS ? endS : null);
     const late = fin != null && nextStart != null && fin > nextStart;
     const names = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).map(function(x){ return x.d.name; }).join(', ');
     return `<div class="tn-info-row" style="cursor:default;"><span><b>${escapeHTML(p.label)}</b><small>${escapeHTML(names)}</small></span><span class="tn-info-r"><b class="${late ? 'tn-warn-t' : ''}" style="font-size:16px;">${fin != null ? tournHm(st) + ' → ' + tournHm(fin) : tournFmtMin(Math.ceil(mins * 1.15 / courts))}</b><em>${late ? 'déborde' : 'fin estimée'}</em></span></div>`;
@@ -12031,10 +12036,12 @@ function openTournForm(id){
       ${tournField('Début', `<input id="tfStart" type="time" value="${escapeHTML(v.start_time || '')}">`)}
       ${tournField('Fin', `<input id="tfEnd" type="time" value="${escapeHTML(v.end_time || '')}">`)}
     </div>
-    <div class="tn-row2">
-      ${tournField('Dernier jour', `<input id="tfEndDate" type="date" value="${escapeHTML(v.end_date || '')}">`, 'Facultatif, pour un tournoi sur plusieurs jours.')}
-      ${tournField('Après-midi à partir de', `<input id="tfPm" type="time" value="${escapeHTML(tournPmStart(t))}">`, 'Chaque jour a une période « matin » et une « après-midi » : chaque catégorie choisit la sienne.')}
+    <div class="tn-row3">
+      ${tournField('Dernier jour', `<input id="tfEndDate" type="date" value="${escapeHTML(v.end_date || '')}">`)}
+      ${tournField('Après-midi dès', `<input id="tfPm" type="time" value="${escapeHTML(tournPmStart(t))}">`)}
+      ${tournField('Soirée dès', `<input id="tfEv" type="time" value="${escapeHTML(tournEvStart(t))}">`)}
     </div>
+    <p class="small tn-grp-s" style="margin:-4px 0 12px;">Dernier jour : facultatif, pour un tournoi sur plusieurs jours. Chaque jour a trois périodes (matin à l'heure de début, après-midi, soirée) : chaque catégorie choisit la sienne.</p>
     ${tournField('Lieu', `<input id="tfVenue" maxlength="120" value="${escapeHTML(v.venue || '')}" placeholder="Centre Pickleball Saguenay">`)}
     ${t ? `${tournField('Terrains', `<input id="tfCourts" maxlength="400" value="${escapeHTML((Array.isArray(v.courts) ? v.courts : []).join(', '))}" placeholder="Pulsar, P3B, Optique Santé">`, 'Noms séparés par des virgules. Ils serviront à l\'horaire.')}
     <div class="tn-grp"><div class="tn-grp-t">Inscriptions</div>
@@ -12121,7 +12128,7 @@ async function tournSave(id){
   // Champs absents (création simplifiée) : on ne les écrit pas.
   [['tfCourts','courts'],['tfPool','pool_points'],['tfBracket','bracket_points'],['tfFinal','final_best_of'],['tfStatus','status'],['tfDeadline','reg_deadline'],['tfNotes','notes']].forEach(function(f){ if(!document.getElementById(f[0])) delete row[f[1]]; });
   if(document.getElementById('tfTest')){ const t0 = tournById(id); row.settings = Object.assign({}, (t0 && t0.settings) || {}, { test: tfVal('tfTest') === '1' }); }
-  if(document.getElementById('tfPm')){ const t0 = tournById(id); row.settings = Object.assign({}, row.settings || (t0 && t0.settings) || {}, { pm_start: tfVal('tfPm') || '13:00' }); }
+  if(document.getElementById('tfPm')){ const t0 = tournById(id); row.settings = Object.assign({}, row.settings || (t0 && t0.settings) || {}, { pm_start: tfVal('tfPm') || '13:00', ev_start: tfVal('tfEv') || '18:00' }); }
   if(!document.getElementById('tfStatus')){ delete row.reg_open; if(!id){ row.status = 'draft'; row.reg_open = false; } }
   let res, newId = id;
   if(id) res = await sb.from('tournaments').update(row).eq('id', id);
