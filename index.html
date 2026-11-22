@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 515">
+<meta name="app-build" content="Version 516">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -8559,8 +8559,18 @@ async function onAuthResolved(user){
   }catch(e){ console.error('liaison automatique', e); }
 
   if(profile.role === 'admin'){
-    SESSION_USER = { role:'admin', email: profile.email };
     await loadMyOrganizations(profile.id);
+    if(MY_ORGANIZATIONS.length === 0 && !profile.is_super_admin){
+      // Rôle « admin » sans aucune organisation (lien organization_admins manquant) :
+      // ne jamais afficher l'écran vide « crée une ligue ». On traite le compte comme
+      // un joueur / organisateur pour qu'il retrouve ses ligues.
+      console.warn('Compte admin sans organisation : repli sur la vue joueur/organisateur', profile.id);
+      profile = Object.assign({}, profile, { role:'player' });
+      CURRENT_PROFILE = profile;
+    }
+  }
+  if(profile.role === 'admin'){
+    SESSION_USER = { role:'admin', email: profile.email };
     if(MY_ORGANIZATIONS.length === 0){
       // Un admin sans organisation (cas rare/legacy) : filet de sécurité.
       CURRENT_ORGANIZATION_ID = null;
