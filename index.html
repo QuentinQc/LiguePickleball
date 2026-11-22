@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 524">
+<meta name="app-build" content="Version 525">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2140,6 +2140,9 @@ table.tn-std{display:table;white-space:normal;}
 .tn-rank li b{font-family:var(--font-display);color:var(--ball);min-width:22px;text-align:right;}
 
 .tn-pk{display:inline-flex;gap:6px;}
+.tn-court-tag{font-size:11px;color:var(--muted);margin:-2px 0 6px;}
+.tn-court .tn-court-as{display:block;margin:10px auto 0;font-size:12px;color:var(--muted);text-decoration:none;}
+.tn-court .tn-court-as:hover{color:var(--ball);text-decoration:underline;}
 .tn-pk .btn{padding-left:12px;padding-right:12px;}
 .tn-q-mv{display:flex;flex-direction:column;gap:2px;margin-right:6px;}
 .tn-q-mv button{width:26px;height:20px;border-radius:6px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.05);color:var(--text);font-size:9px;line-height:1;cursor:pointer;padding:0;}
@@ -9980,7 +9983,7 @@ function tournPrepUnlock(divId){
 // ---- En direct : présences, terrains et file d'attente ----
 function tournSettings(t){
   const s = (t && t.settings) || {};
-  return { rest: typeof s.rest === 'number' ? s.rest : 5, checkin: s.checkin !== false, auto: s.auto === true };
+  return { rest: typeof s.rest === 'number' ? s.rest : 5, checkin: s.checkin !== false, auto: s.auto === true, lend: s.lend !== false, open: Array.isArray(s.open_courts) ? s.open_courts : [] };
 }
 function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter(Boolean); }
 // Durée estimée d'un match selon ses points (minutes).
@@ -10030,10 +10033,78 @@ function tournQueue(t){
   pend.sort(function(x, y){ const a = pr(x), b = pr(y); if(a !== b) return a < b ? -1 : 1; return (x._key - y._key) || (x.seq - y.seq); });
   return pend;
 }
+// Un match peut-il aller sur ce terrain ? Oui si sa catégorie n'a pas de terrains réservés, si le terrain en fait
+// partie, s'il est ouvert à toutes les catégories, ou s'il est prêté : réservé à des catégories qui n'ont plus
+// aucun match à jouer (prêt automatique, réglage du jour).
 function tournCourtOk(m, court){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
   const list = d && Array.isArray(d.courts) ? d.courts : null;
-  return !list || !list.length || list.indexOf(court) !== -1;
+  if(!list || !list.length || list.indexOf(court) !== -1) return true;
+  const t = tournById(m.tournament_id), cfg = tournSettings(t);
+  if(cfg.open.indexOf(court) !== -1) return true;
+  return cfg.lend && !tournCourtClaimed(m.tournament_id, court, m.division_id);
+}
+// Terrain réservé à une autre catégorie qui a encore des matchs à jouer (en attente ou en cours).
+function tournCourtClaimed(tid, court, exceptDiv){
+  return tournDivs(tid).some(function(d){
+    if(d.id === exceptDiv || !Array.isArray(d.courts) || d.courts.indexOf(court) === -1) return false;
+    return (TMATCHES || []).some(function(m){ return m.division_id === d.id && (m.status === 'pending' || m.status === 'playing') && (m.phase === 'pool' || m.team_a || m.team_b || m.src); });
+  });
+}
+// Le match va-t-il sur ce terrain parce qu'il lui est réservé (priorité aux catégories propriétaires) ?
+function tournCourtOwn(m, court){ const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; }); return !!(d && Array.isArray(d.courts) && d.courts.indexOf(court) !== -1); }
+// Prochain match proposé pour un terrain : d'abord les catégories à qui il est réservé, puis les autres.
+function tournPickFor(list, court, used){
+  const free = function(x){ return tournMP(x).every(function(id){ return !used[id]; }); };
+  return list.find(function(x){ return free(x) && tournCourtOwn(x, court); }) || list.find(function(x){ return free(x) && tournCourtOk(x, court); }) || null;
+}
+// Matchs proposés pour les terrains libres, en deux temps : chaque catégorie d'abord sur ses terrains réservés,
+// puis les terrains qui restent (ouverts, prêtés ou sans réservation). Renvoie { terrain: match }.
+function tournPlanCourts(freeCourts, list, used){
+  const out = {};
+  const ok = function(x){ return tournMP(x).every(function(id){ return !used[id]; }); };
+  const take = function(c, x){ out[c] = x; tournMP(x).forEach(function(id){ used[id] = 1; }); };
+  freeCourts.forEach(function(c){ const x = list.find(function(m){ return ok(m) && tournCourtOwn(m, c); }); if(x) take(c, x); });
+  freeCourts.forEach(function(c){ if(out[c]) return; const x = list.find(function(m){ return ok(m) && tournCourtOk(m, c) && Object.keys(out).every(function(k){ return out[k] !== m; }); }); if(x) take(c, x); });
+  return out;
+}
+// État d'un terrain affiché sur sa carte : réservé, prêté ou ouvert à toutes les catégories.
+function tournCourtTag(t, court){
+  const cfg = tournSettings(t);
+  if(cfg.open.indexOf(court) !== -1) return 'Ouvert à toutes';
+  const own = tournDivs(t.id).filter(function(d){ return Array.isArray(d.courts) && d.courts.indexOf(court) !== -1; });
+  if(!own.length) return '';
+  const busy = tournCourtClaimed(t.id, court, null);
+  return busy || !cfg.lend ? own.map(function(d){ return d.name; }).join(', ') : 'Prêté (' + own.map(function(d){ return d.name; }).join(', ') + ' a fini)';
+}
+// Affecter un terrain libre : le réserver à une catégorie, ou l'ouvrir à toutes.
+function openTournCourtAssign(tid, ci){
+  const t = tournById(tid); if(!t) return;
+  const court = tournCourts(t)[ci]; if(!court) return;
+  const divs = tournDivs(tid).filter(function(d){ return (d.stage || 'setup') !== 'done'; });
+  const choices = divs.map(function(d){ return 'Réserver à « ' + d.name + ' »'; }).concat(['Ouvrir à toutes les catégories']);
+  showChoice('Terrain ' + court + ' : à quelle catégorie le donner ? Les autres réservations de ce terrain sont retirées.', choices, function(i){ if(i >= 0 && i < choices.length) tournCourtAssign(tid, court, i < divs.length ? divs[i].id : null); });
+}
+async function tournCourtAssign(tid, court, divId){
+  const t = tournById(tid); if(!t) return;
+  const ups = [];
+  tournDivs(tid).forEach(function(d){
+    const list = Array.isArray(d.courts) ? d.courts.slice() : null;
+    if(d.id === divId){ if(list && list.indexOf(court) === -1){ list.push(court); d.courts = list; ups.push(sb.from('tournament_divisions').update({ courts: list }).eq('id', d.id)); } return; }
+    // Retirée des autres catégories (sauf si c'était leur seul terrain : la liste vide voudrait dire « tous les terrains »).
+    if(list && list.indexOf(court) !== -1 && list.length > 1){ list.splice(list.indexOf(court), 1); d.courts = list; ups.push(sb.from('tournament_divisions').update({ courts: list }).eq('id', d.id)); }
+  });
+  const cfg = tournSettings(t), open = cfg.open.filter(function(c){ return c !== court; });
+  if(!divId) open.push(court);
+  const settings = Object.assign({}, t.settings || {}, { open_courts: open });
+  ups.push(sb.from('tournaments').update({ settings: settings }).eq('id', tid));
+  const res = await Promise.all(ups);
+  if(res.some(function(r){ return r && r.error; })){ showAlert('L\'affectation n\'a pas pu être enregistrée.'); await loadTournaments(true); render(); return; }
+  t.settings = settings;
+  tournLiveNotify(); render();
+  const dn = divId ? tournDivName(divId) : '';
+  showToast(divId ? 'Terrain ' + court + ' réservé à ' + dn : 'Terrain ' + court + ' ouvert à toutes les catégories');
+  tournAutoKick(tid);
 }
 // Heures estimées : simulation simple de la file sur les terrains, avec les durées et le repos.
 function tournEstimates(t, queue){
@@ -10145,6 +10216,7 @@ function tournLiveHTML(t){
   const teamsIn = tournPlayingTeams(t.id);
   const arrived = teamsIn.filter(function(x){ return x.checked_in; }).length;
   const now = Date.now(), used = {};
+  const plan = tournPlanCourts(courts.filter(function(c){ return !playing.some(function(x){ return x.court === c; }); }), ready, used);
   const cards = courts.map(function(c){
     const m = playing.find(function(x){ return x.court === c; });
     if(m){
@@ -10158,15 +10230,17 @@ function tournLiveHTML(t){
       </section>`;
     }
     // Une équipe n'est proposée que sur un seul terrain à la fois.
-    const sug = ready.find(function(x){ return tournMP(x).every(function(id){ return !used[id]; }) && tournCourtOk(x, c); });
-    if(sug) tournMP(sug).forEach(function(id){ used[id] = 1; });
+    const sug = plan[c] || null;
+    const tag = tournCourtTag(t, c);
     return `<section class="tn-court">
       <div class="tn-court-h"><b>${escapeHTML(c)}</b><span class="free">Libre</span></div>
+      ${tag ? `<div class="tn-court-tag">${escapeHTML(tag)}</div>` : ''}
       ${sug ? `<div class="tn-court-s">Prochain match proposé :</div>
         <div class="tn-court-cat"><span>${escapeHTML(tournDivName(sug.division_id))}</span>${tournBadgeHTML(sug)}</div>
         <div class="tn-court-m sug"><span>${escapeHTML(tournTeamName(sug.team_a))}</span><i>contre</i><span>${escapeHTML(tournTeamName(sug.team_b))}</span></div>
         <div class="tn-court-a"><button type="button" class="btn btn-primary" onclick="tournCall('${sug.id}',${courts.indexOf(c)})">${cfg.auto ? 'Appeler maintenant' : 'Appeler ce match'}</button></div>${cfg.auto ? '<div class="tn-court-s" style="margin-top:6px;">Appel automatique dans un instant</div>' : ''}`
       : `<div class="tn-court-empty">${blocked.length ? 'En attente : ' + escapeHTML(blocked[0]._why) : 'Aucun match prêt pour ce terrain'}</div>`}
+      ${tournRole(t.id) && tournRole(t.id) !== 'scorer' ? `<button type="button" class="tn-linkbtn tn-court-as" onclick="openTournCourtAssign('${t.id}',${courts.indexOf(c)})">Affecter ce terrain</button>` : ''}
     </section>`;
   }).join('');
   const qAll = ready.concat(blocked), canMove = tournRole(t.id) && qAll.length > 1;
@@ -10254,11 +10328,11 @@ async function tournAutoCall(tid){
     tournLiveMatches(t).forEach(function(m){ if(m.status === 'playing') tournMP(m).forEach(function(id){ used[id] = 1; }); });
     const ready = tournQueue(t).filter(function(m){ return !m._why; });
     const courts = tournCourts(t);
+    const plan = tournPlanCourts(courts.filter(function(c){ return !busy[c]; }), ready.filter(function(x){ return x.status === 'pending'; }), used);
     for(let ci = 0; ci < courts.length; ci++){
       const c = courts[ci]; if(busy[c]) continue;
-      const sug = ready.find(function(x){ return x.status === 'pending' && tournMP(x).every(function(id){ return !used[id]; }) && tournCourtOk(x, c); });
+      const sug = plan[c];
       if(!sug) continue;
-      tournMP(sug).forEach(function(id){ used[id] = 1; });
       const now = new Date().toISOString();
       const r = await sb.from('tournament_matches').update({ status: 'playing', court: c, called_at: now, started_at: now, updated_at: now }).eq('id', sug.id).eq('status', 'pending').select('id');
       if(r && !r.error && r.data && r.data.length){ sug.status = 'playing'; sug.court = c; sug.called_at = now; sug.started_at = now; invokeSendNotification({ match_id: sug.id, kind: 'called' }); n++; busy[c] = 1; }
@@ -10419,6 +10493,7 @@ function openTournDaySettings(tid){
   const html = `<div class="tn-form">
     ${tournField('Temps de repos minimum entre deux matchs d\'une équipe', tournStepper('tdsRest', cfg.rest, 0, 30), 'En minutes. Une équipe qui vient de jouer n\'est pas appelée avant ce délai.')}
     ${tournField('Présences', tournSeg('tdsCheck', [['1','Pointer les arrivées'],['0','Toutes présentes']], cfg.checkin ? '1' : '0'), 'Avec le pointage, une équipe pas encore arrivée n\'est jamais appelée.')}
+    ${tournField('Terrains réservés libérés', tournSeg('tdsLend', [['1','<b>Prêtés</b><small>Aux autres catégories</small>'],['0','<b>Gardés</b><small>Pour leur catégorie</small>']], cfg.lend ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Prêtés : quand une catégorie n\'a plus de match à jouer, ses terrains réservés servent aux autres catégories. Sur l\'écran En direct, « Affecter ce terrain » permet aussi de donner un terrain libre à une catégorie.')}
     ${tournField('Appel des matchs', tournSeg('tdsAuto', [['0','<b>Manuel</b><small>Tu touches « Appeler ce match »</small>'],['1','<b>Automatique</b><small>Dès qu\'un terrain se libère</small>']], cfg.auto ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Automatique : le prochain match prêt de la file est appelé sur chaque terrain libre et les joueurs reçoivent la notification. Il faut qu\'un appareil de l\'équipe du tournoi garde « En direct » ouvert.')}
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" onclick="tournDaySave('${tid}')">Enregistrer</button></div></div>`;
   setModal({ kind:'content', title:'Réglages du jour', htmlContent: html });
@@ -10426,7 +10501,7 @@ function openTournDaySettings(tid){
 }
 async function tournDaySave(tid){
   const t = tournById(tid); if(!t) return;
-  const settings = Object.assign({}, t.settings || {}, { rest: Math.max(0, Math.min(30, parseInt(tfVal('tdsRest'), 10) || 0)), checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1' });
+  const settings = Object.assign({}, t.settings || {}, { rest: Math.max(0, Math.min(30, parseInt(tfVal('tdsRest'), 10) || 0)), checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1', lend: tfVal('tdsLend') !== '0' });
   const r = await sb.from('tournaments').update({ settings: settings }).eq('id', tid);
   if(r && r.error){ showAlert(r.error.message); return; }
   t.settings = settings; tournLiveNotify();
