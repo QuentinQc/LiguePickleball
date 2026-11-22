@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 529">
+<meta name="app-build" content="Version 530">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2140,6 +2140,15 @@ table.tn-std{display:table;white-space:normal;}
 .tn-rank li b{font-family:var(--font-display);color:var(--ball);min-width:22px;text-align:right;}
 
 .tn-pk{display:inline-flex;gap:6px;}
+table.tn-rk{display:table;white-space:normal;width:100%;border-collapse:collapse;font-size:13px;}
+.tn-rk th{text-align:left;font:600 10px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 5px;border-bottom:1px solid var(--line-soft-strong);}
+.tn-rk td{padding:7px 5px;border-top:1px solid var(--line-soft);}
+.tn-rk td:first-child{font-family:var(--font-display);color:var(--muted);width:18px;}
+.tn-rk .n{text-align:right;white-space:nowrap;}
+.tn-rk tr.me td{color:var(--ball);font-weight:700;}
+.tn-rk .sm{display:none;}
+.tn-rk-sw{width:auto;}
+@media (max-width:640px){ .tn-rk .hm{display:none;} .tn-rk .sm{display:table-cell;} .tn-rk{font-size:12px;} .tn-rk td, .tn-rk th{padding-left:3px;padding-right:3px;} }
 .tn-period{display:block;color:var(--ball);font-size:11px;font-weight:600;}
 .tn-per-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 6px;}
 .tn-per-h b{font-family:var(--font-display);font-size:15px;text-transform:uppercase;letter-spacing:.03em;}
@@ -9554,7 +9563,7 @@ function tournNotify(teamId, kind){ if(teamId) invokeSendNotification({ tourname
 // Pour l'instant, le module tournoi n'est visible que des super admins (essais avant l'ouverture aux organisateurs).
 // Module tournoi : super admins pour l'instant, plus les personnes ajoutées à l'équipe d'un tournoi.
 function tournCanManage(){ return tournIsSuper() || !!(MY_TSTAFF && MY_TSTAFF.length); }
-function tournTabsFor(tid){ return tournRole(tid) === 'scorer' ? ['direct', 'matchs', 'tableau'] : ['reglages', 'inscrits', 'poules', 'direct', 'matchs', 'tableau']; }
+function tournTabsFor(tid){ return tournRole(tid) === 'scorer' ? ['direct', 'matchs', 'classement', 'tableau'] : ['reglages', 'inscrits', 'poules', 'direct', 'matchs', 'classement', 'tableau']; }
 
 // ---- Navigation organisateur ----
 function openTourn(id, tab){
@@ -9578,7 +9587,7 @@ function tournSideHTML(it, ms){
   if(!tournCanManage()) return '';
   ensureTournaments();
   const cur = ms && ms.sheet === 'org-tournoi' ? ms.tid : null;
-  const tabs = [['reglages','Réglages et catégories'],['inscrits','Inscrits'],['poules','Préparer (poules)'],['direct','En direct'],['matchs','Historique des matchs'],['tableau','Tableau final']];
+  const tabs = [['reglages','Réglages et catégories'],['inscrits','Inscrits'],['poules','Préparer (poules)'],['direct','En direct'],['matchs','Historique des matchs'],['classement','Classement'],['tableau','Tableau final']];
   let h = '';
   (TOURNS || []).forEach(function(t){
     const on = t.id === cur;
@@ -9603,12 +9612,12 @@ function tournSheetHTML(){
   const t = tournById(MODAL.tid), allowed = tournTabsFor(MODAL.tid);
   if(allowed.indexOf(VIEW.ttab || 'reglages') === -1) VIEW.ttab = allowed[0];
   const tab = VIEW.ttab || 'reglages';
-  const tabs = [['reglages','Réglages'],['inscrits','Inscrits'],['poules','Préparer'],['direct','En direct'],['matchs','Matchs'],['tableau','Tableau']].filter(function(x){ return allowed.indexOf(x[0]) !== -1; });
+  const tabs = [['reglages','Réglages'],['inscrits','Inscrits'],['poules','Préparer'],['direct','En direct'],['matchs','Matchs'],['classement','Classement'],['tableau','Tableau']].filter(function(x){ return allowed.indexOf(x[0]) !== -1; });
   let body = '<p class="small" style="color:var(--muted);">Chargement…</p>';
   if(t){
     const nav = `<div class="tn-tabs" role="tablist">${tabs.map(function(x){ return `<button type="button" role="tab" class="${tab === x[0] ? 'on' : ''}" onclick="tournTab('${x[0]}')">${x[1]}</button>`; }).join('')}</div>`;
     const testBar = tournTestOn(t) ? `<div class="tn-testbar"><b>Mode test actif</b><span>Simulation disponible : équipes de test, scores générés, étapes simulées.</span>${tournRole(t.id) === 'admin' ? `<button type="button" onclick="openTournTestMode('${t.id}')">Outils de test</button><button type="button" onclick="tournTestSet('${t.id}', false)">Désactiver</button>` : ''}</div>` : '';
-    body = testBar + nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'matchs' ? tournHistoryHTML(t, false) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
+    body = testBar + nav + (tab === 'inscrits' ? tournTeamsPageHTML(t) : tab === 'poules' ? tournPrepHTML(t) : tab === 'direct' ? tournLiveHTML(t) : tab === 'matchs' ? tournHistoryHTML(t, false) : tab === 'classement' ? tournRankHTML(t, false) : tab === 'tableau' ? tournBracketPageHTML(t) : tournSettingsHTML(t));
   }
   return `<div class="chat-overlay dk-page" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet chat-sheet-lg">
@@ -9620,6 +9629,55 @@ function tournSheetHTML(){
       <div class="sheet-body${tournRole(MODAL.tid) === 'scorer' ? ' tn-role-scorer' : ''}" data-key="${escapeHTML('org-tournoi|' + MODAL.tid + '|' + tab)}">${body}</div>
     </div>
   </div>`;
+}
+// ---- Classement : en tout temps, par poule ou pour toute la catégorie (poules et tableau confondus) ----
+// Fiche de chaque équipe (ou joueur, partenaires qui changent) : matchs joués, victoires, défaites, points pour, contre, différentiel.
+function tournRankStats(divId, pool){
+  const rot = tournDivIsRot(divId), row = {};
+  (TTEAMS || []).forEach(function(x){ if(x.division_id === divId && x.status === 'registered' && (!pool || x.pool === pool)) row[x.id] = { id: x.id, j: 0, w: 0, l: 0, pf: 0, pa: 0 }; });
+  tournMatches(divId).forEach(function(m){
+    if(m.status !== 'done' || !m.team_a || !m.team_b) return;
+    if(pool && (m.phase !== 'pool' || m.pool !== pool)) return;
+    // Points marqués : somme des manches en 2 de 3, sinon le score du match.
+    let a = Number(m.score_a) || 0, b = Number(m.score_b) || 0;
+    if(Array.isArray(m.games) && m.games.length){ a = 0; b = 0; m.games.forEach(function(g){ a += Number(g[0]) || 0; b += Number(g[1]) || 0; }); }
+    const aw = m.winner === m.team_a;
+    const add = function(ids, pf, pa, win){ ids.forEach(function(id){ const r = row[id]; if(!r) return; r.j++; r.pf += pf; r.pa += pa; if(win) r.w++; else r.l++; }); };
+    add(rot ? tournMembers(m.team_a) : [m.team_a], a, b, aw);
+    add(rot ? tournMembers(m.team_b) : [m.team_b], b, a, !aw);
+  });
+  return Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; return r; });
+}
+function tournRankHTML(t, ro, me){
+  const divs = tournDivs(t.id).filter(function(d){ return (d.stage || 'setup') !== 'setup'; });
+  if(!divs.length) return `<div class="tn-note" style="margin-top:14px;">Le classement s'affiche dès que les matchs d'une catégorie sont créés.</div>`;
+  if(!VIEW.trkd || !divs.some(function(x){ return x.id === VIEW.trkd; })) VIEW.trkd = divs[0].id;
+  const d = divs.find(function(x){ return x.id === VIEW.trkd; }), labels = tournPoolLabels(d.id), rot = tournDivIsRot(d.id);
+  const scope = VIEW.trks === 'pool' && labels.length ? 'pool' : 'all';
+  const chips = divs.length > 1 ? `<div class="tn-chips">${divs.map(function(x){ return `<button type="button" class="${x.id === d.id ? 'on' : ''}" onclick="VIEW.trkd='${x.id}';render()">${escapeHTML(x.name)}</button>`; }).join('')}</div>` : '';
+  const sw = labels.length ? `<div class="tn-seg tn-rk-sw" role="tablist"><button type="button" class="${scope === 'all' ? 'on' : ''}" onclick="VIEW.trks='all';render()">Catégorie</button><button type="button" class="${scope === 'pool' ? 'on' : ''}" onclick="VIEW.trks='pool';render()">${rot ? 'Par groupe' : 'Par poule'}</button></div>` : '';
+  const mine = me ? (rot ? me.id : me.id) : null;
+  const table = function(list){
+    return `<table class="tn-rk"><thead><tr><th>#</th><th>${rot ? 'Joueur' : 'Équipe'}</th><th class="n">J</th><th class="n">V</th><th class="n">D</th><th class="n hm">Pour</th><th class="n hm">Contre</th><th class="n sm">Points</th><th class="n">+/-</th></tr></thead><tbody>${list.map(function(r, i){
+      return `<tr class="${r.id === mine ? 'me' : ''}"><td>${i + 1}</td><td>${escapeHTML(rot ? tournTeamName(r.id) : tournTeamFull(r.id))}${r.id === mine ? ' <small>(toi)</small>' : ''}</td><td class="n">${r.j}</td><td class="n">${r.w}</td><td class="n">${r.l}</td><td class="n hm">${r.pf}</td><td class="n hm">${r.pa}</td><td class="n sm">${r.pf}-${r.pa}</td><td class="n">${r.diff > 0 ? '+' : ''}${r.diff}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  };
+  let body;
+  if(scope === 'pool'){
+    body = `<div class="tn-pools">${labels.map(function(lb){
+      // Ordre officiel de la poule (avec le résultat entre égaux), colonnes de la fiche complète.
+      const st = tournStandings(d.id, lb), stats = {}; tournRankStats(d.id, lb).forEach(function(r){ stats[r.id] = r; });
+      const list = st.map(function(x){ return stats[x.id] || { id: x.id, j: 0, w: 0, l: 0, pf: 0, pa: 0, diff: 0 }; });
+      return `<section class="tn-pool"><div class="tn-pool-h"><b>${escapeHTML(tournPoolTitle(lb))}</b><span>${list.length} ${rot ? 'joueurs' : 'équipes'}</span></div>${table(list)}</section>`;
+    }).join('')}</div>`;
+  } else {
+    const list = tournRankStats(d.id, null);
+    const pct = function(r, v){ return r.j ? v / r.j : 0; };
+    list.sort(function(x, y){ return (pct(y, y.w) - pct(x, x.w)) || (y.w - x.w) || (y.diff - x.diff) || (y.pf - x.pf) || tournTeamName(x.id).localeCompare(tournTeamName(y.id)); });
+    body = `<section class="tn-pool" style="margin-top:4px;"><div class="tn-pool-h"><b>${escapeHTML(d.name)} · toute la catégorie</b><span>${tournMatches(d.id).filter(function(m){ return m.status === 'done' && m.team_a && m.team_b; }).length} matchs joués</span></div>${table(list)}</section>`;
+  }
+  return chips + `<div class="tn-sec-h tn-prep-bar" style="margin-top:${chips ? 0 : 12}px;"><span>Classement</span>${sw}</div>
+    <p class="small" style="color:var(--muted);margin:4px 0 10px;">${scope === 'pool' ? 'Ordre officiel de chaque ' + (rot ? 'groupe' : 'poule') + ' : victoires, puis résultat entre équipes à égalité, puis différentiel.' : 'Tous les matchs joués de la catégorie, poules et tableau confondus : proportion de victoires, puis différentiel, puis points marqués.'} J = matchs joués, V = victoires, D = défaites, Pour / Contre = points marqués et reçus.</p>${body}`;
 }
 function tournSettingsHTML(t){
   const st = TOURN_ST[t.status] || TOURN_ST.draft, divs = tournDivs(t.id);
@@ -11544,10 +11602,11 @@ function tournPlayerSheetHTML(){
   if(t && me){
     const d = (TDIVS || []).find(function(x){ return x.id === me.division_id; });
     const v = VIEW.tpview || 'mine';
-    const tabs = [['mine','Mes matchs'],['bracket', d && tournNoBracket(tournDivRules(t, d)) ? 'Classement' : 'Tableau'],['all','Résultats']];
+    const tabs = [['mine','Mes matchs'],['rank','Classement']].concat(d && tournNoBracket(tournDivRules(t, d)) ? [] : [['bracket','Tableau']]).concat([['all','Résultats']]);
+    if(v === 'rank' && !VIEW.trkd) VIEW.trkd = me.division_id;
     if(v === 'all' && !VIEW.thd) VIEW.thd = me.division_id;
     body = `<div class="tn-tabs" role="tablist" style="display:flex;">${tabs.map(function(x){ return `<button type="button" role="tab" class="${v === x[0] ? 'on' : ''}" onclick="VIEW.tpview='${x[0]}';render()">${x[1]}</button>`; }).join('')}</div>`
-      + (v === 'bracket' ? `<div class="tn-readonly">${tournPlayerBracketHTML(t, d)}</div>` : v === 'all' ? tournHistoryHTML(t, true) : tournPlayerMineHTML(t, d, me));
+      + (v === 'bracket' ? `<div class="tn-readonly">${tournPlayerBracketHTML(t, d)}</div>` : v === 'rank' ? tournRankHTML(t, true, me) : v === 'all' ? tournHistoryHTML(t, true) : tournPlayerMineHTML(t, d, me));
   } else if(t) body = '<p>Ton équipe n\'est pas dans ce tournoi.</p>';
   return `<div class="chat-overlay" onclick="if(event.target===this && ovDown(this)) closeModal()">
     <div class="chat-sheet chat-sheet-lg">
