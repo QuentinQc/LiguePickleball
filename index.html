@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 516">
+<meta name="app-build" content="Version 517">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1183,6 +1183,11 @@ button.ah-cta{border:0;cursor:pointer;font-family:inherit;}
 .rot-court b{display:block;font-family:var(--font-display);color:var(--ball);margin-bottom:4px;}
 .rot-vs{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:2px 0;}
 .rot-big{text-align:center;padding:18px 0 12px;}
+.rpc-keep{margin-top:12px;padding:12px;border-radius:14px;border:1px solid rgba(207,234,92,.45);background:rgba(207,234,92,.08);display:flex;flex-direction:column;gap:10px;text-align:left;}
+.rpc-keep-t{display:flex;flex-direction:column;gap:2px;}
+.rpc-keep-t b{color:var(--ball);font-size:15px;}
+.rpc-keep-t span{font-size:13px;color:var(--muted);line-height:1.4;}
+.rpc-keep .btn{width:100%;}
 .rpc{display:flex;flex-direction:column;gap:6px;}
 .rpc-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
 .rpc-r{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
@@ -6265,18 +6270,26 @@ function onChronoMessage(p){
   const open = currentOpenSession();
   if(!open || p.sid !== open.id || p.reload){ refreshAfterPush(true); return; }
   open.rotationRound = p.round; open.rotationTimerStart = p.start; open.rotationDone = !!p.done;
+  if(p.ver && DATA_VERSION_FOR === CURRENT_LEAGUE_ID) DATA_VERSION = p.ver;
   if(document.getElementById('rotChrono')){ const el = document.getElementById('rotChrono'); el.innerHTML = rotationChronoInnerHTML(); if(p.start) rotationTick(); }
   if(!appBusyEditing() && !MODAL) render(); else chronoTickPlayers();
 }
 // Rafraîchit chaque seconde le chrono affiché aux joueurs ; filet de sécurité : relit la ligue toutes les 45 s.
-function chronoTickPlayers(){
+function chronoTickPlayers(force){
   const el = document.getElementById('rotPlayerChrono');
   if(!el) return;
   const open = currentOpenSession(), me = SESSION_USER && SESSION_USER.playerId;
-  if(open && me) el.innerHTML = rotationPlayerChronoInnerHTML(me, open);
+  if(open && me){
+    const pt = rotationPlayerChronoParts(me, open), tEl = el.querySelector('.rpc-t');
+    if(!force && tEl && el.getAttribute('data-sig') === pt.sig){ tEl.textContent = pt.time; }
+    else { el.innerHTML = pt.html; el.setAttribute('data-sig', pt.sig); }
+  }
   if(document.visibilityState === 'visible' && Date.now() - CHRONO_POLL_AT > 45000){ CHRONO_POLL_AT = Date.now(); refreshAfterPush(true); }
 }
-function rotationPlayerChronoInnerHTML(meId, open){
+function rotationPlayerChronoInnerHTML(meId, open){ return rotationPlayerChronoParts(meId, open).html; }
+// Chrono vu par un joueur. Tout joueur de la soirée peut démarrer ou arrêter le chrono pour tout le monde
+// (fonction rotation_chrono) ; le changement est diffusé aussitôt à tous les appareils.
+function rotationPlayerChronoParts(meId, open){
   const rot = rotationFor(open), cur = rotationCurrentRound(open, rot), n = rot.rounds.length;
   const fmt = function(m){ const t = Math.max(0, Math.ceil(m * 60)), mm = Math.floor(t / 60), ss = t % 60; return mm + ':' + (ss < 10 ? '0' : '') + ss; };
   let top, time, sub, idx = null;
@@ -6284,16 +6297,38 @@ function rotationPlayerChronoInnerHTML(meId, open){
   else if(cur.finished){ top = 'Ronde ' + n + ' sur ' + n; time = '0:00'; sub = 'Dernière ronde terminée. Merci !'; }
   else if(cur.running){ idx = cur.index; top = 'Ronde ' + (idx + 1) + ' sur ' + n; time = fmt(cur.left); sub = 'Temps restant'; }
   else { idx = cur.index; top = 'Ronde ' + (idx + 1) + ' sur ' + n; time = rot.round + ':00'; sub = 'Prochaine ronde : change de terrain et attends le départ'; }
-  let now = '';
+  let now = '', keeper = '';
   if(idx !== null && rot.rounds[idx]){
     const m = rot.rounds[idx].courts.find(function(x){ return x.a.indexOf(meId) !== -1 || x.b.indexOf(meId) !== -1; });
+    if(open.published && !(cur && cur.finished) && rot.numbers && rot.numbers[meId]){
+      const running = !!(cur && cur.running), busy = ROT_KEEPER_BUSY;
+      keeper = `<div class="rpc-keep"><div class="rpc-keep-t"><b>${running ? 'Chrono en marche' : 'Prêt pour la ronde ' + (idx + 1)}</b><span>${running ? 'N\'importe quel joueur peut l\'arrêter (blessure, pause) : il s\'arrête pour tout le monde.' : 'Quand tout le monde est en place, n\'importe quel joueur peut lancer la ronde : le chrono part pour tout le monde.'}</span></div>
+        <button type="button" class="btn ${running ? 'btn-secondary' : 'btn-primary'}" ${busy ? 'disabled' : ''} onclick="rotationKeeper('${running ? 'stop' : 'start'}')">${busy ? '…' : running ? 'Arrêter le chrono' : 'Démarrer la ronde ' + (idx + 1)}</button></div>`;
+    }
     if(!m) now = `<div class="rpc-now"><b>Repos</b> pendant la ronde ${idx + 1}</div>`;
     else {
       const mate = (m.a.indexOf(meId) !== -1 ? m.a : m.b).filter(function(x){ return x !== meId; })[0], vs = m.a.indexOf(meId) !== -1 ? m.b : m.a;
       now = `<div class="rpc-now"><b>${escapeHTML(recCourtName(m.c))}</b> · avec ${rotNameHTML(mate, rot)}<br>contre ${vs.map(function(x){ return rotNameHTML(x, rot); }).join(' et ')}</div>`;
     }
   }
-  return `<div class="rpc"><div class="rpc-top"><span class="rpc-r">${escapeHTML(top)}</span></div><div class="rpc-t${cur && cur.running ? '' : ' off'}">${time}</div><div class="rpc-s">${escapeHTML(sub)}</div>${now}</div>`;
+  const on = !!(cur && cur.running);
+  return { time: time, on: on, sig: [top, sub, now, keeper, on].join('|'),
+    html: `<div class="rpc"><div class="rpc-top"><span class="rpc-r">${escapeHTML(top)}</span></div><div class="rpc-t${on ? '' : ' off'}">${time}</div><div class="rpc-s">${escapeHTML(sub)}</div>${now}${keeper}</div>` };
+}
+let ROT_KEEPER_BUSY = false;
+async function rotationKeeper(action){
+  const open = currentOpenSession(); if(!open || ROT_KEEPER_BUSY) return;
+  ROT_KEEPER_BUSY = true; chronoTickPlayers(true);
+  const r = await sb.rpc('rotation_chrono', { p_league: CURRENT_LEAGUE_ID, p_session: open.id, p_action: action });
+  ROT_KEEPER_BUSY = false;
+  const d = r && r.data;
+  if(r.error || !d || !d.ok){ chronoTickPlayers(true); showAlert((d && d.error) || (r.error && r.error.message) || 'Impossible pour l\'instant.'); return; }
+  open.rotationRound = d.round; open.rotationTimerStart = d.start || null; open.rotationDone = !!d.done;
+  if(d.ver && DATA_VERSION_FOR === CURRENT_LEAGUE_ID) DATA_VERSION = d.ver;
+  ensureChronoChannel();
+  if(CHRONO_CH){ try{ CHRONO_CH.send({ type: 'broadcast', event: 'chrono', payload: { sid: open.id, round: d.round, start: d.start || null, done: !!d.done, ver: d.ver || null } }); }catch(e){} }
+  chronoTickPlayers(true);
+  showToast(action === 'start' ? 'Chrono démarré pour tout le monde' : 'Chrono arrêté');
 }
 function rotationStartTimer(){
   const open = currentOpenSession(); if(!open) return;
