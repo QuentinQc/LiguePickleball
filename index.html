@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 527">
+<meta name="app-build" content="Version 528">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2140,6 +2140,10 @@ table.tn-std{display:table;white-space:normal;}
 .tn-rank li b{font-family:var(--font-display);color:var(--ball);min-width:22px;text-align:right;}
 
 .tn-pk{display:inline-flex;gap:6px;}
+.tn-period{display:block;color:var(--ball);font-size:11px;font-weight:600;}
+.tn-per-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 6px;}
+.tn-per-h b{font-family:var(--font-display);font-size:15px;text-transform:uppercase;letter-spacing:.03em;}
+.tn-per-h small{color:var(--muted);font-size:12px;}
 .tn-sel-row{cursor:default;gap:12px;}
 .tn-sel-row.on{border-color:rgba(207,234,92,.6);background:rgba(207,234,92,.07);}
 .tn-ck{flex:none;width:26px;height:26px;border-radius:8px;border:2px solid var(--line-soft-strong);background:transparent;color:#0A2420;font-weight:800;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
@@ -9503,8 +9507,39 @@ function tournTeams(tid, divId, status){
 function tournDateLabel(t, short){
   if(!t || !t.event_date) return 'Date à venir';
   const d = new Date(t.event_date + 'T12:00:00');
+  const days = tournDaysOf(t);
+  if(days.length > 1){
+    const e = new Date(days[days.length - 1] + 'T12:00:00');
+    const same = d.getMonth() === e.getMonth();
+    return (short ? '' : d.toLocaleDateString('fr-CA', { weekday:'long' }) + ' ') + d.getDate() + (same ? '' : ' ' + d.toLocaleDateString('fr-CA', { month:'long' })) + (days.length > 2 ? ' au ' : ' et ') + (short ? '' : e.toLocaleDateString('fr-CA', { weekday:'long' }) + ' ') + e.toLocaleDateString('fr-CA', short ? { day:'numeric', month:'long' } : { day:'numeric', month:'long', year:'numeric' });
+  }
   return d.toLocaleDateString('fr-CA', short ? { day:'numeric', month:'long' } : { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
+// Jours du tournoi (date de début à date de fin, 7 jours au plus).
+function tournDaysOf(t){
+  if(!t || !t.event_date) return [];
+  const out = [t.event_date];
+  if(!t.end_date || t.end_date <= t.event_date) return out;
+  const d = new Date(t.event_date + 'T12:00:00Z');
+  for(let i = 0; i < 6; i++){ d.setUTCDate(d.getUTCDate() + 1); const k = d.toISOString().slice(0, 10); if(k > t.end_date) break; out.push(k); }
+  return out;
+}
+// Périodes de jeu d'après les dates : matin et après-midi de chaque jour. Clé : « AAAA-MM-JJ|am » ou « |pm ».
+function tournPeriods(t){
+  const days = tournDaysOf(t), out = [];
+  days.forEach(function(day){
+    const d = new Date(day + 'T12:00:00'), wd = d.toLocaleDateString('fr-CA', { weekday:'long' });
+    const lab = days.length > 1 ? wd.charAt(0).toUpperCase() + wd.slice(1) + ' ' + d.getDate() + ' ' + d.toLocaleDateString('fr-CA', { month:'long' }) + ' · ' : '';
+    out.push({ key: day + '|am', label: lab + (lab ? 'matin' : 'Matin'), day: day, part: 'am' });
+    out.push({ key: day + '|pm', label: lab + (lab ? 'après-midi' : 'Après-midi'), day: day, part: 'pm' });
+  });
+  return out;
+}
+function tournPeriodLabel(t, key){ const p = tournPeriods(t).find(function(x){ return x.key === key; }); return p ? p.label : ''; }
+function tournPmStart(t){ const s = (t && t.settings && t.settings.pm_start) || '13:00'; return /^\d{1,2}:\d{2}$/.test(s) ? s : '13:00'; }
+function tournPeriodStart(t, key){ return String(key || '').slice(-2) === 'pm' ? tournPmStart(t) : ((t && t.start_time) || '08:00'); }
+// Période d'une catégorie, seulement si elle existe encore dans les dates du tournoi.
+function tournDivPeriod(t, d){ return d && d.period && tournPeriods(t).some(function(x){ return x.key === d.period; }) ? d.period : null; }
 function tournLink(id){ const o = (location.origin && location.origin.indexOf('http') === 0) ? location.origin : 'https://dinkeo.ca'; return o + '/?t=' + id; }
 function tournCopyLink(id){
   const link = tournLink(id);
@@ -9598,7 +9633,7 @@ function tournSettingsHTML(t){
     return `<tr onclick="openTournDivForm('${t.id}','${d.id}')">
       <td><b>${escapeHTML(d.name)}</b><small class="tn-fmt-m">${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</small></td><td>${escapeHTML(TOURN_GENDER[d.gender] || d.gender || '—')}</td><td>${escapeHTML(d.level || 'Tous')}</td><td>${escapeHTML(d.age || 'Tous')}</td>
       <td><div class="tn-fill"><span class="tn-bar"><span style="width:${pct}%;${full ? 'background:var(--paddle);' : ''}"></span></span><span class="${full ? 'tn-full' : ''}">${n} / ${max}${full ? ' · complet' : ''}${w ? ' · ' + w + ' en attente' : ''}</span></div></td>
-      <td class="tn-fmt"><b>${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</b><small>${escapeHTML(tournFmtDetail(t, d))}</small>${tournCourtsLabel(d) ? `<small class="tn-courts-only">${escapeHTML(tournCourtsLabel(d))}</small>` : ''}</td></tr>`;
+      <td class="tn-fmt"><b>${escapeHTML(TOURN_FMT_SHORT[tournDivRules(t, d).format])}</b><small>${escapeHTML(tournFmtDetail(t, d))}</small>${tournCourtsLabel(d) ? `<small class="tn-courts-only">${escapeHTML(tournCourtsLabel(d))}</small>` : ''}${tournDivPeriod(t, d) ? `<small class="tn-period">${escapeHTML(tournPeriodLabel(t, d.period))}</small>` : ''}</td></tr>`;
   }).join('');
   return `<div class="tn-head">
       <div class="tn-head-l"><span class="jp-pill ${st[1]}">${st[0]}</span><span class="small" style="color:var(--muted);">${nReg} équipe${nReg > 1 ? 's' : ''}${nWait ? ' · ' + nWait + ' en attente' : ''}</span></div>
@@ -9915,11 +9950,32 @@ function tournPrepAllHTML(t){
   const sel = rows.filter(function(x){ return x.s.ok && TPREPSEL[x.d.id]; });
   const anyReady = rows.some(function(x){ return x.s.ok; });
   return `<div class="tn-sec-h tn-prep-bar" style="margin-top:12px;"><span>Toutes les catégories</span><span class="tn-head-r">${anyReady ? `<button type="button" class="btn btn-secondary" onclick="tournPrepSelAll('${t.id}')">${rows.filter(function(x){ return x.s.ok; }).every(function(x){ return TPREPSEL[x.d.id]; }) ? 'Tout décocher' : 'Tout cocher'}</button>` : ''}<button type="button" class="btn btn-primary" ${sel.length ? '' : 'disabled'} onclick="tournLockAll('${t.id}')">${sel.length ? 'Créer les matchs de ' + (sel.length > 1 ? 'ces ' + sel.length + ' catégories' : 'cette catégorie') : (anyReady ? 'Coche les catégories à démarrer' : 'Rien à créer')}</button></span></div>
-    <p class="small" style="color:var(--muted);margin:6px 0 10px;">Coche les catégories à démarrer maintenant (par exemple celles du matin) : leurs poules, rondes ou tableaux sont créés d'un coup, avec la répartition affichée dans leur page. Les autres restent à préparer pour plus tard. Les matchs des catégories démarrées entrent ensemble dans la file d'attente : chacune reçoit des terrains.</p>
-    <div class="tn-info-list">${rows.map(function(x){
+    <p class="small" style="color:var(--muted);margin:6px 0 10px;">${tournPeriods(t).length && tournDivs(t.id).some(function(d){ return tournDivPeriod(t, d); }) ? 'Démarre une période d\'un coup avec son bouton, ou coche des catégories une à une. ' : ''}Coche les catégories à démarrer maintenant (par exemple celles du matin) : leurs poules, rondes ou tableaux sont créés d'un coup, avec la répartition affichée dans leur page. Les autres restent à préparer pour plus tard. Les matchs des catégories démarrées entrent ensemble dans la file d'attente : chacune reçoit des terrains.</p>
+    ${(function(){
+      const groups = [], byKey = {};
+      rows.forEach(function(x){ const k = tournDivPeriod(t, x.d) || ''; if(!byKey[k]){ byKey[k] = []; groups.push(k); } byKey[k].push(x); });
+      const per = tournPeriods(t).map(function(x){ return x.key; });
+      groups.sort(function(a, b){ return (a === '' ? 99 : per.indexOf(a)) - (b === '' ? 99 : per.indexOf(b)); });
+      if(groups.length === 1 && groups[0] === '') return '';
+      return groups.map(function(k){
+        const g = byKey[k], rdy = g.filter(function(x){ return x.s.ok; }).length;
+        return `<div class="tn-per-h"><b>${k ? escapeHTML(tournPeriodLabel(t, k)) + ' · dès ' + tournPeriodStart(t, k) : 'Sans période'}</b>${k && rdy ? `<button type="button" class="btn btn-primary" onclick="tournStartPeriod('${t.id}','${k}')">Démarrer ${rdy > 1 ? 'ces ' + rdy + ' catégories' : 'cette catégorie'}</button>` : `<small>${g.length - rdy === g.length ? (g.every(function(x){ return x.s.done; }) ? 'Démarrée' : 'Rien de prêt') : ''}</small>`}</div>
+          <div class="tn-info-list">${g.map(function(x){ return tournPrepAllRow(t, x); }).join('')}</div>`;
+      }).join('');
+    })() || `<div class="tn-info-list">${rows.map(function(x){ return tournPrepAllRow(t, x); }).join('')}</div>`}`;
+}
+function tournPrepAllRow(t, x){
+  {
       const on = x.s.ok && TPREPSEL[x.d.id];
       return `<div class="tn-info-row tn-sel-row${on ? ' on' : ''}">${x.s.ok ? `<button type="button" class="tn-ck${on ? ' on' : ''}" role="checkbox" aria-checked="${on}" aria-label="Démarrer ${escapeHTML(x.d.name)}" onclick="tournPrepSel('${x.d.id}')">${on ? '✓' : ''}</button>` : '<span class="tn-ck off"></span>'}<button type="button" class="tn-sel-main" onclick="VIEW.tprep='${x.d.id}';render()"><b>${escapeHTML(x.d.name)}</b><small>${escapeHTML(TOURN_FMT[tournDivRules(t, x.d).format])} · ${escapeHTML(x.s.txt)}</small></button><span class="tn-info-r"><em class="${x.s.ok ? 'tn-ok-t' : x.s.done ? '' : 'tn-warn-t'}">${x.s.ok ? 'Prête' : x.s.done ? '✓ Créée' : 'Pas prête'}</em></span></div>`;
-    }).join('')}</div>`;
+  }
+}
+// Démarrer une période : toutes ses catégories prêtes, d'un coup.
+function tournStartPeriod(tid, key){
+  const t = tournById(tid); if(!t) return;
+  TPREPSEL = {};
+  tournDivs(tid).forEach(function(d){ if(tournDivPeriod(t, d) === key && tournPrepReady(t, d).ok) TPREPSEL[d.id] = true; });
+  tournLockAll(tid);
 }
 function tournPrepSel(divId){ TPREPSEL[divId] = !TPREPSEL[divId]; render(); }
 function tournPrepSelAll(tid){
@@ -11870,19 +11926,47 @@ function tournCardsHTML(t, divs, hours, courts, regTxt){
 }
 function openTournDayInfo(tid){
   const t = tournById(tid); if(!t) return;
-  const est = tournDayEstimate(t), late = est.finish != null && est.end != null && est.finish > est.end;
+  const est = tournDayEstimate(t);
+  const pl = tournPeriodLast(t, est);
+  if(pl) est.finish = pl.fin;
+  const late = est.finish != null && est.end != null && est.finish > est.end;
   const rows = est.rows.map(function(x){ return `<tr><td><b>${escapeHTML(x.d.name)}</b><small>${x.guess ? 'si complète (' + x.n + ' équipes)' : x.reg + (x.reg > 1 ? ' équipes inscrites' : ' équipe inscrite')}</small></td><td class="num">${x.plan.pool + x.plan.bracket}</td><td class="num">${tournFmtMin(x.minutes)}</td></tr>`; }).join('');
   const html = `<div class="tn-info">
     <div class="tn-info-big ${late ? 'warn' : ''}">${est.finish != null && est.matches ? 'Fin estimée vers ' + tournHm(est.finish) : est.matches ? '≈ ' + tournFmtMin(est.span) + ' de tournoi' : 'Pas encore de matchs prévus'}</div>
     <p class="small">${est.start != null ? 'Début à ' + tournHm(est.start) + (est.end != null ? ', fin prévue à ' + tournHm(est.end) : '') + '. ' : ''}${est.matches} matchs, ≈ ${tournFmtMin(est.minutes)} de jeu au total, répartis sur ${est.courts || 1} terrain${(est.courts || 1) > 1 ? 's' : ''}, plus 15 % pour la rotation et les pauses.</p>
     ${late ? `<div class="tn-note tn-note-warn">Le tournoi risque de dépasser l'heure de fin d'environ <b>${tournFmtMin(est.finish - est.end)}</b>. Pistes : ajouter des terrains, passer des matchs à 11 points, réduire la taille des poules ou finir en 1 match au lieu de 2 de 3.</div>` : ''}
     ${!est.courts ? `<div class="tn-note tn-note-warn">Aucun terrain n'est configuré : la file d'attente ne pourra appeler aucun match.</div>` : ''}
+    ${tournPeriodEstimateHTML(t, est)}
     ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Durée de jeu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     <div class="tn-info-k">Terrains</div><p class="small">${est.courts ? escapeHTML(tournCourts(t).join(', ')) : 'Aucun'}</p>
     <p class="small" style="color:var(--muted);">Durées utilisées : 20 min pour un match à 11, 25 min à 15, 35 min à 21.</p>
     ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournForm('${tid}')">Modifier lieu, heures et terrains</button></div>` : ''}
   </div>`;
   showPanelModal('Lieu et horaire', html);
+}
+// Fin estimée de chaque période (matin, après-midi…), avec un avertissement si le matin déborde sur l'après-midi.
+// Dernière période utilisée et sa fin estimée (pour le titre « Fin estimée vers… »).
+function tournPeriodLast(t, est){
+  const per = tournPeriods(t), courts = Math.max(1, tournCourts(t).length || 1);
+  const used = per.filter(function(p){ return est.rows.some(function(x){ return tournDivPeriod(t, x.d) === p.key; }); });
+  if(!used.length) return null;
+  const p = used[used.length - 1];
+  const mins = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).reduce(function(s2, x){ return s2 + x.minutes; }, 0);
+  const st = tournParseTime(tournPeriodStart(t, p.key));
+  return st == null ? null : { st: st, fin: st + Math.ceil(mins * 1.15 / courts), label: p.label };
+}
+function tournPeriodEstimateHTML(t, est){
+  const per = tournPeriods(t), courts = Math.max(1, tournCourts(t).length || 1);
+  const used = per.filter(function(p){ return est.rows.some(function(x){ return tournDivPeriod(t, x.d) === p.key; }); });
+  if(!used.length) return '';
+  return `<div class="tn-info-k">Par période</div><div class="tn-info-list">${used.map(function(p){
+    const mins = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).reduce(function(s2, x){ return s2 + x.minutes; }, 0);
+    const st = tournParseTime(tournPeriodStart(t, p.key)), fin = st != null ? st + Math.ceil(mins * 1.15 / courts) : null;
+    const nextStart = p.part === 'am' ? tournParseTime(tournPmStart(t)) : tournParseTime(t.end_time);
+    const late = fin != null && nextStart != null && fin > nextStart;
+    const names = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).map(function(x){ return x.d.name; }).join(', ');
+    return `<div class="tn-info-row" style="cursor:default;"><span><b>${escapeHTML(p.label)}</b><small>${escapeHTML(names)}</small></span><span class="tn-info-r"><b class="${late ? 'tn-warn-t' : ''}" style="font-size:16px;">${fin != null ? tournHm(st) + ' → ' + tournHm(fin) : tournFmtMin(Math.ceil(mins * 1.15 / courts))}</b><em>${late ? 'déborde' : 'fin estimée'}</em></span></div>`;
+  }).join('')}</div>`;
 }
 function openTournFormatsInfo(tid){
   const t = tournById(tid); if(!t) return;
@@ -11946,6 +12030,10 @@ function openTournForm(id){
       ${tournField('Date', `<input id="tfDate" type="date" value="${escapeHTML(v.event_date || '')}">`)}
       ${tournField('Début', `<input id="tfStart" type="time" value="${escapeHTML(v.start_time || '')}">`)}
       ${tournField('Fin', `<input id="tfEnd" type="time" value="${escapeHTML(v.end_time || '')}">`)}
+    </div>
+    <div class="tn-row2">
+      ${tournField('Dernier jour', `<input id="tfEndDate" type="date" value="${escapeHTML(v.end_date || '')}">`, 'Facultatif, pour un tournoi sur plusieurs jours.')}
+      ${tournField('Après-midi à partir de', `<input id="tfPm" type="time" value="${escapeHTML(tournPmStart(t))}">`, 'Chaque jour a une période « matin » et une « après-midi » : chaque catégorie choisit la sienne.')}
     </div>
     ${tournField('Lieu', `<input id="tfVenue" maxlength="120" value="${escapeHTML(v.venue || '')}" placeholder="Centre Pickleball Saguenay">`)}
     ${t ? `${tournField('Terrains', `<input id="tfCourts" maxlength="400" value="${escapeHTML((Array.isArray(v.courts) ? v.courts : []).join(', '))}" placeholder="Pulsar, P3B, Optique Santé">`, 'Noms séparés par des virgules. Ils serviront à l\'horaire.')}
@@ -12025,7 +12113,7 @@ async function tournSave(id){
   if(!name){ showToast('Donne un nom au tournoi', true); return; }
   const status = tfVal('tfStatus') || 'draft';
   const row = {
-    name: name, event_date: tfVal('tfDate') || null, start_time: tfVal('tfStart') || null, end_time: tfVal('tfEnd') || null,
+    name: name, event_date: tfVal('tfDate') || null, end_date: (tfVal('tfEndDate') && tfVal('tfDate') && tfVal('tfEndDate') > tfVal('tfDate')) ? tfVal('tfEndDate') : null, start_time: tfVal('tfStart') || null, end_time: tfVal('tfEnd') || null,
     venue: tfVal('tfVenue') || null, courts: tfVal('tfCourts').split(',').map(function(s){ return s.trim(); }).filter(Boolean).slice(0, 40),
     pool_points: parseInt(tfVal('tfPool'), 10) || 11, bracket_points: parseInt(tfVal('tfBracket'), 10) || 15, final_best_of: parseInt(tfVal('tfFinal'), 10) || 3,
     status: status, reg_open: status === 'open', reg_deadline: tfVal('tfDeadline') || null, notes: tfVal('tfNotes') || null, updated_at: new Date().toISOString()
@@ -12033,6 +12121,7 @@ async function tournSave(id){
   // Champs absents (création simplifiée) : on ne les écrit pas.
   [['tfCourts','courts'],['tfPool','pool_points'],['tfBracket','bracket_points'],['tfFinal','final_best_of'],['tfStatus','status'],['tfDeadline','reg_deadline'],['tfNotes','notes']].forEach(function(f){ if(!document.getElementById(f[0])) delete row[f[1]]; });
   if(document.getElementById('tfTest')){ const t0 = tournById(id); row.settings = Object.assign({}, (t0 && t0.settings) || {}, { test: tfVal('tfTest') === '1' }); }
+  if(document.getElementById('tfPm')){ const t0 = tournById(id); row.settings = Object.assign({}, row.settings || (t0 && t0.settings) || {}, { pm_start: tfVal('tfPm') || '13:00' }); }
   if(!document.getElementById('tfStatus')){ delete row.reg_open; if(!id){ row.status = 'draft'; row.reg_open = false; } }
   let res, newId = id;
   if(id) res = await sb.from('tournaments').update(row).eq('id', id);
@@ -12074,7 +12163,7 @@ function openTournDivForm(tid, divId){
       ${tournFmtCards(r.format)}
       <div class="tn-row2 tn-fmt-main">
         <div data-f="pools_de double_elim"${show(['pools_de','double_elim'])}>${tournField('Double élimination', tournSeg('tdDeMode', [['full','<b>Complète</b><small>Gagnants, perdants, grande finale</small>'],['consolation','<b>Consolante seulement</b><small>Tableau simple + consolante</small>']], r.de_mode, 'tournDivOptVis', 'tn-seg-st tn-seg-2'))}</div>
-        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Groupes', tournSeg('tdRotGroup', [[0,'Tous ensemble'],[8,'De 8'],[12,'De 12'],[16,'De 16'],[20,'De 20']], r.rot_group || 0, 'tournDivSum'), 'Les partenaires et adversaires changent à l\'intérieur de chaque groupe, avec un classement par groupe. Exemple : 32 joueurs en groupes de 16 = 2 groupes de 16.')}</div>
+        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Groupes', tournSeg('tdRotGroup', [[0,'Un seul'],[8,'De 8'],[12,'De 12'],[16,'De 16'],[20,'De 20']], r.rot_group || 0, 'tournDivSum'), 'Les partenaires et adversaires changent à l\'intérieur de chaque groupe, avec un classement par groupe. Exemple : 32 joueurs en groupes de 16 = 2 groupes de 16.')}</div>
         <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Nombre de rondes', tournSeg('tdRounds', [[0,'Auto'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[10,'10']], r.rot_rounds || 0, 'tournDivSum'), 'Auto : autant de rondes que de joueurs moins un jusqu\'à 8 joueurs, sinon 7. Modifiable au moment de créer les rondes.')}</div>
         <div class="tn-span" data-f="round_robin"${show(['round_robin'])}>${tournField('Après la poule', tournSeg('tdRrFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>Les 2 premiers</small>'],[4,'<b>Demi + finale</b><small>Les 4 premiers</small>']], r.rr_final || 0, 'tournDivOptVis', 'tn-seg-st tn-seg-3'))}</div>
         <div id="tdPlaceWrap" class="tn-span"${tournBronzeAllowed(r) ? '' : ' style="display:none"'}>${tournField('Matchs de classement', tournSeg('tdPlace', [['0','<b>Non</b><small>Une équipe éliminée a fini</small>'],['1','<b>Oui</b><small>Chaque équipe joue jusqu\'à connaître son rang</small>']], r.placement ? '1' : '0', 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Exemple avec 8 équipes au tableau : les perdants des quarts jouent pour les places 5 à 8, puis les matchs pour la 5e et la 7e place. Chaque équipe joue 3 matchs de tableau. Le match pour la 3e place est inclus.')}</div>
@@ -12099,6 +12188,7 @@ function openTournDivForm(tid, divId){
         ${tournField('Âge', `<input id="tdAge" maxlength="20" value="${escapeHTML(v.age || '')}" placeholder="Tous">`)}
         ${tournField(`<span id="tdMaxLbl">${r.format === 'rotation' ? 'Joueurs max.' : 'Équipes max.'}</span>`, tournStepper('tdMax', v.max_teams || 12, 2, 64))}
       </div>
+      ${tournPeriods(t).length ? tournField('Période de jeu', tournSel('tdPeriod', [['', 'Pas de période (démarrée à la main)']].concat(tournPeriods(t).map(function(x){ return [x.key, escapeHTML(x.label) + ' · dès ' + tournPeriodStart(t, x.key)]; })), tournDivPeriod(t, d) || ''), 'Dans « Préparer › Toutes », les catégories sont regroupées par période et démarrent ensemble. Les joueurs voient la période à l\'inscription.') : ''}
       ${tournCourts(t || {}).length ? tournField('Jouer sur', tournMulti('tdCourts', tournCourts(t), (d && Array.isArray(d.courts)) ? d.courts : []), 'Choisis des terrains précis seulement pour réserver cette catégorie à ces terrains : ses matchs n\'iront nulle part ailleurs.') : ''}
     </div>
     <div class="tn-form-acts">
@@ -12156,6 +12246,7 @@ async function tournDivSave(tid, divId){
   row.placement = row.placement && tournBronzeAllowed(row);
   row.bronze_match = tournBronzeAllowed(row) && !row.placement && tfVal('tdBronze') === '1';
   if(document.getElementById('tdCourts')){ let cs = []; try{ cs = JSON.parse(tfVal('tdCourts') || '[]'); }catch(e){} row.courts = cs.length ? cs : null; }
+  if(document.getElementById('tdPeriod')){ const pk = tfVal('tdPeriod'); row.period = pk && tournPeriods(tournById(tid)).some(function(x){ return x.key === pk; }) ? pk : null; }
   let r;
   if(divId) r = await sb.from('tournament_divisions').update(row).eq('id', divId);
   else { row.tournament_id = tid; row.sort = tournDivs(tid).length; r = await sb.from('tournament_divisions').insert(row); }
@@ -12396,7 +12487,7 @@ function tournRegHTML(){
   const divs = (p.divisions || []).map(function(d){
     const full = d.count >= d.max;
     return `<label class="tn-opt${R.f.div === d.id ? ' on' : ''}"><input type="radio" name="trDiv" value="${d.id}" ${R.f.div === d.id ? 'checked' : ''} onchange="TREG.f.div=this.value;render()">
-      <span><b>${escapeHTML(d.name)}</b><small>${escapeHTML([TOURN_GENDER[d.gender] || '', d.level ? 'niveau ' + d.level : '', d.age || '', TOURN_FMT_SHORT[d.format || 'pools_ko']].filter(Boolean).join(' · '))}</small></span>
+      <span><b>${escapeHTML(d.name)}</b>${d.period && tournPeriodLabel(p, d.period) ? `<small class="tn-period">${escapeHTML(tournPeriodLabel(p, d.period))}</small>` : ''}<small>${escapeHTML([TOURN_GENDER[d.gender] || '', d.level ? 'niveau ' + d.level : '', d.age || '', TOURN_FMT_SHORT[d.format || 'pools_ko']].filter(Boolean).join(' · '))}</small></span>
       <em class="${full ? 'full' : ''}">${full ? 'Complet · liste d\'attente' : d.count + ' / ' + d.max}</em></label>`;
   }).join('');
   return head + `<div class="tn-form">
