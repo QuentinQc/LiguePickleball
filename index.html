@@ -6937,9 +6937,7 @@ async function notifySubPlaced(enc, groupName, replacedName){
     await SAVE_CHAIN;
     const lm = (LEAGUES || []).find(l=>l.id===leagueId) || {};
     const where = [lm.name, lm.schedule_label].filter(Boolean).join(' · ') || label;
-    const what = replacedName
-      ? 'Tu remplaces ' + replacedName + (groupName ? ' dans le ' + groupName : '') + ' : tu joues ses matchs à sa place.'
-      : 'Tu joues en plus' + (groupName ? ' dans le ' + groupName : '') + ' (un joueur de plus dans ce ' + grpWord() + ').';
+    const what = 'Tu joues' + (groupName ? ' dans le ' + groupName : '') + '.';
     profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: leagueId,
       title: 'Tu joues ' + (open ? 'le ' + when : 'bientôt') + ' !',
       body: what + ' ' + where + '. Un empêchement ? Ouvre Dinkeo et touche « Je ne peux plus venir ».', url: goUrl('league:' + leagueId + ':group') }));
@@ -20446,7 +20444,7 @@ function substituteAvailabilityHTML(sub){
       <div class="pf-chips">${chip}</div>
     </div>`;
   if(placedGd){
-    html += `<div class="pf-list" style="margin-top:14px;"><div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(placedG ? placedG.name : (rec?'Terrain':'Groupe'))}<small>${replaces ? 'Tu remplaces ' + escapeHTML(playerName(replaces)) + ' : tu joues ses matchs à sa place.' : 'Tu joues en plus : un joueur de plus dans ce ' + escapeHTML(grpWord()) + ' pour cette ' + (rec ? recW('soirée') : 'session') + '.'}</small></span></div></div>`;
+    html += `<div class="pf-list" style="margin-top:14px;"><div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(placedG ? placedG.name : (rec?'Terrain':'Groupe'))}<small>Tu joues dans ce ${escapeHTML(grpWord())} pour cette ${rec ? recW('soirée') : 'session'}.</small></span></div></div>`;
     const warned = SUB_CANT_SENT[open.date + '|' + sub.id];
     html += `<p class="ah-meta" style="margin:12px 2px 10px;">${warned ? "L'organisateur est averti que tu ne peux plus venir. Il va te retirer du " + escapeHTML(grpWord()) + " et trouver quelqu'un d'autre." : "Un empêchement ? Avertis l'organisateur pour qu'il trouve quelqu'un d'autre."}</p>
       ${warned ? '' : `<button class="btn btn-secondary" style="width:100%;" onclick="subCantCome('${sub.id}')">Je ne peux plus venir</button>`}`;
