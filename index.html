@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 538">
+<meta name="app-build" content="Version 539">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2338,7 +2338,8 @@ body.tv-mode .shell-top, body.tv-mode .bnav, body.tv-mode .install-banner{displa
 .tn-sim-r{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:10px;}
 .tn-testbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:8px 12px;border:1px dashed rgba(242,153,74,.6);border-radius:12px;background:rgba(242,153,74,.07);font-size:13px;}
 .tn-testbar b{color:var(--paddle);}
-.tn-testbar span{color:var(--muted);flex:1;min-width:0;}
+.tn-testbar span{color:var(--muted);flex:1 1 220px;min-width:0;}
+@media (max-width:640px){ .tn-testbar span{flex-basis:100%;order:3;} .tn-testbar b{flex:1;} }
 .tn-testbar button{background:none;border:0;color:var(--paddle);font:600 13px var(--font-body);cursor:pointer;padding:2px 4px;}
 .tn-test-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--paddle);border:1px dashed rgba(242,153,74,.6);border-radius:999px;padding:0 6px;}
 .tn-role-scorer .tn-org-only{display:none !important;}
@@ -10443,8 +10444,13 @@ function tournEstimates(t, queue){
 // Durée d'une journée (ou d'une période) en minutes : chaque match va sur le premier terrain permis qui se libère,
 // les catégories à tour de rôle, terrains réservés respectés (prêtés quand leur catégorie a fini). +15 % de battement.
 function tournSimSpan(t, rows){
+  const ends = tournSimEnds(t, rows);
+  return Math.ceil(Object.keys(ends).reduce(function(mx, k2){ return Math.max(mx, ends[k2]); }, 0));
+}
+// Fin de chaque catégorie (minutes après le début) dans cette simulation : { divId: minutes }.
+function tournSimEnds(t, rows){
   const courts = tournCourts(t), cfg = tournSettings(t);
-  if(!courts.length) return Math.ceil(rows.reduce(function(s2, x){ return s2 + x.minutes; }, 0) * 1.15);
+  if(!courts.length){ const tot = Math.ceil(rows.reduce(function(s2, x){ return s2 + x.minutes; }, 0) * 1.15), o = {}; rows.forEach(function(x){ o[x.d.id] = tot; }); return o; }
   const queues = rows.map(function(x){
     const r = tournDivRules(t, x.d), jobs = [];
     for(let i = 0; i < x.plan.pool; i++) jobs.push(tournLiveMinutes(t, r.pool_points) * 1.15);
@@ -10483,7 +10489,15 @@ function tournSimSpan(t, rows){
   };
   let ends = run(null);
   if(cfg.lend) ends = run(ends);
-  return Math.ceil(Object.keys(ends).reduce(function(mx, k2){ return Math.max(mx, ends[k2]); }, 0));
+  return ends;
+}
+// Heure de fin estimée d'une catégorie (minutes depuis minuit), en tenant compte des autres catégories de sa période.
+function tournDivFinish(t, est, x){
+  const key = tournDivPeriod(t, x.d) || '';
+  const same = est.rows.filter(function(y){ return (tournDivPeriod(t, y.d) || '') === key; });
+  const st = key ? tournParseTime(tournPeriodStart(t, key)) : est.start;
+  const e = tournSimEnds(t, same)[x.d.id];
+  return st == null || e == null ? null : st + Math.ceil(e);
 }
 function tournHour(ms){ const d = new Date(ms); return d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0'); }
 function tournRoundSingular(round, rounds){
@@ -12171,7 +12185,7 @@ function tournCardsHTML(t, divs, hours, courts, regTxt){
         + (est.matches && est.finish != null ? ' · fin estimée <b class="' + (late ? 'tn-warn-t' : 'tn-ok-t') + '">' + tournHm(est.finish) + '</b>' : ''), late || !est.courts)
     + card(`openTournFormatsInfo('${t.id}')`, 'Formules',
       est.matches ? est.matches + ' matchs prévus' : 'Aucune catégorie',
-      divs.length ? divs.length + ' catégorie' + (divs.length > 1 ? 's' : '') + (est.minutes ? ' · ≈ ' + tournFmtMin(est.minutes) + ' de jeu' : '') : 'Ajoute une catégorie pour commencer', false)
+      divs.length ? divs.length + ' catégorie' + (divs.length > 1 ? 's' : '') + (est.matches ? ' · ≈ ' + tournFmtMin(est.span) + ' sur ' + (est.courts || 1) + ' terrain' + ((est.courts || 1) > 1 ? 's' : '') : '') : 'Ajoute une catégorie pour commencer', false)
     + card(`openTournRegInfo('${t.id}')`, 'Inscriptions',
       escapeHTML(regTxt),
       reg.length + (cap ? ' / ' + cap : '') + ' équipe' + (reg.length > 1 ? 's' : '') + (wait ? ' · ' + wait + ' en attente' : '') + (todo ? '<br><span class="tn-warn-t">' + escapeHTML(todo) + '</span>' : '<br>Tout est en ordre'), !!todo);
@@ -12182,14 +12196,14 @@ function openTournDayInfo(tid){
   const pl = tournPeriodLast(t, est);
   if(pl){ est.finish = pl.fin; if(est.end != null && pl.st >= est.end) est.end = null; }
   const late = est.finish != null && est.end != null && est.finish > est.end;
-  const rows = est.rows.map(function(x){ return `<tr><td><b>${escapeHTML(x.d.name)}</b><small>${x.guess ? 'si complète (' + x.n + ' équipes)' : x.reg + (x.reg > 1 ? ' équipes inscrites' : ' équipe inscrite')}</small></td><td class="num">${x.plan.pool + x.plan.bracket}</td><td class="num">${tournFmtMin(x.minutes)}</td></tr>`; }).join('');
+  const rows = est.rows.map(function(x){ return `<tr><td><b>${escapeHTML(x.d.name)}</b><small>${x.guess ? 'si complète (' + x.n + ' équipes)' : x.reg + (x.reg > 1 ? ' équipes inscrites' : ' équipe inscrite')}</small></td><td class="num">${x.plan.pool + x.plan.bracket}</td><td class="num">${(function(){ const f = tournDivFinish(t, est, x); return f != null && x.plan.pool + x.plan.bracket ? 'vers ' + tournHm(f) : '—'; })()}</td></tr>`; }).join('');
   const html = `<div class="tn-info">
     <div class="tn-info-big ${late ? 'warn' : ''}">${est.finish != null && est.matches ? 'Fin estimée vers ' + tournHm(est.finish) : est.matches ? '≈ ' + tournFmtMin(est.span) + ' de tournoi' : 'Pas encore de matchs prévus'}</div>
-    <p class="small">${est.start != null ? 'Début à ' + tournHm(est.start) + (est.end != null ? ', fin prévue à ' + tournHm(est.end) : '') + '. ' : ''}${est.matches} matchs, ≈ ${tournFmtMin(est.minutes)} de jeu au total, répartis sur ${est.courts || 1} terrain${(est.courts || 1) > 1 ? 's' : ''}, plus 15 % pour la rotation et les pauses.</p>
+    <p class="small">${est.start != null ? 'Début à ' + tournHm(est.start) + (est.end != null ? ', fin prévue à ' + tournHm(est.end) : '') + '. ' : ''}${est.matches} matchs joués en même temps sur ${est.courts || 1} terrain${(est.courts || 1) > 1 ? 's' : ''} : environ ${tournFmtMin(est.span)} de tournoi, changements de terrain compris.</p>
     ${late ? `<div class="tn-note tn-note-warn">Le tournoi risque de dépasser l'heure de fin d'environ <b>${tournFmtMin(est.finish - est.end)}</b>. Pistes : ajouter des terrains, passer des matchs à 11 points, réduire la taille des poules ou finir en 1 match au lieu de 2 de 3.</div>` : ''}
     ${!est.courts ? `<div class="tn-note tn-note-warn">Aucun terrain n'est configuré : la file d'attente ne pourra appeler aucun match.</div>` : ''}
     ${tournPeriodEstimateHTML(t, est)}
-    ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Durée de jeu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Fin</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     <div class="tn-info-k">Terrains</div><p class="small">${est.courts ? escapeHTML(tournCourts(t).join(', ')) : 'Aucun'}</p>
     <p class="small" style="color:var(--muted);">Durées de base : 15 min pour un match à 11, 20 min à 15, 30 min à 21 (finale 2 de 3 : 2,5 fois plus). Le jour du tournoi, elles s'ajustent à la durée réelle des matchs joués.</p>
     ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournForm('${tid}')">Modifier lieu, heures et terrains</button></div>` : ''}
@@ -12231,7 +12245,7 @@ function openTournFormatsInfo(tid){
   }).join('');
   const html = `<div class="tn-info">
     <div class="tn-info-big">${est.matches} matchs prévus</div>
-    <p class="small">≈ ${tournFmtMin(est.minutes)} de jeu au total. Touche une catégorie pour changer sa formule.</p>
+    <p class="small">≈ ${tournFmtMin(est.span)} de tournoi sur ${est.courts || 1} terrain${(est.courts || 1) > 1 ? 's' : ''}. Touche une catégorie pour changer sa formule.</p>
     <div class="tn-info-list">${rows || '<p class="small">Aucune catégorie.</p>'}</div>
     ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournDivForm('${tid}')">+ Ajouter une catégorie</button></div>` : ''}
   </div>`;
@@ -12334,7 +12348,12 @@ function tournMultiPick(btn, id, i){
   if(all){ all.classList.toggle('on', !out.length); all.setAttribute('aria-pressed', !out.length); }
   if(el) el.value = JSON.stringify(out);
 }
-function tournCourtsLabel(d){ const c = d && Array.isArray(d.courts) ? d.courts : []; return c.length ? (c.length === 1 ? 'Terrain ' + c[0] + ' seulement' : 'Terrains ' + c.join(', ') + ' seulement') : ''; }
+function tournCourtsLabel(d){
+  const c = d && Array.isArray(d.courts) ? d.courts : [];
+  // Tous les terrains du tournoi cochés : aucune restriction réelle, rien à afficher.
+  const t = d ? tournById(d.tournament_id) : null, all = t ? tournCourts(t) : [];
+  if(all.length && all.every(function(x){ return c.indexOf(x) !== -1; })) return '';
+  return c.length ? (c.length === 1 ? 'Terrain ' + c[0] + ' seulement' : 'Terrains ' + c.join(', ') + ' seulement') : ''; }
 function tournSegPick(btn, id, v, fn){
   const box = btn.parentNode;
   box.querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); });
