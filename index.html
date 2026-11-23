@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 537">
+<meta name="app-build" content="Version 538">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10305,7 +10305,10 @@ function tournCourtOk(m, court){
   if(!list || !list.length || list.indexOf(court) !== -1) return true;
   const t = tournById(m.tournament_id), cfg = tournSettings(t);
   if(cfg.open.indexOf(court) !== -1) return true;
-  return cfg.lend && !tournCourtClaimed(m.tournament_id, court, m.division_id);
+  // Prêté : le terrain est réservé à au moins une autre catégorie, et aucune n'a encore de match à jouer.
+  // Un terrain que personne ne s'est réservé ne compte pas comme prêté (« Terrain P3B seulement » reste vrai).
+  const owned = tournDivs(m.tournament_id).some(function(o){ return o.id !== m.division_id && Array.isArray(o.courts) && o.courts.indexOf(court) !== -1; });
+  return cfg.lend && owned && !tournCourtClaimed(m.tournament_id, court, m.division_id);
 }
 // Terrain réservé à une autre catégorie qui a encore des matchs à jouer (en attente ou en cours).
 function tournCourtClaimed(tid, court, exceptDiv){
@@ -10383,33 +10386,104 @@ async function tournCourtAssign(tid, court, divId){
   showToast(divId ? 'Terrain ' + court + ' réservé à ' + dn : 'Terrain ' + court + ' ouvert à toutes les catégories');
   tournAutoKick(tid);
 }
-// Heures estimées : simulation simple de la file sur les terrains, avec les durées et le repos.
+// Heures estimées : simulation de la file sur les terrains, avec les durées et le repos.
+// Deux passes : la première trouve quand chaque catégorie aura fini ses matchs connus ; la seconde prête ses
+// terrains réservés aux autres catégories à partir de ce moment (si le prêt est activé), comme pendant la journée.
 function tournEstimates(t, queue){
-  const now = Date.now(), cfg = tournSettings(t), courts = tournCourts(t), est = {};
-  const free = {}, teamAt = {};
-  courts.forEach(function(c){ free[c] = now; });
-  tournLiveMatches(t).forEach(function(m){
-    if(m.status === 'playing' && m.court){
-      const end = Math.max(now, (m.called_at ? Date.parse(m.called_at) : now) + tournMatchMinutes(t, m) * 60000);
-      if(free[m.court] !== undefined) free[m.court] = end;
+  const now = Date.now(), cfg = tournSettings(t), courts = tournCourts(t);
+  const live = tournLiveMatches(t);
+  // Catégories qui ont encore des matchs du tableau sans équipes connues : leurs terrains restent réservés.
+  const blocked = {};
+  (TMATCHES || []).forEach(function(m){ if(m.tournament_id === t.id && m.status === 'pending' && !(m.team_a && m.team_b) && (m.team_a || m.team_b || m.src)) blocked[m.division_id] = 1; });
+  const run = function(lendAt){
+    const est = {}, free = {}, teamAt = {}, endDiv = {};
+    courts.forEach(function(c){ free[c] = now; });
+    live.forEach(function(m){
+      if(m.status === 'playing' && m.court){
+        const end = Math.max(now, (m.called_at ? Date.parse(m.called_at) : now) + tournMatchMinutes(t, m) * 60000);
+        if(free[m.court] !== undefined) free[m.court] = end;
+        tournMP(m).forEach(function(id){ teamAt[id] = end + cfg.rest * 60000; });
+        endDiv[m.division_id] = Math.max(endDiv[m.division_id] || 0, end);
+      }
+      if(m.status === 'done' && m.ended_at){
+        const e = Date.parse(m.ended_at) + cfg.rest * 60000;
+        tournMP(m).forEach(function(id){ teamAt[id] = Math.max(teamAt[id] || 0, e); });
+      }
+    });
+    // Moment où ce terrain peut recevoir ce match (null : jamais dans cette simulation).
+    const avail = function(m, c){
+      if(!lendAt) return tournCourtOk(m, c) ? free[c] : null;
+      if(cfg.finals.length && tournIsMedal(m)) return cfg.finals.indexOf(c) !== -1 ? free[c] : null;
+      const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
+      const list = d && Array.isArray(d.courts) ? d.courts : null;
+      if(!list || !list.length || list.indexOf(c) !== -1 || cfg.open.indexOf(c) !== -1) return free[c];
+      if(!cfg.lend) return null;
+      let from = free[c];
+      const owners = tournDivs(t.id).filter(function(o){ return o.id !== m.division_id && Array.isArray(o.courts) && o.courts.indexOf(c) !== -1; });
+      if(!owners.length) return null;
+      for(let i = 0; i < owners.length; i++){ if(blocked[owners[i].id]) return null; from = Math.max(from, lendAt[owners[i].id] || 0); }
+      return from;
+    };
+    queue.forEach(function(m){
+      let best = null, bestAt = 0;
+      courts.forEach(function(c){ const a = avail(m, c); if(a !== null && (best === null || a < bestAt)){ best = c; bestAt = a; } });
+      if(best === null) return;
+      const start = Math.max.apply(null, [bestAt, now].concat(tournMP(m).map(function(id){ return teamAt[id] || now; })));
+      est[m.id] = start;
+      const end = start + tournMatchMinutes(t, m) * 60000;
+      free[best] = end;
       tournMP(m).forEach(function(id){ teamAt[id] = end + cfg.rest * 60000; });
-    }
-    if(m.status === 'done' && m.ended_at){
-      const e = Date.parse(m.ended_at) + cfg.rest * 60000;
-      tournMP(m).forEach(function(id){ teamAt[id] = Math.max(teamAt[id] || 0, e); });
-    }
+      endDiv[m.division_id] = Math.max(endDiv[m.division_id] || 0, end);
+    });
+    return { est: est, endDiv: endDiv };
+  };
+  const first = run(null);
+  return cfg.lend ? run(first.endDiv).est : first.est;
+}
+// Durée d'une journée (ou d'une période) en minutes : chaque match va sur le premier terrain permis qui se libère,
+// les catégories à tour de rôle, terrains réservés respectés (prêtés quand leur catégorie a fini). +15 % de battement.
+function tournSimSpan(t, rows){
+  const courts = tournCourts(t), cfg = tournSettings(t);
+  if(!courts.length) return Math.ceil(rows.reduce(function(s2, x){ return s2 + x.minutes; }, 0) * 1.15);
+  const queues = rows.map(function(x){
+    const r = tournDivRules(t, x.d), jobs = [];
+    for(let i = 0; i < x.plan.pool; i++) jobs.push(tournLiveMinutes(t, r.pool_points) * 1.15);
+    for(let i = 0; i < x.plan.bracket; i++) jobs.push(tournLiveMinutes(t, r.bracket_points) * 1.15);
+    if(r.final_best_of === 3 && x.plan.bracket) jobs[jobs.length - 1] += tournLiveMinutes(t, r.bracket_points) * 1.5 * 1.15;
+    const list = Array.isArray(x.d.courts) ? x.d.courts.filter(function(c){ return courts.indexOf(c) !== -1; }) : [];
+    return { d: x.d, jobs: jobs, list: list };
   });
-  queue.forEach(function(m){
-    let best = null;
-    courts.forEach(function(c){ if(tournCourtOk(m, c) && (best === null || free[c] < free[best])) best = c; });
-    if(best === null) return;
-    const start = Math.max.apply(null, [free[best], now].concat(tournMP(m).map(function(id){ return teamAt[id] || now; })));
-    est[m.id] = start;
-    const end = start + tournMatchMinutes(t, m) * 60000;
-    free[best] = end;
-    tournMP(m).forEach(function(id){ teamAt[id] = end + cfg.rest * 60000; });
-  });
-  return est;
+  const run = function(lendAt){
+    const free = {}, endDiv = {}; courts.forEach(function(c){ free[c] = 0; });
+    let k = 0, more = true;
+    const ok = function(q, c, strict){
+      // Sans réservation : un terrain réservé à une catégorie qui a encore des matchs lui est laissé (priorité aux propriétaires).
+      if(!q.list.length) return strict && queues.some(function(o){ return o !== q && o.list.indexOf(c) !== -1 && o.jobs.length > k; }) ? null : 0;
+      if(q.list.indexOf(c) !== -1 || cfg.open.indexOf(c) !== -1) return 0;
+      if(!lendAt || !cfg.lend) return null;
+      let from = 0, owned = false;
+      queues.forEach(function(o){ if(o !== q && o.list.indexOf(c) !== -1){ owned = true; from = Math.max(from, lendAt[o.d.id] || 0); } });
+      if(!owned) tournDivs(t.id).forEach(function(o){ if(o.id !== q.d.id && Array.isArray(o.courts) && o.courts.indexOf(c) !== -1) owned = true; });
+      return owned ? from : null;
+    };
+    while(more){
+      more = false;
+      queues.forEach(function(q){
+        if(k >= q.jobs.length) return; more = true;
+        let best = null, at = 0;
+        const pick = function(strict){ courts.forEach(function(c){ const a = ok(q, c, strict); if(a === null) return; const st = Math.max(free[c], a); if(best === null || st < at){ best = c; at = st; } }); };
+        pick(true); if(best === null) pick(false);
+        if(best === null) return;
+        free[best] = at + q.jobs[k];
+        endDiv[q.d.id] = Math.max(endDiv[q.d.id] || 0, free[best]);
+      });
+      k++;
+    }
+    return endDiv;
+  };
+  let ends = run(null);
+  if(cfg.lend) ends = run(ends);
+  return Math.ceil(Object.keys(ends).reduce(function(mx, k2){ return Math.max(mx, ends[k2]); }, 0));
 }
 function tournHour(ms){ const d = new Date(ms); return d.getHours() + ' h ' + String(d.getMinutes()).padStart(2, '0'); }
 function tournRoundSingular(round, rounds){
@@ -12076,8 +12150,8 @@ function tournDayEstimate(t){
     matches += plan.pool + plan.bracket; minutes += m;
     return { d: d, reg: reg, n: n, plan: plan, minutes: m, guess: !reg };
   });
-  // Rotation des terrains et pauses : on ajoute 15 %.
-  const span = Math.ceil(minutes * 1.15 / courts);
+  // Simulation terrain par terrain (réservations comprises), avec 15 % de battement pour les changements.
+  const span = tournSimSpan(t, rows);
   const start = tournParseTime(t.start_time), end = tournParseTime(t.end_time);
   return { rows: rows, matches: matches, minutes: minutes, courts: tournCourts(t).length, span: span, start: start, end: end, finish: start != null ? start + span : null };
 }
@@ -12131,7 +12205,7 @@ function tournPeriodLast(t, est){
   const p = used[used.length - 1];
   const mins = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).reduce(function(s2, x){ return s2 + x.minutes; }, 0);
   const st = tournParseTime(tournPeriodStart(t, p.key));
-  return st == null ? null : { st: st, fin: st + Math.ceil(mins * 1.15 / courts), label: p.label };
+  return st == null ? null : { st: st, fin: st + tournSimSpan(t, est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; })), label: p.label, mins: mins };
 }
 function tournPeriodEstimateHTML(t, est){
   const per = tournPeriods(t), courts = Math.max(1, tournCourts(t).length || 1);
@@ -12139,7 +12213,7 @@ function tournPeriodEstimateHTML(t, est){
   if(!used.length) return '';
   return `<div class="tn-info-k">Par période</div><div class="tn-info-list">${used.map(function(p){
     const mins = est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; }).reduce(function(s2, x){ return s2 + x.minutes; }, 0);
-    const st = tournParseTime(tournPeriodStart(t, p.key)), fin = st != null ? st + Math.ceil(mins * 1.15 / courts) : null;
+    const st = tournParseTime(tournPeriodStart(t, p.key)), fin = st != null && mins >= 0 ? st + tournSimSpan(t, est.rows.filter(function(x){ return tournDivPeriod(t, x.d) === p.key; })) : null;
     const evS = tournParseTime(tournEvStart(t)), endS = tournParseTime(t.end_time);
     const nextStart = p.part === 'am' ? tournParseTime(tournPmStart(t)) : p.part === 'pm' ? (used.some(function(u){ return u.day === p.day && u.part === 'ev'; }) ? evS : endS) : (endS != null && evS != null && endS > evS ? endS : null);
     const late = fin != null && nextStart != null && fin > nextStart;
