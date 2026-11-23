@@ -6937,7 +6937,7 @@ async function notifySubPlaced(enc, groupName, replacedName){
     await SAVE_CHAIN;
     const lm = (LEAGUES || []).find(l=>l.id===leagueId) || {};
     const where = [lm.name, lm.schedule_label].filter(Boolean).join(' · ') || label;
-    const what = 'Tu joues' + (groupName ? ' dans le ' + groupName : '') + '.';
+    const what = open && open.published && groupName ? 'Tu joues dans le ' + groupName + '.' : 'Le détail sera dans Dinkeo à la publication.';
     profs.forEach(pid=>invokeSendNotification({ profile_id: pid, league_id: leagueId,
       title: 'Tu joues ' + (open ? 'le ' + when : 'bientôt') + ' !',
       body: what + ' ' + where + '. Un empêchement ? Ouvre Dinkeo et touche « Je ne peux plus venir ».', url: goUrl('league:' + leagueId + ':group') }));
@@ -20445,7 +20445,7 @@ function substituteAvailabilityHTML(sub){
       <div class="pf-chips">${chip}</div>
     </div>`;
   if(placedGd){
-    html += `<div class="pf-list" style="margin-top:14px;"><div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(placedG ? placedG.name : (rec?'Terrain':'Groupe'))}<small>Tu joues dans ce ${escapeHTML(grpWord())} pour cette ${rec ? recW('soirée') : 'session'}.${open.published ? '' : ' Les joueurs de ton ' + escapeHTML(grpWord()) + ' seront affichés à la publication.'}</small></span></div></div>`;
+    html += `<div class="pf-list" style="margin-top:14px;"><div class="pf-row" style="cursor:default;"><span class="t">${open.published ? escapeHTML(placedG ? placedG.name : (rec?'Terrain':'Groupe')) : 'Tu joues le ' + escapeHTML(fdl(open.date))}<small>${open.published ? 'Tu joues dans ce ' + escapeHTML(grpWord()) + ' pour cette ' + (rec ? recW('soirée') : 'session') + '.' : 'Le détail (' + escapeHTML(grpWord()) + ' et joueurs) sera affiché à la publication.'}</small></span></div></div>`;
     const warned = SUB_CANT_SENT[open.date + '|' + sub.id];
     html += `<p class="ah-meta" style="margin:12px 2px 10px;">${warned ? "L'organisateur est averti que tu ne peux plus venir. Il va te retirer du " + escapeHTML(grpWord()) + " et trouver quelqu'un d'autre." : "Un empêchement ? Avertis l'organisateur pour qu'il trouve quelqu'un d'autre."}</p>
       ${warned ? '' : `<button class="btn btn-secondary" style="width:100%;" onclick="subCantCome('${sub.id}')">Je ne peux plus venir</button>`}`;
@@ -20905,7 +20905,7 @@ function playerLeagueCardHTML(it){
     const pn = fd ? ((fd.players || []).concat(fd.substitutePool || []).find(function(y){ return y.id === pid; }) || {}).name : (sum && sum.meName);
     if(pn) meta.unshift('' + escapeHTML(String(pn).split(' ')[0]));
   }
-  if(sum && sum.isSub) meta.push('Remplaçant' + (o && o.placed ? ' · ' + escapeHTML(o.placed) : ''));
+  if(sum && sum.isSub) meta.push('Remplaçant' + (o && o.placed && o.published ? ' · ' + escapeHTML(o.placed) : ''));
   if(o && o.visible && !o.absent && sum.groupName) meta.push(escapeHTML(sum.groupName));
   if(sum && sum.showRating && !sum.rec && !sum.isSub && typeof sum.rating === 'number') meta.push('Cote ' + sum.rating.toFixed(2));
   return `<div class="ah-lg" onclick="openMyLeague('${id}')">
