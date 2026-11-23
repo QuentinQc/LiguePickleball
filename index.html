@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 535">
+<meta name="app-build" content="Version 536">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10210,11 +10210,15 @@ function tournSettings(t){
 }
 function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter(Boolean); }
 // Durée estimée d'un match selon ses points (minutes).
+// Durée prévue d'un match selon ses points : 11 pts = 15 min, 15 pts = 20 min, 21 pts = 30 min.
+function tournPtsMinutes(p){ return p >= 21 ? 30 : p >= 15 ? 20 : 15; }
+// Finale 2 de 3 : environ deux manches et demie.
+function tournBo3Minutes(p){ return Math.round(tournPtsMinutes(p) * 2.5 / 5) * 5; }
 function tournMatchMinutes(t, m){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
   const r = tournDivRules(t, d), pts = m.phase === 'pool' ? r.pool_points : r.bracket_points;
-  if(m.phase !== 'pool' && r.final_best_of === 3 && tournIsFinal(m)) return 50;
-  return pts >= 21 ? 35 : pts >= 15 ? 25 : 20;
+  if(m.phase !== 'pool' && r.final_best_of === 3 && tournIsFinal(m)) return tournBo3Minutes(pts);
+  return tournPtsMinutes(pts);
 }
 function tournLiveMatches(t){
   const live = {}; tournDivs(t.id).forEach(function(d){ if((d.stage || 'setup') !== 'setup') live[d.id] = 1; });
@@ -12023,8 +12027,8 @@ function tournPlanFor(t, d, n){
   return out;
 }
 function tournMinutesFor(t, d, plan){
-  const r = tournDivRules(t, d), mn = function(p){ return p >= 21 ? 35 : p >= 15 ? 25 : 20; };
-  return plan.pool * mn(r.pool_points) + plan.bracket * mn(r.bracket_points) + (r.final_best_of === 3 && plan.bracket ? 30 : 0);
+  const r = tournDivRules(t, d), mn = tournPtsMinutes;
+  return plan.pool * mn(r.pool_points) + plan.bracket * mn(r.bracket_points) + (r.final_best_of === 3 && plan.bracket ? tournBo3Minutes(r.bracket_points) - mn(r.bracket_points) : 0);
 }
 function tournFmtMin(m){ const h = Math.floor(m / 60), x = Math.round(m % 60); return (h ? h + ' h ' : '') + (h ? String(x).padStart(2, '0') : x + ' min'); }
 function tournParseTime(v){ const m = /^(\d{1,2}):(\d{2})/.exec(v || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null; }
@@ -12080,7 +12084,7 @@ function openTournDayInfo(tid){
     ${tournPeriodEstimateHTML(t, est)}
     ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Durée de jeu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     <div class="tn-info-k">Terrains</div><p class="small">${est.courts ? escapeHTML(tournCourts(t).join(', ')) : 'Aucun'}</p>
-    <p class="small" style="color:var(--muted);">Durées utilisées : 20 min pour un match à 11, 25 min à 15, 35 min à 21.</p>
+    <p class="small" style="color:var(--muted);">Durées utilisées : 15 min pour un match à 11, 20 min à 15, 30 min à 21 (finale 2 de 3 : 2,5 fois plus).</p>
     ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournForm('${tid}')">Modifier lieu, heures et terrains</button></div>` : ''}
   </div>`;
   showPanelModal('Lieu et horaire', html);
