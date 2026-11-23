@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 541">
+<meta name="app-build" content="Version 542">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -17539,7 +17539,10 @@ async function selfAction(action, payload){
   await scoreReloadFromServer();
   return true;
 }
-function isPlayerActor(){ return !!(SESSION_USER && SESSION_USER.role!=='admin'); }
+// Agit pour soi-même (absence, disponibilité…) : joueur ou remplaçant, ou organisateur qui consulte une ligue
+// comme joueur ou remplaçant (souvent une ligue qu'il n'organise pas). Ces actions passent par le serveur
+// (player_self_action) : l'enregistrement complet de la ligue est réservé à ses organisateurs et serait refusé.
+function isPlayerActor(){ return !!(SESSION_USER && (SESSION_USER.role!=='admin' || ADMIN_VIEWING_AS==='player' || ADMIN_VIEWING_AS==='substitute')); }
 // Quand un joueur se déclare absent, le serveur ne peut pas recalculer les matchs :
 // il marque les groupes concernés, et l'admin les recalcule à sa prochaine ouverture.
 // Si l'effectif actif d'un groupe a changé (ex. un 6e joueur ajouté après la génération), les matchs
