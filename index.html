@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 534">
+<meta name="app-build" content="Version 535">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2065,6 +2065,9 @@ body.desk .dk-add{color:var(--muted);}
 .tn-queue ol{list-style:none;margin:8px 0 0;padding:0;}
 .tn-queue li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line-soft);}
 .tn-queue li.blk{opacity:.6;}
+.tn-queue li.tn-q-tap{cursor:pointer;}
+.tn-q-hint{color:var(--muted);margin:8px 0 0;}
+.tn-queue li.tn-q-tap:hover .tn-q-m b{text-decoration:underline;}
 .tn-q-n{width:22px;height:22px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font:600 12px var(--font-display);background:rgba(207,234,92,.15);color:var(--ball);}
 .tn-queue li.blk .tn-q-n{background:none;border:1px dashed var(--line-soft-strong);}
 .tn-q-m{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -2164,7 +2167,7 @@ table.tn-rk{display:table;white-space:normal;width:100%;border-collapse:collapse
 .tn-court .tn-court-as{display:block;margin:10px auto 0;font-size:12px;color:var(--muted);text-decoration:none;}
 .tn-court .tn-court-as:hover{color:var(--ball);text-decoration:underline;}
 .tn-pk .btn{padding-left:12px;padding-right:12px;}
-.tn-q-mv{display:grid;grid-template-columns:repeat(2,26px);gap:2px;margin-right:6px;}
+.tn-q-mv{display:flex;flex-direction:column;gap:2px;margin-right:6px;}
 .tn-q-mv button{width:26px;height:20px;border-radius:6px;border:1px solid var(--line-soft-strong);background:rgba(255,255,255,.05);color:var(--text);font-size:11px;line-height:1;cursor:pointer;padding:0;}
 .tn-q-mv button:disabled{opacity:.3;cursor:default;}
 .tn-fc{display:flex;flex-wrap:wrap;gap:6px;}
@@ -10489,8 +10492,8 @@ function tournLiveHTML(t){
   const qAll = ready.concat(blocked), canMove = tournRole(t.id) && qAll.length > 1;
   const qRow = function(m, i){
     const k = qAll.indexOf(m);
-    const mv = canMove ? `<span class="tn-q-mv"><button type="button" aria-label="Monter" title="Monter d'une place" ${k <= 0 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}',-1)">▲</button><button type="button" aria-label="Mettre en tête" title="Mettre en tête de la file" ${k <= 0 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}','top')">⇈</button><button type="button" aria-label="Descendre" title="Descendre d'une place" ${k >= qAll.length - 1 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}',1)">▼</button><button type="button" aria-label="Envoyer à la fin" title="Envoyer à la fin de la file" ${k >= qAll.length - 1 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}','end')">⇊</button></span>` : '';
-    return `<li class="${m._why ? 'blk' : ''}">${mv}<span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}${(function(){ const lb = tournCourtsLabel((TDIVS || []).find(function(x){ return x.id === m.division_id; })); return lb ? ' <span class="tn-courts-only">' + escapeHTML(lb) + '</span>' : ''; })()}${m._why ? '<br>' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
+    const mv = canMove ? `<span class="tn-q-mv"><button type="button" aria-label="Monter" title="Monter d'une place" ${k <= 0 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}',-1)">▲</button><button type="button" aria-label="Descendre" title="Descendre d'une place" ${k >= qAll.length - 1 ? 'disabled' : ''} onclick="tournQueueMove('${t.id}','${m.id}',1)">▼</button></span>` : '';
+    return `<li class="${m._why ? 'blk' : ''}${canMove ? ' tn-q-tap' : ''}"${canMove ? ` onclick="if(!event.target.closest('button')) tournQueueMenu('${t.id}','${m.id}')"` : ''}>${mv}<span class="tn-q-n">${m._why ? '' : i + 1}</span><span class="tn-q-m"><b>${escapeHTML(tournTeamName(m.team_a))} c. ${escapeHTML(tournTeamName(m.team_b))}</b><small>${escapeHTML(tournDivName(m.division_id))} ${tournBadgeHTML(m)}${(function(){ const lb = tournCourtsLabel((TDIVS || []).find(function(x){ return x.id === m.division_id; })); return lb ? ' <span class="tn-courts-only">' + escapeHTML(lb) + '</span>' : ''; })()}${m._why ? '<br>' + escapeHTML(m._why) : ''}</small></span><span class="tn-q-t">${est[m.id] ? 'vers ' + tournHour(est[m.id]) : ''}</span></li>`;
   };
   const recent = done.slice().sort(function(a, b){ return String(b.ended_at).localeCompare(String(a.ended_at)); }).slice(0, 6);
   return tournDivStripHTML(t) + `<div class="tn-live-bar">
@@ -10503,7 +10506,7 @@ function tournLiveHTML(t){
       <div class="tn-courts">${cards}</div>
       <aside class="tn-queue">
         <div class="tn-sec-h"><span>File d'attente</span><small>${queue.length} à jouer${queue.some(function(m){ return typeof m.prio === 'number'; }) ? ` · <button type="button" class="tn-linkbtn" onclick="tournQueueAutoOrder('${t.id}')">ordre automatique</button>` : ''}</small></div>
-        ${queue.length ? `<ol>${ready.map(qRow).join('')}${blocked.map(qRow).join('')}</ol>` : `<p class="small" style="color:var(--muted);">Aucun match en attente : tout est joué ou en cours. Regarde l'avancement des catégories en haut.</p>`}
+        ${queue.length ? `<ol>${ready.map(qRow).join('')}${blocked.map(qRow).join('')}</ol>${canMove ? '<p class="small tn-q-hint">Les flèches changent l\'ordre. Touche un match pour le mettre en tête ou à la fin.</p>' : ''}` : `<p class="small" style="color:var(--muted);">Aucun match en attente : tout est joué ou en cours. Regarde l'avancement des catégories en haut.</p>`}
         ${recent.length ? `<div class="tn-k" style="margin:14px 0 6px;">Derniers résultats</div><ul class="tn-res">${recent.map(function(m){
           const aw = m.winner === m.team_a;
           return `<li><button type="button" onclick="openTournScore('${m.id}')"><span class="${aw ? 'w' : ''}">${escapeHTML(tournTeamName(m.team_a))}</span><b>${m.score_a} - ${m.score_b}</b><span class="${aw ? '' : 'w'}">${escapeHTML(tournTeamName(m.team_b))}</span></button></li>`;
@@ -10551,6 +10554,10 @@ async function tournQueueMove(tid, id, dir){
   const res = await Promise.all(ups);
   if(res.some(function(r){ return r && r.error; })){ showAlert('L\'ordre n\'a pas pu être enregistré.'); await loadTournaments(true); render(); return; }
   tournLiveNotify();
+}
+// Toucher un match de la file : le déplacer d'un coup.
+function tournQueueMenu(tid, id){
+  showChoice(tournTeamName((TMATCHES || []).find(function(m){ return m.id === id; }).team_a) + ' c. ' + tournTeamName((TMATCHES || []).find(function(m){ return m.id === id; }).team_b), ['Mettre en tête de la file', 'Envoyer à la fin de la file'], function(i){ tournQueueMove(tid, id, i === 0 ? 'top' : 'end'); });
 }
 async function tournQueueAutoOrder(tid){
   const ids = (TMATCHES || []).filter(function(m){ return m.tournament_id === tid && typeof m.prio === 'number'; }).map(function(m){ return m.id; });
@@ -10744,7 +10751,7 @@ function openTournDaySettings(tid){
     ${tournField('Temps de repos minimum entre deux matchs d\'une équipe', tournStepper('tdsRest', cfg.rest, 0, 30), 'En minutes. Une équipe qui vient de jouer n\'est pas appelée avant ce délai.')}
     ${tournField('Présences', tournSeg('tdsCheck', [['1','Pointer les arrivées'],['0','Toutes présentes']], cfg.checkin ? '1' : '0'), 'Avec le pointage, une équipe pas encore arrivée n\'est jamais appelée.')}
     ${tournField('Terrains réservés libérés', tournSeg('tdsLend', [['1','<b>Prêtés</b><small>Aux autres catégories</small>'],['0','<b>Gardés</b><small>Pour leur catégorie</small>']], cfg.lend ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Prêtés : quand une catégorie n\'a plus de match à jouer, ses terrains réservés servent aux autres catégories. Sur l\'écran En direct, « Affecter ce terrain » permet aussi de donner un terrain libre à une catégorie.')}
-    ${tournCourts(t).length ? tournField('Terrains de championnat', `<div class="tn-fc">${tournCourts(t).map(function(c, i){ const on = cfg.finals.indexOf(c) !== -1; return `<button type="button" class="tn-fc-b${on ? ' on' : ''}" data-court="${escapeHTML(c)}" aria-pressed="${on}" onclick="this.classList.toggle('on');this.setAttribute('aria-pressed', this.classList.contains('on'))">${escapeHTML(c)}</button>`; }).join('')}</div>`, 'Les finales et les matchs pour le bronze vont seulement sur ces terrains, en priorité dès qu\'ils se libèrent. Aucun coché : n\'importe quel terrain.') : ''}
+    ${tournCourts(t).length ? tournField('Terrains de championnat', `<div class="tn-fc">${tournCourts(t).map(function(c, i){ const on = cfg.finals.indexOf(c) !== -1; return `<button type="button" class="tn-fc-b${on ? ' on' : ''}" data-court="${escapeHTML(c)}" aria-pressed="${on}" onclick="this.classList.toggle('on');this.setAttribute('aria-pressed', this.classList.contains('on'))">${escapeHTML(c)}</button>`; }).join('')}</div>`, 'Les finales et les matchs pour le bronze se jouent seulement sur les terrains cochés. Aucun coché : n\'importe quel terrain.') : ''}
     ${tournField('Appel des matchs', tournSeg('tdsAuto', [['0','<b>Manuel</b><small>Tu touches « Appeler ce match »</small>'],['1','<b>Automatique</b><small>Dès qu\'un terrain se libère</small>']], cfg.auto ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Automatique : le prochain match prêt de la file est appelé sur chaque terrain libre et les joueurs reçoivent la notification. Il faut qu\'un appareil de l\'équipe du tournoi garde « En direct » ouvert.')}
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" onclick="tournDaySave('${tid}')">Enregistrer</button></div></div>`;
   setModal({ kind:'content', title:'Réglages du jour', htmlContent: html });
@@ -12301,7 +12308,7 @@ function openTournDivForm(tid, divId){
       <div class="tn-row2 tn-fmt-main">
         <div data-f="pools_de double_elim"${show(['pools_de','double_elim'])}>${tournField('Double élimination', tournSeg('tdDeMode', [['full','<b>Complète</b><small>Gagnants, perdants, grande finale</small>'],['consolation','<b>Consolante seulement</b><small>Tableau simple + consolante</small>']], r.de_mode, 'tournDivOptVis', 'tn-seg-st tn-seg-2'))}</div>
         <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Groupes', tournSeg('tdRotGroup', [[0,'Un seul'],[8,'De 8'],[12,'De 12'],[16,'De 16'],[20,'De 20']], r.rot_group || 0, 'tournDivSum'), 'Les partenaires et adversaires changent à l\'intérieur de chaque groupe, avec un classement par groupe. Exemple : 32 joueurs en groupes de 16 = 2 groupes de 16.')}</div>
-        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Après les rondes', tournSeg('tdRotFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>1+3 contre 2+4</small>'],[4,'<b>Finale + bronze</b><small>Et 5+7 contre 6+8</small>'],[99,'<b>Tableau complet</b><small>Tous, paires fixes</small>']], r.format === 'rotation' ? (r.rr_final || 0) : 0, 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Selon le classement individuel des rondes. Finale : le 1er joue avec le 3e contre le 2e et le 4e ; avec le bronze, le 5e et le 7e affrontent le 6e et le 8e. Tableau complet : tous les joueurs entrent dans un tableau à élimination, en paires formées selon le classement (1+3, 2+4, 5+7, 6+8…) qui restent ensemble jusqu\'au bout.')}</div>
+        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Après les rondes', tournSeg('tdRotFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>1+3 contre 2+4</small>'],[4,'<b>Finale + bronze</b><small>Et 5+7 contre 6+8</small>'],[99,'<b>Tableau complet</b><small>Tous les joueurs, mêmes paires jusqu\'au bout</small>']], r.format === 'rotation' ? (r.rr_final || 0) : 0, 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Les paires sont formées selon le classement des rondes : le 1er avec le 3e, le 2e avec le 4e, et ainsi de suite.')}</div>
         <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Nombre de rondes', tournSeg('tdRounds', [[0,'Auto'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[10,'10']], r.rot_rounds || 0, 'tournDivSum'), 'Auto : autant de rondes que de joueurs moins un jusqu\'à 8 joueurs, sinon 7. Modifiable au moment de créer les rondes.')}</div>
         <div class="tn-span" data-f="round_robin"${show(['round_robin'])}>${tournField('Après la poule', tournSeg('tdRrFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>Les 2 premiers</small>'],[4,'<b>Demi + finale</b><small>Les 4 premiers</small>']], r.rr_final || 0, 'tournDivOptVis', 'tn-seg-st tn-seg-3'))}</div>
         <div id="tdPlaceWrap" class="tn-span"${tournBronzeAllowed(r) ? '' : ' style="display:none"'}>${tournField('Matchs de classement', tournSeg('tdPlace', [['0','<b>Non</b><small>Une équipe éliminée a fini</small>'],['1','<b>Oui</b><small>Chaque équipe joue jusqu\'à connaître son rang</small>']], r.placement ? '1' : '0', 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Exemple avec 8 équipes au tableau : les perdants des quarts jouent pour les places 5 à 8, puis les matchs pour la 5e et la 7e place. Chaque équipe joue 3 matchs de tableau. Le match pour la 3e place est inclus.')}</div>
@@ -12488,20 +12495,19 @@ function tournPayToggle(id, fromPanel){
     return true;
   };
   if(x.paid){
-    showConfirm('Retirer le paiement de ' + name + (x.paid_at ? ' (confirmé le ' + tournPaidWhen(x.paid_at) + (x.paid_by ? ' par ' + x.paid_by : '') + ')' : '') + ' ? L\'équipe repasse « À payer ». Aucun message n\'est envoyé.', async function(){
+    showConfirm('Retirer le paiement de ' + name + ' ?' + (x.paid_at ? ' Il avait été confirmé le ' + tournPaidWhen(x.paid_at) + (x.paid_by ? ' par ' + x.paid_by : '') + '.' : ''), async function(){
       if(!(await save({ paid:false, paid_at:null, paid_by:null }))) return;
       back(); showToast('Paiement retiré');
     });
     return;
   }
   const accounts = [x.p1_profile, x.p2_profile].filter(Boolean).length;
-  const who = x.p2_name ? 'aux deux joueurs' : 'au joueur';
-  showConfirm('Confirmer que ' + name + (x.p2_name ? ' ont payé ? ' : ' a payé ? ') + (x.is_test ? 'Équipe test : aucun message n\'est envoyé.' : accounts ? 'Un message « Paiement reçu » est envoyé ' + (accounts === 2 || !x.p2_name ? who : 'au joueur qui a un compte Dinkeo') + '.' + (accounts === 1 && x.p2_name ? ' Pour l\'autre, un message à copier est offert dans la fiche de l\'équipe.' : '') : 'Aucun joueur n\'a de compte Dinkeo : tu pourras copier un message de confirmation.'), async function(){
+  showConfirm('Confirmer le paiement de ' + name + ' ?' + (x.is_test ? '' : accounts ? ' Un message « Paiement reçu » sera envoyé dans Dinkeo.' : ' Pas de compte Dinkeo : un message à copier sera dans la fiche de l\'équipe.'), async function(){
     const me = (CURRENT_PROFILE && (CURRENT_PROFILE.display_name || String(CURRENT_PROFILE.email || '').split('@')[0])) || null;
     if(!(await save({ paid:true, paid_at: new Date().toISOString(), paid_by: me }))) return;
     if(!x.is_test && accounts) tournNotify(id, 'paid');
     back();
-    showToast(x.is_test ? 'Paiement noté' : accounts ? 'Paiement noté · confirmation envoyée' : 'Paiement noté · copie le message dans la fiche de l\'équipe');
+    showToast(x.is_test ? 'Paiement confirmé' : accounts ? 'Paiement confirmé · message envoyé' : 'Paiement confirmé');
   });
 }
 function tournPromote(id){
@@ -12531,7 +12537,7 @@ function tournTeamPanelHTML(id){
       <button type="button" class="jp-pill ${x.partner_confirmed ? 'ok' : 'w'}" onclick="tournTeamPatch('${x.id}', { partner_confirmed: ${x.partner_confirmed ? 'false' : 'true'} })">${x.partner_confirmed ? 'Partenaire confirmé' : 'Partenaire : en attente (confirmer)'}</button>
       <button type="button" class="jp-pill ${x.paid ? 'ok' : 'w'}" onclick="tournPayToggle('${x.id}', true)">${x.paid ? 'Payé' : 'À payer'}</button>
     </div>
-    ${x.paid ? `<div class="tn-paid"><span>${x.paid_at ? 'Payé le ' + escapeHTML(tournPaidWhen(x.paid_at)) : 'Payé'}${x.paid_by ? ' · confirmé par ' + escapeHTML(x.paid_by) : ''}</span><button type="button" class="tn-linkbtn" onclick="tournPayCopy('${x.id}')">Copier le message de confirmation</button></div>` : ''}
+    ${x.paid ? `<div class="tn-paid"><span>${x.paid_at ? 'Payé le ' + escapeHTML(tournPaidWhen(x.paid_at)) : 'Payé'}${x.paid_by ? ' · confirmé par ' + escapeHTML(x.paid_by) : ''}</span><button type="button" class="tn-linkbtn" onclick="tournPayCopy('${x.id}')">Copier le message pour les joueurs</button></div>` : ''}
     <p class="small" style="color:var(--muted);">${x.status === 'waitlist' ? 'Sur la liste d\'attente' : 'Inscrite'} depuis le ${escapeHTML(new Date(x.created_at).toLocaleDateString('fr-CA', { day:'numeric', month:'long' }))}${t ? ' · ' + escapeHTML(t.name) : ''}.</p>
     <div class="tn-form-acts">
       ${x.status === 'waitlist' ? `<button type="button" class="btn btn-primary" onclick="tournPromote('${x.id}')">Donner la place</button>` : ''}
