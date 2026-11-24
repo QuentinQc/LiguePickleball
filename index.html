@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 561">
+<meta name="app-build" content="Version 562">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10395,7 +10395,7 @@ function tournPrepUnlock(divId){
 // ---- En direct : présences, terrains et file d'attente ----
 function tournSettings(t){
   const s = (t && t.settings) || {};
-  return { rest: typeof s.rest === 'number' ? s.rest : 5, checkin: s.checkin !== false, auto: s.auto === true, lend: s.lend !== false, open: Array.isArray(s.open_courts) ? s.open_courts : [], finals: Array.isArray(s.final_courts) ? s.final_courts : [] };
+  return { rest: typeof s.rest === 'number' ? s.rest : 5, checkin: s.checkin !== false, auto: s.auto === true, lend: s.lend !== false, roundsInOrder: s.rounds_in_order !== false, open: Array.isArray(s.open_courts) ? s.open_courts : [], finals: Array.isArray(s.final_courts) ? s.final_courts : [] };
 }
 function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter(Boolean); }
 // Durée estimée d'un match selon ses points (minutes).
@@ -10459,6 +10459,15 @@ function tournTeamState(t){
 function tournQueue(t){
   const now = Date.now(), cfg = tournSettings(t), st = tournTeamState(t);
   const pend = tournLiveMatches(t).filter(function(m){ return m.status === 'pending'; });
+  // Rondes dans l'ordre : une ronde de poule (par poule) ou de tableau (par catégorie) n'est appelée
+  // qu'une fois toute la ronde précédente terminée.
+  const roundKey = function(m){ return m.phase === 'pool' ? m.division_id + '|p|' + (m.pool || '') : m.phase === 'ko' ? m.division_id + '|ko' : null; };
+  const openRound = {};
+  if(cfg.roundsInOrder) (TMATCHES || []).forEach(function(m){
+    if(m.tournament_id !== t.id || m.status === 'done' || m.status === 'bye' || typeof m.round !== 'number') return;
+    const k = roundKey(m); if(!k) return;
+    if(openRound[k] === undefined || m.round < openRound[k]) openRound[k] = m.round;
+  });
   pend.forEach(function(m){
     const mp = tournMP(m);
     // Prêt depuis : le plus tard entre la création du match et la fin du dernier match de ses joueurs.
@@ -10475,6 +10484,11 @@ function tournQueue(t){
       else if(cfg.checkin && tm && !tm.checked_in) why = tournTeamName(id) + ' : pas arrivée';
       else if(s.lastEnd && now - s.lastEnd < cfg.rest * 60000) why = tournTeamName(id) + ' : repos encore ' + Math.ceil((cfg.rest * 60000 - (now - s.lastEnd)) / 60000) + ' min';
     });
+    if(!why && cfg.roundsInOrder){
+      const k = roundKey(m);
+      if(k && typeof m.round === 'number' && openRound[k] !== undefined && m.round > openRound[k])
+        why = (m.phase === 'pool' ? 'Ronde ' + m.round : tournRoundSingular(m.round, tournKoRounds(m.division_id))) + ' : attend la fin de la ronde ' + openRound[k];
+    }
     m._why = why;
   });
   // Ordre choisi par l'organisateur (flèches de la file) d'abord, puis l'ordre automatique.
@@ -11065,6 +11079,7 @@ function openTournDaySettings(tid){
     ${tournField('Présences', tournSeg('tdsCheck', [['1','Pointer les arrivées'],['0','Toutes présentes']], cfg.checkin ? '1' : '0'), 'Avec le pointage, une équipe pas encore arrivée n\'est jamais appelée.')}
     ${tournField('Terrains réservés libérés', tournSeg('tdsLend', [['1','<b>Prêtés</b><small>Aux autres catégories</small>'],['0','<b>Gardés</b><small>Pour leur catégorie</small>']], cfg.lend ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Prêtés : quand une catégorie n\'a plus de match à jouer, ses terrains réservés servent aux autres catégories. Sur l\'écran En direct, « Affecter ce terrain » permet aussi de donner un terrain libre à une catégorie.')}
     ${tournCourts(t).length ? tournField('Terrains de championnat', `<div class="tn-fc">${tournCourts(t).map(function(c, i){ const on = cfg.finals.indexOf(c) !== -1; return `<button type="button" class="tn-fc-b${on ? ' on' : ''}" data-court="${escapeHTML(c)}" aria-pressed="${on}" onclick="this.classList.toggle('on');this.setAttribute('aria-pressed', this.classList.contains('on'))">${escapeHTML(c)}</button>`; }).join('')}</div>`, 'Les finales et les matchs pour le bronze se jouent seulement sur les terrains cochés. Aucun coché : n\'importe quel terrain.') : ''}
+    ${tournField('Ordre des rondes', tournSeg('tdsRounds', [['1','<b>Dans l\'ordre</b><small>Une ronde attend la fin de la précédente</small>'],['0','<b>Libre</b><small>Dès que les équipes sont prêtes</small>']], cfg.roundsInOrder ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Dans l\'ordre : aucun match de la ronde 2 d\'une poule (ou du tableau) n\'est appelé tant que la ronde 1 n\'est pas terminée.')}
     ${tournField('Appel des matchs', tournSeg('tdsAuto', [['0','<b>Manuel</b><small>Tu touches « Appeler ce match »</small>'],['1','<b>Automatique</b><small>Dès qu\'un terrain se libère</small>']], cfg.auto ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Automatique : le prochain match prêt de la file est appelé sur chaque terrain libre et les joueurs reçoivent la notification. Il faut qu\'un appareil de l\'équipe du tournoi garde « En direct » ouvert.')}
     <div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button><button type="button" class="btn btn-primary" onclick="tournDaySave('${tid}')">Enregistrer</button></div></div>`;
   setModal({ kind:'content', title:'Réglages du jour', htmlContent: html });
@@ -11072,7 +11087,7 @@ function openTournDaySettings(tid){
 }
 async function tournDaySave(tid){
   const t = tournById(tid); if(!t) return;
-  const settings = Object.assign({}, t.settings || {}, { rest: Math.max(0, Math.min(30, parseInt(tfVal('tdsRest'), 10) || 0)), checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1', lend: tfVal('tdsLend') !== '0', final_courts: Array.prototype.map.call(document.querySelectorAll('.tn-fc-b.on'), function(b){ return b.getAttribute('data-court'); }) });
+  const settings = Object.assign({}, t.settings || {}, { rest: Math.max(0, Math.min(30, parseInt(tfVal('tdsRest'), 10) || 0)), checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1', lend: tfVal('tdsLend') !== '0', rounds_in_order: tfVal('tdsRounds') !== '0', final_courts: Array.prototype.map.call(document.querySelectorAll('.tn-fc-b.on'), function(b){ return b.getAttribute('data-court'); }) });
   const r = await sb.from('tournaments').update({ settings: settings }).eq('id', tid);
   if(r && r.error){ showAlert(r.error.message); return; }
   t.settings = settings; tournLiveNotify();
