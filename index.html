@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 547">
+<meta name="app-build" content="Version 548">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -17810,6 +17810,7 @@ async function scoreReloadFromServer(){
 }
 // Bloc de contrôle affiché sous un match / affrontement côté joueur
 // Ligne d'état discrète sous un match (échelle) : enregistrement automatique.
+var LADDER_WARN_OK = {};
 async function playerSubmitLadderScore(gid, mi, auto){
   if(auto){ const ea0=document.getElementById(`sc_${gid}_${mi}_A`), eb0=document.getElementById(`sc_${gid}_${mi}_B`); if(!ea0||!eb0||ea0.value===''||eb0.value==='') return; }
   const open = currentOpenSession();
@@ -17820,6 +17821,12 @@ async function playerSubmitLadderScore(gid, mi, auto){
   const ea = document.getElementById(`sc_${gid}_${mi}_A`), eb = document.getElementById(`sc_${gid}_${mi}_B`);
   const sa = ea && ea.value!=='' ? Number(ea.value) : null, sb_ = eb && eb.value!=='' ? Number(eb.value) : null;
   if(sa==null || sb_==null || sa<0 || sb_<0 || sa>99 || sb_>99){ showAlert("Entre les deux scores (nombres entiers)."); return; }
+  const iss = ladderScoreIssue(open, gid, sa, sb_);
+  if(iss && !LADDER_WARN_OK[gid + '|' + mi + '|' + sa + '-' + sb_]){
+    ladderScoreWarn(iss, 'Envoyer quand même', function(){ LADDER_WARN_OK[gid + '|' + mi + '|' + sa + '-' + sb_] = 1; playerSubmitLadderScore(gid, mi); },
+      function(){ if(ea){ ea.focus(); try{ ea.select(); }catch(e){} } });
+    return;
+  }
   const { error } = await sb.rpc('ladder_submit_score', { p_league_id: CURRENT_LEAGUE_ID, p_session_id: open.id, p_group_id: gid, p_match_idx: mi, p_score_a: sa, p_score_b: sb_ });
   if(error){
     showAlert("La sauvegarde a échoué : " + error.message + " (le SQL « score-security.sql » est-il exécuté dans Supabase ?)");
@@ -17862,6 +17869,22 @@ function refreshMatchHead(gid, mi, m){
   el.className = 'mr-head' + (edit && !done ? ' todo' : '');
   el.textContent = 'Match ' + (mi+1) + (edit && !done ? ' · à saisir' : '') + (el.getAttribute('data-sit')||'');
 }
+// ---- Score qui ne correspond pas au format du groupe (ex. groupe de 5 en 9 points, saisi 8-5) ----
+// Valide : le gagnant a exactement les points du match (9-5), ou une prolongation à 2 points d'écart (11-9 dans un match à 9).
+function ladderScoreIssue(open, gid, a, b){
+  if(a == null || b == null || a === '' || b === '' || isRecLeague() || !open) return null;
+  a = Number(a); b = Number(b);
+  const n = activeRosterForGroup(open, gid).length, t = targetPointsFor(n);
+  const hi = Math.max(a, b), lo = Math.min(a, b);
+  if(hi === t && lo < t) return null;
+  if(hi > t && hi - lo === 2 && lo >= t - 1) return null;
+  return { n: n, t: t, a: a, b: b };
+}
+function ladderScoreWarn(iss, keepLabel, onKeep, onFix){
+  const msg = 'Ce score ne correspond pas au format : ' + iss.a + ' à ' + iss.b + '.\n'
+    + 'Le groupe compte ' + iss.n + ' joueurs : les matchs se jouent en ' + iss.t + ' points (par exemple ' + iss.t + ' à ' + Math.max(0, iss.t - 4) + ').';
+  showChoice(msg, ['Corriger le score', keepLabel], function(i){ if(i === 0){ if(onFix) setTimeout(onFix, 50); } else if(onKeep) onKeep(); }, { noCancel: true });
+}
 function setScore(gid, mi, which, val){
   const open = currentOpenSession();
   // Verrou : on ne modifie jamais les scores d'une session close/finalisée, et un joueur
@@ -17877,6 +17900,11 @@ function setScore(gid, mi, which, val){
   saveData();
   refreshMatchHead(gid, mi, m);
   refreshRsMatch(gid, mi, m);
+  const iss = ladderScoreIssue(open, gid, m.scoreA, m.scoreB);
+  if(iss) ladderScoreWarn(iss, 'Garder ce score', null, function(){
+    const el = document.querySelector('input[onchange*="setScore(\'' + gid + '\',\'' + mi + '\',\'A\'"]');
+    if(el){ el.focus(); try{ el.select(); }catch(e){} }
+  });
 }
 function regenerate(gid){
   const open = currentOpenSession();
@@ -22268,7 +22296,7 @@ function dropModal(toBack){
 function showConfirm(message, onConfirm){ setModal({ kind:'confirm', message, onConfirm }); render(); }
 function showAlert(message){ setModal({ kind:'alert', message }); render(); }
 function showPrompt(message, defaultValue, onConfirm){ setModal({ kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }); render(); }
-function showChoice(message, choices, onConfirm){ setModal({ kind:'choice', message, choices, onConfirm }); render(); }
+function showChoice(message, choices, onConfirm, opts){ setModal({ kind:'choice', message, choices, onConfirm, noCancel: !!(opts && opts.noCancel) }); render(); }
 function showContentModal(title, htmlContent){ setModal({ kind:'content', title, htmlContent }); render(); }
 // Fiche d'une personne : panneau à droite sur ordinateur (la liste reste visible), fenêtre ailleurs.
 function showPanelModal(title, htmlContent){ setModal({ kind:'content', title, htmlContent, panel:true }); render(); }
@@ -22334,8 +22362,8 @@ function modalHTML(){
         <button class="btn btn-primary" onclick="modalConfirmClick()">Confirmer</button>
       </div>`;
   } else if(MODAL.kind === 'choice'){
-    inner += MODAL.choices.map((c,i)=>`<button class="btn btn-secondary" style="display:block;width:100%;margin-bottom:8px;text-align:left;" onclick="modalChoiceClick(${i})">${escapeHTML(c)}</button>`).join('')
-      + `<button class="btn-ghost" onclick="closeModal()">Annuler</button>`;
+    inner += MODAL.choices.map((c,i)=>`<button class="btn ${MODAL.noCancel && i === 0 ? 'btn-primary' : 'btn-secondary'}" style="display:block;width:100%;margin-bottom:8px;text-align:${MODAL.noCancel ? 'center' : 'left'};" onclick="modalChoiceClick(${i})">${escapeHTML(c)}</button>`).join('')
+      + (MODAL.noCancel ? '' : `<button class="btn-ghost" onclick="closeModal()">Annuler</button>`);
   } else { // alert
     inner += `<div class="row" style="justify-content:flex-end;"><button class="btn btn-primary" onclick="closeModal()">OK</button></div>`;
   }
