@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 549">
+<meta name="app-build" content="Version 550">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -6534,7 +6534,24 @@ function courtPlanSVG(highlightId){
     const rot = vert ? ` transform="rotate(-90 ${cx} ${cy})"` : '';
     lines.forEach(function(t, i){ h += `<text x="${cx}" y="${cy + (i - (lines.length - 1) / 2) * (fs + 4) + fs / 3}"${rot} text-anchor="middle" font-size="${fs}" font-weight="${on ? 800 : 600}" fill="${on ? '#16413A' : '#e8f1ee'}" font-family="Inter, Arial, sans-serif">${escapeHTML(t)}</text>`; });
   });
-  return `<svg class="court-plan" viewBox="-20 -20 ${maxX + 40} ${maxY + 40}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan des terrains">${h}</svg>`;
+  // Entrée du centre : DATA.courtEntrance = { x, y, dir } (dir : côté d'où l'on arrive, la flèche pointe vers l'intérieur).
+  const E = DATA.courtEntrance;
+  let minX = -20, minY = -20, extX = 0, extY = 0;
+  if(E && typeof E.x === 'number' && typeof E.y === 'number'){
+    const dir = E.dir || 'right', len = 130, txt = E.label || 'Entrée';
+    const dx = dir === 'right' ? 1 : dir === 'left' ? -1 : 0, dy = dir === 'down' ? 1 : dir === 'up' ? -1 : 0;
+    const x0 = E.x + dx * (len + 14), y0 = E.y + dy * (len + 14), x1 = E.x + dx * 14, y1 = E.y + dy * 14;
+    const ang = Math.atan2(y1 - y0, x1 - x0), hl = 34;
+    const p1 = (x1 - hl * Math.cos(ang - 0.5)) + ',' + (y1 - hl * Math.sin(ang - 0.5)), p2 = (x1 - hl * Math.cos(ang + 0.5)) + ',' + (y1 - hl * Math.sin(ang + 0.5));
+    // La porte : un trait épais sur le mur, perpendiculaire à la flèche.
+    const door = 44;
+    h += `<g class="cp-entry"><line x1="${E.x - dy * door}" y1="${E.y - dx * door}" x2="${E.x + dy * door}" y2="${E.y + dx * door}" stroke="#E96A3C" stroke-width="12" stroke-linecap="round"/>`;
+    h += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#E96A3C" stroke-width="14" stroke-linecap="round"/><polygon points="${x1},${y1} ${p1} ${p2}" fill="#E96A3C"/>`;
+    const tx = dx ? x0 + dx * 12 : x0, ty = dy ? y0 + dy * 40 : y0 + 12;
+    h += `<text x="${tx}" y="${ty + (dx ? 18 : 0)}" text-anchor="${dx > 0 ? 'start' : dx < 0 ? 'end' : 'middle'}" font-size="54" font-weight="800" fill="#E96A3C" font-family="Inter, Arial, sans-serif">${escapeHTML(txt)}</text></g>`;
+    if(dx > 0) extX = len + 230; if(dx < 0) minX -= len + 230; if(dy > 0) extY = len + 90; if(dy < 0) minY -= len + 90;
+  }
+  return `<svg class="court-plan" viewBox="${minX} ${minY} ${maxX + 40 + extX - minX - 20} ${maxY + 40 + extY - minY - 20}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plan des terrains${E ? ' · entrée indiquée' : ''}">${h}</svg>`;
 }
 function openCourtPlan(courtId){
   const c = (DATA.courts || []).find(function(x){ return x.id === courtId; });
