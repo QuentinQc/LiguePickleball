@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 543">
+<meta name="app-build" content="Version 544">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1479,6 +1479,12 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 #app > .card:first-child{margin-top:calc(10px + env(safe-area-inset-top));}
 .pend-note{margin:0;font-size:13px;color:var(--muted);}
 .pend-links{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:14px;}
+.to-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 2px 14px;}
+.to-h{font-size:28px;line-height:1.1;margin:2px 0 0;}
+.to-notif{border-color:rgba(207,234,92,.45);}
+.to-notif b{display:block;font-size:16px;margin-bottom:2px;}
+.to-notif .small{margin:4px 0 12px;color:var(--muted);}
+.to-ok{color:var(--muted);text-align:center;margin:4px 0 0;}
 .pend-link{background:none;border:0;color:var(--muted);font:inherit;font-size:14px;text-decoration:underline;text-underline-offset:3px;padding:8px;cursor:pointer;}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}
 @media (max-width:380px){ .st-fs em{display:none;} }
@@ -3472,7 +3478,7 @@ async function loadInbox(){
   finally{ INBOX_LOADING = false; }
 }
 function ensureInboxLoaded(){
-  if(!CURRENT_PROFILE || !SESSION_USER || SESSION_USER.role === 'pending' || INBOX_LOADED_FOR === CURRENT_PROFILE.id || INBOX_LOADING) return;
+  if(!CURRENT_PROFILE || !SESSION_USER || (SESSION_USER.role === 'pending' && !(MY_TOURNS && MY_TOURNS.length)) || INBOX_LOADED_FOR === CURRENT_PROFILE.id || INBOX_LOADING) return;
   INBOX_LOADED_FOR = CURRENT_PROFILE.id; // une seule tentative au lancement, même en cas d'échec (sinon boucle)
   loadInbox().then(refreshBell);
 }
@@ -8931,6 +8937,8 @@ function renderPending(){
   const canCreateOrg = CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin && !CURRENT_PROFILE.organization_id;
   const who = PENDING_ORG_NAME || "L'organisateur";
   const notifOn = PUSH_SUBSCRIBED;
+  // Compte créé seulement pour un tournoi (aucune ligue, aucune demande en attente) : accueil centré sur le tournoi.
+  if(!waiting && !canCreateOrg && MY_TOURNS && MY_TOURNS.length){ app.innerHTML = tournOnlyHomeHTML(); ensureInboxLoaded(); return; }
   app.innerHTML = `
     ${storageBannerHTML()}
     ${myTournsHTML()}
@@ -8962,6 +8970,30 @@ function renderPending(){
       <p class="small" style="margin-top:10px;">Réservé aux organisateurs. Si tu attends une invitation pour jouer, <strong>n'utilise pas ceci</strong> : entre ton code d'invitation plus haut. Tu peux créer ta propre organisation et devenir administrateur de tes propres ligues.</p>
       <button class="btn btn-secondary" onclick="onCreateMyOwnOrganization()">Créer mon organisation</button>
     </details>` : ''}`;
+}
+// Accueil d'un joueur venu seulement pour un tournoi : ses tournois, les notifications (appel des matchs) et la cloche.
+// Il ne voit rien des ligues ni de l'organisation.
+function tournOnlyHomeHTML(){
+  const name = String((CURRENT_PROFILE && CURRENT_PROFILE.display_name) || '').split(' ')[0];
+  const ios = isIOSDevice() && !isRunningStandalone();
+  let notif = '';
+  if(PUSH_SUBSCRIBED) notif = `<p class="small to-ok">Notifications activées : ton téléphone t'avertira quand ton match sera appelé.</p>`;
+  else if(PUSH_STATUS_CHECKED || ios){
+    const denied = !ios && notifPermission() === 'denied';
+    notif = `<div class="card to-notif"><b>Sois averti quand ton match est appelé</b>
+      <p class="small">${denied ? 'Ce navigateur bloque les notifications de Dinkeo. ' + escapeHTML(notifBlockedSteps())
+        : ios ? "Sur iPhone : touche Partager dans Safari, puis « Sur l'écran d'accueil ». Ouvre ensuite Dinkeo depuis cette icône et active les notifications."
+        : "Ton téléphone sonne dès que l'organisateur t'envoie sur un terrain, même si l'app est fermée."}</p>
+      ${!denied && !ios && PUSH_SUPPORTED ? '<button type="button" class="btn btn-primary" style="width:100%;" onclick="togglePushNotifications()">Activer les notifications</button>' : ''}</div>`;
+  }
+  return `${storageBannerHTML()}
+    <div class="to-top"><div><div class="eyebrow">Dinkeo</div><h1 class="to-h">${name ? 'Bonjour ' + escapeHTML(name) : 'Mes tournois'}</h1></div>${bellHTML()}</div>
+    ${myTournsHTML()}
+    ${notif}
+    <div class="pend-links">
+      <button type="button" class="pend-link" onclick="openInviteCodePrompt()">Tu joues aussi dans une ligue ? Entre ton code</button>
+      <button type="button" class="pend-link" onclick="logout()">Déconnexion</button>
+    </div>`;
 }
 async function onCreateMyOwnOrganization(){
   if(!(CURRENT_PROFILE && CURRENT_PROFILE.is_super_admin)){ showAlert("La création d'une organisation passe par l'équipe Dinkeo. Contacte-nous pour démarrer ta ligue."); return; }
@@ -13079,6 +13111,7 @@ function deskHomeHTML(){
   const ready = homeOrganizerLeaguesReady();
   const leagues = myOrgLeagues().filter(isMyHomeLeague);
   return `<div class="dkh-head"><small>${escapeHTML(frDateLong(fmtDate(new Date())))}</small><h1>${first ? 'Bonjour ' + escapeHTML(first) + ', voici ta semaine' : 'Voici ta semaine'}</h1></div>
+    ${myTournsHTML()}
     <div class="pf-sec">Mes ligues</div>
     ${!ready ? '<p class="small">Chargement…</p>' : (leagues.length ? `<div class="dkh-grid">${leagues.map(deskLeagueCardHTML).join('')}</div>` : homeNoLeagueHTML())}
     ${deskActivityHTML()}`;
@@ -13348,11 +13381,12 @@ function adminHomeHTML(){
     html += `<div class="ah-org"${i===0 ? ' style="margin-top:4px;"' : ''}><div class="mono">${orgMono(o.name || 'Mes ligues')}</div><b>${escapeHTML(o.name || 'Mes ligues')}</b>${right}</div>
     ${ls.length ? `<div class="ah-grid">${ls.map(adminLeagueCardHTML).join('')}</div>` : (homeReady ? homeNoLeagueHTML() : '<p class="small">Chargement…</p>')}`;
   });
-  html += accUpcomingHTML();
+  html = myTournsHTML() + html + accUpcomingHTML();
   if(isDesk()){
     if(!(ORG_ROSTER_ENTRIES_CACHE || []).length && !DESK_ROSTER_ASKED){ DESK_ROSTER_ASKED = true; Promise.all([loadOrgRoster(), loadOrgMembers()]).then(function(){ ORG_ROSTER_ENTRIES_CACHE = organizationRosterEntries(); if(!MODAL && !VIEW.adet && (VIEW.atab === undefined || VIEW.atab === 'accueil')) render(); }).catch(function(){}); }
     html = deskHomeHTML() + accUpcomingHTML();
   }
+  ensureMyTourns();
   setTimeout(()=>refreshAdminSummaries(false), 0);
   return html;
 }
