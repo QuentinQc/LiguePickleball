@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 544">
+<meta name="app-build" content="Version 545">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1479,6 +1479,7 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 #app > .card:first-child{margin-top:calc(10px + env(safe-area-inset-top));}
 .pend-note{margin:0;font-size:13px;color:var(--muted);}
 .pend-links{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:14px;}
+.tn-min-info{margin:-2px 0 4px;padding:10px 12px;border-radius:12px;border:1px solid rgba(207,234,92,.35);background:rgba(207,234,92,.07);font-size:13px;line-height:1.45;color:var(--text);}
 .to-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 2px 14px;}
 .to-h{font-size:28px;line-height:1.1;margin:2px 0 0;}
 .to-notif{border-color:rgba(207,234,92,.45);}
@@ -9455,11 +9456,92 @@ var TOURN_FMT_SHORT = { pools_ko:'Poules + élimination', pools_de:'Poules + dou
 function tournDivRules(t, d){
   d = d || {};
   const fmt = d.format || 'pools_ko', rrf = (d.rr_final === 2 || d.rr_final === 4 || (d.rr_final === 99 && fmt === 'rotation')) ? d.rr_final : 0;
-  return { format: fmt, pool_size: d.pool_size || 4, qualifiers: fmt === 'round_robin' ? (rrf || 2) : fmt === 'rotation' && rrf ? (rrf === 99 ? 99 : rrf === 4 ? 8 : 4) : (d.qualifiers || 2), rr_final: fmt === 'round_robin' || fmt === 'rotation' ? rrf : 0, rot_rounds: d.rot_rounds || 0, rot_group: d.rot_group || 0,
+  return tournApplyMin(t, d, { format: fmt, pool_size: d.pool_size || 4, qualifiers: fmt === 'round_robin' ? (rrf || 2) : fmt === 'rotation' && rrf ? (rrf === 99 ? 99 : rrf === 4 ? 8 : 4) : (d.qualifiers || 2), rr_final: fmt === 'round_robin' || fmt === 'rotation' ? rrf : 0, rot_rounds: d.rot_rounds || 0, rot_group: d.rot_group || 0,
     win_by2: d.win_by2 !== false, placement: !!d.placement,
     pool_points: d.pool_points || (t && t.pool_points) || 11, bracket_points: d.bracket_points || (t && t.bracket_points) || 15,
     final_best_of: d.final_best_of || (t && t.final_best_of) || 3,
-    de_mode: d.de_mode === 'consolation' ? 'consolation' : 'full', bronze_match: !!d.bronze_match };
+    de_mode: d.de_mode === 'consolation' ? 'consolation' : 'full', bronze_match: !!d.bronze_match });
+}
+// ---- Matchs garantis : l'app choisit la structure (poules, qualifiés, classement, rondes) selon le nombre d'équipes ----
+var TOURN_MIN_FMTS = ['pools_ko', 'pools_de', 'pools_only', 'rotation'];
+function tournApplyMin(t, d, r){
+  const M = parseInt(d.min_matches, 10) || 0;
+  if(M < 2 || TOURN_MIN_FMTS.indexOf(r.format) === -1) return r;
+  let n = d.id ? (TTEAMS || []).filter(function(x){ return x.division_id === d.id && x.status === 'registered'; }).length : 0;
+  const guess = !n; if(!n) n = parseInt(d.max_teams, 10) || 0;
+  if(n < 2) return r;
+  const pl = tournAutoPlan(r, n, M);
+  r.min_matches = M; r.auto = { n: n, guess: guess, plan: pl };
+  if(r.format === 'rotation') r.rot_rounds = pl.rounds;
+  else { r.pool_size = pl.pool_size; r.qualifiers = pl.qualifiers; r.placement = pl.placement; if(pl.placement) r.bronze_match = false; }
+  return r;
+}
+// Moins de matchs joués par une équipe dans un tableau de q équipes (tableau simple, avec ou sans matchs de classement).
+function tournKoMinPlays(q, place){
+  if(q < 2) return 0;
+  const ent = []; for(let i = 0; i < q; i++) ent.push({ id: 'x' + i, pool: null, place: 1 });
+  const rows = place ? tournKoExtras('t', 'd', tournKoRows('t', 'd', ent), false, false, true) : tournKoRows('t', 'd', ent);
+  for(let g = 0; g < 40; g++){
+    let moved = false;
+    rows.forEach(function(m){ if(m.status === 'pending' && m.team_a && m.team_b){ m.status = 'done'; m.winner = m.team_a; moved = true; } });
+    rows.filter(function(m){ return m.phase === 'ko' && m.status === 'done'; }).forEach(function(m){ const nx = rows.find(function(x){ return x.phase === 'ko' && x.round === m.round + 1 && x.seq === Math.floor(m.seq / 2); }); if(nx){ const f = m.seq % 2 === 0 ? 'team_a' : 'team_b'; if(nx[f] !== m.winner){ nx[f] = m.winner; moved = true; } } });
+    if(place) tournDeResolve(rows);
+    if(!moved) break;
+  }
+  const cnt = {}; ent.forEach(function(e){ cnt[e.id] = 0; });
+  rows.forEach(function(m){ if(m.status === 'done'){ if(cnt[m.team_a] !== undefined) cnt[m.team_a]++; if(cnt[m.team_b] !== undefined) cnt[m.team_b]++; } });
+  return Object.keys(cnt).reduce(function(mn, k){ return Math.min(mn, cnt[k]); }, 99);
+}
+// Meilleure structure qui garantit au moins M matchs à chaque équipe, avec le moins de matchs au total.
+var TOURN_AUTO_CACHE = {};
+function tournAutoPlan(r, n, M){
+  const key = [r.format, n, M, r.qualifiers, r.rot_group, r.de_mode, r.rr_final].join('|');
+  if(TOURN_AUTO_CACHE[key]) return TOURN_AUTO_CACHE[key];
+  let best = null;
+  const consider = function(c){
+    const ok = c.guar >= M;
+    if(!best || (ok && !best.ok) || (ok === best.ok && (ok ? (c.total < best.total || (c.total === best.total && Math.abs(c.pool_size - 4) < Math.abs(best.pool_size - 4))) : c.guar > best.guar))){ c.ok = ok; best = c; }
+  };
+  if(r.format === 'rotation'){
+    const k = tournRotGroupCount(n, r), sz = Math.floor(n / k), play = 4 * Math.floor(sz / 4);
+    let R = 1; while(R < 20 && Math.floor(R * play / sz) < M) R++;
+    const tot = tournPlanFor(null, { format: 'rotation', rot_group: r.rot_group, rot_rounds: R, rr_final: r.rr_final }, n);
+    best = { rounds: R, guar: sz ? Math.floor(R * play / sz) : 0, total: tot.pool + tot.bracket, sizes: tot.pools, pool_size: 0, ok: true };
+    best.ok = best.guar >= M;
+  } else {
+    const quals = r.format === 'pools_only' ? [0] : (r.qualifiers >= 99 ? [99] : [r.qualifiers, 99]);
+    for(let sz = 3; sz <= 8; sz++){
+      const k = tournPoolCount(n, sz, r.format), smin = Math.floor(n / k);
+      quals.forEach(function(q){
+        const places = r.format === 'pools_ko' && q >= 99 ? [false, true] : [false];
+        places.forEach(function(place){
+          let br = 0;
+          if(q >= 99 && r.format === 'pools_ko') br = tournKoMinPlays(n, place);
+          else if(q >= 99 && r.format === 'pools_de') br = r.de_mode === 'consolation' ? 1 : 2;
+          const fake = { format: r.format, pool_size: sz, qualifiers: q || 2, placement: place, de_mode: r.de_mode, bronze_match: false };
+          const tot = tournPlanFor(null, fake, n);
+          consider({ pool_size: sz, qualifiers: q || 2, placement: place, k: k, sizes: tot.pools, guar: (smin - 1) + br, total: tot.pool + tot.bracket });
+        });
+      });
+    }
+  }
+  TOURN_AUTO_CACHE[key] = best;
+  return best;
+}
+// Phrase qui explique la structure choisie automatiquement.
+function tournAutoText(r){
+  const a = r && r.auto; if(!a || !a.plan) return '';
+  const p = a.plan, unit = r.format === 'rotation' ? 'joueur' : 'équipe';
+  const who = a.n + ' ' + unit + (a.n > 1 ? 's' : '') + (a.guess ? ' (si la catégorie est complète)' : (r.format === 'rotation' ? ' inscrit' : ' inscrite') + (a.n > 1 ? 's' : ''));
+  let how;
+  if(r.format === 'rotation') how = p.rounds + ' ronde' + (p.rounds > 1 ? 's' : '');
+  else {
+    how = (p.sizes.length > 1 ? p.sizes.length + ' poules (' + p.sizes.join(', ') + ')' : 'une poule de ' + p.sizes[0]);
+    if(r.format !== 'pools_only') how += p.qualifiers >= 99 ? ' · toutes les équipes au tableau' : ' · ' + tournQualTxt(p.qualifiers);
+    if(p.placement) how += ' · matchs de classement';
+  }
+  const res = p.ok ? 'au moins ' + p.guar + ' match' + (p.guar > 1 ? 's' : '') + ' par ' + unit : 'au mieux ' + p.guar + ' match' + (p.guar > 1 ? 's' : '') + ' par ' + unit + ' (pas assez d\'' + unit + 's pour ' + r.min_matches + ')';
+  return 'Avec ' + who + ' : ' + how + ' → ' + res + ' · ' + p.total + ' matchs au total.';
 }
 // Poules suivies d'un tableau (élimination simple ou double).
 function tournPoolsThenBracket(r){ return r.format === 'pools_ko' || r.format === 'pools_de' || ((r.format === 'round_robin' || r.format === 'rotation') && !!r.rr_final); }
@@ -9485,7 +9567,7 @@ function tournFullDe(r){ return (r.format === 'double_elim' || r.format === 'poo
 // Match pour le bronze possible : tableau à élimination simple (avec ou sans consolante).
 function tournBronzeAllowed(r){ return r.format === 'pools_ko' || (r.format === 'rotation' && r.rr_final === 99) || (r.format === 'round_robin' && r.rr_final === 4) || ((r.format === 'pools_de' || r.format === 'double_elim') && r.de_mode === 'consolation'); }
 function tournPodiumFor(t, d){ const r = tournDivRules(t, d); return tournFullDe(r) && tournMatches(d.id, 'gf').length ? tournDePodium(d) : tournPodium(t, d); }
-function tournFmtDetail(t, d){ const r = tournDivRules(t, d); return tournFmtDetail0(t, d) + (tournPlaceOn(r) ? ' · matchs de classement' : '') + (r.win_by2 ? '' : ' · score libre'); }
+function tournFmtDetail(t, d){ const r = tournDivRules(t, d); return (r.min_matches ? 'Au moins ' + r.min_matches + ' matchs par ' + (r.format === 'rotation' ? 'joueur' : 'équipe') + ' · ' : '') + tournFmtDetail0(t, d) + (tournPlaceOn(r) ? ' · matchs de classement' : '') + (r.win_by2 ? '' : ' · score libre'); }
 // Matchs de classement : les équipes éliminées du tableau simple continuent à jouer jusqu'à connaître leur rang.
 function tournPlaceOn(r){ return !!(r && r.placement && tournBronzeAllowed(r)); }
 function tournFmtDetail0(t, d){
@@ -10132,6 +10214,7 @@ function tournPoolsDraftHTML(t, d, r){
   const nMatches = pools.reduce(function(s, p){ return s + p.length * (p.length - 1) / 2; }, 0);
   return `<div class="tn-sec-h tn-prep-bar"><span>${pools.length > 1 ? pools.length + ' poules' : 'Poule unique'} · aperçu</span>
       <span class="tn-head-r">${r.format !== 'round_robin' ? `<span class="tn-pk"><button type="button" class="btn btn-secondary" aria-label="Retirer une poule" ${pools.length <= 1 ? 'disabled' : ''} onclick="tournPrepPools('${d.id}',-1)">− Poule</button><button type="button" class="btn btn-secondary" aria-label="Ajouter une poule" onclick="tournPrepPools('${d.id}',1)">+ Poule</button></span>` : ''}${pools.length > 1 ? (TPREPRND[d.id] ? `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Nouveau tirage</button><button type="button" class="btn btn-secondary" onclick="tournPrepSeeded('${d.id}')">Têtes de série</button>` : `<button type="button" class="btn btn-secondary" onclick="tournPrepRandom('${d.id}')">Au hasard</button><button type="button" class="btn btn-secondary" onclick="tournPrepReset('${d.id}')">Refaire la répartition</button>`) : ''}<button type="button" class="btn btn-primary" onclick="tournPrepLock('${t.id}','${d.id}')">Verrouiller et créer les ${nMatches} matchs</button></span></div>
+    ${r.auto ? `<div class="tn-min-info" style="margin:6px 0 4px;">${escapeHTML(tournAutoText(r))}</div>` : ''}
     <p class="small" style="color:var(--muted);margin:6px 0 10px;">${pools.length > 1 ? (TPREPRND[d.id] ? 'Répartition au hasard (tirage au sort), sans tenir compte des têtes de série.' : 'Répartition en serpentin selon les têtes de série. « Au hasard » fait plutôt un tirage au sort.') + ' Touche une équipe pour la changer de poule ou lui donner un numéro de tête de série. « + Poule » et « − Poule » changent le nombre de poules.' : (r.format === 'round_robin' ? 'Toutes les équipes se rencontrent.' : 'Une seule poule : toutes les équipes se rencontrent. « + Poule » les sépare en poules.')} ${tournPoolsThenBracket(r) ? (r.format === 'round_robin' ? (r.rr_final === 2 ? 'Les 2 premiers jouent ensuite la finale.' : 'Les 4 premiers jouent ensuite les demi-finales et la finale.') : r.qualifiers >= 99 ? 'Toutes les équipes passent au tableau, placées selon leur classement de poule.' : tournQualTxt(r.qualifiers, true) + ' de chaque poule au tableau.') : r.format === 'pools_only' ? 'Pas de tableau : le classement de chaque poule est le résultat final.' : ''}</p>
     <div class="tn-pools">${pools.map(function(p, i){
       return `<section class="tn-pool"><div class="tn-pool-h"><b>${pools.length > 1 ? 'Poule ' + tournPoolLabel(i) : 'Poule unique'}</b><span>${p.length} équipes · ${p.length * (p.length - 1) / 2} matchs</span></div>
@@ -12473,18 +12556,19 @@ function openTournDivForm(tid, divId){
     <div class="tn-grp tn-grp-first"><div class="tn-grp-t">${d ? 'Formule' : '1. Choisis la formule'}</div>
       ${tournFmtCards(r.format)}
       <div class="tn-row2 tn-fmt-main">
+        <div class="tn-span" data-f="pools_ko pools_de pools_only rotation"${show(TOURN_MIN_FMTS)}>${tournField('<span id="tdMinLbl">Matchs garantis par ' + (r.format === 'rotation' ? 'joueur' : 'équipe') + '</span>', tournSeg('tdMin', [[0,'Libre'],[3,'3'],[4,'4'],[5,'5'],[6,'6']], (d && d.min_matches) || 0, 'tournDivMinVis'), 'L\'app choisit elle-même la taille des poules, qui passe au tableau, les matchs de classement ou le nombre de rondes, selon le nombre d\'inscrits. « Libre » : tu règles tout toi-même dans « Ajuster ».')}<div id="tdMinInfo" class="tn-min-info"></div></div>
         <div data-f="pools_de double_elim"${show(['pools_de','double_elim'])}>${tournField('Double élimination', tournSeg('tdDeMode', [['full','<b>Complète</b><small>Gagnants, perdants, grande finale</small>'],['consolation','<b>Consolante seulement</b><small>Tableau simple + consolante</small>']], r.de_mode, 'tournDivOptVis', 'tn-seg-st tn-seg-2'))}</div>
         <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Groupes', tournSeg('tdRotGroup', [[0,'Un seul'],[8,'De 8'],[12,'De 12'],[16,'De 16'],[20,'De 20']], r.rot_group || 0, 'tournDivSum'), 'Les partenaires et adversaires changent à l\'intérieur de chaque groupe, avec un classement par groupe. Exemple : 32 joueurs en groupes de 16 = 2 groupes de 16.')}</div>
         <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Après les rondes', tournSeg('tdRotFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>1+3 contre 2+4</small>'],[4,'<b>Finale + bronze</b><small>Et 5+7 contre 6+8</small>'],[99,'<b>Tableau complet</b><small>Tous les joueurs, mêmes paires jusqu\'au bout</small>']], r.format === 'rotation' ? (r.rr_final || 0) : 0, 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Les paires sont formées selon le classement des rondes : le 1er avec le 3e, le 2e avec le 4e, et ainsi de suite.')}</div>
-        <div class="tn-span" data-f="rotation"${show(['rotation'])}>${tournField('Nombre de rondes', tournSeg('tdRounds', [[0,'Auto'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[10,'10']], r.rot_rounds || 0, 'tournDivSum'), 'Auto : autant de rondes que de joueurs moins un jusqu\'à 8 joueurs, sinon 7. Modifiable au moment de créer les rondes.')}</div>
+        <div class="tn-span" data-man="1" data-f="rotation"${show(['rotation'])}>${tournField('Nombre de rondes', tournSeg('tdRounds', [[0,'Auto'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[10,'10']], r.rot_rounds || 0, 'tournDivSum'), 'Auto : autant de rondes que de joueurs moins un jusqu\'à 8 joueurs, sinon 7. Modifiable au moment de créer les rondes.')}</div>
         <div class="tn-span" data-f="round_robin"${show(['round_robin'])}>${tournField('Après la poule', tournSeg('tdRrFinal', [[0,'<b>Rien</b><small>Le classement est final</small>'],[2,'<b>Finale</b><small>Les 2 premiers</small>'],[4,'<b>Demi + finale</b><small>Les 4 premiers</small>']], r.rr_final || 0, 'tournDivOptVis', 'tn-seg-st tn-seg-3'))}</div>
         <div id="tdPlaceWrap" class="tn-span"${tournBronzeAllowed(r) ? '' : ' style="display:none"'}>${tournField('Matchs de classement', tournSeg('tdPlace', [['0','<b>Non</b><small>Une équipe éliminée a fini</small>'],['1','<b>Oui</b><small>Chaque équipe joue jusqu\'à connaître son rang</small>']], r.placement ? '1' : '0', 'tournDivOptVis', 'tn-seg-st tn-seg-2'), 'Exemple avec 8 équipes au tableau : les perdants des quarts jouent pour les places 5 à 8, puis les matchs pour la 5e et la 7e place. Chaque équipe joue 3 matchs de tableau. Le match pour la 3e place est inclus.')}</div>
         <div id="tdBronzeWrap" data-f="pools_ko pools_de double_elim round_robin rotation"${tournBronzeAllowed(r) ? '' : ' style="display:none"'}>${tournField('Match pour la médaille de bronze', tournSeg('tdBronze', [['0','Non'],['1','Oui']], r.bronze_match ? '1' : '0', 'tournDivSum'), 'Les deux perdants des demi-finales jouent pour la 3e place.')}</div>
       </div>
       <details class="tn-adv"><summary><span id="tdFmtSum">${escapeHTML(tournFmtDetail(t, d))}</span><em>Ajuster</em></summary>
       <div class="tn-row2 tn-fmt-opts">
-        <div data-f="pools_ko pools_de pools_only"${show(['pools_ko','pools_de','pools_only'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8']], r.pool_size, 'tournDivSum'), 'Chaque équipe joue toutes les autres de sa poule (round robin). Exemple : 16 équipes en poules de 8 = 2 poules, 7 matchs de poule par équipe.')}</div>
-        <div data-f="pools_ko pools_de"${show(['pools_ko','pools_de'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[99,'Toutes']], r.qualifiers, 'tournDivSum'), 'Nombre de premiers de chaque poule qui passent au tableau. Avec « Toutes », chaque équipe joue le tableau, placée selon son classement de poule.')}</div>
+        <div data-man="1" data-f="pools_ko pools_de pools_only"${show(['pools_ko','pools_de','pools_only'])}>${tournField('Équipes par poule', tournSeg('tdPool', [[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8']], r.pool_size, 'tournDivSum'), 'Chaque équipe joue toutes les autres de sa poule (round robin). Exemple : 16 équipes en poules de 8 = 2 poules, 7 matchs de poule par équipe.')}</div>
+        <div data-man="1" data-f="pools_ko pools_de"${show(['pools_ko','pools_de'])}>${tournField('Qualifiés par poule', tournSeg('tdQual', [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[99,'Toutes']], r.qualifiers, 'tournDivSum'), 'Nombre de premiers de chaque poule qui passent au tableau. Avec « Toutes », chaque équipe joue le tableau, placée selon son classement de poule.')}</div>
         <div data-f="pools_ko pools_de round_robin pools_only rotation"${show(['pools_ko','pools_de','round_robin','pools_only','rotation'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' || r.format === 'rotation' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points, 'tournDivSum'))}</div>
         <div data-f="pools_ko pools_de double_elim round_robin rotation"${show(['pools_ko','pools_de','double_elim','round_robin','rotation'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points, 'tournDivSum'))}</div>
         <div class="tn-span">${tournField('Fin des matchs', tournSeg('tdBy2', [['1','<b>2 points d\'écart</b><small>Plafond : 15 à 11, 18 à 15, 25 à 21</small>'],['0','<b>Score libre</b><small>Le premier au total gagne</small>']], r.win_by2 ? '1' : '0', 'tournDivSum', 'tn-seg-st tn-seg-2'))}</div>
@@ -12510,7 +12594,32 @@ function openTournDivForm(tid, divId){
       <button type="button" class="btn btn-primary" onclick="tournDivSave('${tid}', ${d ? `'${d.id}'` : 'null'})">${d ? 'Enregistrer' : 'Ajouter'}</button>
     </div></div>`;
   setModal({ kind:'content', title: d ? 'Modifier la catégorie' : 'Ajouter une catégorie', htmlContent: html });
+  TD_FORM_N = d ? (TTEAMS || []).filter(function(x){ return x.division_id === d.id && x.status === 'registered'; }).length : 0;
   render();
+  setTimeout(tournDivMinVis, 0);
+}
+// Matchs garantis : cache les réglages que l'app choisit elle-même et explique la structure retenue.
+var TD_FORM_N = 0;
+function tournDivMinVis(){
+  const f = tfVal('tdFormat') || 'pools_ko', M = parseInt(tfVal('tdMin'), 10) || 0, auto = M >= 2 && TOURN_MIN_FMTS.indexOf(f) !== -1;
+  document.querySelectorAll('.tn-form [data-man]').forEach(function(el){
+    const fmts = (el.getAttribute('data-f') || '').split(' ');
+    el.style.display = auto || fmts.indexOf(f) === -1 ? 'none' : '';
+  });
+  const pw = document.getElementById('tdPlaceWrap'); if(pw && auto && f === 'pools_ko') pw.style.display = 'none';
+  const lbl = document.getElementById('tdMinLbl'); if(lbl) lbl.textContent = 'Matchs garantis par ' + (f === 'rotation' ? 'joueur' : 'équipe');
+  const info = document.getElementById('tdMinInfo');
+  if(info){
+    if(!auto){ info.textContent = ''; info.style.display = 'none'; }
+    else {
+      const n = function(id){ return parseInt(tfVal(id), 10) || null; };
+      const r = tournDivRules(null, { id: null, format: f, max_teams: TD_FORM_N || n('tdMax') || 12, min_matches: M, qualifiers: n('tdQual'), rot_group: n('tdRotGroup') || 0,
+        rr_final: (f === 'rotation' ? n('tdRotFinal') : n('tdRrFinal')) || 0, de_mode: tfVal('tdDeMode') || 'full' });
+      if(TD_FORM_N && r.auto) r.auto.guess = false;
+      info.textContent = tournAutoText(r); info.style.display = '';
+    }
+  }
+  tournDivSum();
 }
 function tournFmtHelp(f){
   return { pools_ko:'Les équipes jouent en poules, puis les meilleures passent au tableau final.',
@@ -12524,7 +12633,7 @@ function tournFmtHelp(f){
 function tournDivSum(){
   const el = document.getElementById('tdFmtSum'); if(!el) return;
   const n = function(id){ return parseInt(tfVal(id), 10) || null; };
-  el.textContent = tournFmtDetail(null, { format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: (tfVal('tdFormat') === 'rotation' ? n('tdRotFinal') : n('tdRrFinal')) || 0, rot_rounds: n('tdRounds') || 0, rot_group: n('tdRotGroup') || 0, win_by2: tfVal('tdBy2') !== '0', placement: tfVal('tdPlace') === '1', pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
+  el.textContent = tournFmtDetail(null, { min_matches: parseInt(tfVal('tdMin'), 10) || 0, max_teams: TD_FORM_N || n('tdMax'), format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: (tfVal('tdFormat') === 'rotation' ? n('tdRotFinal') : n('tdRrFinal')) || 0, rot_rounds: n('tdRounds') || 0, rot_group: n('tdRotGroup') || 0, win_by2: tfVal('tdBy2') !== '0', placement: tfVal('tdPlace') === '1', pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
 }
 // Options qui dépendent de la formule et du mode de double élimination.
 function tournDivOptVis(){
@@ -12540,6 +12649,7 @@ function tournDivFmt(f){
   const ml = document.getElementById('tdMaxLbl'); if(ml) ml.textContent = f === 'rotation' ? 'Joueurs max.' : 'Équipes max.';
   const h = document.getElementById('tdFmtHelp'); if(h) h.textContent = tournFmtHelp(f);
   tournDivOptVis();
+  tournDivMinVis();
 }
 async function tournDivSave(tid, divId){
   const name = tfVal('tdName');
@@ -12555,6 +12665,7 @@ async function tournDivSave(tid, divId){
     placement: tfVal('tdPlace') === '1',
     pool_points: parseInt(tfVal('tdPoolPts'), 10) || 11, bracket_points: parseInt(tfVal('tdBrPts'), 10) || 15, final_best_of: parseInt(tfVal('tdFinal'), 10) === 1 ? 1 : 3,
     de_mode: tfVal('tdDeMode') === 'consolation' ? 'consolation' : 'full' };
+  { const M = parseInt(tfVal('tdMin'), 10) || 0; row.min_matches = M >= 2 && TOURN_MIN_FMTS.indexOf(fmt) !== -1 ? M : null; }
   row.placement = row.placement && tournBronzeAllowed(row);
   row.bronze_match = tournBronzeAllowed(row) && !row.placement && tfVal('tdBronze') === '1';
   if(document.getElementById('tdCourts')){ let cs = []; try{ cs = JSON.parse(tfVal('tdCourts') || '[]'); }catch(e){} row.courts = cs.length ? cs : null; }
