@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 559">
+<meta name="app-build" content="Version 560">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5546,7 +5546,8 @@ function firstLossIndex(matches, pid){
 // "a" doit être classé avant "b" selon ce critère seul, 0 si égalité.
 // Moyenne de points par match joué : juste même quand toutes les parties n'ont pas pu être jouées
 // (un joueur qui a joué une partie de moins n'est pas désavantagé). Aucun match joué : classé derrière.
-function avgPtsKey(r){ return (r.played > 0) ? Math.round(r.pf * 1000 / r.played) : -1; }
+// Moyenne arrondie à deux décimales (comme affichée) : une égalité à deux décimales passe aux critères suivants.
+function avgPtsKey(r){ return (r.played > 0) ? Math.round(r.pf * 100 / r.played) : -1; }
 // Le critère « points » (clé gardée pour les ligues existantes) classe à la moyenne par match joué.
 const TIEBREAK_CRITERIA = {
   points: { label: 'Moyenne de points par match joué', cmp: (a,b)=> avgPtsKey(b) - avgPtsKey(a) },
@@ -19399,7 +19400,7 @@ function sessionSummaryHTML(s, withDelete, viewerPlayerId, isOpen){
       const isGuest = isGuestId(r.playerId);
       const isSub = !isGuest && subValues.has(r.playerId);
       const mv = mvs.find(m=>m.playerId===r.playerId && m.fromGroupId===g.id);
-      const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
+      const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(2);
       const played = r.played || 0, scheduled = r.scheduled || 0;
       const incomplete = scheduled > 0 && played < scheduled;
       const delta = s.ratingDeltas ? s.ratingDeltas[r.playerId] : undefined;
@@ -21930,7 +21931,7 @@ function lastSessionResultHTML(pid){
   const gd = (s.groupsData||[]).find(function(x){ return x.groupId === gid; });
   const subValues = new Set((gd && gd.substitutes ? Object.values(gd.substitutes) : []).concat((gd && gd.extras) || []));
   const list = rows.map(function(r, i){
-    const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(1);
+    const avg = (r.avgPts === null || r.avgPts === undefined) ? '—' : r.avgPts.toFixed(2);
     const tag = isGuestId(r.playerId) ? ' <span class="rs-tag">invité</span>' : (subValues.has(r.playerId) ? ' <span class="rs-tag">rempl.</span>' : '');
     return `<div class="pf-row hs-row" style="cursor:default;"><span class="hs-rk">${i+1}</span><span class="t">${escapeHTML(playerName(r.playerId))}${tag}<small>moy. ${avg} · ${r.wins}-${r.losses} · ${r.pf} pts</small></span></div>`;
   }).join('');
