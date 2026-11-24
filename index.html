@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 551">
+<meta name="app-build" content="Version 552">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -6891,7 +6891,7 @@ function extraRowsHTML(open, g, startIdx, rec){
     return `<div class="pf-row"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
       <span class="sd-handle" data-enc="${x}" data-fg="${g.id}" data-fx="1" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
       <span style="width:18px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${startIdx + k + 1}</span>
-      <span class="t">${escapeHTML(playerName(x))}<small>En plus pour cette session · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
+      <span class="t">${escapeHTML(playerName(x))}</span><span class="pf-chip on">Remplaçant</span>
     </div>`;
   }).join('');
 }
@@ -16930,12 +16930,12 @@ function adminGroupsHTML(){
             return `<div class="pf-row sub-slot" data-g="${g.id}" data-a="${p.id}"${openFn ? ` onclick="${openFn}"` : ' style="cursor:default;"'}>
               <span class="sd-handle" data-enc="${subId}" data-fg="${g.id}" data-fa="${p.id}" onpointerdown="subDragStart(event)" onclick="event.stopPropagation()" aria-label="Déplacer ou retirer">⋮⋮</span>
               ${rec ? '' : `<span style="width:18px;color:var(--muted);font-family:var(--font-display);font-size:16px;text-align:center;">${ps.length + ai + 1}</span>`}
-              <span class="t">${escapeHTML(playerName(subId))}<small>remplace ${escapeHTML(p.name)} · glisse vers la bande du haut pour le retirer</small></span><span class="pf-chip on">Remplaçant</span>
+              <span class="t">${escapeHTML(playerName(subId))}</span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
           return `<div class="pf-row sub-slot empty ab-row" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
             <span class="ab-dot" aria-hidden="true"></span>
-            <span class="t">${escapeHTML(p.name)}<small>Place libre${(DATA.substitutePool||[]).length ? ' · glisse un remplaçant ici' : ''}</small></span><span class="ab-tag">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>
+            <span class="t">${escapeHTML(p.name)}</span><span class="ab-tag">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>
           </div>`;
         }).join('')}
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
