@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 560">
+<meta name="app-build" content="Version 561">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -16940,10 +16940,8 @@ function adminGroupsHTML(){
               <span class="t">${escapeHTML(playerName(subId))}</span><span class="pf-chip on">Remplaçant</span>
             </div>`;
           }
-          return `<div class="pf-row sub-slot empty ab-row" data-g="${g.id}" data-a="${p.id}" onclick="openPlayerDetailModal('${p.id}')">
-            <span class="ab-dot" aria-hidden="true"></span>
-            <span class="t">${escapeHTML(p.name)}</span><span class="ab-tag">${p.injured ? gw(p,'Blessé','Blessée','Blessé(e)') : gw(p,'Absent','Absente','Absent(e)')}</span>
-          </div>`;
+          // Absent sans remplaçant : sa place est libre, le joueur n'apparaît plus dans le groupe (il reste dans la bande des absents).
+          return '';
         }).join('')}
         ${displayCount===0 ? `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucun joueur sur ce ${grpWord()}</span></div>`:''}
       </div>
@@ -17045,7 +17043,7 @@ function subDockHTML(open){
   return `<div class="card sd-dock${SUB_PICK ? ' picking' : ''}" id="subDock">
     <div class="sd-cols">
       <div class="sd-col">
-        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em><button type="button" class="sd-q" aria-label="Comment placer un remplaçant" onclick="showAlert('Touche un remplaçant puis l’absent dans son groupe, ou glisse-le sur l’absent. Pour le retirer, glisse-le de son groupe vers cette bande.')">?</button></div>
+        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em><button type="button" class="sd-q" aria-label="Comment placer un remplaçant" onclick="showAlert('Touche un remplaçant puis un groupe, ou glisse-le sur le groupe : il prend la place libérée par l’absent. Pour le retirer, glisse-le de son groupe vers cette bande.')">?</button></div>
         ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">${all.length ? "Aucun n'a encore indiqué sa disponibilité." : 'Tous déjà placés.'}</p>`}
       </div>
       <div class="sd-col">
@@ -17053,7 +17051,7 @@ function subDockHTML(open){
         ${absList.length ? `<div class="sd-abs-list">${absList.map(absChip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Aucune absence.</p>`}
       </div>
     </div>
-    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Touche un remplaçant puis l’absent dans son ' + grpWord() + ', ou maintiens-le et glisse-le dessus. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant le ' + grpWord() + ' où le placer.' : 'Touche un remplaçant puis un ' + grpWord() + ', ou maintiens-le et glisse-le sur le ' + grpWord() + '. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
   </div>`;
 }
 // Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
