@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 562">
+<meta name="app-build" content="Version 563">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9527,7 +9527,7 @@ function tournDivRules(t, d){
   return tournApplyMin(t, d, { format: fmt, pool_size: d.pool_size || 4, qualifiers: fmt === 'round_robin' ? (rrf || 2) : fmt === 'rotation' && rrf ? (rrf === 99 ? 99 : rrf === 4 ? 8 : 4) : (d.qualifiers || 2), rr_final: fmt === 'round_robin' || fmt === 'rotation' ? rrf : 0, rot_rounds: d.rot_rounds || 0, rot_group: d.rot_group || 0,
     win_by2: d.win_by2 !== false, placement: !!d.placement,
     pool_points: d.pool_points || (t && t.pool_points) || 11, bracket_points: d.bracket_points || (t && t.bracket_points) || 15,
-    final_best_of: d.final_best_of || (t && t.final_best_of) || 3,
+    final_best_of: d.final_best_of || (t && t.final_best_of) || 3, final_points: [9, 11, 15].indexOf(d.final_points) !== -1 ? d.final_points : 11,
     de_mode: d.de_mode === 'consolation' ? 'consolation' : 'full', bronze_match: !!d.bronze_match });
 }
 // ---- Matchs garantis : l'app choisit la structure (poules, qualifiés, classement, rondes) selon le nombre d'équipes ----
@@ -9639,7 +9639,7 @@ function tournFmtDetail(t, d){ const r = tournDivRules(t, d); return (r.min_matc
 // Matchs de classement : les équipes éliminées du tableau simple continuent à jouer jusqu'à connaître leur rang.
 function tournPlaceOn(r){ return !!(r && r.placement && tournBronzeAllowed(r)); }
 function tournFmtDetail0(t, d){
-  const r = tournDivRules(t, d), fin = r.final_best_of === 1 ? 'finale en 1 match' : 'finale 2 de 3';
+  const r = tournDivRules(t, d), fin = r.final_best_of === 1 ? 'finale en 1 match' : 'finale 2 de 3 à ' + r.final_points;
   const extra = (tournBronzeAllowed(r) && r.bronze_match ? ' · match pour le bronze' : '');
   const de = r.de_mode === 'consolation' ? 'tableau simple + consolante' : 'double élimination complète';
   if(r.format === 'round_robin') return 'Matchs à ' + r.pool_points + (r.rr_final === 2 ? ' · puis finale entre les 2 premiers à ' + r.bracket_points + ' · ' + fin : r.rr_final === 4 ? ' · puis demi-finales et finale (4 premiers) à ' + r.bracket_points + ' · ' + fin + extra : '');
@@ -10400,7 +10400,7 @@ function tournSettings(t){
 function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter(Boolean); }
 // Durée estimée d'un match selon ses points (minutes).
 // Durée prévue d'un match selon ses points : 11 pts = 15 min, 15 pts = 20 min, 21 pts = 30 min.
-function tournPtsMinutes(p){ return p >= 21 ? 30 : p >= 15 ? 20 : 15; }
+function tournPtsMinutes(p){ return p >= 21 ? 30 : p >= 15 ? 20 : p >= 11 ? 15 : 12; }
 // Finale 2 de 3 : environ deux manches et demie.
 function tournBo3Minutes(p){ return Math.round(tournPtsMinutes(p) * 2.5 / 5) * 5; }
 // Ajustement en temps réel : durée moyenne des matchs déjà joués aujourd'hui (en un match), par nombre de points.
@@ -10418,7 +10418,7 @@ function tournRealDurations(t){
     if(!(mins >= 4 && mins <= 90)) return; // score entré en retard ou par erreur
     const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; }); if(!d) return;
     const r = tournDivRules(t, d), p = m.phase === 'pool' ? r.pool_points : r.bracket_points;
-    const k = p >= 21 ? 21 : p >= 15 ? 15 : 11;
+    const k = p >= 21 ? 21 : p >= 15 ? 15 : p >= 11 ? 11 : 9;
     const b = by[k] = by[k] || { n: 0, sum: 0 };
     b.n++; b.sum += mins;
   });
@@ -10426,14 +10426,14 @@ function tournRealDurations(t){
   return by;
 }
 function tournLiveMinutes(t, p){
-  const k = p >= 21 ? 21 : p >= 15 ? 15 : 11, base = tournPtsMinutes(k), b = tournRealDurations(t)[k];
+  const k = p >= 21 ? 21 : p >= 15 ? 15 : p >= 11 ? 11 : 9, base = tournPtsMinutes(k), b = tournRealDurations(t)[k];
   if(!b || !b.n) return base;
   return Math.round((base * 3 + b.sum) / (3 + b.n));
 }
 function tournMatchMinutes(t, m){
   const d = (TDIVS || []).find(function(x){ return x.id === m.division_id; });
   const r = tournDivRules(t, d), pts = m.phase === 'pool' ? r.pool_points : r.bracket_points;
-  if(m.phase !== 'pool' && r.final_best_of === 3 && tournIsFinal(m)) return Math.round(tournLiveMinutes(t, pts) * 2.5 / 5) * 5;
+  if(m.phase !== 'pool' && r.final_best_of === 3 && tournIsFinal(m)) return Math.round(tournLiveMinutes(t, r.final_points) * 2.5 / 5) * 5;
   return tournLiveMinutes(t, pts);
 }
 function tournLiveMatches(t){
@@ -10657,7 +10657,7 @@ function tournSimEnds(t, rows){
     const r = tournDivRules(t, x.d), jobs = [];
     for(let i = 0; i < x.plan.pool; i++) jobs.push(tournLiveMinutes(t, r.pool_points) * 1.15);
     for(let i = 0; i < x.plan.bracket; i++) jobs.push(tournLiveMinutes(t, r.bracket_points) * 1.15);
-    if(r.final_best_of === 3 && x.plan.bracket) jobs[jobs.length - 1] += tournLiveMinutes(t, r.bracket_points) * 1.5 * 1.15;
+    if(r.final_best_of === 3 && x.plan.bracket) jobs[jobs.length - 1] += (tournLiveMinutes(t, r.final_points) * 2.5 - tournLiveMinutes(t, r.bracket_points)) * 1.15;
     const list = Array.isArray(x.d.courts) ? x.d.courts.filter(function(c){ return courts.indexOf(c) !== -1; }) : [];
     return { d: x.d, jobs: jobs, list: list };
   });
@@ -10878,7 +10878,7 @@ async function tournQueueMove(tid, id, dir){
 }
 // Durées réelles du jour, affichées sous la file pour expliquer les heures estimées.
 function tournDurHint(t){
-  const by = tournRealDurations(t), ks = [11, 15, 21].filter(function(k){ return by[k] && by[k].n; });
+  const by = tournRealDurations(t), ks = [9, 11, 15, 21].filter(function(k){ return by[k] && by[k].n; });
   if(!ks.length) return '<p class="small tn-q-hint">Heures estimées avec 15 min par match à 11, 20 min à 15, 30 min à 21. Elles s\'ajustent dès que des matchs sont joués.</p>';
   return '<p class="small tn-q-hint">Heures ajustées au rythme du jour : ' + ks.map(function(k){ return 'match à ' + k + ' ≈ ' + tournLiveMinutes(t, k) + ' min'; }).join(', ') + ' (' + ks.reduce(function(n, k){ return n + by[k].n; }, 0) + ' matchs joués).</p>';
 }
@@ -10932,10 +10932,10 @@ function tournUncall(id){
 }
 function tournScorePts(m){
   const t = tournById(m.tournament_id), r = tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; }));
-  return m.phase === 'pool' ? r.pool_points : (tournIsFinal(m) && r.final_best_of === 3 ? 11 : r.bracket_points);
+  return m.phase === 'pool' ? r.pool_points : (tournIsFinal(m) && r.final_best_of === 3 ? r.final_points : r.bracket_points);
 }
-// Plafond de la règle des 2 points d'écart : à 11 on peut aller jusqu'à 15, à 15 jusqu'à 18, à 21 jusqu'à 25.
-function tournCap(p){ return p >= 21 ? 25 : p >= 15 ? 18 : 15; }
+// Plafond de la règle des 2 points d'écart : à 9 on peut aller jusqu'à 11, à 11 jusqu'à 15, à 15 jusqu'à 18, à 21 jusqu'à 25.
+function tournCap(p){ return p >= 21 ? 25 : p >= 15 ? 18 : p >= 11 ? 15 : 11; }
 function tournScoreRuleTxt(r, p){ return r.win_by2 ? '2 points d\'écart (maximum ' + tournCap(p) + ')' : 'score libre'; }
 // Score valide pour un match (ou une manche) à p points : '' si correct, sinon l'explication.
 function tournScoreCheck(r, x, y, p){
@@ -10963,7 +10963,7 @@ function openTournScore(id){
     grid = `<div class="tn-sc">${[m.team_a, m.team_b].map(function(tid, k){ return `<div class="tn-sc-r"><span>${escapeHTML(tournTeamFull(tid))}</span>${inp(k ? 'tsc_b' : 'tsc_a', k ? m.score_b : m.score_a, 'Points de ' + tournTeamFull(tid))}</div>`; }).join('')}</div>`;
   }
   const html = `<div class="tn-form">
-    <p class="small" style="color:var(--muted);margin:0 0 10px;">${escapeHTML(tournDivLabel(m))}${m.court ? ' · ' + escapeHTML(m.court) : ''} · ${bo3 ? '2 manches gagnantes à 11' : 'match à ' + pts} · ${escapeHTML(tournScoreRuleTxt(tournDivRules(tournById(m.tournament_id), (TDIVS || []).find(function(x){ return x.id === m.division_id; })), bo3 ? 11 : pts))}</p>
+    <p class="small" style="color:var(--muted);margin:0 0 10px;">${escapeHTML(tournDivLabel(m))}${m.court ? ' · ' + escapeHTML(m.court) : ''} · ${bo3 ? '2 manches gagnantes à ' + pts : 'match à ' + pts} · ${escapeHTML(tournScoreRuleTxt(tournDivRules(tournById(m.tournament_id), (TDIVS || []).find(function(x){ return x.id === m.division_id; })), pts))}</p>
     ${grid}
     <div class="tn-form-acts">
       <button type="button" class="btn btn-secondary" onclick="tournForfeit('${m.id}')">Forfait…</button>
@@ -11001,7 +11001,7 @@ async function tournScoreSave(id){
       const x = parseInt(tfVal('tsg_0' + g), 10), y = parseInt(tfVal('tsg_1' + g), 10);
       if(isNaN(x) && isNaN(y)) continue;
       if(isNaN(x) || isNaN(y) || x === y){ showToast('Manche ' + (g + 1) + ' : entre deux scores différents', true); return; }
-      const bad = tournScoreCheck(rr, x, y, 11); if(bad){ showAlert('Manche ' + (g + 1) + ' : ' + bad); return; }
+      const bad = tournScoreCheck(rr, x, y, tournScorePts(m)); if(bad){ showAlert('Manche ' + (g + 1) + ' : ' + bad); return; }
       games.push([x, y]); if(x > y) wa++; else wb++;
     }
     if(Math.max(wa, wb) < 2){ showToast('Il faut 2 manches gagnées pour terminer la finale', true); return; }
@@ -11875,8 +11875,8 @@ function tournTestFill(id){
     const g = [aWins, three ? !aWins : aWins, aWins];
     for(let i = 0; i < 3; i++){
       if(i === 2 && !three){ set('tsg_0' + i, ''); set('tsg_1' + i, ''); continue; }
-      const w = g[i], l = lose(11);
-      set('tsg_0' + i, w ? 11 : l); set('tsg_1' + i, w ? l : 11);
+      const fp = tournScorePts(m), w = g[i], l = lose(fp);
+      set('tsg_0' + i, w ? fp : l); set('tsg_1' + i, w ? l : fp);
     }
   } else {
     const pts = tournScorePts(m), l = lose(pts);
@@ -12352,7 +12352,7 @@ function tournPlanFor(t, d, n){
 }
 function tournMinutesFor(t, d, plan){
   const r = tournDivRules(t, d), mn = function(p){ return tournLiveMinutes(t, p); };
-  return plan.pool * mn(r.pool_points) + plan.bracket * mn(r.bracket_points) + (r.final_best_of === 3 && plan.bracket ? Math.round(mn(r.bracket_points) * 1.5) : 0);
+  return plan.pool * mn(r.pool_points) + plan.bracket * mn(r.bracket_points) + (r.final_best_of === 3 && plan.bracket ? Math.round(mn(r.final_points) * 2.5 - mn(r.bracket_points)) : 0);
 }
 function tournFmtMin(m){ const h = Math.floor(m / 60), x = Math.round(m % 60); return (h ? h + ' h ' : '') + (h ? String(x).padStart(2, '0') : x + ' min'); }
 function tournParseTime(v){ const m = /^(\d{1,2}):(\d{2})/.exec(v || ''); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null; }
@@ -12408,7 +12408,7 @@ function openTournDayInfo(tid){
     ${tournPeriodEstimateHTML(t, est)}
     ${rows ? `<table class="dk-tbl tn-info-tbl"><thead><tr><th>Catégorie</th><th class="num">Matchs</th><th class="num">Fin</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     <div class="tn-info-k">Terrains</div><p class="small">${est.courts ? escapeHTML(tournCourts(t).join(', ')) : 'Aucun'}</p>
-    <p class="small" style="color:var(--muted);">Durées de base : 15 min pour un match à 11, 20 min à 15, 30 min à 21 (finale 2 de 3 : 2,5 fois plus). Le jour du tournoi, elles s'ajustent à la durée réelle des matchs joués.</p>
+    <p class="small" style="color:var(--muted);">Durées de base : 12 min pour un match à 9, 15 min à 11, 20 min à 15, 30 min à 21 (finale 2 de 3 : 2,5 fois la durée d'une manche). Le jour du tournoi, elles s'ajustent à la durée réelle des matchs joués.</p>
     ${tournRole(tid) !== 'scorer' ? `<div class="tn-form-acts"><span style="flex:1"></span><button type="button" class="btn btn-primary" onclick="closeModal();openTournForm('${tid}')">Modifier lieu, heures et terrains</button></div>` : ''}
   </div>`;
   showPanelModal('Lieu et horaire', html);
@@ -12655,7 +12655,8 @@ function openTournDivForm(tid, divId){
         <div data-f="pools_ko pools_de round_robin pools_only rotation"${show(['pools_ko','pools_de','round_robin','pools_only','rotation'])}>${tournField(`<span id="tdPoolLbl">${r.format === 'round_robin' || r.format === 'rotation' ? 'Points des matchs' : 'Points des poules'}</span>`, tournSeg('tdPoolPts', [[11,'11'],[15,'15'],[21,'21']], r.pool_points, 'tournDivSum'))}</div>
         <div data-f="pools_ko pools_de double_elim round_robin rotation"${show(['pools_ko','pools_de','double_elim','round_robin','rotation'])}>${tournField('Points du tableau', tournSeg('tdBrPts', [[11,'11'],[15,'15'],[21,'21']], r.bracket_points, 'tournDivSum'))}</div>
         <div class="tn-span">${tournField('Fin des matchs', tournSeg('tdBy2', [['1','<b>2 points d\'écart</b><small>Plafond : 15 à 11, 18 à 15, 25 à 21</small>'],['0','<b>Score libre</b><small>Le premier au total gagne</small>']], r.win_by2 ? '1' : '0', 'tournDivSum', 'tn-seg-st tn-seg-2'))}</div>
-        <div data-f="pools_ko pools_de double_elim round_robin rotation"${show(['pools_ko','pools_de','double_elim','round_robin','rotation'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of, 'tournDivSum'))}</div>
+        <div data-f="pools_ko pools_de double_elim round_robin rotation"${show(['pools_ko','pools_de','double_elim','round_robin','rotation'])}>${tournField('Finale', tournSeg('tdFinal', [[1,'1 match'],[3,'2 de 3']], r.final_best_of, 'tournFinalVis'))}</div>
+        <div id="tdFinalPtsWrap" data-f="pools_ko pools_de double_elim round_robin rotation"${r.final_best_of === 3 ? show(['pools_ko','pools_de','double_elim','round_robin','rotation']) : ' style="display:none"'}>${tournField('Manches de la finale', tournSeg('tdFinalPts', [[9,'9'],[11,'11'],[15,'15']], r.final_points, 'tournDivSum'))}</div>
       </div>
       </details>
     </div>
@@ -12716,7 +12717,7 @@ function tournFmtHelp(f){
 function tournDivSum(){
   const el = document.getElementById('tdFmtSum'); if(!el) return;
   const n = function(id){ return parseInt(tfVal(id), 10) || null; };
-  el.textContent = tournFmtDetail(null, { min_matches: parseInt(tfVal('tdMin'), 10) || 0, max_teams: TD_FORM_N || n('tdMax'), format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: (tfVal('tdFormat') === 'rotation' ? n('tdRotFinal') : n('tdRrFinal')) || 0, rot_rounds: n('tdRounds') || 0, rot_group: n('tdRotGroup') || 0, win_by2: tfVal('tdBy2') !== '0', placement: tfVal('tdPlace') === '1', pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
+  el.textContent = tournFmtDetail(null, { min_matches: parseInt(tfVal('tdMin'), 10) || 0, max_teams: TD_FORM_N || n('tdMax'), format: tfVal('tdFormat') || 'pools_ko', pool_size: n('tdPool'), qualifiers: n('tdQual'), rr_final: (tfVal('tdFormat') === 'rotation' ? n('tdRotFinal') : n('tdRrFinal')) || 0, rot_rounds: n('tdRounds') || 0, rot_group: n('tdRotGroup') || 0, win_by2: tfVal('tdBy2') !== '0', placement: tfVal('tdPlace') === '1', pool_points: n('tdPoolPts'), bracket_points: n('tdBrPts'), final_best_of: n('tdFinal'), final_points: n('tdFinalPts'), de_mode: tfVal('tdDeMode') || 'full', bronze_match: tfVal('tdBronze') === '1' });
 }
 // Options qui dépendent de la formule et du mode de double élimination.
 function tournDivOptVis(){
@@ -12726,6 +12727,11 @@ function tournDivOptVis(){
   if(w) w.style.display = ok && tfVal('tdPlace') !== '1' ? '' : 'none';
   tournDivSum();
 }
+function tournFinalVis(){
+  const w = document.getElementById('tdFinalPtsWrap'), f = tfVal('tdFormat') || 'pools_ko';
+  if(w) w.style.display = tfVal('tdFinal') === '3' && (w.getAttribute('data-f') || '').split(' ').indexOf(f) !== -1 ? '' : 'none';
+  tournDivSum();
+}
 function tournDivFmt(f){
   document.querySelectorAll('.tn-form [data-f]').forEach(function(el){ el.style.display = (' ' + el.getAttribute('data-f') + ' ').indexOf(' ' + f + ' ') !== -1 ? '' : 'none'; });
   const l = document.getElementById('tdPoolLbl'); if(l) l.textContent = f === 'round_robin' || f === 'rotation' ? 'Points des matchs' : 'Points des poules';
@@ -12733,6 +12739,7 @@ function tournDivFmt(f){
   const h = document.getElementById('tdFmtHelp'); if(h) h.textContent = tournFmtHelp(f);
   tournDivOptVis();
   tournDivMinVis();
+  tournFinalVis();
 }
 async function tournDivSave(tid, divId){
   const name = tfVal('tdName');
@@ -12746,7 +12753,7 @@ async function tournDivSave(tid, divId){
     rot_group: fmt === 'rotation' && [8, 12, 16, 20].indexOf(parseInt(tfVal('tdRotGroup'), 10)) !== -1 ? parseInt(tfVal('tdRotGroup'), 10) : 0,
     win_by2: tfVal('tdBy2') !== '0',
     placement: tfVal('tdPlace') === '1',
-    pool_points: parseInt(tfVal('tdPoolPts'), 10) || 11, bracket_points: parseInt(tfVal('tdBrPts'), 10) || 15, final_best_of: parseInt(tfVal('tdFinal'), 10) === 1 ? 1 : 3,
+    pool_points: parseInt(tfVal('tdPoolPts'), 10) || 11, bracket_points: parseInt(tfVal('tdBrPts'), 10) || 15, final_best_of: parseInt(tfVal('tdFinal'), 10) === 1 ? 1 : 3, final_points: [9, 11, 15].indexOf(parseInt(tfVal('tdFinalPts'), 10)) !== -1 ? parseInt(tfVal('tdFinalPts'), 10) : 11,
     de_mode: tfVal('tdDeMode') === 'consolation' ? 'consolation' : 'full' };
   { const M = parseInt(tfVal('tdMin'), 10) || 0; row.min_matches = M >= 2 && TOURN_MIN_FMTS.indexOf(fmt) !== -1 ? M : null; }
   row.placement = row.placement && tournBronzeAllowed(row);
