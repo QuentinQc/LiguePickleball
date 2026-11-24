@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 552">
+<meta name="app-build" content="Version 553">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1776,15 +1776,21 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .sd-h em{font-style:normal;font-size:13px;font-weight:800;color:var(--ball);}
 .sd-h em.o{color:#FF9F0A;}
 .sd-col .sd-list{flex-direction:column;align-items:stretch;overflow:visible;padding:8px 0 0;margin:0;}
-.sd-col .sd-chip{width:100%;padding:5px 10px 5px 5px;font-size:13px;}
+.sd-col .sd-chip{width:100%;padding:6px 10px 6px 6px;font-size:13px;border-radius:12px;min-height:48px;text-align:left;background:rgba(207,234,92,.05);}
 .sd-col .sd-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sd-col .sd-av{width:26px;height:26px;font-size:10px;}
 .sd-abs-list{display:flex;flex-direction:column;gap:6px;padding-top:8px;}
+.sd-col .sd-list{gap:6px;}
 .sd-col .sd-list,.sd-abs-list{max-height:168px;overflow-y:auto;}
-.sd-abs{font-style:normal !important;display:flex;flex-direction:column;padding:6px 10px;border-radius:14px;border:1px solid rgba(255,159,10,.25);background:rgba(255,159,10,.06);min-width:0;}
+.sd-abs{font-style:normal !important;display:flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:12px;min-height:48px;border:1px solid rgba(255,159,10,.35);background:rgba(255,159,10,.06);min-width:0;}
+.sd-t{display:flex !important;flex-direction:column;min-width:0;line-height:1.25;white-space:normal !important;}
+.sd-t b{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-t small{font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-av-ab{width:26px;height:26px;font-size:10px;background:linear-gradient(135deg,#FF9F0A,#E96A3C) !important;}
+.sd-chip.pick .sd-t small{color:var(--court);}
 .sd-abs.free{border:1px dashed rgba(255,159,10,.7);}
 .sd-abs:not(.free){opacity:.6;}
-.sd-abs-n{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-abs-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sd-abs small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sd-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .sd-top b{font-size:16px;}
@@ -2001,9 +2007,8 @@ body.desk .rp-grid > .card{margin:0;}
 .sb-more{width:44px;height:44px;border-radius:12px;border:1px solid var(--line-soft-strong);background:transparent;color:var(--text);font-size:20px;cursor:pointer;}
 body.desk .lg-ov #sessSubtabs{position:sticky;top:0;z-index:6;background:var(--court);margin:0 0 10px !important;padding:6px 0;}
 body.desk .lg-ov .lg-sheet .sd-dock{top:58px;padding:10px 12px;}
-body.desk .sd-cols{grid-template-columns:3fr minmax(220px,1fr);}
-body.desk .sd-col .sd-list{flex-direction:row;flex-wrap:wrap;gap:6px;max-height:84px;}
-body.desk .sd-col .sd-chip{width:auto;}
+body.desk .sd-cols{grid-template-columns:1fr 1fr;}
+body.desk .sd-col .sd-list,body.desk .sd-abs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;max-height:110px;align-content:start;}
 body.desk .sd-abs-list{max-height:84px;}
 body.desk .sd-dock:not(.picking) .sd-foot > .ah-meta{display:none;}
 .sd-q{display:none;}
@@ -17019,7 +17024,7 @@ function subDockHTML(open){
   const placed = (DATA.substitutePool||[]).filter(function(sp){ return used.has('sub::' + sp.id); }).length;
   const chip = function(sp){
     const d = (open.availableSubs||[]).indexOf(sp.id) !== -1;
-    return `<button type="button" class="sd-chip${d ? ' dispo' : ''}${SUB_PICK === 'sub::' + sp.id ? ' pick' : ''}" data-enc="sub::${sp.id}" onpointerdown="subDragStart(event)" onclick="subPick('sub::${sp.id}')">${avatarHTML('sd-av', partnerInitials(sp.name), null)}<span>${escapeHTML(sp.name)}</span>${d ? '' : '<small>non indiqué</small>'}</button>`;
+    return `<button type="button" class="sd-chip${d ? ' dispo' : ''}${SUB_PICK === 'sub::' + sp.id ? ' pick' : ''}" data-enc="sub::${sp.id}" onpointerdown="subDragStart(event)" onclick="subPick('sub::${sp.id}')">${avatarHTML('sd-av', partnerInitials(sp.name), null)}<span class="sd-t"><b>${escapeHTML(sp.name)}</b><small>${d ? 'Disponible' : 'Pas indiqué'}</small></span></button>`;
   };
   // Absents de la session (à droite) : ceux sans remplaçant d'abord ; on peut y déposer un remplaçant.
   const absList = [];
@@ -17033,7 +17038,7 @@ function subDockHTML(open){
   absList.sort(function(a,b){ return (!!a.by) - (!!b.by); });
   const absChip = function(x){
     const free = !x.by;
-    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-abs-n">${escapeHTML(x.p.name)}</span><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : 'remplacé(e) par ' + escapeHTML(String(playerName(x.by)).split(' ')[0]))}</small></div>`;
+    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-av sd-av-ab">${escapeHTML(partnerInitials(x.p.name))}</span><span class="sd-t"><b class="sd-abs-n">${escapeHTML(x.p.name)}</b><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : 'remplacé(e) par ' + escapeHTML(String(playerName(x.by)).split(' ')[0]))}</small></span></div>`;
   };
   return `<div class="card sd-dock${SUB_PICK ? ' picking' : ''}" id="subDock">
     <div class="sd-cols">
