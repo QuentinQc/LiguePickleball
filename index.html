@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 550">
+<meta name="app-build" content="Version 551">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5625,6 +5625,9 @@ function groupById(id){ return DATA.groups.find(g=>g.id===id); }
 // dernière session jouée (pour aider à ajuster les positions actuelles).
 function previousSessionInfoForPlayer(pid){
   const closed = DATA.sessions.filter(s=>s.status==='closed').slice().reverse();
+  // Absent à la toute dernière session : on le dit, plutôt que de remonter à la précédente où il a joué.
+  const last = closed[0];
+  if(last && (last.absences || []).indexOf(pid) !== -1) return { absent: true, date: last.date };
   for(const s of closed){
     if(!s.standingsByGroup) continue;
     for(const gid in s.standingsByGroup){
@@ -16903,7 +16906,7 @@ function adminGroupsHTML(){
       <div class="pf-list" style="margin-top:10px;">
         ${ps.map((p,i)=>{
           const prev = previousSessionInfoForPlayer(p.id);
-          const prevText = prev ? `Dernière session : ${escapeHTML(prev.groupName)}, ${prev.position}${prev.position===1?'er':'e'} sur ${prev.total}` : '';
+          const prevText = !prev ? '' : prev.absent ? `Dernière session : ${gw(p, 'absent', 'absente', 'absent(e)')}` : `Dernière session : ${escapeHTML(prev.groupName)}, ${prev.position}${prev.position===1?'er':'e'} sur ${prev.total}`;
           return `<div class="pf-row"
           ondragover="onRowDragOver(event)"
           ondragleave="onRowDragLeave(event)"
