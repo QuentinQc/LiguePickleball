@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 542">
+<meta name="app-build" content="Version 543">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1824,6 +1824,8 @@ body.desk .dk-brand .pbi{width:30px;height:30px;}
 body.desk .dk-sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:14px 10px 4px;}
 body.desk .dk-it{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:9px 10px;color:var(--text);font:500 14px var(--font-body);cursor:pointer;}
 body.desk .dk-it:hover{background:rgba(255,255,255,.06);}
+body.desk .dk-it.dk-add{color:var(--ball);font-weight:600;margin-top:2px;}
+body.desk .dk-add-ico{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;border:1px dashed currentColor;font-size:13px;line-height:1;}
 body.desk .dk-it.on{background:var(--ball);color:var(--court);font-weight:700;}
 body.desk .dk-it .dk-n{margin-left:auto;font-size:12px;font-weight:700;border-radius:999px;padding:0 8px;background:var(--paddle);color:#0A2420;}
 body.desk .dk-it.on .dk-n{background:#0A2420;color:var(--ball);}
@@ -12957,6 +12959,7 @@ function deskSideHTML(){
     h += it(on, l.name, `dkLeague('${l.id}')`, 0, 'ball');
     if(on) h += `<div class="dk-sub">${secs.map(function(x){ return it((VIEW.tab || 'session') === x[0], x[1], `dkTab('${x[0]}')`); }).join('')}</div>`;
   });
+  if(!isOrganizerOnly()) h += `<button type="button" class="dk-it dk-add" onclick="onCreateLeague()"><span class="dk-add-ico" aria-hidden="true">+</span><span>Nouvelle ligue</span></button>`;
   h += `</div>`;
   const th = tournSideHTML(it, ms);
   if(th) h += sec('tn', 'gamification', 'Tournois') + th + `</div>`;
