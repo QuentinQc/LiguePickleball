@@ -17870,14 +17870,13 @@ function refreshMatchHead(gid, mi, m){
   el.textContent = 'Match ' + (mi+1) + (edit && !done ? ' · à saisir' : '') + (el.getAttribute('data-sit')||'');
 }
 // ---- Score qui ne correspond pas au format du groupe (ex. groupe de 5 en 9 points, saisi 8-5) ----
-// Valide : le gagnant a exactement les points du match (9-5), ou une prolongation à 2 points d'écart (11-9 dans un match à 9).
+// Valide : le gagnant a exactement les points du match (9-5 dans un match à 9), sans prolongation.
 function ladderScoreIssue(open, gid, a, b){
   if(a == null || b == null || a === '' || b === '' || isRecLeague() || !open) return null;
   a = Number(a); b = Number(b);
   const n = activeRosterForGroup(open, gid).length, t = targetPointsFor(n);
   const hi = Math.max(a, b), lo = Math.min(a, b);
   if(hi === t && lo < t) return null;
-  if(hi > t && hi - lo === 2 && lo >= t - 1) return null;
   return { n: n, t: t, a: a, b: b };
 }
 function ladderScoreWarn(iss, keepLabel, onKeep, onFix){
