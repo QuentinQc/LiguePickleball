@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 558">
+<meta name="app-build" content="Version 559">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1788,7 +1788,7 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .sd-t small{font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sd-av-ab{width:26px;height:26px;font-size:10px;background:linear-gradient(135deg,#FF9F0A,#E96A3C) !important;}
 .sd-chip.pick .sd-t small{color:var(--court);}
-.sd-abs.free{border:1px dashed rgba(255,159,10,.7);}
+.sd-abs.free{border:1px solid rgba(255,159,10,.35);}
 .sd-abs:not(.free){opacity:1;}
 .sd-abs.empty{color:var(--text);font-style:normal;font-size:inherit;padding:6px 10px 6px 6px;}
 .sd-abs-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -17036,15 +17036,15 @@ function subDockHTML(open){
       absList.push({ p: p, g: g, by: by });
     });
   });
-  absList.sort(function(a,b){ return (!!a.by) - (!!b.by); });
+  // Simple liste des absents, dans l'ordre des groupes : le remplacement se gère dans les groupes.
   const absChip = function(x){
     const free = !x.by;
-    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-av sd-av-ab">${escapeHTML(partnerInitials(x.p.name))}</span><span class="sd-t"><b class="sd-abs-n">${escapeHTML(x.p.name)}</b><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : gw(x.p, 'remplacé', 'remplacée', 'remplacé(e)'))}</small></span></div>`;
+    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-av sd-av-ab">${escapeHTML(partnerInitials(x.p.name))}</span><span class="sd-t"><b class="sd-abs-n">${escapeHTML(x.p.name)}</b><small>${escapeHTML(x.g.name)}</small></span></div>`;
   };
   return `<div class="card sd-dock${SUB_PICK ? ' picking' : ''}" id="subDock">
     <div class="sd-cols">
       <div class="sd-col">
-        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em><button type="button" class="sd-q" aria-label="Comment placer un remplaçant" onclick="showAlert('Touche un remplaçant puis un absent, ou glisse-le sur l’absent. Pour le retirer, glisse-le de son groupe vers cette bande.')">?</button></div>
+        <div class="sd-h"><span class="rp-pill">Remplaçants</span><em>${dispo.length}</em><button type="button" class="sd-q" aria-label="Comment placer un remplaçant" onclick="showAlert('Touche un remplaçant puis l’absent dans son groupe, ou glisse-le sur l’absent. Pour le retirer, glisse-le de son groupe vers cette bande.')">?</button></div>
         ${shown.length ? `<div class="sd-list">${shown.map(chip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">${all.length ? "Aucun n'a encore indiqué sa disponibilité." : 'Tous déjà placés.'}</p>`}
       </div>
       <div class="sd-col">
@@ -17052,7 +17052,7 @@ function subDockHTML(open){
         ${absList.length ? `<div class="sd-abs-list">${absList.map(absChip).join('')}</div>` : `<p class="ah-meta" style="margin:6px 2px 0;font-size:13px;">Aucune absence.</p>`}
       </div>
     </div>
-    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Touche un remplaçant puis un absent, ou maintiens-le et glisse-le sur l’absent. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
+    <div class="sd-foot"><span class="ah-meta">${SUB_PICK ? 'Touche maintenant un absent à remplacer ou un ' + grpWord() + ' de 4.' : 'Touche un remplaçant puis l’absent dans son ' + grpWord() + ', ou maintiens-le et glisse-le dessus. Pour le retirer, glisse-le de son ' + grpWord() + ' vers cette bande.'}</span>${all.length > dispo.length ? `<button type="button" class="btn-ghost" style="min-height:36px;padding:4px 10px;font-size:13px;" onclick="SUB_DOCK_ALL=!SUB_DOCK_ALL;render()">${SUB_DOCK_ALL ? 'Disponibles seulement' : 'Tous les remplaçants (' + all.length + ')'}</button>` : ''}</div>
   </div>`;
 }
 // Place un remplaçant : sur la ligne d'un absent (vide ou déjà remplacé), ou sur un groupe.
