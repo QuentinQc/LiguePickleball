@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 545">
+<meta name="app-build" content="Version 546">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5700,14 +5700,6 @@ function onRowDrop(ev, gid, targetPid){
 }
 // Déplacement d'un joueur (souris ou doigt) : vers un groupe, avant un joueur donné, ou en attente (gid vide).
 // Le joueur reste ensuite dans ce groupe : il y est classé et monte ou descend à partir de là.
-document.addEventListener('keydown', function(ev){
-  if(ev.key !== 'Enter' || !ev.target || !ev.target.classList || !ev.target.classList.contains('rs-in')) return;
-  const all = Array.prototype.slice.call(document.querySelectorAll('.rs-in'));
-  const i = all.indexOf(ev.target); if(i < 0) return;
-  ev.preventDefault();
-  try{ ev.target.dispatchEvent(new Event('change', { bubbles: true })); }catch(e){}
-  setTimeout(function(){ const nx = Array.prototype.slice.call(document.querySelectorAll('.rs-in'))[i + 1]; if(nx){ nx.focus(); try{ nx.select(); }catch(e){} } }, 80);
-});
 // Après un déplacement : un message avec « Annuler » remet les groupes comme avant.
 function undoSnapPlayers(){ return (DATA.players||[]).map(function(p){ return [p.id, p.groupId || null, p.order]; }); }
 function showUndoToast(msg, snap){
@@ -8025,6 +8017,7 @@ document.addEventListener('keydown', e=>{
   if(isArea && !(e.ctrlKey || e.metaKey)) return;
   if(isArea && t.closest('.chat-composer')) return; // le chat a sa propre logique
   if(t.hasAttribute('data-noenter') || t.classList.contains('orgpick-search')) return;
+  if(t.matches && t.matches(SCORE_INPUT_SEL)){ const l = scoreInputsAround(t); if(l.indexOf(t) < l.length - 1) return; }
   let node = t.parentElement;
   while(node && node!==document.body){
     const btns = Array.from(node.querySelectorAll('button.btn-primary')).filter(b=>!b.disabled && b.offsetParent!==null);
@@ -17687,6 +17680,38 @@ async function selfAction(action, payload){
   await scoreReloadFromServer();
   return true;
 }
+// ---- Cases de score : Entrée passe à la case suivante (touche « Suivant » du clavier numérique) ----
+// Toutes les cases de score de l'écran, dans l'ordre : ligue, MLP, tournoi, grille sur ordinateur.
+var SCORE_INPUT_SEL = 'input.rs-in, input.pill-input, #tsc_a, #tsc_b, input[id^="tsg_"]';
+function scoreInputsAround(el){
+  const scope = el.closest('#modalRoot') || document;
+  return Array.prototype.filter.call(scope.querySelectorAll(SCORE_INPUT_SEL), function(x){ return !x.disabled && !x.readOnly && x.offsetParent !== null; });
+}
+document.addEventListener('focusin', function(e){
+  const el = e.target; if(!el || !el.matches || !el.matches(SCORE_INPUT_SEL)) return;
+  const list = scoreInputsAround(el), i = list.indexOf(el);
+  el.setAttribute('enterkeyhint', i >= 0 && i < list.length - 1 ? 'next' : 'done');
+  try{ el.select(); }catch(err){}
+});
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Enter' || e.isComposing) return;
+  const el = e.target; if(!el || !el.matches || !el.matches(SCORE_INPUT_SEL)) return;
+  const list = scoreInputsAround(el), i = list.indexOf(el);
+  if(i < 0) return;
+  if(i === list.length - 1){
+    // Dernière case : le bouton principal de la fenêtre (Enregistrer) s'en charge s'il y en a un ; sinon on ferme le clavier.
+    if(!e.defaultPrevented){ e.preventDefault(); try{ el.dispatchEvent(new Event('change', { bubbles: true })); }catch(err){} el.blur(); }
+    return;
+  }
+  e.preventDefault();
+  const inModal = !!el.closest('#modalRoot');
+  try{ el.dispatchEvent(new Event('change', { bubbles: true })); }catch(err){}
+  const go = function(){
+    const all = Array.prototype.filter.call((inModal ? document.getElementById('modalRoot') : document).querySelectorAll(SCORE_INPUT_SEL), function(x){ return !x.disabled && !x.readOnly && x.offsetParent !== null; });
+    const nx = all[i + 1]; if(nx && document.activeElement !== nx){ nx.focus(); try{ nx.select(); }catch(err){} }
+  };
+  go(); setTimeout(go, 80); // l'enregistrement peut redessiner l'écran : on retrouve la case suivante
+});
 // Agit pour soi-même (absence, disponibilité…) : joueur ou remplaçant, ou organisateur qui consulte une ligue
 // comme joueur ou remplaçant (souvent une ligue qu'il n'organise pas). Ces actions passent par le serveur
 // (player_self_action) : l'enregistrement complet de la ligue est réservé à ses organisateurs et serait refusé.
