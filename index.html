@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 557">
+<meta name="app-build" content="Version 558">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -17039,7 +17039,7 @@ function subDockHTML(open){
   absList.sort(function(a,b){ return (!!a.by) - (!!b.by); });
   const absChip = function(x){
     const free = !x.by;
-    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-av sd-av-ab">${escapeHTML(partnerInitials(x.p.name))}</span><span class="sd-t"><b class="sd-abs-n">${escapeHTML(x.p.name)}</b><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : 'remplacé(e) par ' + escapeHTML(String(playerName(x.by)).split(' ')[0]))}</small></span></div>`;
+    return `<div class="sd-abs${free ? ' free sub-slot empty' : ''}"${free ? ` data-g="${x.g.id}" data-a="${x.p.id}"` : ''}><span class="sd-av sd-av-ab">${escapeHTML(partnerInitials(x.p.name))}</span><span class="sd-t"><b class="sd-abs-n">${escapeHTML(x.p.name)}</b><small>${escapeHTML(x.g.name)} · ${free ? (x.p.injured ? 'blessé(e)' : 'à remplacer') : (x.by === 'loan' ? 'joue ailleurs' : gw(x.p, 'remplacé', 'remplacée', 'remplacé(e)'))}</small></span></div>`;
   };
   return `<div class="card sd-dock${SUB_PICK ? ' picking' : ''}" id="subDock">
     <div class="sd-cols">
