@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 566">
+<meta name="app-build" content="Version 567">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2503,6 +2503,9 @@ body.tv-mode .shell-top, body.tv-mode .bnav, body.tv-mode .install-banner{displa
 .tn-row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
 .tn-row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
 .tn-form-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+.tn-ff{margin-top:22px;padding-top:12px;border-top:1px solid var(--line-soft);text-align:center;}
+.tn-ff-b{background:none;border:0;padding:6px 8px;font:500 12.5px var(--font-body);color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;}
+.tn-ff-b:hover,.tn-ff-b:focus-visible{color:var(--paddle);}
 .tn-danger{color:#ff8a7a !important;border-color:rgba(255,138,122,.45) !important;}
 .tn-who{display:flex;flex-direction:column;padding:10px 0;border-bottom:1px solid var(--line-soft);}
 .tn-who span{font-size:13px;color:var(--muted);}
@@ -11012,12 +11015,12 @@ function openTournScore(id){
     <p class="small" style="color:var(--muted);margin:0 0 10px;">${escapeHTML(tournDivLabel(m))}${m.court ? ' · ' + escapeHTML(m.court) : ''} · ${bo3 ? Math.ceil(nG / 2) + ' manches gagnantes à ' + pts : 'match à ' + pts} · ${escapeHTML(tournScoreRuleTxt(tournDivRules(tournById(m.tournament_id), (TDIVS || []).find(function(x){ return x.id === m.division_id; })), pts))}</p>
     ${grid}
     <div class="tn-form-acts">
-      <button type="button" class="btn btn-secondary" onclick="tournForfeit('${m.id}')">Forfait…</button>
       ${tournTestOn(tournById(m.tournament_id)) ? `<button type="button" class="btn btn-secondary tn-test-btn" onclick="tournTestFill('${m.id}')">Générer</button>` : ''}
       <span style="flex:1"></span>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
       <button type="button" class="btn btn-primary" onclick="tournScoreSave('${m.id}')">Enregistrer</button>
-    </div></div>`;
+    </div>
+    <div class="tn-ff"><button type="button" class="tn-ff-b" onclick="tournForfeit('${m.id}')">Une équipe déclare forfait…</button></div></div>`;
   setModal({ kind:'content', title: m.status === 'done' ? 'Corriger le score' : 'Score du match', htmlContent: html });
   render();
   setTimeout(function(){ const el = document.getElementById(bo3 ? 'tsg_00' : 'tsc_a'); if(el && m.status !== 'done') el.focus(); }, 60);
@@ -11075,8 +11078,10 @@ function tournForfeit(id){
     if(i !== 0 && i !== 1) return;
     const aLoses = i === 0, w = aLoses ? m.team_b : m.team_a;
     if(m.winner && m.winner !== w && (tournKoBlocked(m) || tournDeBlocked(m))){ showAlert('Le gagnant a déjà joué le match suivant du tableau : corrige d\'abord ce match-là.'); return; }
+    showConfirm(tournTeamFull(aLoses ? m.team_a : m.team_b) + ' déclare forfait. ' + tournTeamFull(w) + ' gagne ' + pts + '-0. Confirmer ?', function(){
     tournMatchPatch(id, { score_a: aLoses ? 0 : pts, score_b: aLoses ? pts : 0, games: null, winner: w, status: 'done', ended_at: new Date().toISOString() }, true)
       .then(function(ok){ return ok && (tournIsDe(m) ? tournDeAdvance(m) : tournAdvance(m)); }).then(function(){ tournLiveNotify(); tournBackToSheet(); render(); tournAfterResult(m); tournAutoKick(m.tournament_id); });
+    });
   });
 }
 // Équipes qui jouent : inscrites dans une catégorie dont les poules ou le tableau sont créés.
