@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 567">
+<meta name="app-build" content="Version 568">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10121,17 +10121,19 @@ function tournUuid(){
 function tournRotSchedule(ids, rounds){
   const per = Math.floor(ids.length / 4), sitN = ids.length - per * 4;
   const key = function(a, b){ return a < b ? a + '|' + b : b + '|' + a; };
-  const partner = {}, opp = {}, sat = {}, out = [];
-  ids.forEach(function(id){ sat[id] = 0; });
+  const partner = {}, opp = {}, sat = {}, lastSat = {}, out = [];
+  ids.forEach(function(id){ sat[id] = 0; lastSat[id] = -1; });
   const cost = function(sp){
     const pc = (partner[key(sp[0][0], sp[0][1])] || 0) + (partner[key(sp[1][0], sp[1][1])] || 0);
     let oc = 0; sp[0].forEach(function(a){ sp[1].forEach(function(b){ oc += opp[key(a, b)] || 0; }); });
     return pc * 100 + oc * 3;
   };
   for(let r = 0; r < rounds; r++){
-    const order = tournShuffle(ids.slice()).sort(function(a, b){ return sat[a] - sat[b]; });
+    // Repos : d'abord ceux qui se sont le moins reposés, puis celui dont le dernier repos est le plus ancien
+    // (le repos tourne dans le même ordre : personne n'enchaîne tous les matchs pendant que d'autres attendent deux fois).
+    const order = tournShuffle(ids.slice()).sort(function(a, b){ return (sat[a] - sat[b]) || (lastSat[a] - lastSat[b]); });
     const rest = order.slice(0, sitN), play = order.slice(sitN);
-    rest.forEach(function(id){ sat[id]++; });
+    rest.forEach(function(id){ sat[id]++; lastSat[id] = r; });
     let best = null, bestCost = Infinity;
     for(let it = 0; it < 400 && bestCost > 0; it++){
       const sh = tournShuffle(play.slice()), games = []; let c = 0;
@@ -10167,6 +10169,19 @@ function tournRotDraftHTML(t, d, r, n){
       ${g.map(function(id){ return `<div class="tn-pool-t" style="cursor:default;"><span class="tn-seedb"></span><span>${escapeHTML(tournTeamFull(id))}</span></div>`; }).join('')}
     </section>`; }).join('')}</div>`;
 }
+// Matchs par joueur avec ce nombre de rondes : si tout le monde ne joue pas autant, le dire et proposer les nombres de rondes qui tombent juste.
+function tournRotEvenTxt(groups, rounds){
+  const gcd = function(a, b){ return b ? gcd(b, a % b) : a; };
+  let out = '';
+  groups.forEach(function(g, gi){
+    const n = g.length, per = Math.floor(n / 4); if(per < 1) return;
+    const slots = rounds * per * 4, lo = Math.floor(slots / n), more = slots % n; if(!more) return;
+    const step = n / gcd(per * 4, n), down = Math.floor(rounds / step) * step, up = down + step;
+    const alt = (down > 0 ? down + ' ou ' : '') + up + ' rondes';
+    out += ' ' + (groups.length > 1 ? 'Groupe ' + String.fromCharCode(65 + gi) + ' : ' : 'Attention : ') + 'avec ' + rounds + ' rondes, ' + (n - more) + ' joueur' + (n - more > 1 ? 's jouent ' : ' joue ') + lo + ' matchs et ' + more + ' en ' + (more > 1 ? 'jouent ' : 'joue ') + (lo + 1) + '. Pour que tous jouent autant : ' + alt + '.';
+  });
+  return out;
+}
 async function tournRotLock(tid, divId){
   const t = tournById(tid), d = (TDIVS || []).find(function(x){ return x.id === divId; }); if(!t || !d) return;
   if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
@@ -10175,7 +10190,7 @@ async function tournRotLock(tid, divId){
   const r = tournDivRules(t, d), k = tournRotK(divId, ids.length, r), groups = tournPrepSplit(divId, players, k);
   const rounds = Math.max(1, Math.min(20, parseInt(tfVal('trRounds'), 10) || tournRotRounds(Math.floor(ids.length / k), r)));
   const nM = groups.reduce(function(sum, g){ return sum + rounds * Math.floor(g.length / 4); }, 0);
-  return showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs' + (k > 1 ? ', ' + k + ' groupes' : '') + ') pour « ' + d.name + ' » ? Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
+  return showConfirm('Créer ' + rounds + ' rondes (' + nM + ' matchs' + (k > 1 ? ', ' + k + ' groupes' : '') + ') pour « ' + d.name + ' » ?' + tournRotEvenTxt(groups, rounds) + ' Tu pourras recommencer tant qu\'aucun score n\'est entré.', async function(){
     if(tournMatches(divId).length){ showToast('Les rondes sont déjà créées', true); return; }
     const byId = {}; players.forEach(function(x){ byId[x.id] = x; });
     const pairs = [], rows = [];
