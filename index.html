@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 569">
+<meta name="app-build" content="Version 570">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -2892,6 +2892,10 @@ async function fetchLeagueData(leagueId){
 // la ligue n'a pas changé depuis ; sinon (absence ou score enregistré entre-temps par un joueur,
 // autre admin), elle recharge la ligue au lieu d'effacer ces changements.
 let DATA_VERSION = null, DATA_VERSION_FOR = null;
+// Ligue d'origine de chaque objet DATA chargé. Un enregistrement n'écrit jamais les données d'une ligue
+// dans une autre (ex. : on passe du lundi au mercredi pendant qu'une sauvegarde du lundi est en attente).
+const DATA_OWNER = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
+function dataOwner(d){ return (DATA_OWNER && d && typeof d === 'object') ? DATA_OWNER.get(d) : undefined; }
 async function fetchLeagueVersion(leagueId){
   try{
     const r = await sb.from('league_data').select('updated_at').eq('league_id', leagueId).single();
@@ -2899,6 +2903,7 @@ async function fetchLeagueVersion(leagueId){
   }catch(e){ return null; }
 }
 async function loadData(leagueId){
+  rescueUpload();
   if(SIM && leagueId === SIM.leagueId) return DATA;
   try{
     // Version lue AVANT les données : si une écriture se glisse entre les deux, l'enregistrement
@@ -2910,7 +2915,7 @@ async function loadData(leagueId){
     STORAGE_OK = true;
     OFFLINE_MODE = false;
     const result = (data && data.data && Object.keys(data.data).length>0) ? data.data : null;
-    if(result) cacheDataLocally(leagueId, result);
+    if(result){ if(DATA_OWNER) DATA_OWNER.set(result, leagueId); cacheDataLocally(leagueId, result); }
     if(result && leagueId === CURRENT_LEAGUE_ID) setTimeout(function(){ if(DATA === result) takeGroupSnap(); }, 0);
     return result;
   }catch(e){
@@ -2930,8 +2935,30 @@ async function loadData(leagueId){
 }
 // ---- Cache local (hors ligne) : garde une copie des dernières données vues
 // sur cet appareil, pour pouvoir au moins les consulter sans connexion. ----
+// Récupération (25 nov.) : les données de la ligue du mercredi ont été écrasées par celles du lundi à 13 h 48 UTC.
+// Un appareil qui garde une copie locale d'avant l'incident l'envoie une fois dans league_rescue,
+// et cette bonne copie n'est plus remplacée par la mauvaise.
+const RESCUE_LID = '1b51e2dc-f824-4f0f-b4fa-1ea33d669974', RESCUE_CUT = '2026-11-25T13:48:20';
+function rescueGoodCopy(){
+  try{
+    const c = getCachedDataLocally(RESCUE_LID);
+    if(!c || !c.data || !c.cachedAt || String(c.cachedAt) >= RESCUE_CUT) return null;
+    if(/lundi/i.test(String(c.data.leagueName || ''))) return null;
+    return c;
+  }catch(e){ return null; }
+}
+function rescueUpload(){
+  try{
+    if(typeof sb === 'undefined' || !sb || localStorage.getItem('dk_rescue_mer') === '1') return;
+    const c = rescueGoodCopy(); if(!c) return;
+    sb.from('league_rescue').insert({ league_id: RESCUE_LID, cached_at: c.cachedAt, data: c.data }).then(function(r){
+      if(r && !r.error){ try{ localStorage.setItem('dk_rescue_mer', '1'); }catch(e){} }
+    });
+  }catch(e){}
+}
 function cacheDataLocally(leagueId, data){
   if(SIM) return;
+  if(leagueId === RESCUE_LID && rescueGoodCopy()){ rescueUpload(); return; }
   try{ localStorage.setItem('cachedData_'+leagueId, JSON.stringify({ data, cachedAt: new Date().toISOString() })); }catch(e){}
 }
 function getCachedDataLocally(leagueId){
@@ -3673,8 +3700,10 @@ function saveData(){
 async function saveDataNow(){
   if(SIM) return; // simulation : rien n'est enregistré
   if(!CURRENT_LEAGUE_ID) return;
-  try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
   const leagueId = CURRENT_LEAGUE_ID;
+  const owner = dataOwner(DATA);
+  if(owner && owner !== leagueId){ console.warn('Enregistrement annulé : ces données appartiennent à une autre ligue', owner, leagueId); return; }
+  try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
   const guarded = !!DATA_VERSION && DATA_VERSION_FOR === leagueId;
   try{
     let q = sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
