@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 568">
+<meta name="app-build" content="Version 569">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -10457,7 +10457,7 @@ function tournPrepUnlock(divId){
 // ---- En direct : présences, terrains et file d'attente ----
 function tournSettings(t){
   const s = (t && t.settings) || {};
-  return { rest: typeof s.rest === 'number' ? s.rest : 5, checkin: s.checkin !== false, auto: s.auto === true, lend: s.lend !== false, roundsInOrder: s.rounds_in_order !== false, open: Array.isArray(s.open_courts) ? s.open_courts : [], finals: Array.isArray(s.final_courts) ? s.final_courts : [] };
+  return { rest: 0, checkin: s.checkin !== false, auto: s.auto === true, lend: s.lend !== false, roundsInOrder: s.rounds_in_order !== false, open: Array.isArray(s.open_courts) ? s.open_courts : [], finals: Array.isArray(s.final_courts) ? s.final_courts : [] };
 }
 function tournCourts(t){ return (Array.isArray(t.courts) ? t.courts : []).filter(Boolean); }
 // Durée estimée d'un match selon ses points (minutes).
@@ -11141,7 +11141,6 @@ async function tournAllPresent(tid){
 function openTournDaySettings(tid){
   const t = tournById(tid), cfg = tournSettings(t);
   const html = `<div class="tn-form">
-    ${tournField('Temps de repos minimum entre deux matchs d\'une équipe', tournStepper('tdsRest', cfg.rest, 0, 30), 'En minutes. Une équipe qui vient de jouer n\'est pas appelée avant ce délai.')}
     ${tournField('Présences', tournSeg('tdsCheck', [['1','Pointer les arrivées'],['0','Toutes présentes']], cfg.checkin ? '1' : '0'), 'Avec le pointage, une équipe pas encore arrivée n\'est jamais appelée.')}
     ${tournField('Terrains réservés libérés', tournSeg('tdsLend', [['1','<b>Prêtés</b><small>Aux autres catégories</small>'],['0','<b>Gardés</b><small>Pour leur catégorie</small>']], cfg.lend ? '1' : '0', null, 'tn-seg-st tn-seg-2'), 'Prêtés : quand une catégorie n\'a plus de match à jouer, ses terrains réservés servent aux autres catégories. Sur l\'écran En direct, « Affecter ce terrain » permet aussi de donner un terrain libre à une catégorie.')}
     ${tournCourts(t).length ? tournField('Terrains de championnat', `<div class="tn-fc">${tournCourts(t).map(function(c, i){ const on = cfg.finals.indexOf(c) !== -1; return `<button type="button" class="tn-fc-b${on ? ' on' : ''}" data-court="${escapeHTML(c)}" aria-pressed="${on}" onclick="this.classList.toggle('on');this.setAttribute('aria-pressed', this.classList.contains('on'))">${escapeHTML(c)}</button>`; }).join('')}</div>`, 'Les finales et les matchs pour le bronze se jouent seulement sur les terrains cochés. Aucun coché : n\'importe quel terrain.') : ''}
@@ -11154,7 +11153,7 @@ function openTournDaySettings(tid){
 }
 async function tournDaySave(tid){
   const t = tournById(tid); if(!t) return;
-  const settings = Object.assign({}, t.settings || {}, { rest: Math.max(0, Math.min(30, parseInt(tfVal('tdsRest'), 10) || 0)), checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1', lend: tfVal('tdsLend') !== '0', rounds_in_order: tfVal('tdsRounds') !== '0', tiebreak: (TOURN_TB_STATE || tournTiebreakList(t)).map(function(c){ return { key: c.key, enabled: c.enabled }; }), final_courts: Array.prototype.map.call(document.querySelectorAll('.tn-fc-b.on'), function(b){ return b.getAttribute('data-court'); }) });
+  const settings = Object.assign({}, t.settings || {}, { checkin: tfVal('tdsCheck') !== '0', auto: tfVal('tdsAuto') === '1', lend: tfVal('tdsLend') !== '0', rounds_in_order: tfVal('tdsRounds') !== '0', tiebreak: (TOURN_TB_STATE || tournTiebreakList(t)).map(function(c){ return { key: c.key, enabled: c.enabled }; }), final_courts: Array.prototype.map.call(document.querySelectorAll('.tn-fc-b.on'), function(b){ return b.getAttribute('data-court'); }) });
   const r = await sb.from('tournaments').update({ settings: settings }).eq('id', tid);
   if(r && r.error){ showAlert(r.error.message); return; }
   t.settings = settings; tournLiveNotify();
