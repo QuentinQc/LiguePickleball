@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 570">
+<meta name="app-build" content="Version 571">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -3703,14 +3703,21 @@ async function saveDataNow(){
   const leagueId = CURRENT_LEAGUE_ID;
   const owner = dataOwner(DATA);
   if(owner && owner !== leagueId){ console.warn('Enregistrement annulé : ces données appartiennent à une autre ligue', owner, leagueId); return; }
-  try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
+  // Jamais d'enregistrement « à l'aveugle » : il faut la version serveur de CETTE ligue (chargée sur cet appareil)
+  // et pas une copie hors ligne. Sinon on recharge la ligue au lieu d'écrire par-dessus.
   const guarded = !!DATA_VERSION && DATA_VERSION_FOR === leagueId;
+  if(OFFLINE_MODE || !guarded){
+    SAVE_ERROR = OFFLINE_MODE ? "Hors connexion : la modification n'a pas été enregistrée." : "La ligue n'était pas à jour : elle a été rechargée, refais la dernière modification.";
+    console.warn('Enregistrement annulé : version de la ligue inconnue ou hors ligne', leagueId);
+    if(!OFFLINE_MODE && leagueId === CURRENT_LEAGUE_ID){ const fresh = await loadData(leagueId); if(fresh && leagueId === CURRENT_LEAGUE_ID){ DATA = fresh; migrateData(); } render(); }
+    return;
+  }
+  try{ if(SESSION_USER && SESSION_USER.role === 'admin' && !DATA.testMode) syncAllGroupMatches(); }catch(e){ console.error('synchro des matchs', e); }
   try{
-    let q = sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', leagueId);
-    if(guarded) q = q.eq('updated_at', DATA_VERSION);
+    const q = sb.from('league_data').update({ data: DATA, updated_at: new Date().toISOString() }).eq('league_id', leagueId).eq('updated_at', DATA_VERSION);
     const { data: rows, error } = await q.select('updated_at');
     if(error) throw error;
-    if(guarded && (!rows || !rows.length)){ await onSaveConflict(leagueId); return; }
+    if(!rows || !rows.length){ await onSaveConflict(leagueId); return; }
     if(rows && rows[0] && rows[0].updated_at){ DATA_VERSION = rows[0].updated_at; DATA_VERSION_FOR = leagueId; }
     SAVE_ERROR = null;
     liveNotifySaved();
