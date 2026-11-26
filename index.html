@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 585">
+<meta name="app-build" content="Version 586">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -184,7 +184,7 @@ textarea:focus{outline:none;border-color:var(--ball);box-shadow:0 0 0 3px rgba(2
 input[type=text],input[type=email],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]){border-radius:12px;}
 input[type=date],input[type=time]{color-scheme:dark;}
 /* Sélecteur de date Dinkeo : le champ système est caché, un bouton au style de l'app le remplace. */
-input.dk-date-src{display:none !important;}
+input.dk-date-src,select.dk-date-src{display:none !important;}
 .dk-date{display:inline-flex;align-items:center;gap:10px;min-height:42px;font-family:var(--font-body);font-size:15px;font-weight:600;padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.2);color:var(--text);cursor:pointer;text-align:left;box-sizing:border-box;max-width:100%;}
 .dk-date svg{color:var(--ball);flex:none;}
 .dk-date.dk-none{color:var(--muted);font-weight:500;font-style:normal;}
@@ -192,7 +192,7 @@ input.dk-date-src{display:none !important;}
 .dk-date:disabled{opacity:.5;cursor:default;}
 .field .dk-date,.pc-field .dk-date,.wz-grid2 .dk-date,.tn-field .dk-date,.cmp-body .dk-date{width:100%;}
 .dk-date-t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.dk-date{container-type:inline-size;}
+.field .dk-date:not(.dk-sel),.pc-field .dk-date:not(.dk-sel),.wz-grid2 .dk-date:not(.dk-sel),.tn-field .dk-date:not(.dk-sel),.cmp-body .dk-date:not(.dk-sel){container-type:inline-size;}
 @container (max-width:185px){ .dk-wd{display:none;} }
 .dkdp-ov{position:fixed;inset:0;z-index:5000;background:rgba(3,12,10,.55);display:none;align-items:center;justify-content:center;padding:16px;}
 .dkdp-ov.show{display:flex;}
@@ -221,6 +221,17 @@ input.dk-date-src{display:none !important;}
 .dkt-more{margin:6px 2px 0;}
 .dkt-more summary{color:var(--muted);font-size:12.5px;cursor:pointer;padding:2px 0 6px;}
 .dk-time .dk-date-t{font-variant-numeric:tabular-nums;}
+.dk-sel{justify-content:space-between;}
+.dk-sel svg{color:var(--muted);}
+.dks{max-width:400px;}
+.dks-l{display:flex;flex-direction:column;gap:2px;max-height:min(60vh,460px);overflow-y:auto;margin:0 -4px;padding:0 4px 4px;}
+.dks-o{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 12px;border-radius:12px;border:0;background:none;color:var(--text);font:500 15px var(--font-body);text-align:left;cursor:pointer;}
+.dks-o:hover:not(:disabled){background:rgba(255,255,255,.05);}
+.dks-o:focus-visible{outline:2px solid var(--ball);outline-offset:-2px;}
+.dks-o.on{background:rgba(207,234,92,.12);color:var(--ball);font-weight:700;}
+.dks-o b{color:var(--ball);}
+.dks-o:disabled{opacity:.4;cursor:default;}
+.dks-g{font:600 11px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 12px 4px;}
 @media (max-width:640px){
   .dkdp-ov{align-items:flex-end;padding:0;}
   .dkdp{max-width:none;border-radius:24px 24px 0 0;padding:16px 16px calc(14px + env(safe-area-inset-bottom, 0px));}
@@ -5063,9 +5074,66 @@ function dktSet(v){
   inp.dispatchEvent(new Event('input', { bubbles: true }));
   inp.dispatchEvent(new Event('change', { bubbles: true }));
 }
+// ---- Menus de choix Dinkeo : chaque <select> devient un bouton qui ouvre une liste de choix (✓ sur la sélection). ----
+// Le <select> d'origine reste caché (id, valeur, réactions inchangées). Un <select> caché exprès (display:none) reste caché.
+const DKS_CHEV = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
+function dksSync(sel){
+  const b = sel._dks; if(!b) return;
+  const o = sel.options[sel.selectedIndex], t = o ? o.text : '';
+  const el = b.querySelector('.dk-date-t');
+  if(el.textContent !== t) el.textContent = t;
+  if(b.disabled !== !!sel.disabled) b.disabled = !!sel.disabled;
+}
+function dksEnhance(root){
+  (root || document).querySelectorAll('select:not([data-dks])').forEach(function(sel){
+    sel.setAttribute('data-dks', '1');
+    if(sel.multiple || sel.style.display === 'none' || sel.hidden) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = (sel.className ? sel.className + ' ' : '') + 'dk-date dk-sel';
+    const st = sel.getAttribute('style'); if(st) b.setAttribute('style', st);
+    b.innerHTML = '<span class="dk-date-t"></span>' + DKS_CHEV;
+    b.setAttribute('aria-label', sel.getAttribute('aria-label') || dkdLabel(sel));
+    b.setAttribute('aria-haspopup', 'listbox');
+    b.addEventListener('click', function(){ dksOpen(sel); });
+    sel._dks = b;
+    sel.classList.add('dk-date-src');
+    sel.parentNode.insertBefore(b, sel.nextSibling);
+    sel.addEventListener('change', function(){ dksSync(sel); });
+    dksSync(sel);
+  });
+}
+let DKS = null;
+function dksOpen(sel){
+  DKS = { sel: sel };
+  let ov = document.getElementById('dkDp');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'dkDp'; ov.className = 'dkdp-ov'; document.body.appendChild(ov); }
+  ov.onclick = function(e){ if(e.target === ov){ if(DKS) dksClose(); else if(DKT) dktClose(); else dkdClose(); } };
+  const lab = sel.getAttribute('aria-label') || dkdLabel(sel);
+  let rows = '', idx = 0;
+  const row = function(o){ const i = idx++; const on = i === sel.selectedIndex;
+    return `<button type="button" role="option" aria-selected="${on}" class="dks-o${on ? ' on' : ''}" ${o.disabled ? 'disabled' : ''} onclick="dksPick(${i})"><span>${escapeHTML(o.text)}</span>${on ? '<b aria-hidden="true">✓</b>' : ''}</button>`; };
+  Array.prototype.forEach.call(sel.children, function(ch){
+    if(ch.tagName === 'OPTGROUP'){ rows += `<div class="dks-g">${escapeHTML(ch.label || '')}</div>`; Array.prototype.forEach.call(ch.children, function(o){ rows += row(o); }); }
+    else if(ch.tagName === 'OPTION') rows += row(ch);
+  });
+  ov.innerHTML = `<div class="dkdp dks" role="dialog" aria-modal="true" aria-label="${escapeHTML(lab)}">
+    <div class="dkdp-h"><div><small>${escapeHTML(lab === 'Date' ? 'Choisir' : lab)}</small></div><button type="button" class="dkdp-x" onclick="dksClose()" aria-label="Fermer">×</button></div>
+    <div class="dks-l" role="listbox">${rows}</div></div>`;
+  ov.classList.add('show');
+  document.addEventListener('keydown', dksKey);
+  setTimeout(function(){ const f = ov.querySelector('.dks-o.on') || ov.querySelector('.dks-o'); if(f){ f.scrollIntoView({ block:'nearest' }); f.focus({ preventScroll: true }); } }, 30);
+}
+function dksKey(e){ if(e.key === 'Escape'){ e.stopPropagation(); dksClose(); } }
+function dksClose(){ const ov = document.getElementById('dkDp'); if(ov) ov.classList.remove('show'); document.removeEventListener('keydown', dksKey); if(DKS && DKS.sel && DKS.sel._dks) try{ DKS.sel._dks.focus(); }catch(e){} DKS = null; }
+function dksPick(i){
+  if(!DKS) return; const sel = DKS.sel, changed = sel.selectedIndex !== i;
+  sel.selectedIndex = i; dksSync(sel); dksClose();
+  if(changed){ sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+}
 (function(){
   let pend = false;
-  const run = function(){ pend = false; try{ dkdEnhance(document); dktEnhance(document); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); document.querySelectorAll('input[data-dkt]').forEach(dktSync); }catch(e){} };
+  const run = function(){ pend = false; try{ dkdEnhance(document); dktEnhance(document); dksEnhance(document); document.querySelectorAll('select[data-dks]').forEach(dksSync); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); document.querySelectorAll('input[data-dkt]').forEach(dktSync); }catch(e){} };
   try{
     new MutationObserver(function(){ if(!pend){ pend = true; (window.requestAnimationFrame || setTimeout)(run); } }).observe(document.documentElement, { childList: true, subtree: true });
   }catch(e){}
