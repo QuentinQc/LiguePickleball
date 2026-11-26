@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 580">
+<meta name="app-build" content="Version 581">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -214,6 +214,13 @@ input.dk-date-src{display:none !important;}
 .dkdp-c:disabled{color:rgba(255,255,255,.22);cursor:default;}
 .dkdp-f{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:6px 2px 2px;border-top:1px solid var(--line-soft);}
 .dkdp-l{background:none;border:0;color:var(--ball);font:700 14px var(--font-body);padding:8px 6px;cursor:pointer;}
+.dkdp-l:disabled{opacity:.4;cursor:default;}
+.dkt-lab{font:600 11px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:6px 2px 6px;}
+.dkt-g{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;}
+.dkt-g .dkdp-c{height:40px;}
+.dkt-more{margin:6px 2px 0;}
+.dkt-more summary{color:var(--muted);font-size:12.5px;cursor:pointer;padding:2px 0 6px;}
+.dk-time .dk-date-t{font-variant-numeric:tabular-nums;}
 @media (max-width:640px){
   .dkdp-ov{align-items:flex-end;padding:0;}
   .dkdp{max-width:none;border-radius:24px 24px 0 0;padding:16px 16px calc(14px + env(safe-area-inset-bottom, 0px));}
@@ -4915,7 +4922,7 @@ function dkdOpen(inp){
   let ov = document.getElementById('dkDp');
   if(!ov){
     ov = document.createElement('div'); ov.id = 'dkDp'; ov.className = 'dkdp-ov';
-    ov.addEventListener('click', function(e){ if(e.target === ov) dkdClose(); });
+    ov.addEventListener('click', function(e){ if(e.target === ov){ if(DKT) dktClose(); else dkdClose(); } });
     document.body.appendChild(ov);
   }
   dkdRender();
@@ -4953,9 +4960,73 @@ function dkdPick(ds){
   inp.dispatchEvent(new Event('input', { bubbles: true }));
   inp.dispatchEvent(new Event('change', { bubbles: true }));
 }
+// ---- Sélecteur d'heure Dinkeo (24 h) : même principe que les dates. On touche l'heure, puis les minutes. ----
+const DKT_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.5V8l2.4 1.6"/></svg>';
+function dktTxt(v){ const m = /^(\d{1,2}):(\d{2})/.exec(v || ''); return m ? parseInt(m[1], 10) + ' h ' + m[2] : ''; }
+function dktSync(inp){
+  const b = inp._dkt; if(!b) return;
+  const t = dktTxt(inp.value), el = b.querySelector('.dk-date-t'), txt = t || 'Choisir une heure';
+  if(el.textContent !== txt) el.textContent = txt;
+  if(b.classList.contains('dk-none') !== !t) b.classList.toggle('dk-none', !t);
+  if(b.disabled !== !!inp.disabled) b.disabled = !!inp.disabled;
+}
+function dktEnhance(root){
+  (root || document).querySelectorAll('input[type="time"]:not([data-dkt])').forEach(function(inp){
+    inp.setAttribute('data-dkt', '1');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = (inp.className ? inp.className + ' ' : '') + 'dk-date dk-time';
+    const st = inp.getAttribute('style'); if(st) b.setAttribute('style', st);
+    b.innerHTML = DKT_ICON + '<span class="dk-date-t"></span>';
+    b.setAttribute('aria-label', dkdLabel(inp));
+    b.addEventListener('click', function(){ dktOpen(inp); });
+    inp._dkt = b;
+    inp.classList.add('dk-date-src');
+    inp.parentNode.insertBefore(b, inp.nextSibling);
+    inp.addEventListener('change', function(){ dktSync(inp); });
+    dktSync(inp);
+  });
+}
+let DKT = null; // { inp, h, m }
+function dktOpen(inp){
+  const mm = /^(\d{1,2}):(\d{2})/.exec(inp.value || '');
+  DKT = { inp: inp, h: mm ? parseInt(mm[1], 10) : null, m: mm ? parseInt(mm[2], 10) : null, label: dkdLabel(inp) };
+  let ov = document.getElementById('dkDp');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'dkDp'; ov.className = 'dkdp-ov'; ov.addEventListener('click', function(e){ if(e.target === ov){ if(DKT) dktClose(); else dkdClose(); } }); document.body.appendChild(ov); }
+  dktRender(); ov.classList.add('show');
+  document.addEventListener('keydown', dktKey);
+}
+function dktKey(e){ if(e.key === 'Escape'){ e.stopPropagation(); dktClose(); } }
+function dktClose(){ const ov = document.getElementById('dkDp'); if(ov) ov.classList.remove('show'); document.removeEventListener('keydown', dktKey); if(DKT && DKT.inp && DKT.inp._dkt) try{ DKT.inp._dkt.focus(); }catch(e){} DKT = null; }
+function dktRender(){
+  const ov = document.getElementById('dkDp'); if(!ov || !DKT) return;
+  const pad = function(n){ return String(n).padStart(2, '0'); };
+  let hours = '';
+  for(let h = 6; h <= 23; h++) hours += `<button type="button" class="dkdp-c${DKT.h === h ? ' sel' : ''}" onclick="dktHour(${h})">${h}</button>`;
+  const early = [0,1,2,3,4,5].map(function(h){ return `<button type="button" class="dkdp-c dkt-early${DKT.h === h ? ' sel' : ''}" onclick="dktHour(${h})">${h}</button>`; }).join('');
+  let mins = '';
+  for(let m = 0; m < 60; m += 5) mins += `<button type="button" class="dkdp-c${DKT.m === m ? ' sel' : ''}" ${DKT.h === null ? 'disabled' : ''} onclick="dktMin(${m})">${pad(m)}</button>`;
+  const cur = DKT.h !== null ? DKT.h + ' h ' + (DKT.m !== null ? pad(DKT.m) : '··') : 'Aucune heure';
+  ov.innerHTML = `<div class="dkdp" role="dialog" aria-modal="true" aria-label="${escapeHTML(DKT.label)}">
+    <div class="dkdp-h"><div><small>${escapeHTML(DKT.label)}</small><b>${cur}</b></div><button type="button" class="dkdp-x" onclick="dktClose()" aria-label="Fermer">×</button></div>
+    <div class="dkt-lab">Heure</div><div class="dkt-g">${hours}</div>
+    <details class="dkt-more"${DKT.h !== null && DKT.h < 6 ? ' open' : ''}><summary>Avant 6 h</summary><div class="dkt-g">${early}</div></details>
+    <div class="dkt-lab">Minutes</div><div class="dkt-g">${mins}</div>
+    <div class="dkdp-f">${DKT.inp.value ? `<button type="button" class="dkdp-l" onclick="dktSet('')">Effacer</button>` : '<span></span>'}<button type="button" class="dkdp-l" ${DKT.h === null ? 'disabled' : ''} onclick="dktSet()">OK</button></div>
+  </div>`;
+}
+function dktHour(h){ if(!DKT) return; DKT.h = h; if(DKT.m === null) DKT.m = 0; dktRender(); }
+function dktMin(m){ if(!DKT || DKT.h === null) return; DKT.m = m; dktSet(); }
+function dktSet(v){
+  if(!DKT) return; const inp = DKT.inp;
+  inp.value = v === '' ? '' : String(DKT.h).padStart(2, '0') + ':' + String(DKT.m || 0).padStart(2, '0');
+  dktSync(inp); dktClose();
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
 (function(){
   let pend = false;
-  const run = function(){ pend = false; try{ dkdEnhance(document); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); }catch(e){} };
+  const run = function(){ pend = false; try{ dkdEnhance(document); dktEnhance(document); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); document.querySelectorAll('input[data-dkt]').forEach(dktSync); }catch(e){} };
   try{
     new MutationObserver(function(){ if(!pend){ pend = true; (window.requestAnimationFrame || setTimeout)(run); } }).observe(document.documentElement, { childList: true, subtree: true });
   }catch(e){}
@@ -20085,14 +20156,15 @@ function openPlayTimeModal(){
   const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
   const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
   const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : '';
+  const dur = DATA.sessionDurationMin || 120, durs = [60, 90, 120, 150, 180].concat([60, 90, 120, 150, 180].indexOf(dur) === -1 ? [dur] : []).sort(function(a, b){ return a - b; });
   const html = `<div class="field"><label>Jour de jeu</label>
       <input type="hidden" id="setPlayDay" value="${pd}">
       <div class="wz-chips st-days">${days.map((d,i)=>`<button type="button" class="wz-chip${pd===i?' sel':''}" onclick="pickChip(this,'setPlayDay','${i}')">${d}</button>`).join('')}<button type="button" class="wz-chip${pd===''?' sel':''}" onclick="pickChip(this,'setPlayDay','')">Aucun</button></div>
     </div>
     <div class="row">
-      <div class="field"><label for="setPlayTime">Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(lm.schedule_label) || '')}"></div>
-      <div class="field"><label for="setSessionDur">Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" inputmode="numeric" value="${DATA.sessionDurationMin || 120}"></div>
-    </div>`;
+      <div class="field" style="flex:1;min-width:0;"><label for="setPlayTime">Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(lm.schedule_label) || '')}"></div>
+    </div>
+    <div class="field"><label>Durée</label><input type="hidden" id="setSessionDur" value="${dur}"><div class="wz-chips st-days">${durs.map(function(m){ return `<button type="button" class="wz-chip${m === dur ? ' sel' : ''}" onclick="pickChip(this,'setSessionDur','${m}')">${m % 60 ? Math.floor(m / 60) + ' h ' + (m % 60) : (m / 60) + ' h'}</button>`; }).join('')}</div></div>`;
   showFormModal(isRecLeague() ? 'Jour de ' + recW('soirée') : 'Soir de jeu', html, function(){
     const dayVal = document.getElementById('setPlayDay').value;
     DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
