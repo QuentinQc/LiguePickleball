@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 584">
+<meta name="app-build" content="Version 585">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -20289,6 +20289,18 @@ function openPlayTimeModal(){
     DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
     DATA.playTime = document.getElementById('setPlayTime').value || undefined;
     DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
+  });
+}
+function visSwitch(label, desc, checked, js){
+  return `<div class="vis-row"><div class="vis-txt"><div class="vis-l">${label}</div>${desc?`<div class="small">${desc}</div>`:''}</div><label class="switch"><input type="checkbox" ${checked?'checked':''} onchange="${js}"><span class="switch-slider"></span></label></div>`;
+}
+function openTabVisibilityModal(){
+  showContentModal('Onglets visibles', function(){
+    return `<p class="small" style="margin:0 0 12px;color:var(--muted);">Ce qui apparaît dans le portail. Au moins un onglet reste toujours visible.</p>
+      <div class="pf-sec" style="margin-top:0;">Joueurs réguliers</div>
+      <div class="pf-list">${playerTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenPlayerTabs||[]).includes(k), `toggleHiddenKey('hiddenPlayerTabs','${k}',this.checked,playerTabDefs)`)).join('')}</div>
+      <div class="pf-sec">Remplaçants</div>
+      <div class="pf-list">${subTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('')}</div>`;
   });
 }
 function setDataFlag(k, v){ DATA[k] = !!v; saveAndRender(); }
