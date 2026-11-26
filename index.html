@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 582">
+<meta name="app-build" content="Version 583">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1639,11 +1639,17 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .st-sw .ic:empty{display:none;}
 .st-sw .switch{flex:0 0 auto;}
 .st-days .wz-chip{padding:9px 13px;font-size:14px;}
-.pa-chips .pa-day.on{background:var(--paddle);border-color:var(--paddle);color:#fff;}
-.pa-chips .pa-day.part{background:rgba(233,106,60,.75);}
 .pa-more{display:block;width:100%;margin-top:10px;padding:11px;border-radius:14px;border:1px dashed var(--line-soft-strong,rgba(255,255,255,.22));background:none;color:var(--text);font:600 14px var(--font-body);cursor:pointer;}
 .pa-more:hover{border-color:var(--ball);}
-.pa-range{margin-top:10px;padding:12px;border-radius:16px;border:1px solid var(--line-soft);background:var(--court-elevated-2);}
+.pa-cal{margin-top:10px;}
+.pa-sum{padding:2px 4px 10px;}
+.pa-sum b{display:block;font-size:16px;}
+.pa-sum small{display:block;color:var(--muted);font-size:13px;}
+.pa-acts{display:flex;gap:8px;margin-top:10px;}
+.pa-acts .btn{flex:1;margin:0;}
+.pa-ic{display:flex;color:var(--ball);flex:none;}
+.sc-off{color:rgba(255,255,255,.22);cursor:default;display:flex;align-items:center;justify-content:center;}
+.sc-c.sc-off.sc-p::after{opacity:.3;}
 .st-tb.off .t{color:var(--muted);}
 .st-arrows{display:flex;gap:4px;flex:0 0 auto;}
 .st-arrows button{width:32px;height:32px;border-radius:10px;border:0;background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;font-size:12px;}
@@ -15898,48 +15904,82 @@ function playerDetailModalHTML(pid){
 function openAdminAbsenceHub(pid){
   showContentModal('', function(){ return adminAbsenceHubHTML(pid); });
 }
-// Absences prévues (côté organisateur) : les prochaines sessions en pastilles à toucher, et les
-// longues périodes (vacances) avec Du / Au. Chaque touche s'enregistre tout de suite.
-function adminPlannedAbsenceHTML(p){
-  const pid = p.id, open = currentOpenSession(), rec = isRecLeague();
-  const w1 = rec ? recW('soirée') : 'session', wN = rec ? recW('soirées') : 'sessions';
-  const planned = plannedAbsencesForPlayer(pid), today = fmtDate(new Date());
-  const upcoming = pawUpcoming(pawInfoFromData(DATA, pid)).filter(function(ds){ return !(open && ds === open.date); });
-  const cover = function(ds){ return planned.find(function(a){ return ds >= a.startDate && ds <= a.endDate; }); };
-  const short = function(ds){ const d = new Date(ds + 'T12:00:00'); return DKD_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + DKD_MON[d.getMonth()]; };
-  let h = `<div class="pf-sec">Absences prévues</div>`;
-  if(upcoming.length){
-    h += `<p class="small" style="color:var(--muted);margin:-2px 2px 8px;">Touche les prochaines ${wN} où ${escapeHTML(p.name.split(' ')[0])} sera ${gw(p,'absent','absente','absent(e)')}. Touche encore pour annuler.</p>
-      <div class="an-chips pa-chips" style="margin-top:0;">${upcoming.map(function(ds){
-        const a = cover(ds), on = !!a, part = a && a.startDate !== a.endDate;
-        return `<button type="button" class="an-chip paw-chip pa-day${on ? ' on' : ''}${part ? ' part' : ''}" aria-pressed="${on}" onclick="adminPlanToggle('${pid}','${ds}')">${escapeHTML(short(ds))}</button>`;
-      }).join('')}</div>`;
-  } else {
-    h += `<p class="small" style="color:var(--muted);margin:-2px 2px 8px;">Aucune ${w1} à venir connue (jour de jeu ou saison non indiqués) : utilise une période.</p>`;
+// Absences prévues (côté organisateur) : liste des absences à venir et un calendrier intégré pour en
+// ajouter une (premier jour, puis dernier jour ; un seul jour possible). Même style que la saison.
+function paSessionsIn(a, b){
+  const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : null; if(pd === null || !a) return 0;
+  const blocked = new Set(DATA.blockedDates || []); let n = 0;
+  const d = new Date(a + 'T12:00:00'), end = b || a;
+  for(let i = 0; i < 400; i++){ const ds = fmtDate(d); if(ds > end) break; if(d.getDay() === pd && !blocked.has(ds) && !(DATA.seasonEndDate && ds > DATA.seasonEndDate)) n++; d.setDate(d.getDate() + 1); }
+  return n;
+}
+function paShort(ds){ const d = new Date(ds + 'T12:00:00'); return DKD_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + DKD_MON[d.getMonth()]; }
+function paRangeTxt(a, b){ return (!b || a === b) ? paShort(a) : 'Du ' + paShort(a) + ' au ' + paShort(b); }
+// Calendrier d'absence (organisateur et joueur) : C = { month, a, b } ; « tap » et « nav » sont les noms des
+// fonctions à appeler ; planned = absences déjà prévues (affichées en orange).
+function absCalHTML(C, planned, tap, nav){
+  const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : null, today = fmtDate(new Date());
+  const rec = isRecLeague(), w1 = rec ? recW('soirée') : 'session', wN = rec ? recW('soirées') : 'sessions';
+  const y = parseInt(C.month.slice(0, 4), 10), m = parseInt(C.month.slice(5, 7), 10) - 1;
+  const nDays = new Date(y, m + 1, 0).getDate(), lead = new Date(y, m, 1).getDay();
+  const taken = function(ds){ return (planned || []).some(function(a){ return ds >= a.startDate && ds <= a.endDate; }); };
+  let cells = '';
+  for(let i = 0; i < lead; i++) cells += '<span class="sc-c sc-e"></span>';
+  for(let d = 1; d <= nDays; d++){
+    const ds = fmtDate(new Date(y, m, d)), dow = new Date(y, m, d).getDay();
+    const inR = C.a && ((C.b && ds >= C.a && ds <= C.b) || ds === C.a);
+    const cls = ['sc-c'];
+    if(inR) cls.push('sc-in');
+    if(ds === C.a) cls.push('sc-s');
+    if(ds === (C.b || C.a)) cls.push('sc-f');
+    if(pd !== null && dow === pd) cls.push('sc-p');
+    if(taken(ds)) cls.push('sc-b');
+    if(ds === today) cls.push('sc-t');
+    cells += ds < today ? `<span class="${cls.join(' ')} sc-off">${d}</span>` : `<button type="button" class="${cls.join(' ')}" onclick="${tap}('${ds}')" aria-label="${escapeHTML(frDateLong(ds))}">${d}</button>`;
   }
-  const ranges = planned.filter(function(a){ return a.startDate !== a.endDate && a.endDate >= today; });
-  const past = planned.filter(function(a){ return a.endDate < today; }).length;
-  if(ranges.length) h += `<div class="pf-list" style="margin-top:10px;">${ranges.map(function(a){
-      const n = upcoming.filter(function(ds){ return ds >= a.startDate && ds <= a.endDate; }).length;
-      return `<div class="pf-row" style="cursor:default;"><span class="t">Du ${escapeHTML(fdl(a.startDate))} au ${escapeHTML(fdl(a.endDate))}<small>${n ? n + ' ' + (n > 1 ? wN : w1) + ' à venir' : 'Aucune ' + w1 + ' à venir dans cette période'}</small></span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`;
-    }).join('')}</div>`;
-  if(VIEW.paRange === pid){
-    h += `<div class="pa-range"><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;">
-        <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" min="${today}" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-        <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" min="${today}" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="VIEW.paRange=null;render()">Annuler</button><button class="btn btn-primary" style="flex:1;" onclick="VIEW.paRange=null;submitPlannedAbsence('${pid}')">Ajouter la période</button></div></div>`;
+  const n = C.a ? paSessionsIn(C.a, C.b || C.a) : 0, nTxt = n ? n + ' ' + (n > 1 ? wN : w1) : 'aucune ' + w1;
+  const sum = C.a ? `<b>${escapeHTML(paRangeTxt(C.a, C.b))}</b><small>${nTxt}${!C.b ? ' · touche le dernier jour, ou garde ce jour seul' : ''}</small>` : `<b>Touche le premier jour d'absence</b><small>Puis le dernier jour (un seul jour, c'est possible aussi)</small>`;
+  return `<div class="pa-sum">${sum}</div>
+    <div class="sc-cal">
+      <div class="sc-mh"><button type="button" onclick="${nav}(-1)" aria-label="Mois précédent">‹</button><b>${FR_MONTHS[m]} ${y}</b><button type="button" onclick="${nav}(1)" aria-label="Mois suivant">›</button></div>
+      <div class="sc-g">${['D','L','M','M','J','V','S'].map(function(x, i){ return `<span class="sc-wd${pd === i ? ' on' : ''}">${x}</span>`; }).join('')}${cells}</div>
+      <div class="sc-leg"><span><i class="sc-l-in"></i>Absence</span>${pd !== null ? `<span><i class="sc-l-p"></i>${ST_DAYS[pd]}s de jeu</span>` : ''}${(planned || []).length ? `<span><i class="sc-l-b"></i>Déjà prévue</span>` : ''}</div>
+    </div>`;
+}
+function absCalTapIn(C, ds){ if(!C.a || C.b || ds < C.a){ C.a = ds; C.b = ''; } else C.b = ds; }
+function absCalMonthIn(C, d){ const y = parseInt(C.month.slice(0, 4), 10), m = parseInt(C.month.slice(5, 7), 10) - 1 + d; C.month = fmtDate(new Date(y, m, 1)).slice(0, 7); }
+function adminPlannedAbsenceHTML(p){
+  const pid = p.id, rec = isRecLeague(), w1 = rec ? recW('soirée') : 'session', wN = rec ? recW('soirées') : 'sessions';
+  const today = fmtDate(new Date()), planned = plannedAbsencesForPlayer(pid);
+  const upcoming = planned.filter(function(a){ return a.endDate >= today; }), past = planned.length - upcoming.length;
+  const nTxt = function(n){ return n ? n + ' ' + (n > 1 ? wN : w1) : 'aucune ' + w1; };
+  let h = `<div class="pf-sec">Absences prévues</div>`;
+  h += upcoming.length
+    ? `<div class="pf-list">${upcoming.map(function(a){ return `<div class="pf-row" style="cursor:default;"><span class="pa-ic" aria-hidden="true">${DKD_ICON}</span><span class="t">${escapeHTML(paRangeTxt(a.startDate, a.endDate))}<small>${nTxt(paSessionsIn(a.startDate, a.endDate))}</small></span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`; }).join('')}</div>`
+    : `<div class="pf-list"><div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div></div>`;
+  const C = VIEW.paCal && VIEW.paCal.pid === pid ? VIEW.paCal : null;
+  if(!C){
+    h += `<button type="button" class="pa-more" onclick="paCalOpen('${pid}')">+ Ajouter une absence</button>`;
   } else {
-    h += `<button type="button" class="pa-more" onclick="VIEW.paRange='${pid}';render()">+ Une période (vacances, voyage)…</button>`;
+    h += `<div class="pa-cal">${absCalHTML(C, planned, 'paCalTap', 'paCalMonth')}
+      <div class="pa-acts"><button type="button" class="btn btn-secondary" onclick="VIEW.paCal=null;render()">Annuler</button><button type="button" class="btn btn-primary" ${C.a ? '' : 'disabled'} onclick="paCalAdd()">Ajouter l'absence</button></div>
+    </div>`;
   }
   if(past) h += `<p class="small" style="color:var(--muted);margin:8px 2px 0;">${past} absence${past > 1 ? 's' : ''} prévue${past > 1 ? 's' : ''} déjà passée${past > 1 ? 's' : ''}.</p>`;
   return h;
 }
-function adminPlanToggle(pid, ds){
-  const a = plannedAbsencesForPlayer(pid).find(function(x){ return ds >= x.startDate && ds <= x.endDate; });
-  if(!a){ addPlannedAbsence(pid, ds, ds); saveAndRender(); showToast('Absent(e) le ' + frDateLong(ds).toLowerCase()); return; }
-  if(a.startDate === a.endDate){ removePlannedAbsence(a.id); showToast('Absence retirée'); return; }
-  showConfirm('Cette date fait partie de l\'absence du ' + fdl(a.startDate) + ' au ' + fdl(a.endDate) + '. Retirer toute la période ?', function(){ removePlannedAbsence(a.id); }, { okLabel: 'Retirer la période' });
+function paCalOpen(pid){ VIEW.paCal = { pid: pid, month: fmtDate(new Date()).slice(0, 7), a: '', b: '' }; render(); }
+function paCalMonth(d){ const C = VIEW.paCal; if(!C) return; absCalMonthIn(C, d); render(); }
+function paCalTap(ds){
+  const C = VIEW.paCal; if(!C) return;
+  absCalTapIn(C, ds); render();
+}
+function paCalAdd(){
+  const C = VIEW.paCal; if(!C || !C.a) return;
+  const a = C.a, b = C.b || C.a, pid = C.pid;
+  VIEW.paCal = null;
+  addPlannedAbsence(pid, a, b); saveAndRender();
+  showToast('Absence ajoutée : ' + paRangeTxt(a, b === a ? '' : b));
 }
 function adminAbsenceHubHTML(pid){
   const p = DATA.players.find(x=>x.id===pid);
@@ -22774,7 +22814,7 @@ function pawInfoFromData(d, playerId){
 }
 async function openPlannedAbsenceWizard(playerId){
   const links = pawLinksFor(playerId);
-  PAW = { pid: playerId, links: links, step: links.length > 1 ? 1 : 2, leagues: [CURRENT_LEAGUE_ID], mode: 'dates', dates: {}, start: '', end: '', info: {}, busy: false };
+  PAW = { pid: playerId, links: links, step: links.length > 1 ? 1 : 2, leagues: [CURRENT_LEAGUE_ID], mode: 'range', dates: {}, start: '', end: '', info: {}, busy: false };
   PAW.info[CURRENT_LEAGUE_ID] = pawInfoFromData(DATA, playerId);
   MODAL_UNDER = null; MODAL = { kind:'content', sheet:'pabs', title:'' }; render();
   // Calendrier des autres ligues (jour de jeu, dates bloquées, absences déjà prévues).
@@ -22806,7 +22846,9 @@ function pawAlreadyAbsent(info, ds){
 function pawToggleLeague(id){ toggleInList(PAW.leagues, id); renderSheet(); }
 function pawSetMode(m){ pawSaveRange(); PAW.mode = m; renderSheet(); }
 function pawToggleDate(lid, ds){ const arr = PAW.dates[lid] = PAW.dates[lid] || []; toggleInList(arr, ds); renderSheet(); }
-function pawSaveRange(){ const a = document.getElementById('pawStart'), b = document.getElementById('pawEnd'); if(a) PAW.start = a.value; if(b) PAW.end = b.value; }
+function pawSaveRange(){ if(PAW && PAW.cal){ PAW.start = PAW.cal.a || ''; PAW.end = PAW.cal.a ? (PAW.cal.b || PAW.cal.a) : ''; } }
+function pawCalTap(ds){ if(!PAW) return; PAW.cal = PAW.cal || { month: ds.slice(0, 7), a: '', b: '' }; absCalTapIn(PAW.cal, ds); pawSaveRange(); renderSheet(); }
+function pawCalMonth(d){ if(!PAW || !PAW.cal) return; absCalMonthIn(PAW.cal, d); renderSheet(); }
 function pawOnRange(){ pawSaveRange(); const btn = document.getElementById('pawNext'); if(btn) btn.disabled = !pawStepValid(); }
 function pawSelectedDates(lid){ return ((PAW.dates[lid] || []).slice()).sort(); }
 function pawStepValid(){
@@ -22832,7 +22874,7 @@ function pawSheetHTML(){
       <p class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Tu peux en choisir plusieurs.</p>`;
   } else if(P.step === 2){
     body += `<div class="an-sec" style="margin-top:6px;">Quand seras-tu absent(e) ?</div>
-      <div class="pf-seg"><button type="button" class="${P.mode==='dates'?'on':''}" onclick="pawSetMode('dates')">Des ${w} précises</button><button type="button" class="${P.mode==='range'?'on':''}" onclick="pawSetMode('range')">Une période</button></div>`;
+      <div class="pf-seg"><button type="button" class="${P.mode==='range'?'on':''}" onclick="pawSetMode('range')">Choisir les dates</button><button type="button" class="${P.mode==='dates'?'on':''}" onclick="pawSetMode('dates')">Des ${w} précises</button></div>`;
     if(P.mode === 'dates'){
       P.leagues.forEach(function(lid){
         const info = P.info[lid], dates = pawUpcoming(info);
@@ -22847,10 +22889,9 @@ function pawSheetHTML(){
       });
       body += `<p class="ah-meta" style="margin:12px 2px 0;font-size:13px;">Touche chaque ${isRecLeague() ? ('' + recW('soirée') + '') : 'session'} où tu seras absent(e). Les dates barrées sont déjà notées.</p>`;
     } else {
-      body += `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:14px;">
-          <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="pawStart" type="date" value="${escapeHTML(P.start||'')}" onchange="pawOnRange()" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-          <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="pawEnd" type="date" value="${escapeHTML(P.end||'')}" onchange="pawOnRange()" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-        </div>
+      P.cal = P.cal || { month: (P.start || fmtDate(new Date())).slice(0, 7), a: P.start || '', b: (P.end && P.end !== P.start) ? P.end : '' };
+      body += `<div class="pa-cal" style="margin-top:14px;">${absCalHTML(P.cal, (P.info[CURRENT_LEAGUE_ID] || {}).planned || [], 'pawCalTap', 'pawCalMonth')}</div>`;
+      body += `
         <p class="ah-meta" style="margin:10px 2px 0;font-size:13px;">Tu seras absent(e) à toutes les ${w} ${P.leagues.length > 1 ? 'des ligues choisies' : 'de la ligue'} pendant cette période, par exemple pour des vacances.</p>`;
     }
   } else {
