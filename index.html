@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 587">
+<meta name="app-build" content="Version 588">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -222,6 +222,13 @@ input.dk-date-src,select.dk-date-src{display:none !important;}
 .dkt-more summary{color:var(--muted);font-size:12.5px;cursor:pointer;padding:2px 0 6px;}
 .dk-time .dk-date-t{font-variant-numeric:tabular-nums;}
 .dk-sel{justify-content:space-between;}
+.dk-num{display:inline-flex;align-items:stretch;border:1px solid rgba(255,255,255,0.2);border-radius:999px;background:rgba(0,0,0,0.2);overflow:hidden;max-width:100%;vertical-align:middle;}
+.dk-num:focus-within{border-color:var(--ball);}
+.dk-num button{width:42px;min-height:42px;border:0;background:none;color:var(--text);font-size:20px;line-height:1;cursor:pointer;flex:none;padding:0;}
+.dk-num button:active{background:rgba(207,234,92,.15);}
+.dk-num input[type=number]{flex:1;min-width:0;width:56px;border:0 !important;background:none !important;border-radius:0 !important;text-align:center;font:700 18px var(--font-display);color:var(--ball);padding:0 2px;margin:0;box-shadow:none !important;-moz-appearance:textfield;}
+.dk-num input[type=number]::-webkit-outer-spin-button,.dk-num input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.field .dk-num,.wz-grid2 .dk-num,.tn-field .dk-num{display:flex;width:100%;}
 .dk-sel svg{color:var(--muted);}
 .dks{max-width:400px;}
 .dks-l{display:flex;flex-direction:column;gap:2px;max-height:min(60vh,460px);overflow-y:auto;margin:0 -4px;padding:0 4px 4px;}
@@ -5084,6 +5091,37 @@ function dktSet(v){
   inp.dispatchEvent(new Event('input', { bubbles: true }));
   inp.dispatchEvent(new Event('change', { bubbles: true }));
 }
+// ---- Compteurs Dinkeo : chaque champ numérique entier devient [−] nombre [+] (le nombre reste modifiable au clavier).
+// Exclus : cases de score, nombres décimaux, compteurs déjà faits, têtes de série. Le champ d'origine est gardé tel quel.
+function dknSkip(inp){
+  if(inp.closest('.tn-stepper, .dk-num')) return true;
+  if(inp.classList.contains('pill-input') || inp.classList.contains('rs-in') || inp.classList.contains('tn-seed')) return true;
+  if(/^(sc_|tsc_|tsg_)/.test(inp.id || '')) return true;
+  if(inp.closest('.tn-sc, .rs-row, .score-grid')) return true;
+  const st = inp.getAttribute('step'); if(st && (st === 'any' || parseFloat(st) % 1 !== 0)) return true;
+  return false;
+}
+function dknEnhance(root){
+  (root || document).querySelectorAll('input[type="number"]:not([data-dkn])').forEach(function(inp){
+    inp.setAttribute('data-dkn', '1');
+    if(dknSkip(inp)) return;
+    const w = document.createElement('span'); w.className = 'dk-num';
+    const mk = function(d, txt, lab){ const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.setAttribute('aria-label', lab); b.addEventListener('click', function(){ dknStep(inp, d); }); return b; };
+    inp.parentNode.insertBefore(w, inp);
+    w.appendChild(mk(-1, '−', 'Moins')); w.appendChild(inp); w.appendChild(mk(1, '+', 'Plus'));
+    if(!inp.getAttribute('inputmode')) inp.setAttribute('inputmode', 'numeric');
+  });
+}
+function dknStep(inp, d){
+  if(inp.disabled || inp.readOnly) return;
+  const step = parseFloat(inp.getAttribute('step')) || 1, min = inp.min !== '' ? parseFloat(inp.min) : -Infinity, max = inp.max !== '' ? parseFloat(inp.max) : Infinity;
+  let v = parseFloat(inp.value); if(isNaN(v)) v = isFinite(min) ? min : 0; else v += d * step;
+  v = Math.max(min, Math.min(max, v));
+  if(String(v) === inp.value) return;
+  inp.value = v;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
 // ---- Menus de choix Dinkeo : chaque <select> devient un bouton qui ouvre une liste de choix (✓ sur la sélection). ----
 // Le <select> d'origine reste caché (id, valeur, réactions inchangées). Un <select> caché exprès (display:none) reste caché.
 const DKS_CHEV = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
@@ -5143,7 +5181,7 @@ function dksPick(i){
 }
 (function(){
   let pend = false;
-  const run = function(){ pend = false; try{ dkdEnhance(document); dktEnhance(document); dksEnhance(document); document.querySelectorAll('select[data-dks]').forEach(dksSync); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); document.querySelectorAll('input[data-dkt]').forEach(dktSync); }catch(e){} };
+  const run = function(){ pend = false; try{ dkdEnhance(document); dktEnhance(document); dksEnhance(document); dknEnhance(document); document.querySelectorAll('select[data-dks]').forEach(dksSync); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); document.querySelectorAll('input[data-dkt]').forEach(dktSync); }catch(e){} };
   try{
     new MutationObserver(function(){ if(!pend){ pend = true; (window.requestAnimationFrame || setTimeout)(run); } }).observe(document.documentElement, { childList: true, subtree: true });
   }catch(e){}
@@ -5643,8 +5681,8 @@ function wizBodyHTML(key){
   } else if(key === 'calendrier'){
     h += `<span class="wz-lab" style="margin-top:0;">Jour de jeu</span><div class="wz-chips">
       ${[1,2,3,4,5,6,0].map(d=>`<button type="button" class="wz-chip${String(WIZ.day)===String(d)?' sel':''}" onclick="wizSetDay(String(WIZ.day)==='${d}'?'':'${d}')">${FR_DAYS[d].charAt(0).toUpperCase()+FR_DAYS[d].slice(1,3)}</button>`).join('')}</div>
-      <div class="wz-grid2"><div><span class="wz-lab">Heure</span><input class="wz-in" type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)"></div>
-      <div><span class="wz-lab">Durée (min)</span><input class="wz-in" type="number" min="15" step="15" value="${WIZ.duration}" onchange="wizNum('duration',this.value,15,600)"></div></div>
+      <span class="wz-lab">Heure de début</span><input class="wz-in" type="time" value="${escapeHTML(WIZ.time)}" onchange="wizSet('time',this.value)" style="width:100%;">
+      <span class="wz-lab">Durée</span><div class="wz-chips">${[60,90,120,150,180].concat([60,90,120,150,180].indexOf(WIZ.duration) === -1 ? [WIZ.duration] : []).sort(function(a, b){ return a - b; }).map(function(m){ return `<button type="button" class="wz-chip${WIZ.duration === m ? ' sel' : ''}" onclick="WIZ.duration=${m};renderSheet()">${m % 60 ? Math.floor(m / 60) + ' h ' + (m % 60) : (m / 60) + ' h'}</button>`; }).join('')}</div>
       <div class="wz-grid2"><div><span class="wz-lab">Ville</span><input class="wz-in" placeholder="ex: Chicoutimi" value="${escapeHTML(WIZ.city)}" onchange="wizSet('city',this.value)"></div>
       <div><span class="wz-lab">Lieu de jeu</span><input class="wz-in" placeholder="ex: Centre Pickleball" value="${escapeHTML(WIZ.venue)}" onchange="wizSet('venue',this.value)"></div></div>
       <div class="wz-grid2"><div><span class="wz-lab">Début de saison</span><input class="wz-in" type="date" value="${escapeHTML(WIZ.seasonStart)}" onchange="wizSet('seasonStart',this.value)"></div>
@@ -21178,7 +21216,7 @@ function openMatchFormatModal(){
       <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 5</label><input id="setRules5Points" type="number" min="1" value="${DATA.rules5Points || 9}"></div>
     </div>
     <div class="row">
-      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 6 (exception)</label><input id="setRules6Matches" type="number" min="1" value="${DATA.rules6Matches || 6}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Matchs — groupe de 6</label><input id="setRules6Matches" type="number" min="1" value="${DATA.rules6Matches || 6}"></div>
       <div class="field" style="flex:1;min-width:140px;"><label>Points — groupe de 6</label><input id="setRules6Points" type="number" min="1" value="${DATA.rules6Points || 11}"></div>
     </div>
     <p class="small">Un groupe de 6 (exception) utilise une rotation fixe équilibrée de 6 matchs : chaque joueur en joue 4, avec 4 partenaires différents. Un autre nombre répète ou coupe cette rotation. Pour une taille autre que 4, 5 ou 6, les matchs sont générés plus simplement (paires successives).</p>`;
