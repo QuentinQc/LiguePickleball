@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 573">
+<meta name="app-build" content="Version 574">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -11010,7 +11010,11 @@ async function tournAutoCall(tid){
 function tournAutoKick(tid){ setTimeout(function(){ tournAutoCall(tid); }, 400); }
 function tournUncall(id){
   const mu = (TMATCHES || []).find(function(x){ return x.id === id; }), auto = mu && tournSettings(tournById(mu.tournament_id)).auto;
-  showConfirm('Libérer le terrain ? Le match retourne dans la file d\'attente' + (auto ? ' (avec l\'appel automatique, mets-le plus bas dans la file s\'il ne doit pas être rappelé tout de suite).' : '.'), function(){ tournMatchPatch(id, { status: 'pending', court: null, called_at: null, started_at: null }); });
+  if(!mu) return;
+  const where = mu.court ? 'le terrain ' + mu.court : 'le terrain';
+  showConfirm('Libérer ' + where + ' ?\n\n' + tournTeamName(mu.team_a) + ' c. ' + tournTeamName(mu.team_b) + '\n\nLe match n\'est PAS terminé : aucun score n\'est enregistré et il retourne dans la file d\'attente.' + (auto ? ' Avec l\'appel automatique, il peut être rappelé tout de suite : mets-le plus bas dans la file s\'il doit attendre.' : '') + '\n\nMatch joué ? Utilise plutôt « Entrer le score ».',
+    function(){ tournMatchPatch(id, { status: 'pending', court: null, called_at: null, started_at: null }); },
+    { safe: true, okLabel: 'Libérer le terrain', cancelLabel: 'Garder le match' });
 }
 function tournScorePts(m){
   const t = tournById(m.tournament_id), r = tournDivRules(t, (TDIVS || []).find(function(x){ return x.id === m.division_id; }));
@@ -22470,7 +22474,7 @@ function dropModal(toBack){
   MODAL_UNDER = null;
   MODAL = u;
 }
-function showConfirm(message, onConfirm){ setModal({ kind:'confirm', message, onConfirm }); render(); }
+function showConfirm(message, onConfirm, opts){ setModal({ kind:'confirm', message, onConfirm, okLabel: opts && opts.okLabel, cancelLabel: opts && opts.cancelLabel, safe: !!(opts && opts.safe) }); render(); }
 function showAlert(message){ setModal({ kind:'alert', message }); render(); }
 function showPrompt(message, defaultValue, onConfirm){ setModal({ kind:'prompt', message, defaultValue: defaultValue||'', onConfirm }); render(); }
 function showChoice(message, choices, onConfirm, opts){ setModal({ kind:'choice', message, choices, onConfirm, noCancel: !!(opts && opts.noCancel) }); render(); }
@@ -22534,9 +22538,15 @@ function modalHTML(){
         <button class="btn btn-primary" onclick="modalConfirmClick()">OK</button>
       </div>`;
   } else if(MODAL.kind === 'confirm'){
-    inner += `<div class="row" style="justify-content:flex-end;">
-        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
-        <button class="btn btn-primary" onclick="modalConfirmClick()">Confirmer</button>
+    // safe : l'action risquée devient le bouton discret ; le bouton bien visible garde tout tel quel.
+    inner += MODAL.safe
+      ? `<div class="row" style="justify-content:flex-end;">
+        <button class="btn btn-danger" onclick="modalConfirmClick()">${escapeHTML(MODAL.okLabel || 'Confirmer')}</button>
+        <button class="btn btn-primary" onclick="closeModal()">${escapeHTML(MODAL.cancelLabel || 'Annuler')}</button>
+      </div>`
+      : `<div class="row" style="justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal()">${escapeHTML(MODAL.cancelLabel || 'Annuler')}</button>
+        <button class="btn btn-primary" onclick="modalConfirmClick()">${escapeHTML(MODAL.okLabel || 'Confirmer')}</button>
       </div>`;
   } else if(MODAL.kind === 'choice'){
     inner += MODAL.choices.map((c,i)=>`<button class="btn ${MODAL.noCancel && i === 0 ? 'btn-primary' : 'btn-secondary'}" style="display:block;width:100%;margin-bottom:8px;text-align:${MODAL.noCancel ? 'center' : 'left'};" onclick="modalChoiceClick(${i})">${escapeHTML(c)}</button>`).join('')
