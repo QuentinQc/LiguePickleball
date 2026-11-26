@@ -19766,7 +19766,7 @@ function stThemes(){
                         : sw('Entrer leurs scores', 'À partir du jour de la session. Sinon, toi seul.', DATA.allowPlayerScoreEntry, 'allowPlayerScoreEntry'));
   can.push(r('Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'à accepter par tous' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()'));
   T.push({ id:'joueurs', t:'Joueurs', ic:'ply', sum: rec ? 'Ce qu\'ils voient · règlement' : ((DATA.showRatingToPlayers ? 'Cote visible' : 'Cote cachée') + ' · ' + (DATA.allowPlayerScoreEntry || (mlp && DATA.mlpPlayerScoreEntry !== false) ? 'ils entrent les scores' : 'toi seul entres les scores')),
-    secs: [ { t:'Ce qu\'ils voient', rows: see }, { t:'Ce qu\'ils peuvent faire', rows: can },
+    secs: [ { t:'Ce qu\'ils voient', rows: see }, { t: can.length > 1 ? 'Ce qu\'ils peuvent faire' : 'Règlement', rows: can },
       adminOwnLink('player') ? { t:'Voir l\'app comme eux', rows: [ r('Passer en vue joueur', 'Pour vérifier ce qu\'ils voient', 'toggleAdminPlayerView()') ] } : null ] });
   // Ligue
   T.push({ id:'ligue', t:'Ligue', ic:'lig', sum: (lm.listed === false ? 'Cachée de la recherche' : 'Visible dans la recherche') + (where ? ' · ' + where : '') + (!rec && !mlp && (DATA.courts||[]).length ? ' · ' + DATA.courts.length + ' terrain' + (DATA.courts.length>1?'s':'') : ''),
