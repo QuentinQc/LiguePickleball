@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 576">
+<meta name="app-build" content="Version 577">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -5701,6 +5701,8 @@ function groupNameFor(n, groups){
 }
 function playersInGroup(gid){ return DATA.players.filter(p=>p.groupId===gid); }
 
+// Montées/descentes : minimum garanti (défaut 1) et maximum visé (swapCount), entre deux groupes voisins.
+function swapMin(){ const m = (typeof DATA.swapMin === 'number') ? DATA.swapMin : 1; return Math.max(0, Math.min(DATA.swapCount || 1, m)); }
 function GROUP_MAX_PLAYERS(){ return DATA.groupMaxPlayers || 5; }
 const GROUP_HARD_MAX = 6; // exception : un groupe peut occasionnellement compter 6 joueurs (rotation spéciale)
 function GROUP_MIN_PLAYERS(){ return DATA.groupMinPlayers || 4; }
@@ -7097,24 +7099,26 @@ function finalizeSession(session){
       const lower = sorted[i+1];
       // Les remplaçants réguliers (joueurs prêtés) suivent les règles normales du
       // groupe où ils ont joué. Seuls les invités hors ligue ne sont jamais éligibles.
-      // Règle de la ligue : on vise N montées et N descentes (N = swapCount, ex. 2-2) et on garantit
-      // au moins 1 et 1. Places réelles : le classement compte tout le monde, remplaçants compris ;
-      // seuls les joueurs de la ligue classés dans les N premières places peuvent monter et ceux des
-      // N dernières places descendre. Le 3e (hors de ces places) reste dans son groupe.
+      // Règle de la ligue : on vise le maximum (swapCount, ex. 2) de montées et de descentes et on
+      // garantit le minimum (swapMin, ex. 1). Places réelles : le classement compte tout le monde,
+      // remplaçants compris ; seuls les joueurs de la ligue classés dans les « maximum » premières places
+      // peuvent monter et ceux des « maximum » dernières places descendre (le suivant reste dans son groupe).
+      // Si des remplaçants occupent ces places, on va chercher plus loin seulement pour atteindre le minimum.
       // Autant de montées que de descentes à chaque frontière : les groupes gardent leur taille.
       // Un absent du groupe du haut descend de toute façon et compte comme une des descentes.
       const eligible = function(r){ return !isGuestOrSubId(r.playerId) && !movedPlayerIds.has(r.playerId); };
       const upperAll = standingsByGroup[upper.id] || [], lowerAll = standingsByGroup[lower.id] || [];
-      const nUpWin = DATA.swapCount + (extraUp[i]||0), nDownWin = DATA.swapCount + (extraDown[i]||0);
-      let upCand = lowerAll.slice(0, nUpWin).filter(eligible);
-      let downCand = upperAll.slice(Math.max(0, upperAll.length - nDownWin)).filter(eligible).reverse();
-      // Garantie d'au moins 1 : si les places de montée (ou de descente) ne sont occupées que par des
-      // remplaçants, on prend le premier (ou le dernier) joueur de la ligue du groupe.
-      if(!upCand.length){ const f = lowerAll.find(eligible); if(f) upCand = [f]; }
+      const nUpWin = DATA.swapCount + (extraUp[i]||0), nDownWin = DATA.swapCount + (extraDown[i]||0), nMin = swapMin();
       const absentFromUpper = absentNoLoanByGroup[upper.id] || 0;
-      if(!downCand.length && !absentFromUpper){ const l = upperAll.slice().reverse().find(eligible); if(l) downCand = [l]; }
+      let upCand = lowerAll.slice(0, nUpWin).filter(eligible);
+      if(upCand.length < nMin){ lowerAll.slice(nUpWin).filter(eligible).forEach(function(r){ if(upCand.length < nMin) upCand.push(r); }); }
+      let downCand = upperAll.slice(Math.max(0, upperAll.length - nDownWin)).filter(eligible).reverse();
+      if(downCand.length + absentFromUpper < nMin){
+        upperAll.slice(0, Math.max(0, upperAll.length - nDownWin)).filter(eligible).reverse().forEach(function(r){
+          if(downCand.length + absentFromUpper < nMin && upCand.indexOf(r) === -1) downCand.push(r); });
+      }
       // Autant de montées que de descentes (absents compris), sans dépasser les places prévues.
-      const nUp = Math.min(upCand.length, Math.max(1, absentFromUpper + downCand.length));
+      const nUp = Math.min(upCand.length, Math.max(nMin, absentFromUpper + downCand.length));
       const nDown = Math.min(downCand.length, Math.max(0, nUp - absentFromUpper));
       const ups = upCand.slice(0, nUp), downs = downCand.slice(0, nDown);
       ups.forEach(function(r){ movements.push({ playerId: r.playerId, fromGroupId: lower.id, toGroupId: upper.id }); movedPlayerIds.add(r.playerId); });
@@ -20362,7 +20366,7 @@ function openGeneralInfoModal(){
       <div class="field"><label>Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
       <div class="field"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
     </div>
-    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Joueurs qui montent / descendent</label><input id="setSwap" type="number" min="1" value="${DATA.swapCount}"><div class="small" style="color:var(--muted);margin-top:4px;">Entre deux groupes voisins, à chaque session.</div></div>` : ''}
+    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Montées / descentes entre deux groupes voisins</label><div class="row" style="gap:10px;flex-wrap:wrap;"><div style="flex:1;min-width:130px;"><label for="setSwapMin" class="small" style="color:var(--muted);">Minimum garanti</label><input id="setSwapMin" type="number" min="0" inputmode="numeric" value="${swapMin()}"></div><div style="flex:1;min-width:130px;"><label for="setSwap" class="small" style="color:var(--muted);">Maximum visé</label><input id="setSwap" type="number" min="1" inputmode="numeric" value="${DATA.swapCount}"></div></div><div class="small" style="color:var(--muted);margin-top:4px;">À chaque session, on vise le maximum : seuls les joueurs classés dans ces premières places montent et ceux des dernières places descendent (le suivant reste). Si des remplaçants occupent ces places, il en bouge moins, mais jamais moins que le minimum. Toujours autant de montées que de descentes : les groupes gardent leur taille.</div></div>` : ''}
     <p class="small" style="color:var(--muted);margin:4px 0 0;">Le format est choisi à la création de la ligue et ne se change pas ici.</p>`;
   showFormModal('Informations générales', html, saveGeneralInfoForm);
 }
@@ -20378,6 +20382,8 @@ function saveGeneralInfoForm(){
   // Montées/descentes : seulement en échelle (le champ n'est pas affiché pour les autres formats).
   const swapEl = document.getElementById('setSwap');
   if(swapEl) DATA.swapCount = Math.max(1, parseInt(swapEl.value,10) || 1);
+  const swapMinEl = document.getElementById('setSwapMin');
+  if(swapMinEl){ const v = parseInt(swapMinEl.value, 10); DATA.swapMin = Math.max(0, Math.min(DATA.swapCount, isNaN(v) ? 1 : v)); }
   DATA.playTime = document.getElementById('setPlayTime').value || undefined;
   DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
   const scheduleLabel = document.getElementById('setLeagueSchedule').value.trim();
