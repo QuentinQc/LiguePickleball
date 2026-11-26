@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 579">
+<meta name="app-build" content="Version 580">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -183,6 +183,42 @@ textarea::placeholder{color:var(--muted);}
 textarea:focus{outline:none;border-color:var(--ball);box-shadow:0 0 0 3px rgba(207,234,92,.18);}
 input[type=text],input[type=email],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]){border-radius:12px;}
 input[type=date],input[type=time]{color-scheme:dark;}
+/* Sélecteur de date Dinkeo : le champ système est caché, un bouton au style de l'app le remplace. */
+input.dk-date-src{display:none !important;}
+.dk-date{display:inline-flex;align-items:center;gap:10px;min-height:42px;font-family:var(--font-body);font-size:15px;font-weight:600;padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.2);color:var(--text);cursor:pointer;text-align:left;box-sizing:border-box;max-width:100%;}
+.dk-date svg{color:var(--ball);flex:none;}
+.dk-date.dk-none{color:var(--muted);font-weight:500;font-style:normal;}
+.dk-date:hover,.dk-date:focus-visible{border-color:var(--ball);outline:none;}
+.dk-date:disabled{opacity:.5;cursor:default;}
+.field .dk-date,.pc-field .dk-date,.wz-grid2 .dk-date,.tn-field .dk-date,.cmp-body .dk-date{width:100%;}
+.dk-date-t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dk-date{container-type:inline-size;}
+@container (max-width:185px){ .dk-wd{display:none;} }
+.dkdp-ov{position:fixed;inset:0;z-index:5000;background:rgba(3,12,10,.55);display:none;align-items:center;justify-content:center;padding:16px;}
+.dkdp-ov.show{display:flex;}
+.dkdp{width:100%;max-width:360px;background:#132f2b;border:1px solid rgba(255,255,255,.16);border-radius:22px;padding:14px 14px 10px;box-shadow:0 24px 60px rgba(0,0,0,.5);color:var(--text);}
+.dkdp-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin:0 2px 10px;}
+.dkdp-h small{display:block;color:var(--muted);font-size:12.5px;}
+.dkdp-h b{display:block;font-size:17px;}
+.dkdp-x{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:none;color:var(--text);font-size:20px;line-height:1;cursor:pointer;flex:none;}
+.dkdp-mh{display:flex;align-items:center;justify-content:space-between;margin:0 2px 6px;}
+.dkdp-mh b{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em;font-size:16px;}
+.dkdp-mh button{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:none;color:var(--text);font-size:18px;cursor:pointer;}
+.dkdp-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;}
+.dkdp-wd{text-align:center;font:600 11px var(--font-body);color:var(--muted);padding:4px 0;}
+.dkdp-c{height:42px;border:0;border-radius:12px;background:none;color:var(--text);font:500 15px var(--font-body);cursor:pointer;font-variant-numeric:tabular-nums;}
+.dkdp-c:hover:not(:disabled){background:rgba(207,234,92,.14);}
+.dkdp-c:focus-visible{outline:2px solid var(--ball);outline-offset:-2px;}
+.dkdp-c.tod{box-shadow:inset 0 0 0 1px rgba(207,234,92,.6);}
+.dkdp-c.sel{background:var(--ball);color:var(--court);font-weight:800;}
+.dkdp-c:disabled{color:rgba(255,255,255,.22);cursor:default;}
+.dkdp-f{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:6px 2px 2px;border-top:1px solid var(--line-soft);}
+.dkdp-l{background:none;border:0;color:var(--ball);font:700 14px var(--font-body);padding:8px 6px;cursor:pointer;}
+@media (max-width:640px){
+  .dkdp-ov{align-items:flex-end;padding:0;}
+  .dkdp{max-width:none;border-radius:24px 24px 0 0;padding:16px 16px calc(14px + env(safe-area-inset-bottom, 0px));}
+  .dkdp-c{height:46px;}
+}
 .ta-counter{text-align:right;font-size:11px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums;}
 .ta-counter.warn{color:var(--paddle);}
 .f-label{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;}
@@ -4819,6 +4855,112 @@ async function loadSocialEvents(){
   SOCIAL_EVENTS = evList;
   SOCIAL_EVENT_RSVPS = map;
 }
+// ============ Sélecteur de date Dinkeo ============
+// Chaque <input type="date"> de l'app est remplacé à l'écran par un bouton au style de l'app qui ouvre un
+// calendrier (feuille par le bas sur téléphone, fenêtre centrée sur ordinateur). Le champ d'origine reste
+// dans la page, caché : il garde son id, sa valeur, ses min/max et ses réactions (onchange) ; le code
+// existant n'a donc rien à changer.
+const DKD_DOW = ['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'];
+const DKD_MON = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const DKD_MONF = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const DKD_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3"/></svg>';
+function dkdYmd(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function dkdTxt(v){ if(!/^\d{4}-\d{2}-\d{2}$/.test(v || '')) return ''; const d = new Date(v + 'T12:00:00'); return DKD_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + DKD_MON[d.getMonth()] + ' ' + d.getFullYear(); }
+function dkdLabel(inp){
+  const lab = inp.closest('label'); if(lab){ const sp = lab.querySelector('span'); return (sp ? sp.textContent : lab.textContent).trim(); }
+  if(inp.id){ const l = document.querySelector('label[for="' + inp.id + '"]'); if(l) return l.textContent.trim(); }
+  const f = inp.closest('.field, .wz-grid2 > div, .tn-field, .pc-field'); if(f){ const l = f.querySelector('label, .wz-lab, .tn-k'); if(l) return l.textContent.trim(); }
+  return 'Date';
+}
+function dkdSync(inp){
+  const b = inp._dkd; if(!b) return;
+  const t = dkdTxt(inp.value);
+  const el = b.querySelector('.dk-date-t'), txt = t || 'Choisir une date';
+  if(el.textContent !== txt){
+    // Le jour de la semaine se cache quand le bouton est étroit (voir @container) : la date reste entière.
+    const k = t ? t.indexOf(' ') : -1;
+    el.innerHTML = k > 0 ? '<span class="dk-wd">' + escapeHTML(t.slice(0, k + 1)) + '</span>' + escapeHTML(t.slice(k + 1)) : escapeHTML(txt);
+  }
+  if(b.classList.contains('dk-none') !== !t) b.classList.toggle('dk-none', !t);
+  if(b.disabled !== !!inp.disabled) b.disabled = !!inp.disabled;
+}
+function dkdEnhance(root){
+  (root || document).querySelectorAll('input[type="date"]:not([data-dkd])').forEach(function(inp){
+    inp.setAttribute('data-dkd', '1');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = (inp.className ? inp.className + ' ' : '') + 'dk-date';
+    const st = inp.getAttribute('style'); if(st) b.setAttribute('style', st);
+    b.innerHTML = DKD_ICON + '<span class="dk-date-t"></span>';
+    b.setAttribute('aria-label', dkdLabel(inp));
+    b.addEventListener('click', function(){ dkdOpen(inp); });
+    inp._dkd = b;
+    inp.classList.add('dk-date-src');
+    inp.parentNode.insertBefore(b, inp.nextSibling);
+    inp.addEventListener('change', function(){ dkdSync(inp); });
+    dkdSync(inp);
+  });
+}
+let DKD = null; // { inp, month:'YYYY-MM' }
+function dkdOpen(inp){
+  const today = dkdYmd(new Date());
+  // Champ « Au » vide : on part de la date du champ « Du » juste avant (même formulaire).
+  let ref = inp.value;
+  if(!ref){
+    const all = Array.prototype.slice.call((inp.closest('.modal-box, .sheet, form, .card, body') || document).querySelectorAll('input[type="date"]'));
+    const i = all.indexOf(inp); if(i > 0 && all[i - 1].value) ref = all[i - 1].value;
+  }
+  ref = ref || inp.min || today;
+  DKD = { inp: inp, month: ref.slice(0, 7), label: dkdLabel(inp) };
+  let ov = document.getElementById('dkDp');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'dkDp'; ov.className = 'dkdp-ov';
+    ov.addEventListener('click', function(e){ if(e.target === ov) dkdClose(); });
+    document.body.appendChild(ov);
+  }
+  dkdRender();
+  ov.classList.add('show');
+  document.addEventListener('keydown', dkdKey);
+  setTimeout(function(){ const f = ov.querySelector('.dkdp-c.sel') || ov.querySelector('.dkdp-x'); if(f) f.focus({ preventScroll: true }); }, 30);
+}
+function dkdKey(e){ if(e.key === 'Escape'){ e.stopPropagation(); dkdClose(); } }
+function dkdClose(){ const ov = document.getElementById('dkDp'); if(ov) ov.classList.remove('show'); document.removeEventListener('keydown', dkdKey); if(DKD && DKD.inp && DKD.inp._dkd) try{ DKD.inp._dkd.focus(); }catch(e){} DKD = null; }
+function dkdRender(){
+  const ov = document.getElementById('dkDp'); if(!ov || !DKD) return;
+  const inp = DKD.inp, v = inp.value, min = inp.min || '', max = inp.max || '', today = dkdYmd(new Date());
+  const y = parseInt(DKD.month.slice(0, 4), 10), m = parseInt(DKD.month.slice(5, 7), 10) - 1;
+  const nDays = new Date(y, m + 1, 0).getDate(), lead = new Date(y, m, 1).getDay();
+  let cells = '';
+  for(let i = 0; i < lead; i++) cells += '<span></span>';
+  for(let d = 1; d <= nDays; d++){
+    const ds = dkdYmd(new Date(y, m, d)), off = (min && ds < min) || (max && ds > max);
+    cells += `<button type="button" class="dkdp-c${ds === v ? ' sel' : ''}${ds === today ? ' tod' : ''}" ${off ? 'disabled' : ''} onclick="dkdPick('${ds}')" aria-label="${escapeHTML(dkdTxt(ds))}">${d}</button>`;
+  }
+  const canToday = !((min && today < min) || (max && today > max));
+  ov.innerHTML = `<div class="dkdp" role="dialog" aria-modal="true" aria-label="${escapeHTML(DKD.label)}">
+    <div class="dkdp-h"><div><small>${escapeHTML(DKD.label)}</small><b>${v ? escapeHTML(dkdTxt(v)) : 'Aucune date'}</b></div><button type="button" class="dkdp-x" onclick="dkdClose()" aria-label="Fermer">×</button></div>
+    <div class="dkdp-mh"><button type="button" onclick="dkdMonth(-1)" aria-label="Mois précédent">‹</button><b>${DKD_MONF[m]} ${y}</b><button type="button" onclick="dkdMonth(1)" aria-label="Mois suivant">›</button></div>
+    <div class="dkdp-g">${['D','L','M','M','J','V','S'].map(function(x){ return `<span class="dkdp-wd">${x}</span>`; }).join('')}${cells}</div>
+    <div class="dkdp-f">${v ? `<button type="button" class="dkdp-l" onclick="dkdPick('')">Effacer</button>` : '<span></span>'}${canToday ? `<button type="button" class="dkdp-l" onclick="dkdPick('${today}')">Aujourd'hui</button>` : ''}</div>
+  </div>`;
+}
+function dkdMonth(d){ if(!DKD) return; const y = parseInt(DKD.month.slice(0, 4), 10), m = parseInt(DKD.month.slice(5, 7), 10) - 1 + d; DKD.month = dkdYmd(new Date(y, m, 1)).slice(0, 7); dkdRender(); }
+function dkdPick(ds){
+  if(!DKD) return; const inp = DKD.inp;
+  inp.value = ds;
+  dkdSync(inp);
+  dkdClose();
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
+(function(){
+  let pend = false;
+  const run = function(){ pend = false; try{ dkdEnhance(document); document.querySelectorAll('input[data-dkd]').forEach(dkdSync); }catch(e){} };
+  try{
+    new MutationObserver(function(){ if(!pend){ pend = true; (window.requestAnimationFrame || setTimeout)(run); } }).observe(document.documentElement, { childList: true, subtree: true });
+  }catch(e){}
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+})();
 function showToast(msg, isErr){
   try{
     let t = document.getElementById('dkToast');
