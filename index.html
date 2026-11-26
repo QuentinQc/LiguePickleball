@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 572">
+<meta name="app-build" content="Version 573">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -9912,22 +9912,6 @@ function tournSheetHTML(){
 }
 // ---- Classement : en tout temps, par poule ou pour toute la catégorie (poules et tableau confondus) ----
 // Fiche de chaque équipe (ou joueur, partenaires qui changent) : matchs joués, victoires, défaites, points pour, contre, différentiel.
-function tournRankStats(divId, pool){
-  const rot = tournDivIsRot(divId), row = {};
-  (TTEAMS || []).forEach(function(x){ if(x.division_id === divId && x.status === 'registered' && (!pool || x.pool === pool)) row[x.id] = { id: x.id, j: 0, w: 0, l: 0, pf: 0, pa: 0 }; });
-  tournMatches(divId).forEach(function(m){
-    if(m.status !== 'done' || !m.team_a || !m.team_b) return;
-    if(pool && (m.phase !== 'pool' || m.pool !== pool)) return;
-    // Points marqués : somme des manches en 2 de 3, sinon le score du match.
-    let a = Number(m.score_a) || 0, b = Number(m.score_b) || 0;
-    if(Array.isArray(m.games) && m.games.length){ a = 0; b = 0; m.games.forEach(function(g){ a += Number(g[0]) || 0; b += Number(g[1]) || 0; }); }
-    const aw = m.winner === m.team_a;
-    const add = function(ids, pf, pa, win){ ids.forEach(function(id){ const r = row[id]; if(!r) return; r.j++; r.pf += pf; r.pa += pa; if(win) r.w++; else r.l++; }); };
-    add(rot ? tournMembers(m.team_a) : [m.team_a], a, b, aw);
-    add(rot ? tournMembers(m.team_b) : [m.team_b], b, a, !aw);
-  });
-  return Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; return r; });
-}
 function tournRankHTML(t, ro, me){
   const divs = tournDivs(t.id).filter(function(d){ return (d.stage || 'setup') !== 'setup'; });
   if(!divs.length) return `<div class="tn-note" style="margin-top:14px;">Le classement s'affiche dès que les matchs d'une catégorie sont créés.</div>`;
@@ -9938,26 +9922,23 @@ function tournRankHTML(t, ro, me){
   const sw = labels.length ? `<div class="tn-seg tn-rk-sw" role="tablist"><button type="button" class="${scope === 'all' ? 'on' : ''}" onclick="VIEW.trks='all';render()">Catégorie</button><button type="button" class="${scope === 'pool' ? 'on' : ''}" onclick="VIEW.trks='pool';render()">${rot ? 'Par groupe' : 'Par poule'}</button></div>` : '';
   const mine = me ? (rot ? me.id : me.id) : null;
   const table = function(list){
-    return `<table class="tn-rk"><thead><tr><th>#</th><th>${rot ? 'Joueur' : 'Équipe'}</th><th class="n">J</th><th class="n">V</th><th class="n">D</th><th class="n hm">Pour</th><th class="n hm">Contre</th><th class="n sm">Points</th><th class="n">+/-</th></tr></thead><tbody>${list.map(function(r, i){
-      return `<tr class="${r.id === mine ? 'me' : ''}"><td>${i + 1}</td><td>${escapeHTML(rot ? tournTeamName(r.id) : tournTeamFull(r.id))}${r.id === mine ? ' <small>(toi)</small>' : ''}</td><td class="n">${r.j}</td><td class="n">${r.w}</td><td class="n">${r.l}</td><td class="n hm">${r.pf}</td><td class="n hm">${r.pa}</td><td class="n sm">${r.pf}-${r.pa}</td><td class="n">${r.diff > 0 ? '+' : ''}${r.diff}</td></tr>`;
+    return `<table class="tn-rk"><thead><tr><th>#</th><th>${rot ? 'Joueur' : 'Équipe'}</th><th class="n">J</th><th class="n">V</th><th class="n">D</th><th class="n">Moy.</th><th class="n hm">Pour</th><th class="n hm">Contre</th><th class="n sm">Points</th><th class="n">+/-</th></tr></thead><tbody>${list.map(function(r, i){
+      return `<tr class="${r.id === mine ? 'me' : ''}"><td>${i + 1}</td><td>${escapeHTML(rot ? tournTeamName(r.id) : tournTeamFull(r.id))}${r.id === mine ? ' <small>(toi)</small>' : ''}</td><td class="n">${r.j}</td><td class="n">${r.w}</td><td class="n">${r.l}</td><td class="n">${r.j ? (r.pf / r.j).toFixed(2) : '–'}</td><td class="n hm">${r.pf}</td><td class="n hm">${r.pa}</td><td class="n sm">${r.pf}-${r.pa}</td><td class="n">${r.diff > 0 ? '+' : ''}${r.diff}</td></tr>`;
     }).join('')}</tbody></table>`;
   };
   let body;
   if(scope === 'pool'){
     body = `<div class="tn-pools">${labels.map(function(lb){
       // Ordre officiel de la poule (avec le résultat entre égaux), colonnes de la fiche complète.
-      const st = tournStandings(d.id, lb), stats = {}; tournRankStats(d.id, lb).forEach(function(r){ stats[r.id] = r; });
-      const list = st.map(function(x){ return stats[x.id] || { id: x.id, j: 0, w: 0, l: 0, pf: 0, pa: 0, diff: 0 }; });
+      const list = tournStandings(d.id, lb);
       return `<section class="tn-pool"><div class="tn-pool-h"><b>${escapeHTML(tournPoolTitle(lb))}</b><span>${list.length} ${rot ? 'joueurs' : 'équipes'}</span></div>${table(list)}</section>`;
     }).join('')}</div>`;
   } else {
-    const list = tournRankStats(d.id, null);
-    const pct = function(r, v){ return r.j ? v / r.j : 0; };
-    list.sort(function(x, y){ return (pct(y, y.w) - pct(x, x.w)) || (y.w - x.w) || (y.diff - x.diff) || (y.pf - x.pf) || tournTeamName(x.id).localeCompare(tournTeamName(y.id)); });
+    const list = tournRankRows(d.id, function(){ return true; }, function(){ return true; });
     body = `<section class="tn-pool" style="margin-top:4px;"><div class="tn-pool-h"><b>${escapeHTML(d.name)} · toute la catégorie</b><span>${tournMatches(d.id).filter(function(m){ return m.status === 'done' && m.team_a && m.team_b; }).length} matchs joués</span></div>${table(list)}</section>`;
   }
   return chips + `<div class="tn-sec-h tn-prep-bar" style="margin-top:${chips ? 0 : 12}px;"><span>Classement</span>${sw}</div>
-    <p class="small" style="color:var(--muted);margin:4px 0 10px;">${scope === 'pool' ? 'Ordre officiel de chaque ' + (rot ? 'groupe' : 'poule') + ' : victoires, puis résultat entre équipes à égalité, puis différentiel.' : 'Tous les matchs joués de la catégorie, poules et tableau confondus : proportion de victoires, puis différentiel, puis points marqués.'} J = matchs joués, V = victoires, D = défaites, Pour / Contre = points marqués et reçus.</p>${body}`;
+    <p class="small" style="color:var(--muted);margin:4px 0 10px;">${scope === 'pool' ? 'Classement de chaque ' + (rot ? 'groupe' : 'poule') : 'Tous les matchs joués de la catégorie, poules et tableau confondus'}, selon l'ordre de départage des Réglages du jour : ${escapeHTML(tournTiebreakOrder(t).map(function(k){ return TOURN_TB_LABEL[k].replace(/ \(.*\)$/, '').toLowerCase(); }).join(', puis ') || 'aucun critère')}. J = matchs joués, Moy. = points marqués par match, V = victoires, D = défaites, Pour / Contre = points marqués et reçus.</p>${body}`;
 }
 function tournSettingsHTML(t){
   const st = TOURN_ST[t.status] || TOURN_ST.draft, divs = tournDivs(t.id);
@@ -11260,14 +11241,19 @@ function tournLiveNotify(){ try{ if(TLIVE_CH) TLIVE_CH.send({ type: 'broadcast',
 // (par défaut : moyenne de points par match joué à deux décimales, victoires, face-à-face, premier match perdu le plus tard).
 // Équipes fixes ou joueurs (partenaires qui changent).
 function tournStandings(divId, pool){
+  return tournRankRows(divId, function(x){ return x.pool === pool; }, function(m){ return m.phase === 'pool' && m.pool === pool; });
+}
+// Classement selon l'ordre de départage du tournoi : une poule (tournStandings) ou toute la catégorie
+// (onglet Classement, tous les matchs joués). Mêmes critères, même ordre, partout.
+function tournRankRows(divId, keepEnt, keepMatch){
   const rot = tournDivIsRot(divId);
-  const ents = (TTEAMS || []).filter(function(x){ return x.division_id === divId && x.pool === pool && x.status === 'registered'; });
+  const ents = (TTEAMS || []).filter(function(x){ return x.division_id === divId && x.status === 'registered' && keepEnt(x); });
   const row = {};
   ents.forEach(function(x){ row[x.id] = { id: x.id, w: 0, l: 0, pf: 0, pa: 0, played: 0, left: 0 }; });
   const sides = function(m){ return rot ? [tournMembers(m.team_a), tournMembers(m.team_b)] : [[m.team_a], [m.team_b]]; };
   const done = [];
   (TMATCHES || []).forEach(function(m){
-    if(m.division_id !== divId || m.phase !== 'pool' || m.pool !== pool || !m.team_a || !m.team_b) return;
+    if(m.division_id !== divId || !keepMatch(m) || !m.team_a || !m.team_b || m.status === 'bye') return;
     const sd = sides(m);
     if(m.status !== 'done'){ sd[0].concat(sd[1]).forEach(function(id){ if(row[id]) row[id].left++; }); return; }
     // Points : somme des manches en 2 de 3, sinon le score du match.
@@ -11279,7 +11265,7 @@ function tournStandings(divId, pool){
     sd[1].forEach(function(id){ const r = row[id]; if(!r) return; r.pf += sb; r.pa += sa; r.played++; if(aWin) r.l++; else r.w++; });
   });
   done.sort(function(x, y){ return x.t < y.t ? -1 : x.t > y.t ? 1 : x.seq - y.seq; });
-  const list = Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; r.avg = r.played ? r.pf / r.played : null; return r; });
+  const list = Object.keys(row).map(function(k){ const r = row[k]; r.diff = r.pf - r.pa; r.j = r.played; r.avg = r.played ? r.pf / r.played : null; return r; });
   const avgKey = function(r){ return r.played > 0 ? Math.round(r.pf * 100 / r.played) : -1; };
   const h2h = function(x, y){ let n = 0; done.forEach(function(m){
     const xa = m.a.indexOf(x) !== -1, xb = m.b.indexOf(x) !== -1, ya = m.a.indexOf(y) !== -1, yb = m.b.indexOf(y) !== -1;
