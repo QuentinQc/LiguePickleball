@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 577">
+<meta name="app-build" content="Version 578">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1493,6 +1493,59 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .rp-sort button{font-size:13px;padding:6px 12px;}
 .rp-v{font-family:var(--font-display);font-size:18px;color:var(--ball);flex:0 0 auto;}
 .st-list{margin-bottom:6px;}
+/* Réglages de la ligue : six thèmes. Téléphone : accueil (identité, recherche, tuiles) puis un thème.
+   Ordinateur (>= 1000 px) : thèmes à gauche, contenu à droite. */
+.stx{display:block;}
+.stx-nav{display:none;}
+.stx.home .stx-theme{display:none;}
+.stx:not(.home) .stx-home{display:none;}
+.st-id{display:flex;gap:12px;align-items:center;padding:14px;border-radius:18px;background:linear-gradient(135deg,rgba(207,234,92,.16),rgba(207,234,92,.04));border:1px solid rgba(207,234,92,.35);margin:4px 0 12px;}
+.st-id-d{width:52px;height:52px;border-radius:14px;background:var(--ball);color:var(--court);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;line-height:1;}
+.st-id-d b{font:700 15px var(--font-display);letter-spacing:.04em;}
+.st-id-d small{font:600 12px var(--font-display);margin-top:3px;}
+.st-id-t{flex:1;min-width:0;}
+.st-id-t b{display:block;font-size:16px;line-height:1.25;}
+.st-id-t small{display:block;color:var(--muted);font-size:13px;line-height:1.35;}
+.st-id-a{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none;}
+.st-id-a button{background:none;border:0;color:var(--ball);font:700 13px var(--font-body);cursor:pointer;padding:4px 2px;}
+.st-id-a .st-help{width:28px;height:28px;border-radius:50%;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));color:var(--muted);padding:0;display:grid;place-items:center;}
+.st-q{display:flex;align-items:center;gap:8px;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));border-radius:999px;padding:0 14px;background:rgba(0,0,0,.15);margin:0 0 10px;}
+.st-q span{display:flex;color:var(--muted);}
+.st-q svg{width:15px;height:15px;}
+.st-q input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--text);font:500 15px var(--font-body);padding:11px 0;box-shadow:none;margin:0;}
+.st-q:focus-within{border-color:var(--ball);}
+.st-qr:empty{display:none;}
+.st-qr{margin:-2px 0 12px;}
+.st-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.st-tile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:18px;padding:13px 13px 12px;color:var(--text);cursor:pointer;min-width:0;font:inherit;}
+.st-tile:hover,.st-tile:focus-visible{border-color:var(--ball);}
+.st-tile-ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(207,234,92,.12);color:var(--ball);}
+.st-tile-ic svg{width:17px;height:17px;}
+.st-tile b{font-size:15px;}
+.st-tile small{color:var(--muted);font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.st-head{display:flex;align-items:center;gap:10px;margin:2px 0 4px;}
+.st-head h3{margin:0;color:var(--text);font-family:var(--font-display);text-transform:uppercase;font-size:22px;letter-spacing:.02em;}
+.st-back{width:34px;height:34px;border-radius:50%;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));background:none;color:var(--text);font-size:20px;line-height:1;cursor:pointer;flex:none;}
+.st-s2{gap:10px;flex-wrap:wrap;}
+.st-s2 .t{flex:1 1 180px;min-width:0;}
+.st-s2c{display:flex;align-items:center;gap:6px;flex:none;}
+.st-a{color:var(--muted);font-size:13px;}
+.st-stp{display:inline-flex;align-items:center;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));border-radius:999px;overflow:hidden;}
+.st-stp button{width:34px;height:34px;background:none;border:0;color:var(--text);font-size:18px;cursor:pointer;padding:0;}
+.st-stp button:active{background:rgba(207,234,92,.15);}
+.st-stp em{font-style:normal;min-width:22px;text-align:center;font:700 17px var(--font-display);color:var(--ball);}
+@media (min-width:1000px){
+  .stx{display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px;align-items:start;}
+  .stx-nav{display:flex;flex-direction:column;gap:2px;position:sticky;top:12px;}
+  .stx-nav > button{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:none;border:0;color:var(--text);font:500 15px var(--font-body);text-align:left;cursor:pointer;}
+  .stx-nav > button svg{width:17px;height:17px;flex:none;color:var(--muted);}
+  .stx-nav > button:hover{background:rgba(255,255,255,.04);}
+  .stx-nav > button.on{background:rgba(207,234,92,.14);color:var(--ball);font-weight:700;}
+  .stx-nav > button.on svg{color:var(--ball);}
+  .stx .stx-home, .stx:not(.home) .stx-home, .stx.home .stx-theme{display:block;}
+  .stx .stx-home .st-tiles, .stx .stx-msearch{display:none;}
+  .st-back{display:none;}
+}
 .cal-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:10px;}
 .cal-add input{width:100%;box-sizing:border-box;min-width:0;}
 .st-sum{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;}
@@ -19640,77 +19693,229 @@ function stGroup(title, rows){
   const body = rows.filter(Boolean).join('');
   return body ? `<div class="pf-sec">${title}</div><div class="pf-list st-list">${body}</div>` : '';
 }
-function adminSettingsSectionHTML(){
-  const mlp = DATA.leagueFormat === 'mlp', rec = isRecLeague();
+// ============ Réglages de la ligue : six thèmes (refonte) ============
+// Téléphone : carte d'identité, recherche et tuiles ; une tuile ouvre son thème (retour ‹).
+// Ordinateur : thèmes à gauche, contenu à droite. Les oui/non et les compteurs se règlent sur place,
+// s'enregistrent tout de suite et peuvent s'annuler quelques secondes ; le reste ouvre sa fenêtre.
+const ST_DAYS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+function stTimeTxt(t){ const m = /^(\d{1,2}):(\d{2})/.exec(String(t || '')); return m ? parseInt(m[1], 10) + ' h ' + m[2] : ''; }
+function stThemes(){
+  const mlp = DATA.leagueFormat === 'mlp', rec = isRecLeague(), orgOnly = isOrganizerOnly();
+  const ladder = (DATA.leagueFormat || 'ladder') === 'ladder';
   const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
-  const formatSummary = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Récréatif' }[DATA.leagueFormat] || 'Échelle';
   const where = [lm.city, lm.venue].filter(Boolean).join(' · ');
-  const calSummary = (DATA.autoStartSessions ? 'La session suivante se crée seule à la fin d\'une session' : 'Tu crées chaque session toi-même')
-    + (DATA.seasonEndDate ? ' · fin le ' + fdl(DATA.seasonEndDate) : '') + ((DATA.blockedDates||[]).length ? ' · ' + DATA.blockedDates.length + ' date' + (DATA.blockedDates.length>1?'s':'') + ' bloquée' + (DATA.blockedDates.length>1?'s':'') : '');
-  const nP = (DATA.players||[]).length, nS = (DATA.substitutePool||[]).length;
-  let html = stGroup('Ligue', [
-    isOrganizerOnly() ? '' : settingsRow('', 'Informations générales', 'Nom, horaire, jour de jeu · ' + [lm.schedule_label, formatSummary].filter(Boolean).join(' · '), 'openGeneralInfoModal()'),
-    mlp ? '' : settingsRow('', 'Calendrier de saison', calSummary, 'openSeasonCalendarModal()'),
-    mlp ? '' : settingsRow('', 'Rappel d\'absence', absenceReminderSummary(), 'openAbsenceReminderModal()'),
-    isOrganizerOnly() ? '' : settingsRow('', 'Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()'),
-    settingsRow('', 'Ajouter des membres', `Ajouter des personnes de l'organisation à cette ligue · ${nP} joueur${nP>1?'s':''}, ${nS} remplaçant${nS>1?'s':''}`, "openAddToLeagueModal('org')"),
-    isOrganizerOnly() ? '' : settingsRow('', 'Organisateurs', organizersSettingsSummary(), 'openOrganizersModal()'),
-    settingsRow('', 'Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'acceptation demandée aux joueurs et remplaçants' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()')
-  ]);
-  let regles;
-  if(mlp) regles = [settingsRow('', 'Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()')];
-  else if(rec){
+  const day = typeof DATA.playDayOfWeek === 'number' ? ST_DAYS[DATA.playDayOfWeek] : '';
+  const dur = DATA.sessionDurationMin || 120;
+  const durTxt = (dur % 60 ? Math.floor(dur / 60) + ' h ' + (dur % 60) : (dur / 60) + ' h');
+  const playTxt = [day, stTimeTxt(DATA.playTime)].filter(Boolean).join(' ') || 'Jour et heure à indiquer';
+  const nBlk = (DATA.blockedDates||[]).length;
+  const seasonTxt = (DATA.seasonStartDate || DATA.seasonEndDate) ? ((DATA.seasonStartDate ? 'Du ' + fdl(DATA.seasonStartDate) : 'Début libre') + (DATA.seasonEndDate ? ' au ' + fdl(DATA.seasonEndDate) : ', sans date de fin')) : 'Aucune date de saison';
+  const r = function(t, s, js){ return { k:'nav', t:t, s:s, js:js }; };
+  const sw = function(t, s, on, flag){ return { k:'sw', t:t, s:s, on:!!on, flag:flag }; };
+  const st2 = function(t, s, a, b, unit){ return { k:'step2', t:t, s:s, a:a, b:b, unit:unit }; };
+  const T = [];
+  // Calendrier
+  T.push({ id:'calendrier', t:'Calendrier', ic:'cal',
+    sum: playTxt + (mlp ? '' : ' · ' + durTxt + (nBlk ? ' · ' + nBlk + ' date' + (nBlk>1?'s':'') + ' bloquée' + (nBlk>1?'s':'') : '') + ' · rappel ' + (parseInt(DATA.absenceReminderDays||0,10) ? 'actif' : 'désactivé')),
+    secs: [
+      { t: rec ? ('Jour de ' + recW('soirée')) : 'Soir de jeu', rows: [ orgOnly ? null : r('Jour, heure et durée', playTxt + ' · ' + durTxt, 'openPlayTimeModal()') ] },
+      mlp ? null : { t:'Saison', rows: [ r('Saison et dates bloquées', seasonTxt + (nBlk ? ' · ' + nBlk + ' date' + (nBlk>1?'s':'') + ' bloquée' + (nBlk>1?'s':'') : ''), 'openSeasonCalendarModal()') ] },
+      mlp ? null : { t:'Automatique', rows: [
+        r((rec ? recW('Soirée') : 'Session') + ' suivante', DATA.autoStartSessions ? 'Se crée seule à la fin de chaque ' + (rec ? recW('soirée') : 'session') : 'Tu crées chaque ' + (rec ? recW('soirée') : 'session') + ' toi-même', 'openSeasonCalendarModal()'),
+        r('Rappel d\'absence', absenceReminderSummary(), 'openAbsenceReminderModal()') ] }
+    ] });
+  // Groupes et matchs (ou Formule / Équipes)
+  if(mlp){
+    T.push({ id:'groupes', t:'Équipes', ic:'grp', sum: mlpCompositionLabel(DATA.mlpRosterSize||4),
+      secs: [{ t:'Équipes', rows: [ r('Composition des équipes', mlpCompositionLabel(DATA.mlpRosterSize||4), 'openMlpRosterSizeModal()') ] }] });
+  } else if(rec){
     const lim = socialCourtLimits(), K = isRotationMode() ? rotationSettings().maxCourts : (parseInt(DATA.socialMaxCourts, 10) || 0);
-    regles = [settingsRow('', ('Formule de la ' + recW('soirée') + ''), isRotationMode() ? (function(){ const st = rotationSettings(); return 'Rotation chronométrée · ' + st.rounds + ' rondes de ' + st.round + ' min + ' + st.change + ' min de changement'; })() : ('Terrains tirés au sort pour la ' + recW('soirée') + ''), 'openSocialModeModal()'),
-      isRotationMode() ? '' : settingsRow('', 'Joueurs par terrain', 'Nombre de joueurs placés sur chaque terrain au tirage · ' + lim.label, 'openCourtSizeModal()'),
-      settingsRow('', 'Noms des terrains', (DATA.recCourtNames||[]).some(function(x){ return x && String(x).trim(); }) ? recCourtNamesSummary() : 'Terrain 1, Terrain 2… · touche pour les nommer (ex. : nom des partenaires)', 'openRecCourtNamesModal()'),
-      settingsRow('', 'Terrains disponibles', K ? 'Le tirage utilise au plus ' + K + ' terrain' + (K>1?'s':'') : 'Le tirage utilise autant de terrains que nécessaire', 'openMaxCourtsModal()')];
+    const formule = isRotationMode() ? (function(){ const x = rotationSettings(); return 'Rotation chronométrée · ' + x.rounds + ' rondes de ' + x.round + ' min + ' + x.change + ' min de changement'; })() : ('Terrains tirés au sort pour la ' + recW('soirée'));
+    T.push({ id:'groupes', t:'Formule', ic:'grp', sum: isRotationMode() ? 'Rotation chronométrée' : 'Terrains tirés au sort',
+      secs: [{ t:'Formule', rows: [
+        r('Formule de la ' + recW('soirée'), formule, 'openSocialModeModal()'),
+        isRotationMode() ? null : r('Joueurs par terrain', lim.label, 'openCourtSizeModal()'),
+        r('Terrains disponibles', K ? 'Au plus ' + K + ' terrain' + (K>1?'s':'') : 'Autant que nécessaire', 'openMaxCourtsModal()') ] }] });
   } else {
-    const enabledCriteria = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label);
-    regles = [settingsRow('', 'Terrains', (DATA.courts||[]).length ? (DATA.courts.length + ' terrain' + (DATA.courts.length>1?'s':'') + (DATA.courtRotation ? ' · rotation à chaque session' : ' · fixes')) : 'Indiquer sur quel terrain joue chaque groupe', 'openCourtsModal()'),
-      settingsRow('', 'Taille des groupes', `De ${DATA.groupMinPlayers||4} à ${DATA.groupMaxPlayers||5} joueurs par groupe`, 'openGroupSizeModal()'),
-      settingsRow('', 'Génération des matchs', DATA.matchupMode==='manual' ? 'Manuelle : les matchs suivent ton modèle de rotation' : "Automatique : l'app crée les matchs de chaque groupe", 'openMatchupSettingsModal()'),
-      settingsRow(pbIcon(), 'Format des matchs', `Groupe de 4 : ${DATA.rules4Matches||6} matchs en ${DATA.rules4Points||11} points · de 5 : ${DATA.rules5Matches||10} matchs en ${DATA.rules5Points||9} points`, 'openMatchFormatModal()'),
-      settingsRow('', 'Ordre de départage', enabledCriteria.length ? 'En cas d\'égalité : ' + enabledCriteria.join(', puis ') : 'Aucun critère : les égalités gardent leur ordre', 'openTiebreakModal()')];
+    const crit = normalizedTiebreakCriteria().filter(c=>c.enabled).map(c=>TIEBREAK_CRITERIA[c.key].label.replace(/ \(.*\)$/, '').toLowerCase());
+    const gMin = DATA.groupMinPlayers || 4, gMax = DATA.groupMaxPlayers || 5;
+    T.push({ id:'groupes', t:'Groupes et matchs', ic:'grp',
+      sum: gMin + ' à ' + gMax + ' joueurs' + (ladder ? ' · ' + swapMin() + ' à ' + DATA.swapCount + ' montée' + (DATA.swapCount>1?'s':'') : '') + ' · matchs à ' + (DATA.rules4Points||11) + ' et ' + (DATA.rules5Points||9),
+      secs: [
+        { t:'Groupes', rows: [
+          st2('Joueurs par groupe', gMax >= 6 ? 'Les groupes se remplissent jusqu\'à 6' : 'Un groupe de 6 reste possible en exception', { key:'groupMinPlayers', v:gMin }, { key:'groupMaxPlayers', v:gMax }),
+          ladder ? st2('Montées et descentes', 'Entre deux groupes voisins : au moins ' + swapMin() + ', au plus ' + DATA.swapCount + '. Seuls les vrais premiers montent et les vrais derniers descendent ; un absent descend d\'un groupe.', { key:'swapMin', v:swapMin() }, { key:'swapCount', v:DATA.swapCount }) : null ] },
+        { t:'Matchs', rows: [
+          r('Format des matchs', 'Groupe de 4 : ' + (DATA.rules4Matches||6) + ' × ' + (DATA.rules4Points||11) + ' pts · de 5 : ' + (DATA.rules5Matches||10) + ' × ' + (DATA.rules5Points||9) + ' pts · de 6 : ' + (DATA.rules6Matches||6) + ' × ' + (DATA.rules6Points||11) + ' pts', 'openMatchFormatModal()'),
+          r('Création des matchs', DATA.matchupMode==='manual' ? 'Manuelle : selon ton modèle de rotation' : 'Automatique : l\'app crée les matchs de chaque groupe', 'openMatchupSettingsModal()'),
+          r('Ordre de départage', crit.length ? (function(x){ return x.charAt(0).toUpperCase() + x.slice(1); })(crit.join(', puis ')) : 'Aucun critère', 'openTiebreakModal()') ] }
+      ] });
   }
-  html += stGroup('Règles du jeu', regles);
+  // Joueurs
   const hiddenN = (DATA.hiddenPlayerTabs||[]).filter(k=>playerTabDefs().some(d=>d[0]===k)).length + (DATA.hiddenSubTabs||[]).filter(k=>subTabDefs().some(d=>d[0]===k)).length;
-  const vue = [adminOwnLink('player') ? settingsRow('', 'Voir comme un joueur', "Passe dans ton espace joueur pour voir l'app comme tes joueurs", 'toggleAdminPlayerView()') : '',
-    (playerTabDefs().length > 1 || subTabDefs().length > 1) ? settingsRow('', 'Onglets visibles', 'Sections offertes aux joueurs et remplaçants · ' + (hiddenN ? hiddenN + ' masquée' + (hiddenN>1?'s':'') : 'toutes visibles'), 'openTabVisibilityModal()') : ''];
-  if(rec){
-    if(!isRotationMode()) vue.push(stSwitchRow('', 'Terrain avant publication', ('Les joueurs voient leur terrain avant que tu publies la ' + recW('soirée') + ''), DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
-  } else {
-    vue.push(stSwitchRow('', 'Cote des joueurs', 'Chaque joueur voit sa cote et celle des joueurs de son groupe. Toi, tu la vois toujours.', DATA.showRatingToPlayers, `setDataFlag('showRatingToPlayers',this.checked)`));
-    vue.push(stSwitchRow('', 'Cote des remplaçants', 'Chaque remplaçant voit sa propre cote', DATA.showRatingToSubs, `setDataFlag('showRatingToSubs',this.checked)`));
-    if(!mlp) vue.push(stSwitchRow('', 'Groupe avant publication', 'Les joueurs voient leur groupe avant que tu publies la session', DATA.showGroupBeforePublish, `setDataFlag('showGroupBeforePublish',this.checked)`));
-    vue.push(mlp ? stSwitchRow('', 'Les joueurs entrent les scores', 'Les joueurs des deux équipes entrent le résultat de leur affrontement. Sinon, toi seul.', DATA.mlpPlayerScoreEntry !== false, `setDataFlag('mlpPlayerScoreEntry',this.checked)`)
-                 : stSwitchRow('', 'Les joueurs entrent les scores', 'À partir du jour de la session, les joueurs entrent eux-mêmes leurs scores. Sinon, toi seul.', DATA.allowPlayerScoreEntry, `setDataFlag('allowPlayerScoreEntry',this.checked)`));
-    const nLog = (DATA.scoreLog||[]).length;
-    vue.push(settingsRow('', 'Journal des scores', `Qui a entré ou modifié chaque score, et quand · ${nLog} changement${nLog>1?'s':''}`, 'openScoreLogModal()'));
+  const see = [];
+  if(rec){ if(!isRotationMode()) see.push(sw('Leur terrain avant la publication', 'Sinon, seulement quand tu publies', DATA.showGroupBeforePublish, 'showGroupBeforePublish')); }
+  else {
+    see.push(sw('Leur cote', 'Et celle des joueurs de leur groupe. Toi, tu la vois toujours.', DATA.showRatingToPlayers, 'showRatingToPlayers'));
+    see.push(sw('Cote des remplaçants', 'Chaque remplaçant voit la sienne', DATA.showRatingToSubs, 'showRatingToSubs'));
+    if(!mlp) see.push(sw('Leur groupe avant la publication', 'Sinon, seulement quand tu publies', DATA.showGroupBeforePublish, 'showGroupBeforePublish'));
   }
-  html += stGroup('Ce que voient les joueurs', vue);
-  html += stGroup('Avancé', [
-    settingsRow('', 'Guide', "Comment utiliser l'application", 'showAdminGuideModal()'),
-    settingsRow('', 'Simulation avec joueurs test', SIM ? 'En cours · touche pour quitter' : "Essayer la ligue avec des joueurs fictifs, sans toucher aux vrais membres ni rien enregistrer", 'openSimulationModal()'),
-    rec ? '' : settingsRow('', 'Mode test', 'Moins de matchs par groupe, pour essayer l\'app ou faire une démonstration · ' + (DATA.testMode ? 'activé' : 'désactivé'), 'openTestModeModal()')
-  ]);
-  if(!isOrganizerOnly()) html += `<div class="pf-list pf-danger"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
-    <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${mlp?'équipes, sessions et classement':(rec?('' + recW('soirées') + ' et historique'):'groupes, historique et classement')}. Les comptes des joueurs sont conservés.</p>`;
-  return html;
+  if(playerTabDefs().length > 1 || subTabDefs().length > 1) see.push(r('Onglets offerts', hiddenN ? hiddenN + ' masqué' + (hiddenN>1?'s':'') : 'Tous visibles', 'openTabVisibilityModal()'));
+  const can = [];
+  if(!rec) can.push(mlp ? sw('Entrer leurs scores', 'Les deux équipes entrent le résultat de leur affrontement. Sinon, toi seul.', DATA.mlpPlayerScoreEntry !== false, 'mlpPlayerScoreEntry')
+                        : sw('Entrer leurs scores', 'À partir du jour de la session. Sinon, toi seul.', DATA.allowPlayerScoreEntry, 'allowPlayerScoreEntry'));
+  can.push(r('Règlement', DATA.rulesText ? ('Version ' + (DATA.rulesVersion||1) + ' · ' + (DATA.rulesRequire ? 'à accepter par tous' : 'consultable, sans acceptation')) : 'Aucun règlement rédigé', 'openRulesEditModal()'));
+  T.push({ id:'joueurs', t:'Joueurs', ic:'ply', sum: rec ? 'Ce qu\'ils voient · règlement' : ((DATA.showRatingToPlayers ? 'Cote visible' : 'Cote cachée') + ' · ' + (DATA.allowPlayerScoreEntry || (mlp && DATA.mlpPlayerScoreEntry !== false) ? 'ils entrent les scores' : 'toi seul entres les scores')),
+    secs: [ { t:'Ce qu\'ils voient', rows: see }, { t:'Ce qu\'ils peuvent faire', rows: can },
+      adminOwnLink('player') ? { t:'Voir l\'app comme eux', rows: [ r('Passer en vue joueur', 'Pour vérifier ce qu\'ils voient', 'toggleAdminPlayerView()') ] } : null ] });
+  // Ligue
+  T.push({ id:'ligue', t:'Ligue', ic:'lig', sum: (lm.listed === false ? 'Cachée de la recherche' : 'Visible dans la recherche') + (where ? ' · ' + where : '') + (!rec && !mlp && (DATA.courts||[]).length ? ' · ' + DATA.courts.length + ' terrain' + (DATA.courts.length>1?'s':'') : ''),
+    secs: [
+      orgOnly ? null : { t:'Identité', rows: [ r('Nom et horaire affiché', (DATA.leagueName || lm.name || '') + (lm.schedule_label ? ' · ' + lm.schedule_label : ''), 'openLeagueIdentityModal()') ] },
+      orgOnly ? null : { t:'Lieu et visibilité', rows: [ r('Visibilité et lieu', (lm.listed === false ? 'Cachée de la recherche de ligues' : ('Les joueurs peuvent la trouver et demander à la rejoindre' + (lm.is_full ? ' · affichée complète' : ''))) + (where ? ' · ' + where : ''), 'openLeagueListingModal()') ] },
+      mlp ? null : { t:'Terrains', rows: [ rec
+        ? r('Noms des terrains', (DATA.recCourtNames||[]).some(function(x){ return x && String(x).trim(); }) ? recCourtNamesSummary() : 'Terrain 1, Terrain 2… · touche pour les nommer', 'openRecCourtNamesModal()')
+        : r('Terrains', (DATA.courts||[]).length ? (DATA.courts.length + ' terrain' + (DATA.courts.length>1?'s':'') + (DATA.courtRotation ? ' · rotation à chaque session' : ' · fixes')) : 'Indiquer sur quel terrain joue chaque groupe', 'openCourtsModal()') ] },
+      orgOnly ? null : { t:'', danger:true, rows: [] }
+    ] });
+  if(!orgOnly) T.push({ id:'orgas', t:'Organisateurs', ic:'org', sum: organizersSettingsSummary(),
+    secs: [{ t:'Organisateurs', rows: [ r('Qui peut gérer la ligue', organizersSettingsSummary(), 'openOrganizersModal()') ] }] });
+  const tools = [];
+  if(!rec){ const nLog = (DATA.scoreLog||[]).length; tools.push(r('Journal des scores', 'Qui a entré ou modifié chaque score, et quand · ' + nLog + ' changement' + (nLog>1?'s':''), 'openScoreLogModal()')); }
+  tools.push(r('Simulation avec joueurs test', SIM ? 'En cours · touche pour quitter' : 'Essayer la ligue avec des joueurs fictifs, sans rien enregistrer', 'openSimulationModal()'));
+  if(!rec) tools.push(r('Mode test', 'Moins de matchs par groupe, pour essayer ou faire une démonstration · ' + (DATA.testMode ? 'activé' : 'désactivé'), 'openTestModeModal()'));
+  T.push({ id:'outils', t:'Outils', ic:'out', sum: (rec ? 'Simulation' : 'Journal des scores · simulation · mode test'), secs: [{ t:'Outils', rows: tools }] });
+  T.forEach(function(th){ th.secs = th.secs.filter(Boolean).map(function(sc){ sc.rows = (sc.rows||[]).filter(Boolean); return sc; }).filter(function(sc){ return sc.rows.length || sc.danger; }); });
+  return T.filter(function(th){ return th.secs.length; });
 }
-// Onglets visibles pour les joueurs et les remplaçants (au moins un reste toujours visible).
-function openTabVisibilityModal(){
-  showContentModal('Onglets visibles', function(){
-    return `<p class="small" style="margin:0 0 12px;color:var(--muted);">Ce qui apparaît dans le portail. Au moins un onglet reste toujours visible.</p>
-      <div class="pf-sec" style="margin-top:0;">Joueurs réguliers</div>
-      <div class="pf-list">${playerTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenPlayerTabs||[]).includes(k), `toggleHiddenKey('hiddenPlayerTabs','${k}',this.checked,playerTabDefs)`)).join('')}</div>
-      <div class="pf-sec">Remplaçants</div>
-      <div class="pf-list">${subTabDefs().map(([k,l])=>stSwitchRow('', escapeHTML(l), '', !(DATA.hiddenSubTabs||[]).includes(k), `toggleHiddenKey('hiddenSubTabs','${k}',this.checked,subTabDefs)`)).join('')}</div>`;
+const ST_ICONS = {
+  cal:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3"/></svg>',
+  grp:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="1.5" y="2" width="5.5" height="5" rx="1.2"/><rect x="9" y="2" width="5.5" height="5" rx="1.2"/><rect x="5.2" y="9" width="5.5" height="5" rx="1.2"/></svg>',
+  ply:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="5.5" r="2.7"/><path d="M2.5 14c.8-3 3-4.3 5.5-4.3s4.7 1.3 5.5 4.3"/></svg>',
+  lig:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 1.5c-2.6 0-4.5 2-4.5 4.4C3.5 9.2 8 14.5 8 14.5s4.5-5.3 4.5-8.6C12.5 3.5 10.6 1.5 8 1.5z"/><circle cx="8" cy="6" r="1.6"/></svg>',
+  org:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="5.5" cy="5.5" r="2.3"/><circle cx="11" cy="6.5" r="1.9"/><path d="M1.5 13.5c.6-2.4 2.2-3.5 4-3.5s3.4 1.1 4 3.5M10 10.3c1.8-.3 3.6.6 4.3 3.2"/></svg>',
+  out:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9.5 2.5l4 4-7 7H2.5v-4z"/><path d="M8 4l4 4"/></svg>',
+  q:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>'
+};
+function stRowHTML(x, i){
+  if(x.k === 'sw') return `<div class="pf-row st-sw" data-st="${i}" style="cursor:default;"><span class="t">${escapeHTML(x.t)}${x.s ? `<small>${escapeHTML(x.s)}</small>` : ''}</span><label class="switch"><input type="checkbox" ${x.on ? 'checked' : ''} aria-label="${escapeHTML(x.t)}" onchange="stFlag('${x.flag}',this.checked,'${escapeHTML(x.t).replace(/'/g, '&#39;')}')"><span class="switch-slider"></span></label></div>`;
+  if(x.k === 'step2'){
+    const stp = function(o){ return `<span class="st-stp"><button type="button" aria-label="Moins" onclick="stStep('${o.key}',-1)">−</button><em>${o.v}</em><button type="button" aria-label="Plus" onclick="stStep('${o.key}',1)">+</button></span>`; };
+    return `<div class="pf-row st-s2" data-st="${i}" style="cursor:default;"><span class="t">${escapeHTML(x.t)}${x.s ? `<small>${escapeHTML(x.s)}</small>` : ''}</span><span class="st-s2c">${stp(x.a)}<span class="st-a">à</span>${stp(x.b)}</span></div>`;
+  }
+  return `<button type="button" class="pf-row" data-st="${i}" onclick="${x.js}"><span class="t">${escapeHTML(x.t)}${x.s ? `<small class="st-sum">${escapeHTML(x.s)}</small>` : ''}</span><span class="ch">›</span></button>`;
+}
+function stThemeHTML(th){
+  let i = 0;
+  return th.secs.map(function(sc){
+    if(sc.danger) return `<div class="pf-list pf-danger" style="margin-top:18px;"><button type="button" class="pf-row" onclick="onDeleteLeague()"><span class="t">Supprimer cette ligue</span></button></div>
+      <p class="small" style="color:var(--muted);margin:8px 4px 0;text-align:center;">Supprime définitivement ${DATA.leagueFormat==='mlp'?'équipes, sessions et classement':(isRecLeague()?(recW('soirées') + ' et historique'):'groupes, historique et classement')}. Les comptes des joueurs restent.</p>`;
+    return (sc.t ? `<div class="pf-sec">${escapeHTML(sc.t)}</div>` : '') + `<div class="pf-list st-list">${sc.rows.map(function(x){ return stRowHTML(x, i++); }).join('')}</div>`;
+  }).join('');
+}
+function stIdentityHTML(){
+  const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
+  const day = typeof DATA.playDayOfWeek === 'number' ? ST_DAYS[DATA.playDayOfWeek].slice(0, 3).toUpperCase() : '—';
+  const hm = /^(\d{1,2}):(\d{2})/.exec(String(DATA.playTime || ''));
+  const hour = hm ? parseInt(hm[1], 10) + 'H' + (hm[2] !== '00' ? hm[2] : '') : '';
+  const fmt = { ladder:'Échelle', pools:'Poules fixes', single:'Division unique', mlp:'MLP', social:'Récréatif' }[DATA.leagueFormat] || 'Échelle';
+  const nG = (DATA.groups||[]).length, nP = (DATA.players||[]).length;
+  const facts = [fmt, (!isRecLeague() && DATA.leagueFormat !== 'mlp' && nG) ? nG + ' groupe' + (nG>1?'s':'') : '', nP + ' joueur' + (nP>1?'s':'')].filter(Boolean).join(' · ');
+  const season = DATA.seasonEndDate ? 'Saison jusqu\'au ' + fdl(DATA.seasonEndDate) : (DATA.seasonStartDate ? 'Saison depuis le ' + fdl(DATA.seasonStartDate) : (lm.schedule_label || ''));
+  return `<div class="st-id"><span class="st-id-d"><b>${day}</b>${hour ? `<small>${hour}</small>` : ''}</span><span class="st-id-t"><b>${escapeHTML(DATA.leagueName || lm.name || 'Ligue')}</b><small>${escapeHTML(facts)}</small>${season ? `<small>${escapeHTML(season)}</small>` : ''}</span>
+    <span class="st-id-a">${isOrganizerOnly() ? '' : `<button type="button" onclick="openLeagueIdentityModal()">Modifier</button>`}<button type="button" class="st-help" onclick="showAdminGuideModal()" aria-label="Guide">?</button></span></div>`;
+}
+function adminSettingsSectionHTML(){
+  const T = stThemes();
+  if(VIEW.stTheme && !T.some(function(x){ return x.id === VIEW.stTheme; })) VIEW.stTheme = null;
+  const cur = T.find(function(x){ return x.id === VIEW.stTheme; }) || T[0];
+  const search = `<div class="st-q"><span aria-hidden="true">${ST_ICONS.q}</span><input type="search" id="stQ" placeholder="Rechercher un réglage…" aria-label="Rechercher un réglage" value="${escapeHTML(VIEW.stQ || '')}" oninput="stSearch(this.value)"></div><div id="stQr" class="st-qr">${stSearchHTML(VIEW.stQ || '')}</div>`;
+  const nav = `<nav class="stx-nav">${search.replace('placeholder="Rechercher un réglage…"', 'placeholder="Rechercher…"')}${T.map(function(th){ return `<button type="button" class="${th.id === cur.id ? 'on' : ''}" onclick="stGo('${th.id}')">${ST_ICONS[th.ic]}<span>${escapeHTML(th.t)}</span></button>`; }).join('')}</nav>`;
+  const tiles = `<div class="st-tiles">${T.map(function(th){ return `<button type="button" class="st-tile" onclick="stGo('${th.id}')"><span class="st-tile-ic">${ST_ICONS[th.ic]}</span><b>${escapeHTML(th.t)}</b><small>${escapeHTML(th.sum || '')}</small></button>`; }).join('')}</div>`;
+  const home = `<div class="stx-home">${stIdentityHTML()}<div class="stx-msearch">${search.replace('id="stQ"', 'id="stQm"').replace('id="stQr"', 'id="stQrm"')}</div>${tiles}</div>`;
+  const theme = `<div class="stx-theme"><div class="st-head"><button type="button" class="st-back" onclick="stGo(null)" aria-label="Retour aux réglages">‹</button><h3>${escapeHTML(cur.t)}</h3></div>${stThemeHTML(cur)}</div>`;
+  return `<div class="stx${VIEW.stTheme ? '' : ' home'}">${nav}<div class="stx-main">${home}${theme}</div></div>`;
+}
+function stGo(id){
+  VIEW.stTheme = id; VIEW.stQ = ''; render();
+  setTimeout(function(){ const e = document.querySelector('.stx'); if(e && e.getBoundingClientRect().top < 0) e.scrollIntoView({ block:'start' }); }, 0);
+}
+// Recherche : tous les réglages de tous les thèmes ; un résultat ouvre son thème (et sa fenêtre s'il en a une).
+function stSearchHTML(q){
+  q = dupNorm(q || '').trim(); if(!q) return '';
+  const out = [];
+  stThemes().forEach(function(th){ th.secs.forEach(function(sc){ sc.rows.forEach(function(x){
+    if(dupNorm(x.t + ' ' + (x.s || '') + ' ' + th.t + ' ' + (sc.t || '')).indexOf(q) !== -1) out.push({ th: th, x: x });
+  }); }); });
+  if(!out.length) return `<p class="small" style="color:var(--muted);margin:6px 4px;">Aucun réglage ne correspond.</p>`;
+  return `<div class="pf-list st-list">${out.slice(0, 8).map(function(o){
+    const js = "stGo('" + o.th.id + "')" + (o.x.k === 'nav' ? ';' + o.x.js : '');
+    return `<button type="button" class="pf-row" onclick="${js.replace(/"/g, '&quot;')}"><span class="t">${escapeHTML(o.x.t)}<small class="st-sum">${escapeHTML(o.th.t)}</small></span><span class="ch">›</span></button>`;
+  }).join('')}</div>`;
+}
+function stSearch(v){
+  VIEW.stQ = v;
+  ['stQr', 'stQrm'].forEach(function(id){ const box = document.getElementById(id); if(box) box.innerHTML = stSearchHTML(v); });
+  ['stQ', 'stQm'].forEach(function(id){ const el = document.getElementById(id); if(el && el.value !== v) el.value = v; });
+}
+// Modifications sur place : enregistrées tout de suite, « Annuler » quelques secondes.
+function stUndoToast(msg, restore){
+  try{
+    let t = document.getElementById('dkToast');
+    if(!t){ t = document.createElement('div'); t.id = 'dkToast'; t.className = 'dk-toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+    t.innerHTML = escapeHTML(msg) + '<button type="button" class="dk-undo">Annuler</button>';
+    t.classList.remove('err');
+    t.querySelector('.dk-undo').onclick = function(){ restore(); t.classList.remove('show'); saveAndRender(); showToast('Modification annulée'); };
+    void t.offsetWidth; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 6000);
+  }catch(e){}
+}
+function stFlag(k, v, label){
+  const had = Object.prototype.hasOwnProperty.call(DATA, k), old = DATA[k];
+  DATA[k] = !!v; saveAndRender();
+  stUndoToast((label || 'Réglage') + ' : ' + (v ? 'activé' : 'désactivé'), function(){ if(had) DATA[k] = old; else delete DATA[k]; });
+}
+function stStep(key, d){
+  const before = { groupMinPlayers: DATA.groupMinPlayers, groupMaxPlayers: DATA.groupMaxPlayers, swapMin: DATA.swapMin, swapCount: DATA.swapCount };
+  let gMin = DATA.groupMinPlayers || 4, gMax = DATA.groupMaxPlayers || 5, sMin = swapMin(), sMax = DATA.swapCount || 1, label = '';
+  if(key === 'groupMinPlayers'){ gMin = Math.max(2, Math.min(gMax, gMin + d)); label = 'Joueurs par groupe : ' + gMin + ' à ' + gMax; }
+  else if(key === 'groupMaxPlayers'){ gMax = Math.max(gMin, Math.min(GROUP_HARD_MAX, gMax + d)); label = 'Joueurs par groupe : ' + gMin + ' à ' + gMax; }
+  else if(key === 'swapMin'){ sMin = Math.max(0, Math.min(sMax, sMin + d)); label = 'Montées et descentes : ' + sMin + ' à ' + sMax; }
+  else if(key === 'swapCount'){ sMax = Math.max(Math.max(1, sMin), Math.min(4, sMax + d)); label = 'Montées et descentes : ' + sMin + ' à ' + sMax; }
+  if(gMin === (DATA.groupMinPlayers || 4) && gMax === (DATA.groupMaxPlayers || 5) && sMin === swapMin() && sMax === (DATA.swapCount || 1)) return;
+  DATA.groupMinPlayers = gMin; DATA.groupMaxPlayers = gMax; DATA.swapMin = sMin; DATA.swapCount = sMax;
+  saveAndRender();
+  stUndoToast(label, function(){ Object.keys(before).forEach(function(k){ if(before[k] === undefined) delete DATA[k]; else DATA[k] = before[k]; }); });
+}
+// Fenêtres ciblées : identité (nom, horaire affiché) et soir de jeu (jour, heure, durée).
+function openLeagueIdentityModal(){
+  const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
+  const html = `<div class="field"><label for="setLeagueName">Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName || lm.name || '')}"></div>
+    <div class="field"><label for="setLeagueSchedule">Horaire affiché</label><input id="setLeagueSchedule" placeholder="ex. : Mercredi 17 h" value="${escapeHTML(lm.schedule_label || '')}"></div>
+    <p class="small" style="color:var(--muted);margin:4px 0 0;">L'horaire affiché apparaît sous le nom de la ligue. Le format (${escapeHTML({ ladder:'échelle', pools:'poules fixes', single:'division unique', mlp:'MLP', social:'récréatif' }[DATA.leagueFormat] || 'échelle')}) est choisi à la création et ne se change pas ici.</p>`;
+  showFormModal('Nom de la ligue', html, function(){
+    DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
+    updateCurrentLeagueMeta(DATA.leagueName, document.getElementById('setLeagueSchedule').value.trim());
   });
 }
-// ---- Interrupteurs à enregistrement immédiat ----
-function visSwitch(label, desc, checked, js){
-  return `<div class="vis-row"><div class="vis-txt"><div class="vis-l">${label}</div>${desc?`<div class="small">${desc}</div>`:''}</div><label class="switch"><input type="checkbox" ${checked?'checked':''} onchange="${js}"><span class="switch-slider"></span></label></div>`;
+function openPlayTimeModal(){
+  const lm = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID) || {};
+  const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : '';
+  const html = `<div class="field"><label>Jour de jeu</label>
+      <input type="hidden" id="setPlayDay" value="${pd}">
+      <div class="wz-chips st-days">${days.map((d,i)=>`<button type="button" class="wz-chip${pd===i?' sel':''}" onclick="pickChip(this,'setPlayDay','${i}')">${d}</button>`).join('')}<button type="button" class="wz-chip${pd===''?' sel':''}" onclick="pickChip(this,'setPlayDay','')">Aucun</button></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="setPlayTime">Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(lm.schedule_label) || '')}"></div>
+      <div class="field"><label for="setSessionDur">Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" inputmode="numeric" value="${DATA.sessionDurationMin || 120}"></div>
+    </div>`;
+  showFormModal(isRecLeague() ? 'Jour de ' + recW('soirée') : 'Soir de jeu', html, function(){
+    const dayVal = document.getElementById('setPlayDay').value;
+    DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
+    DATA.playTime = document.getElementById('setPlayTime').value || undefined;
+    DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
+  });
 }
 function setDataFlag(k, v){ DATA[k] = !!v; saveAndRender(); }
 function toggleHiddenKey(listKey, key, visible, defsFn){
@@ -20203,7 +20408,7 @@ function openSocialModeModal(){
           <div class="field" style="margin:0;"><label>Durée d'une ronde (min)</label><input id="smRound" type="number" min="5" max="45" value="${st.round}"></div>
           <div class="field" style="margin:0;"><label>Changement (min)</label><input id="smChange" type="number" min="0" max="10" value="${st.change}"></div>
         </div>
-        <p class="small" style="color:var(--muted);margin:10px 2px 0;">${recW('Soirée')} de ${st.total} min (Informations générales) · au plus ${st.maxCourts} terrains (Terrains disponibles).</p>
+        <p class="small" style="color:var(--muted);margin:10px 2px 0;">${recW('Soirée')} de ${st.total} min (Calendrier) · au plus ${st.maxCourts} terrains (Terrains disponibles).</p>
       </div>`;
   }, function(){
     const isRot = document.getElementById('smRot').classList.contains('on');
@@ -20349,47 +20554,11 @@ function openMlpRosterSizeModal(){
     DATA.mlpRosterSize = parseInt(document.getElementById('mlpRosterSizeSelect').value,10) || 4;
   });
 }
-function openGeneralInfoModal(){
-  const currentLeagueMeta = LEAGUES.find(l=>l.id===CURRENT_LEAGUE_ID);
-  const formatLabel = { ladder:'Échelle (montées/descentes)', pools:'Poules fixes (aucun mouvement)', single:'Division unique (classement cumulatif)', social: isRotationMode() ? 'Récréatif · rotation chronométrée' : ('Récréatif · terrains tirés au sort à chaque ' + recW('soirée') + '') }[DATA.leagueFormat] || 'Échelle (montées/descentes)';
-  const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-  const pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : '';
-  const html = `
-    <div class="pf-chips" style="margin:0 0 14px;"><span class="pf-chip acc">${formatLabel}</span></div>
-    <div class="field"><label>Nom de la ligue</label><input id="setLeagueName" value="${escapeHTML(DATA.leagueName)}"></div>
-    <div class="field"><label>Horaire affiché</label><input id="setLeagueSchedule" placeholder="ex: Mardi 19h" value="${escapeHTML((currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
-    <div class="field"><label>Jour de jeu</label>
-      <input type="hidden" id="setPlayDay" value="${pd}">
-      <div class="wz-chips st-days">${days.map((d,i)=>`<button type="button" class="wz-chip${pd===i?' sel':''}" onclick="pickChip(this,'setPlayDay','${i}')">${d}</button>`).join('')}<button type="button" class="wz-chip${pd===''?' sel':''}" onclick="pickChip(this,'setPlayDay','')">Aucun</button></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Heure de début</label><input id="setPlayTime" type="time" value="${escapeHTML(DATA.playTime || parseTimeFromLabel(currentLeagueMeta && currentLeagueMeta.schedule_label) || '')}"></div>
-      <div class="field"><label>Durée (minutes)</label><input id="setSessionDur" type="number" min="15" step="15" value="${DATA.sessionDurationMin || 120}"></div>
-    </div>
-    ${(DATA.leagueFormat || 'ladder') === 'ladder' ? `<div class="field"><label>Montées / descentes entre deux groupes voisins</label><div class="row" style="gap:10px;flex-wrap:wrap;"><div style="flex:1;min-width:130px;"><label for="setSwapMin" class="small" style="color:var(--muted);">Minimum garanti</label><input id="setSwapMin" type="number" min="0" inputmode="numeric" value="${swapMin()}"></div><div style="flex:1;min-width:130px;"><label for="setSwap" class="small" style="color:var(--muted);">Maximum visé</label><input id="setSwap" type="number" min="1" inputmode="numeric" value="${DATA.swapCount}"></div></div><div class="small" style="color:var(--muted);margin-top:4px;">À chaque session, on vise le maximum : seuls les joueurs classés dans ces premières places montent et ceux des dernières places descendent (le suivant reste). Si des remplaçants occupent ces places, il en bouge moins, mais jamais moins que le minimum. Toujours autant de montées que de descentes : les groupes gardent leur taille.</div></div>` : ''}
-    <p class="small" style="color:var(--muted);margin:4px 0 0;">Le format est choisi à la création de la ligue et ne se change pas ici.</p>`;
-  showFormModal('Informations générales', html, saveGeneralInfoForm);
-}
 // Pastilles de choix dans un formulaire : met la valeur dans le champ caché, sans redessiner la fenêtre.
 function pickChip(btn, inputId, value){
   const inp = document.getElementById(inputId); if(inp) inp.value = value;
   Array.from(btn.parentNode.children).forEach(function(b){ b.classList.toggle('sel', b === btn); });
 }
-function saveGeneralInfoForm(){
-  DATA.leagueName = document.getElementById('setLeagueName').value.trim() || DATA.leagueName;
-  const dayVal = document.getElementById('setPlayDay').value;
-  DATA.playDayOfWeek = dayVal === '' ? undefined : parseInt(dayVal, 10);
-  // Montées/descentes : seulement en échelle (le champ n'est pas affiché pour les autres formats).
-  const swapEl = document.getElementById('setSwap');
-  if(swapEl) DATA.swapCount = Math.max(1, parseInt(swapEl.value,10) || 1);
-  const swapMinEl = document.getElementById('setSwapMin');
-  if(swapMinEl){ const v = parseInt(swapMinEl.value, 10); DATA.swapMin = Math.max(0, Math.min(DATA.swapCount, isNaN(v) ? 1 : v)); }
-  DATA.playTime = document.getElementById('setPlayTime').value || undefined;
-  DATA.sessionDurationMin = Math.max(15, parseInt(document.getElementById('setSessionDur').value,10) || 120);
-  const scheduleLabel = document.getElementById('setLeagueSchedule').value.trim();
-  updateCurrentLeagueMeta(DATA.leagueName, scheduleLabel);
-}
-
 // ---- Pop-up : Taille des groupes ----
 function openGroupSizeModal(){
   const html = `
@@ -20759,8 +20928,7 @@ function settingsGuideHTML(){
   + guideSec('Communauté et annonces', `<p class="small"><b>Publier</b> : chercher un partenaire, organiser un événement ou <b>envoyer une annonce</b> (une ou plusieurs ligues, ou des joueurs choisis). Coche « Afficher aussi à l'ouverture de l'app » pour qu'elle s'affiche en fenêtre pendant 14 jours, même chez ceux sans notifications.</p>`)
   + (rec ? guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque ${recW('soirée')} passée, avec les présents, les remplaçants et les absents. <b>Rapports</b> : Bilan de présence, Liste des joueurs et suivi du <b>Règlement</b>.</p>`) : '')
   + (rec ? '' : guideSec('Historique et Rapports', `<p class="small"><b>Historique</b> : chaque session passée, que tu peux rouvrir pour corriger ou supprimer (montées, descentes et cotes annulées). <b>Rapports</b> : Bilan de la ligue, <b>${grpWord(true, true)}</b> (composition à exporter en PDF, Excel ou Word), Liste des joueurs, Rapport de session et suivi du <b>Règlement</b>.</p>`))
-  + (rec ? guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : formule de la ${recW('soirée')} (rotation chronométrée ou terrains tirés au sort), noms des terrains, terrains disponibles. <b>Ce que voient les joueurs</b> : terrain avant publication, onglets.</p>`) : '')
-  + (rec ? '' : guideSec('Réglages de la ligue', `<p class="small"><b>Ligue</b> : informations, calendrier de saison, visibilité, ajout de membres, <b>règlement</b> à faire accepter. <b>Règles du jeu</b> : taille des ${grpWord(true)}, format des matchs, ordre de départage. <b>Ce que voient les joueurs</b> : cotes visibles ou non, saisie des scores par les joueurs, onglets. <b>Avancé</b> : mode test.</p>`))
+  + guideSec('Réglages de la ligue', `<p class="small">En haut, la carte de la ligue (nom, jour, heure, saison) et une recherche : tape un mot comme « cote » ou « départage ». Puis six thèmes. <b>Calendrier</b> : jour, heure et durée, saison et dates bloquées, ${rec ? recW('soirée') : 'session'} suivante créée seule, rappel d'absence. <b>${rec ? 'Formule' : 'Groupes et matchs'}</b> : ${rec ? 'formule de la ' + recW('soirée') + ', joueurs par terrain, terrains disponibles' : 'joueurs par ' + grpWord() + ', montées et descentes (minimum et maximum), format des matchs, création des matchs, ordre de départage'}. <b>Joueurs</b> : ce qu'ils voient${rec ? '' : ', s\'ils entrent leurs scores'}, onglets offerts, règlement à faire accepter. <b>Ligue</b> : nom, lieu et visibilité, terrains. <b>Organisateurs</b>. <b>Outils</b> : ${rec ? 'simulation' : 'journal des scores, simulation, mode test'}. Les interrupteurs et les compteurs s'enregistrent tout de suite, avec « Annuler » quelques secondes.</p>`)
   + guideSec('Dépannage', `<p class="small">• Un joueur ne voit pas ${rec ? ('sa ' + recW('soirée') + ' : la ' + recW('soirée') + '') : 'ses matchs : la session'} est-elle publiée ?<br>• Un joueur ne reçoit pas les notifications : demande-lui de toucher « Tester » dans Moi › Notifications, et d'ouvrir l'app depuis son icône.<br>• Un nouvel inscrit n'arrive pas à confirmer son courriel : vérifie Organisations › Comptes, sa demande peut y être en attente.<br>• L'app semble ancienne : la fermer complètement puis la rouvrir.${rec ? '' : '<br>• Nombre de matchs inattendu : vérifie le mode test dans Réglages › Avancé.'}</p>`)
   + `<div class="card"><button class="btn-ghost" onclick="showPlayerGuideModal()">Aperçu du guide du joueur</button></div>`;
 }
