@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 586">
+<meta name="app-build" content="Version 587">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -326,7 +326,17 @@ td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;}
 .topbar-ico{position:relative;}
 .notif-list{display:flex;flex-direction:column;gap:6px;}
 .notif-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--court-elevated-2);border:1px solid var(--line-soft);border-radius:14px;padding:11px 14px;cursor:pointer;}
-.notif-row input[type=checkbox]{width:22px;height:22px;flex:0 0 auto;margin:0;accent-color:var(--ball);}
+/* Cases à cocher Dinkeo : oui/non d'une ligne de réglage = interrupteur ; sélection = case arrondie verte avec ✓. */
+input[type=checkbox]:not(.switch input){-webkit-appearance:none;appearance:none;width:22px;height:22px;min-width:22px;min-height:0;padding:0;box-sizing:border-box;align-self:center;flex:0 0 auto;margin:0;border-radius:7px;border:1.5px solid rgba(255,255,255,.32);background:rgba(0,0,0,.2);display:inline-grid;place-content:center;cursor:pointer;vertical-align:middle;transition:background .15s ease,border-color .15s ease;}
+input[type=checkbox]:not(.switch input)::before{content:"";width:11px;height:6px;border-left:2.5px solid var(--court);border-bottom:2.5px solid var(--court);transform:translateY(-1px) rotate(-45deg) scale(0);transition:transform .15s ease;}
+input[type=checkbox]:not(.switch input):checked{background:var(--ball);border-color:var(--ball);}
+input[type=checkbox]:not(.switch input):checked::before{transform:translateY(-1px) rotate(-45deg) scale(1);}
+input[type=checkbox]:not(.switch input):focus-visible{outline:2px solid var(--ball);outline-offset:2px;}
+input[type=checkbox]:not(.switch input):disabled{opacity:.45;cursor:default;}
+.notif-row input[type=checkbox]:not(.switch input){width:46px;min-width:46px;height:27px;min-height:0;border-radius:999px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.15);place-content:center start;padding:0 3px;}
+.notif-row input[type=checkbox]:not(.switch input)::before{width:19px;height:19px;border:0;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);transform:none;transition:transform .18s ease;}
+.notif-row input[type=checkbox]:not(.switch input):checked{background:var(--ball);border-color:var(--ball);}
+.notif-row input[type=checkbox]:not(.switch input):checked::before{transform:translateX(19px);}
 .topbar-icos{display:flex;gap:6px;align-items:center;position:relative;}
 .topbar-menu-backdrop{position:fixed;inset:0;z-index:890;}
 .topbar-menu{position:absolute;top:calc(100% + 10px);right:0;z-index:891;min-width:200px;background:var(--court-elevated-2);border:1px solid var(--line-soft-strong);border-radius:16px;padding:6px;box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;animation:chatPop .15s ease-out;}
