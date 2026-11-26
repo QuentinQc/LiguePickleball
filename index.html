@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 578">
+<meta name="app-build" content="Version 579">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1547,6 +1547,47 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
   .st-back{display:none;}
 }
 .cal-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:10px;}
+/* Calendrier de saison intégré */
+.sc-seg{display:flex;background:rgba(0,0,0,.22);border-radius:12px;padding:3px;gap:3px;margin:0 0 12px;}
+.sc-seg button{flex:1;border:0;background:none;color:var(--text);font:700 14px var(--font-body);padding:9px 6px;border-radius:9px;cursor:pointer;}
+.sc-seg button.on{background:var(--ball);color:var(--court);}
+.sc-chips{display:flex;align-items:stretch;gap:8px;margin:0 0 6px;}
+.sc-chip{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));background:none;border-radius:14px;padding:8px 12px;color:var(--text);cursor:pointer;}
+.sc-chip small{color:var(--muted);font-size:12px;}
+.sc-chip b{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.sc-chip.on{border-color:var(--ball);box-shadow:0 0 0 1px var(--ball) inset;}
+.sc-arrow{align-self:center;color:var(--muted);}
+.sc-hint{color:var(--muted);margin:4px 2px 8px;}
+.sc-cal{border:1px solid var(--line-soft);border-radius:18px;padding:10px 10px 8px;background:var(--court-elevated-2);}
+.sc-mh{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px;}
+.sc-mh b{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em;font-size:16px;}
+.sc-mh button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));background:none;color:var(--text);font-size:18px;cursor:pointer;}
+.sc-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px 0;}
+.sc-wd{text-align:center;font:600 11px var(--font-body);color:var(--muted);padding:2px 0 6px;}
+.sc-wd.on{color:var(--ball);}
+.sc-c{position:relative;height:40px;border:0;background:none;color:var(--text);font:500 14px var(--font-body);cursor:pointer;padding:0;font-variant-numeric:tabular-nums;}
+.sc-e{cursor:default;}
+.sc-in{background:rgba(207,234,92,.14);}
+.sc-s,.sc-f{background:var(--ball);color:var(--court);font-weight:800;}
+.sc-s{border-radius:12px 0 0 12px;}
+.sc-f{border-radius:0 12px 12px 0;}
+.sc-s.sc-f{border-radius:12px;}
+.sc-p::after{content:"";position:absolute;left:50%;bottom:5px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--ball);}
+.sc-s.sc-p::after,.sc-f.sc-p::after{background:var(--court);}
+.sc-b{color:var(--paddle);text-decoration:line-through;text-decoration-thickness:2px;font-weight:700;}
+.sc-b::after{background:var(--paddle) !important;}
+.sc-t{box-shadow:inset 0 0 0 1px var(--line-soft-strong,rgba(255,255,255,.3));border-radius:10px;}
+.sc-c:not(.sc-e):hover{outline:1px solid rgba(207,234,92,.5);outline-offset:-2px;border-radius:10px;}
+.sc-leg{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:8px;font-size:12px;color:var(--muted);}
+.sc-leg span{display:inline-flex;align-items:center;gap:6px;}
+.sc-leg i{display:inline-block;width:12px;height:12px;border-radius:4px;}
+.sc-l-in{background:rgba(207,234,92,.3);}
+.sc-l-p{width:6px !important;height:6px !important;border-radius:50% !important;background:var(--ball);}
+.sc-l-b{background:var(--paddle);}
+.sc-clear{display:block;margin:8px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font:500 13px var(--font-body);cursor:pointer;}
+.sc-bl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.sc-bc{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(233,106,60,.45);color:var(--paddle);border-radius:999px;padding:3px 4px 3px 10px;font-size:13px;font-weight:600;}
+.sc-bc button{width:22px;height:22px;border-radius:50%;border:0;background:rgba(233,106,60,.15);color:var(--paddle);font-size:14px;line-height:1;cursor:pointer;padding:0;}
 .cal-add input{width:100%;box-sizing:border-box;min-width:0;}
 .st-sum{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;}
 .lg-ov{z-index:950;}
@@ -20802,47 +20843,77 @@ function filterTabs(tabs, hiddenKeys){
 // ---- Pop-up : Calendrier de saison ----
 let SEASON_CAL_STATE = null;
 function openSeasonCalendarModal(){
+  const today = fmtDate(new Date());
+  const startM = (DATA.seasonStartDate || today).slice(0, 7);
   SEASON_CAL_STATE = {
     startDate: DATA.seasonStartDate || '',
     endDate: DATA.seasonEndDate || '',
     blockedDates: (DATA.blockedDates || []).slice().sort(),
     autoStart: !!DATA.autoStartSessions,
     autoPublish: !!DATA.autoPublishSessions,
-    newBlockedDate: ''
+    mode: 'season', editing: DATA.seasonStartDate ? 'end' : 'start', month: startM
   };
-  showFormModal('Calendrier de saison', seasonCalendarFormHTML, saveSeasonCalendarForm);
+  showFormModal('Saison et dates bloquées', seasonCalendarFormHTML, saveSeasonCalendarForm);
+}
+// Calendrier intégré (remplace les champs de date du système) : saison en bande colorée, jours de jeu
+// marqués d'un point, dates bloquées barrées. Les touches ne redessinent que le calendrier.
+function scFmt(d){ if(!d) return ''; const x = new Date(d + 'T12:00:00'); return ['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'][x.getDay()] + ' ' + x.getDate() + ' ' + FR_MONTHS_SHORT[x.getMonth()] + (FR_MONTHS_SHORT[x.getMonth()] !== FR_MONTHS[x.getMonth()] ? '.' : '') + ' ' + x.getFullYear(); }
+function seasonCalInnerHTML(){
+  const st = SEASON_CAL_STATE, pd = typeof DATA.playDayOfWeek === 'number' ? DATA.playDayOfWeek : null;
+  const y = parseInt(st.month.slice(0, 4), 10), m = parseInt(st.month.slice(5, 7), 10) - 1;
+  const first = new Date(y, m, 1), nDays = new Date(y, m + 1, 0).getDate(), lead = first.getDay(), today = fmtDate(new Date());
+  const blocked = {}; st.blockedDates.forEach(function(d){ blocked[d] = 1; });
+  let cells = '';
+  for(let i = 0; i < lead; i++) cells += '<span class="sc-c sc-e"></span>';
+  for(let d = 1; d <= nDays; d++){
+    const ds = fmtDate(new Date(y, m, d)), dow = new Date(y, m, d).getDay();
+    const inR = st.startDate && (st.endDate ? (ds >= st.startDate && ds <= st.endDate) : ds >= st.startDate);
+    const cls = ['sc-c'];
+    if(inR) cls.push('sc-in');
+    if(ds === st.startDate) cls.push('sc-s');
+    if(ds === st.endDate) cls.push('sc-f');
+    if(pd !== null && dow === pd) cls.push('sc-p');
+    if(blocked[ds]) cls.push('sc-b');
+    if(ds === today) cls.push('sc-t');
+    cells += `<button type="button" class="${cls.join(' ')}" onclick="seasonCalTap('${ds}')" aria-label="${escapeHTML(frDateLong(ds))}${blocked[ds] ? ', bloquée' : ''}">${d}</button>`;
+  }
+  const chip = function(which, label, val){ const on = st.mode === 'season' && st.editing === which; return `<button type="button" class="sc-chip${on ? ' on' : ''}" onclick="seasonCalEdit('${which}')"><small>${label}</small><b>${val ? escapeHTML(scFmt(val)) : (which === 'end' ? 'Sans date de fin' : 'À choisir')}</b></button>`; };
+  const hint = st.mode === 'season'
+    ? (st.editing === 'start' ? 'Touche le premier jour de la saison.' : 'Touche le dernier jour de la saison' + (st.endDate ? ' (ou « Sans fin » pour l\'enlever).' : '.'))
+    : 'Touche un ' + (pd !== null ? ST_DAYS[pd].toLowerCase() : 'jour') + ' pour le bloquer (congé, férié), touche-le encore pour le débloquer.';
+  return `<div class="sc-seg" role="tablist"><button type="button" class="${st.mode === 'season' ? 'on' : ''}" onclick="seasonCalMode('season')">Saison</button><button type="button" class="${st.mode === 'blocked' ? 'on' : ''}" onclick="seasonCalMode('blocked')">Dates bloquées${st.blockedDates.length ? ' · ' + st.blockedDates.length : ''}</button></div>
+    ${st.mode === 'season' ? `<div class="sc-chips">${chip('start', 'Début', st.startDate)}<span class="sc-arrow">→</span>${chip('end', 'Fin', st.endDate)}</div>` : ''}
+    <p class="small sc-hint">${hint}</p>
+    <div class="sc-cal">
+      <div class="sc-mh"><button type="button" onclick="seasonCalMonth(-1)" aria-label="Mois précédent">‹</button><b>${FR_MONTHS[m]} ${y}</b><button type="button" onclick="seasonCalMonth(1)" aria-label="Mois suivant">›</button></div>
+      <div class="sc-g">${['D','L','M','M','J','V','S'].map(function(x, i){ return `<span class="sc-wd${pd === i ? ' on' : ''}">${x}</span>`; }).join('')}${cells}</div>
+      <div class="sc-leg"><span><i class="sc-l-in"></i>Saison</span>${pd !== null ? `<span><i class="sc-l-p"></i>${ST_DAYS[pd]}s de jeu</span>` : ''}<span><i class="sc-l-b"></i>Bloquée</span></div>
+    </div>
+    ${st.mode === 'season' && st.endDate ? `<button type="button" class="sc-clear" onclick="seasonCalClearEnd()">Sans fin : enlever la date de fin</button>` : ''}
+    ${st.blockedDates.length ? `<div class="sc-bl">${st.blockedDates.map(function(d){ return `<span class="sc-bc">${escapeHTML(scFmt(d))}<button type="button" onclick="seasonCalTap('${d}', true)" aria-label="Débloquer ${escapeHTML(frDateLong(d))}">×</button></span>`; }).join('')}</div>` : ''}`;
+}
+function seasonCalRefresh(){ const box = document.getElementById('seasonCalBox'); if(box) box.innerHTML = seasonCalInnerHTML(); else render(); }
+function seasonCalMode(m){ SEASON_CAL_STATE.mode = m; seasonCalRefresh(); }
+function seasonCalEdit(w){ SEASON_CAL_STATE.mode = 'season'; SEASON_CAL_STATE.editing = w; seasonCalRefresh(); }
+function seasonCalMonth(d){ const st = SEASON_CAL_STATE; const y = parseInt(st.month.slice(0, 4), 10), m = parseInt(st.month.slice(5, 7), 10) - 1 + d; st.month = fmtDate(new Date(y, m, 1)).slice(0, 7); seasonCalRefresh(); }
+function seasonCalClearEnd(){ SEASON_CAL_STATE.endDate = ''; SEASON_CAL_STATE.editing = 'end'; seasonCalRefresh(); }
+function seasonCalTap(ds, forceBlocked){
+  const st = SEASON_CAL_STATE;
+  if(forceBlocked || st.mode === 'blocked'){
+    const i = st.blockedDates.indexOf(ds);
+    if(i === -1){ st.blockedDates.push(ds); st.blockedDates.sort(); } else st.blockedDates.splice(i, 1);
+  } else if(st.editing === 'start' || !st.startDate || ds < st.startDate){
+    st.startDate = ds; if(st.endDate && st.endDate < ds) st.endDate = ''; st.editing = 'end';
+  } else { st.endDate = ds; }
+  seasonCalRefresh();
 }
 function seasonCalendarFormHTML(){
   const st = SEASON_CAL_STATE;
-  return `
-    <div class="row">
-      <div class="field" style="flex:1;min-width:160px;"><label>Début de saison</label><input type="date" id="seasonStart" value="${st.startDate}" onchange="SEASON_CAL_STATE.startDate=this.value;"></div>
-      <div class="field" style="flex:1;min-width:160px;"><label>Fin de saison (optionnel)</label><input type="date" id="seasonEnd" value="${st.endDate}" onchange="SEASON_CAL_STATE.endDate=this.value;"></div>
-    </div>
-    <p class="small">Laisse « Fin de saison » vide pour une saison sans fin définie.</p>
-    <div class="card" style="padding:4px 14px;margin:10px 0;">
+  return `<div id="seasonCalBox">${seasonCalInnerHTML()}</div>
+    <div class="card" style="padding:4px 14px;margin:12px 0 0;">
       <div class="vis-row"><div class="vis-txt"><div class="vis-l">Démarrage automatique</div><div class="small">La prochaine session est créée dès que tu touches « Terminer la session ».</div></div><label class="switch"><input type="checkbox" ${st.autoStart?'checked':''} onchange="SEASON_CAL_STATE.autoStart=this.checked;render();"><span class="switch-slider"></span></label></div>
       ${st.autoStart ? `<div class="vis-row"><div class="vis-txt"><div class="vis-l">Publier automatiquement</div><div class="small">Sinon, la session reste en préparation et tu la publies toi-même.</div></div><label class="switch"><input type="checkbox" ${st.autoPublish?'checked':''} onchange="SEASON_CAL_STATE.autoPublish=this.checked;"><span class="switch-slider"></span></label></div>` : ''}
-    </div>
-    <div class="pf-sec">Dates bloquées (congés, jours fériés)</div>
-    <div class="cal-add">
-      <input type="date" id="newBlockedDate" value="${st.newBlockedDate}" onchange="SEASON_CAL_STATE.newBlockedDate=this.value;">
-      <button class="btn btn-secondary" onclick="addBlockedDate()">Ajouter</button>
-    </div>
-    ${st.blockedDates.length ? `<div class="pf-list">${st.blockedDates.map(d=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(d))}</span><button type="button" class="btn-ghost-danger" onclick="removeBlockedDate('${d}')">retirer</button></div>`).join('')}</div>` : `<div class="ah-meta" style="margin:0 2px;">Aucune date bloquée.</div>`}`;
-}
-function addBlockedDate(){
-  const st = SEASON_CAL_STATE;
-  const val = document.getElementById('newBlockedDate').value;
-  if(!val) return;
-  if(!st.blockedDates.includes(val)){ st.blockedDates.push(val); st.blockedDates.sort(); }
-  st.newBlockedDate = '';
-  render();
-}
-function removeBlockedDate(d){
-  const st = SEASON_CAL_STATE;
-  st.blockedDates = st.blockedDates.filter(x=>x!==d);
-  render();
+    </div>`;
 }
 function saveSeasonCalendarForm(){
   const st = SEASON_CAL_STATE;
