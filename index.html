@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 581">
+<meta name="app-build" content="Version 582">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1639,6 +1639,11 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .st-sw .ic:empty{display:none;}
 .st-sw .switch{flex:0 0 auto;}
 .st-days .wz-chip{padding:9px 13px;font-size:14px;}
+.pa-chips .pa-day.on{background:var(--paddle);border-color:var(--paddle);color:#fff;}
+.pa-chips .pa-day.part{background:rgba(233,106,60,.75);}
+.pa-more{display:block;width:100%;margin-top:10px;padding:11px;border-radius:14px;border:1px dashed var(--line-soft-strong,rgba(255,255,255,.22));background:none;color:var(--text);font:600 14px var(--font-body);cursor:pointer;}
+.pa-more:hover{border-color:var(--ball);}
+.pa-range{margin-top:10px;padding:12px;border-radius:16px;border:1px solid var(--line-soft);background:var(--court-elevated-2);}
 .st-tb.off .t{color:var(--muted);}
 .st-arrows{display:flex;gap:4px;flex:0 0 auto;}
 .st-arrows button{width:32px;height:32px;border-radius:10px;border:0;background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;font-size:12px;}
@@ -4886,7 +4891,7 @@ function dkdSync(inp){
   if(el.textContent !== txt){
     // Le jour de la semaine se cache quand le bouton est étroit (voir @container) : la date reste entière.
     const k = t ? t.indexOf(' ') : -1;
-    el.innerHTML = k > 0 ? '<span class="dk-wd">' + escapeHTML(t.slice(0, k + 1)) + '</span>' + escapeHTML(t.slice(k + 1)) : escapeHTML(txt);
+    el.innerHTML = k > 0 ? '<span class="dk-wd">' + escapeHTML(t.slice(0, k + 1)) + '</span>' + escapeHTML(t.slice(k + 1)) : 'Choisir<span class="dk-wd"> une date</span>';
   }
   if(b.classList.contains('dk-none') !== !t) b.classList.toggle('dk-none', !t);
   if(b.disabled !== !!inp.disabled) b.disabled = !!inp.disabled;
@@ -15893,6 +15898,49 @@ function playerDetailModalHTML(pid){
 function openAdminAbsenceHub(pid){
   showContentModal('', function(){ return adminAbsenceHubHTML(pid); });
 }
+// Absences prévues (côté organisateur) : les prochaines sessions en pastilles à toucher, et les
+// longues périodes (vacances) avec Du / Au. Chaque touche s'enregistre tout de suite.
+function adminPlannedAbsenceHTML(p){
+  const pid = p.id, open = currentOpenSession(), rec = isRecLeague();
+  const w1 = rec ? recW('soirée') : 'session', wN = rec ? recW('soirées') : 'sessions';
+  const planned = plannedAbsencesForPlayer(pid), today = fmtDate(new Date());
+  const upcoming = pawUpcoming(pawInfoFromData(DATA, pid)).filter(function(ds){ return !(open && ds === open.date); });
+  const cover = function(ds){ return planned.find(function(a){ return ds >= a.startDate && ds <= a.endDate; }); };
+  const short = function(ds){ const d = new Date(ds + 'T12:00:00'); return DKD_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + DKD_MON[d.getMonth()]; };
+  let h = `<div class="pf-sec">Absences prévues</div>`;
+  if(upcoming.length){
+    h += `<p class="small" style="color:var(--muted);margin:-2px 2px 8px;">Touche les prochaines ${wN} où ${escapeHTML(p.name.split(' ')[0])} sera ${gw(p,'absent','absente','absent(e)')}. Touche encore pour annuler.</p>
+      <div class="an-chips pa-chips" style="margin-top:0;">${upcoming.map(function(ds){
+        const a = cover(ds), on = !!a, part = a && a.startDate !== a.endDate;
+        return `<button type="button" class="an-chip paw-chip pa-day${on ? ' on' : ''}${part ? ' part' : ''}" aria-pressed="${on}" onclick="adminPlanToggle('${pid}','${ds}')">${escapeHTML(short(ds))}</button>`;
+      }).join('')}</div>`;
+  } else {
+    h += `<p class="small" style="color:var(--muted);margin:-2px 2px 8px;">Aucune ${w1} à venir connue (jour de jeu ou saison non indiqués) : utilise une période.</p>`;
+  }
+  const ranges = planned.filter(function(a){ return a.startDate !== a.endDate && a.endDate >= today; });
+  const past = planned.filter(function(a){ return a.endDate < today; }).length;
+  if(ranges.length) h += `<div class="pf-list" style="margin-top:10px;">${ranges.map(function(a){
+      const n = upcoming.filter(function(ds){ return ds >= a.startDate && ds <= a.endDate; }).length;
+      return `<div class="pf-row" style="cursor:default;"><span class="t">Du ${escapeHTML(fdl(a.startDate))} au ${escapeHTML(fdl(a.endDate))}<small>${n ? n + ' ' + (n > 1 ? wN : w1) + ' à venir' : 'Aucune ' + w1 + ' à venir dans cette période'}</small></span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`;
+    }).join('')}</div>`;
+  if(VIEW.paRange === pid){
+    h += `<div class="pa-range"><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;">
+        <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" min="${today}" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+        <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" min="${today}" style="width:100%;min-width:0;box-sizing:border-box;"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="VIEW.paRange=null;render()">Annuler</button><button class="btn btn-primary" style="flex:1;" onclick="VIEW.paRange=null;submitPlannedAbsence('${pid}')">Ajouter la période</button></div></div>`;
+  } else {
+    h += `<button type="button" class="pa-more" onclick="VIEW.paRange='${pid}';render()">+ Une période (vacances, voyage)…</button>`;
+  }
+  if(past) h += `<p class="small" style="color:var(--muted);margin:8px 2px 0;">${past} absence${past > 1 ? 's' : ''} prévue${past > 1 ? 's' : ''} déjà passée${past > 1 ? 's' : ''}.</p>`;
+  return h;
+}
+function adminPlanToggle(pid, ds){
+  const a = plannedAbsencesForPlayer(pid).find(function(x){ return ds >= x.startDate && ds <= x.endDate; });
+  if(!a){ addPlannedAbsence(pid, ds, ds); saveAndRender(); showToast('Absent(e) le ' + frDateLong(ds).toLowerCase()); return; }
+  if(a.startDate === a.endDate){ removePlannedAbsence(a.id); showToast('Absence retirée'); return; }
+  showConfirm('Cette date fait partie de l\'absence du ' + fdl(a.startDate) + ' au ' + fdl(a.endDate) + '. Retirer toute la période ?', function(){ removePlannedAbsence(a.id); }, { okLabel: 'Retirer la période' });
+}
 function adminAbsenceHubHTML(pid){
   const p = DATA.players.find(x=>x.id===pid);
   if(!p) return `<p class="small">Joueur introuvable.</p>`;
@@ -15914,13 +15962,7 @@ function adminAbsenceHubHTML(pid){
       <button type="button" class="${p.injured?'on bad':''}" onclick="${p.injured ? '' : `setPlayerInjured('${pid}',true)`}">${gw(p,'Blessé','Blessée','Blessé(e)')}</button>
     </div>
     ${p.injured ? `<p class="small" style="color:var(--muted);margin:6px 2px 0;">Hors de son groupe jusqu'à son retour ; il faudra le replacer ensuite (Session › Groupes).</p>` : ''}
-    <div class="pf-sec">Absences prévues (vacances)</div>
-    <div class="pf-list">${planned.length ? planned.map(a=>`<div class="pf-row" style="cursor:default;"><span class="t">${escapeHTML(frDateLong(a.startDate))}${a.startDate!==a.endDate ? ' → ' + escapeHTML(frDateLong(a.endDate)) : ''}</span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`).join('') : `<div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div>`}</div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:10px;">
-      <div class="field" style="margin:0;min-width:0;"><label>Du</label><input id="paStart" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-      <div class="field" style="margin:0;min-width:0;"><label>Au</label><input id="paEnd" type="date" style="width:100%;min-width:0;box-sizing:border-box;"></div>
-    </div>
-    <button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="submitPlannedAbsence('${pid}')">+ Ajouter une absence prévue</button>`;
+    ${adminPlannedAbsenceHTML(p)}`;
   return h;
 }
 // Blessure : bascule en attente en gardant une trace du dernier groupe ; au retour, reste en attente pour être replacé.
