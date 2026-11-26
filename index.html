@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="app-build" content="Version 583">
+<meta name="app-build" content="Version 584">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -1639,9 +1639,37 @@ button.grp-court{background:none;border:0;padding:0;cursor:pointer;text-align:le
 .st-sw .ic:empty{display:none;}
 .st-sw .switch{flex:0 0 auto;}
 .st-days .wz-chip{padding:9px 13px;font-size:14px;}
-.pa-more{display:block;width:100%;margin-top:10px;padding:11px;border-radius:14px;border:1px dashed var(--line-soft-strong,rgba(255,255,255,.22));background:none;color:var(--text);font:600 14px var(--font-body);cursor:pointer;}
-.pa-more:hover{border-color:var(--ball);}
+.pa-more{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:12px;border-radius:999px;border:1px solid rgba(207,234,92,.35);background:rgba(207,234,92,.08);color:var(--ball);font:700 15px var(--font-body);cursor:pointer;}
+.pa-more:hover{border-color:var(--ball);background:rgba(207,234,92,.14);}
 .pa-cal{margin-top:10px;}
+/* Absences : l'orange = absence, comme partout dans l'app. */
+.pa-cal .sc-in{background:rgba(233,106,60,.18);}
+.pa-cal .sc-s,.pa-cal .sc-f{background:var(--paddle);color:#fff;}
+.pa-cal .sc-s.sc-p::after,.pa-cal .sc-f.sc-p::after{background:#fff;}
+.pa-cal .sc-b{text-decoration:none;color:#f6b89e;font-weight:600;background:rgba(233,106,60,.10);}
+.pa-cal .sc-b::after{background:var(--paddle) !important;}
+.pa-cal .sc-l-in{background:rgba(233,106,60,.45);}
+.pa-cal .sc-l-b{background:rgba(233,106,60,.22);}
+.pa-tile{width:44px;height:46px;border-radius:12px;background:rgba(233,106,60,.16);color:var(--paddle);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;line-height:1;}
+.pa-tile b{font:700 18px var(--font-display);}
+.pa-tile small{color:inherit;font:700 10px var(--font-body);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;}
+.pa-tile-0{background:rgba(255,255,255,.06);color:var(--muted);}
+.pa-it{flex:1;min-width:0;}
+.pa-it b{display:block;font-size:15px;line-height:1.3;}
+.pa-it small{display:block;color:var(--muted);font-size:13px;line-height:1.35;margin-top:2px;}
+.pa-list{display:flex;flex-direction:column;gap:8px;}
+.pa-item{display:flex;align-items:center;gap:12px;padding:10px 10px 10px 10px;border-radius:16px;background:var(--court-elevated-2);border:1px solid var(--line-soft);}
+.pa-x{width:34px;height:34px;border-radius:50%;border:1px solid var(--line-soft-strong,rgba(255,255,255,.18));background:none;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;flex:none;}
+.pa-x:hover{color:var(--paddle);border-color:var(--paddle);}
+.pa-empty{margin:0 2px;color:var(--muted);font-size:14px;}
+.pa-sum{display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px;border:1px dashed var(--line-soft-strong,rgba(255,255,255,.2));margin-bottom:10px;}
+.pa-sum.on{border:1px solid rgba(233,106,60,.45);background:rgba(233,106,60,.08);}
+.pa-n{flex:none;font:700 12px var(--font-body);color:var(--paddle);background:rgba(233,106,60,.16);border-radius:999px;padding:5px 10px;white-space:nowrap;}
+.paw-sum.pa-item{margin-top:10px;}
+.paw-sum .pa-tile{display:flex;color:var(--paddle);font-size:inherit;line-height:1;}
+.paw-sum .pa-it{display:block;color:var(--text);font-size:inherit;}
+.paw-sum .pa-it b{margin-bottom:0;}
+.paw-sum .pa-it small{display:block;}
 .pa-sum{padding:2px 4px 10px;}
 .pa-sum b{display:block;font-size:16px;}
 .pa-sum small{display:block;color:var(--muted);font-size:13px;}
@@ -15913,6 +15941,7 @@ function paSessionsIn(a, b){
   for(let i = 0; i < 400; i++){ const ds = fmtDate(d); if(ds > end) break; if(d.getDay() === pd && !blocked.has(ds) && !(DATA.seasonEndDate && ds > DATA.seasonEndDate)) n++; d.setDate(d.getDate() + 1); }
   return n;
 }
+function paTile(ds){ const d = new Date(ds + 'T12:00:00'); return `<span class="pa-tile" aria-hidden="true"><b>${d.getDate()}</b><small>${DKD_MON[d.getMonth()].replace('.', '')}</small></span>`; }
 function paShort(ds){ const d = new Date(ds + 'T12:00:00'); return DKD_DOW[d.getDay()] + ' ' + d.getDate() + ' ' + DKD_MON[d.getMonth()]; }
 function paRangeTxt(a, b){ return (!b || a === b) ? paShort(a) : 'Du ' + paShort(a) + ' au ' + paShort(b); }
 // Calendrier d'absence (organisateur et joueur) : C = { month, a, b } ; « tap » et « nav » sont les noms des
@@ -15938,8 +15967,10 @@ function absCalHTML(C, planned, tap, nav){
     cells += ds < today ? `<span class="${cls.join(' ')} sc-off">${d}</span>` : `<button type="button" class="${cls.join(' ')}" onclick="${tap}('${ds}')" aria-label="${escapeHTML(frDateLong(ds))}">${d}</button>`;
   }
   const n = C.a ? paSessionsIn(C.a, C.b || C.a) : 0, nTxt = n ? n + ' ' + (n > 1 ? wN : w1) : 'aucune ' + w1;
-  const sum = C.a ? `<b>${escapeHTML(paRangeTxt(C.a, C.b))}</b><small>${nTxt}${!C.b ? ' · touche le dernier jour, ou garde ce jour seul' : ''}</small>` : `<b>Touche le premier jour d'absence</b><small>Puis le dernier jour (un seul jour, c'est possible aussi)</small>`;
-  return `<div class="pa-sum">${sum}</div>
+  const sum = C.a
+    ? `${paTile(C.a)}<span class="pa-it"><b>${escapeHTML(paRangeTxt(C.a, C.b))}</b><small>${!C.b ? 'Touche le dernier jour, ou garde ce jour seul' : 'Touche un autre jour pour recommencer'}</small></span><span class="pa-n">${nTxt}</span>`
+    : `<span class="pa-tile pa-tile-0" aria-hidden="true">${DKD_ICON}</span><span class="pa-it"><b>Touche le premier jour d'absence</b><small>Puis le dernier jour. Un seul jour, c'est possible aussi.</small></span>`;
+  return `<div class="pa-sum${C.a ? ' on' : ''}">${sum}</div>
     <div class="sc-cal">
       <div class="sc-mh"><button type="button" onclick="${nav}(-1)" aria-label="Mois précédent">‹</button><b>${FR_MONTHS[m]} ${y}</b><button type="button" onclick="${nav}(1)" aria-label="Mois suivant">›</button></div>
       <div class="sc-g">${['D','L','M','M','J','V','S'].map(function(x, i){ return `<span class="sc-wd${pd === i ? ' on' : ''}">${x}</span>`; }).join('')}${cells}</div>
@@ -15955,18 +15986,24 @@ function adminPlannedAbsenceHTML(p){
   const nTxt = function(n){ return n ? n + ' ' + (n > 1 ? wN : w1) : 'aucune ' + w1; };
   let h = `<div class="pf-sec">Absences prévues</div>`;
   h += upcoming.length
-    ? `<div class="pf-list">${upcoming.map(function(a){ return `<div class="pf-row" style="cursor:default;"><span class="pa-ic" aria-hidden="true">${DKD_ICON}</span><span class="t">${escapeHTML(paRangeTxt(a.startDate, a.endDate))}<small>${nTxt(paSessionsIn(a.startDate, a.endDate))}</small></span><button type="button" class="btn-ghost-danger" onclick="removePlannedAbsence('${a.id}')">Retirer</button></div>`; }).join('')}</div>`
-    : `<div class="pf-list"><div class="pf-row" style="cursor:default;"><span class="t" style="color:var(--muted);">Aucune absence prévue.</span></div></div>`;
+    ? `<div class="pa-list">${upcoming.map(function(a){ return `<div class="pa-item">${paTile(a.startDate)}<span class="pa-it"><b>${escapeHTML(paRangeTxt(a.startDate, a.endDate))}</b><small>${nTxt(paSessionsIn(a.startDate, a.endDate))}</small></span><button type="button" class="pa-x" onclick="paRemove('${a.id}')" aria-label="Retirer l'absence ${escapeHTML(paRangeTxt(a.startDate, a.endDate))}">×</button></div>`; }).join('')}</div>`
+    : `<p class="pa-empty">Aucune absence prévue.</p>`;
   const C = VIEW.paCal && VIEW.paCal.pid === pid ? VIEW.paCal : null;
   if(!C){
-    h += `<button type="button" class="pa-more" onclick="paCalOpen('${pid}')">+ Ajouter une absence</button>`;
+    h += `<button type="button" class="pa-more" onclick="paCalOpen('${pid}')">${DKD_ICON}<span>Ajouter une absence</span></button>`;
   } else {
     h += `<div class="pa-cal">${absCalHTML(C, planned, 'paCalTap', 'paCalMonth')}
-      <div class="pa-acts"><button type="button" class="btn btn-secondary" onclick="VIEW.paCal=null;render()">Annuler</button><button type="button" class="btn btn-primary" ${C.a ? '' : 'disabled'} onclick="paCalAdd()">Ajouter l'absence</button></div>
+      <div class="pa-acts"><button type="button" class="btn btn-secondary" onclick="VIEW.paCal=null;render()">Annuler</button><button type="button" class="btn btn-primary" ${C.a ? '' : 'disabled'} onclick="paCalAdd()">Ajouter</button></div>
     </div>`;
   }
   if(past) h += `<p class="small" style="color:var(--muted);margin:8px 2px 0;">${past} absence${past > 1 ? 's' : ''} prévue${past > 1 ? 's' : ''} déjà passée${past > 1 ? 's' : ''}.</p>`;
   return h;
+}
+function paRemove(id){
+  const a = (DATA.plannedAbsences || []).find(function(x){ return x.id === id; }); if(!a) return;
+  DATA.plannedAbsences = DATA.plannedAbsences.filter(function(x){ return x.id !== id; });
+  saveAndRender();
+  stUndoToast('Absence retirée : ' + paRangeTxt(a.startDate, a.endDate === a.startDate ? '' : a.endDate), function(){ DATA.plannedAbsences = (DATA.plannedAbsences || []).concat([a]); });
 }
 function paCalOpen(pid){ VIEW.paCal = { pid: pid, month: fmtDate(new Date()).slice(0, 7), a: '', b: '' }; render(); }
 function paCalMonth(d){ const C = VIEW.paCal; if(!C) return; absCalMonthIn(C, d); render(); }
@@ -22899,7 +22936,10 @@ function pawSheetHTML(){
     P.leagues.forEach(function(lid){
       const txt = P.mode === 'range' ? pawRangeText(P.start, P.end) : pawSelectedDates(lid).map(frDateLong).join('<br>');
       if(!txt) return;
-      body += `<div class="paw-sum"><b>${escapeHTML(paLeagueName(lid))}</b><span>${P.mode === 'range' ? escapeHTML(txt) : txt}</span></div>`;
+      if(P.mode === 'range'){
+        const nS = lid === CURRENT_LEAGUE_ID ? paSessionsIn(P.start, P.end) : 0;
+        body += `<div class="paw-sum pa-item">${paTile(P.start)}<span class="pa-it"><b>${escapeHTML(paRangeTxt(P.start, P.end === P.start ? '' : P.end))}</b><small>${escapeHTML(paLeagueName(lid))}${nS ? ' · ' + nS + ' ' + (nS > 1 ? w : w.replace(/s$/, '')) : ''}</small></span></div>`;
+      } else body += `<div class="paw-sum"><b>${escapeHTML(paLeagueName(lid))}</b><span>${txt}</span></div>`;
     });
     body += `<p class="ah-meta" style="margin:12px 2px 0;font-size:13px;">Les organisateurs de chaque ligue seront avisés. Pour annuler une absence plus tard, communique avec un organisateur.</p>`;
   }
